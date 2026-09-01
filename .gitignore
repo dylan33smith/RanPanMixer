@@ -1,0 +1,13 @@
+# The private input. docs/data.md states it must never be committed; this is
+# what enforces that rather than trusting it.
+/data/
+data
+!/data.md
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/logs/
+/artifacts/
+/external/
+.venv/
