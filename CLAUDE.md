@@ -20,8 +20,9 @@ It carries **no findings, no results, no numbers** — those live in `docs/`.
   This protects an *external target's mapped path* and never modifies the graph.
 - **Environment:** single Linux workstation. No data acquired yet — every path in
   `docs/data.md` is `PLANNED` until it is built and its row is updated.
-- **Stack:** Python 3.12. NumPy/SciPy for the sampler. PanMixer
-  (`https://github.com/G2Lab/PanMixer`) is an upstream dependency, not vendored yet.
+- **Stack:** Python. NumPy/SciPy for the sampler. PanMixer is pinned at `c182c38`
+  under `external/PanMixer` (a symlink to `/data` — it writes inside its own tree
+  and assumes SLURM, which this machine does not have). Its conda env is `panmixer`.
   Check before assuming any library is installed.
 
 ## Documentation Architecture
@@ -42,6 +43,9 @@ Also present: `paper/` (the proposal and manuscript drafts), `archive_docs/`
    only — never from the target.** Any target-dependent pruning of the HMM state
    space voids Theorem 1. This is the easiest way to buy utility and silently
    lose the guarantee; it is the single rule most likely to be broken by accident.
+   ⚠ On PanMixer's data, target inclusion is the DEFAULT — its allele frequencies,
+   support counts and scoring panel all include the target, because there the
+   target is a cohort member. Recompute leave-one-out; see `docs/data.md`.
 2. **The utility must be globally bounded in [0,1].** If a raw utility has range
    `delta_u != 1`, the calibration is `eta_tau = arctanh(tau)/delta_u`. An
    unnormalized utility does not weaken the bound — it removes it.

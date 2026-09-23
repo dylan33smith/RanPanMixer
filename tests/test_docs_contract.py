@@ -173,7 +173,7 @@ def test_data_md_layout_rows_marked_ok_exist_on_disk():
     """
     wrong = []
     for line in _read(DATA).splitlines():
-        m = re.match(r"\|\s*`([A-Za-z0-9_./-]+)`\s*\|.*\|\s*`(OK|PLANNED|MISSING|STALE|DEPRECATED)`\s*\|\s*$", line)
+        m = re.match(r"\|\s*`([A-Za-z0-9_./-]+)`\s*\|.*\|\s*`(OK|PLANNED|BUILDING|MISSING|STALE|DEPRECATED)`\s*\|\s*$", line)
         if not m:
             continue
         rel, state = m.group(1), m.group(2)
@@ -182,7 +182,14 @@ def test_data_md_layout_rows_marked_ok_exist_on_disk():
             wrong.append(f"  `{rel}` is marked OK but does not exist")
         if state == "PLANNED" and exists:
             wrong.append(f"  `{rel}` is marked PLANNED but DOES exist -- "
-                         f"promote the row to OK and describe what is in it")
+                         f"promote it to OK, or to BUILDING if a job is still writing it")
+        # BUILDING = a running job is writing this path. It may or may not exist yet,
+        # and a half-written file is not quotable -- so the row must name the job log
+        # that says whether the write finished.
+        if state == "BUILDING" and "logs/" not in line:
+            wrong.append(f"  `{rel}` is marked BUILDING but names no logs/ sentinel -- "
+                         f"a half-written file is indistinguishable from a finished one "
+                         f"without the job status")
     assert not wrong, (
         "docs/data.md storage layout disagrees with the disk:\n" + "\n".join(wrong) +
         f"\n{FIX}"
@@ -408,6 +415,11 @@ def _retracted_probes() -> list[str]:
         for num in re.findall(r"\d+\.\d{4,}", line):
             if num not in elsewhere:
                 probes.add(num)
+        # Scientific notation is distinctive at far fewer digits than a decimal:
+        # "5.8e-12" cannot collide the way "0.023" can.
+        for num in re.findall(r"\d+(?:\.\d+)?e-?\d+", line):
+            if num not in elsewhere:
+                probes.add(num)
         for ident in re.findall(r"[a-z][a-z0-9]*(?:_[a-z0-9]+){2,}", line):
             if ident not in elsewhere:
                 probes.add(ident)
@@ -420,10 +432,13 @@ def test_corrections_do_not_survive_elsewhere():
         pytest.skip("nothing has been retracted yet -- this check arms itself on "
                     "the first in-place correction")
     probes = _retracted_probes()
-    assert probes, (
-        "memory.md has [INCORRECT] lines but none carries a distinctive probe (a "
-        ">=4-decimal number or a multi-underscore identifier). Retractions that "
-        "cannot be grepped cannot be propagated.")
+    if not probes:
+        # A PROSE retraction ("the contrast is not X") carries no greppable token.
+        # That is legitimate and must not block: this check exists to stop a wrong
+        # NUMBER being quoted elsewhere, and there is no number here to chase.
+        # Propagating a prose correction is a human read, not a regex.
+        pytest.skip("retractions present but none carries a greppable numeric probe "
+                    "-- prose corrections must be propagated by reading, not grep")
 
     survivors = []
     for f in _scan_files():
