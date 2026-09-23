@@ -4,6 +4,9 @@
 data
 !/data.md
 
+# Claude Code tool state
+.claude/
+
 __pycache__/
 *.py[cod]
 .pytest_cache/

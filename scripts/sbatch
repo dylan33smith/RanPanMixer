@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""A blocking, local stand-in for SLURM's `sbatch`.
+
+PanMixer submits every job through `sbatch`, both directly from its data pipeline
+and via tools/common/slurm_helper.py. This machine has no SLURM. Putting this file
+earlier on PATH lets the pinned checkout run UNMODIFIED.
+
+It is deliberately BLOCKING: run_get_starting_data_pipeline.sh chains jobs with
+`--dependency=afterok:<id>`, and because we finish before returning, the dependency
+is satisfied by construction and needs no bookkeeping.
+
+Non-zero exit on any failed array task. `--parsable` prints a fake job id.
+Concurrency is capped from the script's own `#SBATCH --mem` against total RAM, so
+a 150G job does not run 22-wide on a 251G box.
+"""
+from __future__ import annotations
+
+import argparse, os, re, subprocess, sys, time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+TOTAL_RAM_GB = int(os.environ.get("SHIM_TOTAL_RAM_GB", "240"))
+TOTAL_CPUS = int(os.environ.get("SHIM_TOTAL_CPUS", str(max(1, (os.cpu_count() or 4) - 2))))
+
+
+def parse_directives(script: Path) -> dict:
+    """Read #SBATCH headers. Only what changes scheduling behaviour is honoured."""
+    out = {"array": None, "mem_gb": None, "cpus": 1, "job_name": script.stem,
+           "output": None, "error": None}
+    for line in script.read_text(errors="replace").splitlines():
+        s = line.strip()
+        if s.startswith("#!"):
+            continue
+        if not s.startswith("#SBATCH"):
+            if s and not s.startswith("#"):
+                break          # first real command ends the header block
+            continue
+        body = s[len("#SBATCH"):].strip()
+        if m := re.match(r"--array[= ]([0-9,\-]+)(?:%(\d+))?", body):
+            out["array"] = (m.group(1), int(m.group(2)) if m.group(2) else None)
+        elif m := re.match(r"--mem[= ](\d+)([GgMm])", body):
+            v = int(m.group(1))
+            out["mem_gb"] = v if m.group(2) in "Gg" else max(1, v // 1024)
+        elif m := re.match(r"--cpus-per-task[= ](\d+)", body):
+            out["cpus"] = int(m.group(1))
+        elif m := re.match(r"--job-name[= ](\S+)", body):
+            out["job_name"] = m.group(1)
+        elif m := re.match(r"--output[= ](\S+)", body):
+            out["output"] = m.group(1)
+        elif m := re.match(r"--error[= ](\S+)", body):
+            out["error"] = m.group(1)
+    return out
+
+
+def expand_array(spec: str) -> list[int]:
+    idx: list[int] = []
+    for part in spec.split(","):
+        if "-" in part:
+            a, b = part.split("-", 1)
+            idx.extend(range(int(a), int(b) + 1))
+        else:
+            idx.append(int(part))
+    return idx
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--parsable", action="store_true")
+    ap.add_argument("--dependency", default=None)   # accepted; blocking makes it moot
+    ap.add_argument("--export", default=None)       # accepted; we inherit the env
+    ap.add_argument("--array", default=None)        # CLI override of the header
+    ap.add_argument("script")
+    ap.add_argument("script_args", nargs=argparse.REMAINDER)
+    args, _unknown = ap.parse_known_args()
+
+    script = Path(args.script).resolve()
+    if not script.exists():
+        print(f"sbatch(shim): no such script: {script}", file=sys.stderr)
+        return 1
+
+    d = parse_directives(script)
+    array_spec = args.array or (d["array"][0] if d["array"] else None)
+    throttle = d["array"][1] if d["array"] else None
+    indices = expand_array(array_spec) if array_spec else [None]
+
+    by_mem = TOTAL_RAM_GB // d["mem_gb"] if d["mem_gb"] else len(indices)
+    by_cpu = TOTAL_CPUS // max(1, d["cpus"])
+    workers = max(1, min(len(indices), by_mem, by_cpu, throttle or len(indices)))
+
+    jobid = int(time.time()) % 10_000_000
+    logdir = script.parent
+    print(f"sbatch(shim): {d['job_name']} id={jobid} tasks={len(indices)} "
+          f"concurrency={workers} (mem={d['mem_gb']}G cpus={d['cpus']})", file=sys.stderr)
+
+    def run_one(i):
+        env = dict(os.environ)
+        env["SLURM_JOB_ID"] = str(jobid)
+        env["SLURM_SUBMIT_DIR"] = os.getcwd()
+        if i is not None:
+            env["SLURM_ARRAY_TASK_ID"] = str(i)
+            env["SLURM_ARRAY_JOB_ID"] = str(jobid)
+        tag = f"{jobid}_{i}" if i is not None else str(jobid)
+        # check.py greps files named out_*/error_* in a job directory.
+        op, ep = logdir / f"out_{tag}.log", logdir / f"error_{tag}.log"
+        with open(op, "w") as o, open(ep, "w") as e:
+            rc = subprocess.call(["bash", str(script), *args.script_args],
+                                 stdout=o, stderr=e, env=env, cwd=os.getcwd())
+        if rc != 0:
+            print(f"sbatch(shim): TASK {i} FAILED rc={rc} -- see {ep}", file=sys.stderr)
+        return rc
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        codes = list(ex.map(run_one, indices))
+
+    failed = [i for i, rc in zip(indices, codes) if rc != 0]
+    if args.parsable:
+        print(jobid)
+    if failed:
+        # Loudly, and with a non-zero status: a fan-out that cannot tell
+        # "ran nothing" from "found nothing" is the failure this shim must avoid.
+        print(f"sbatch(shim): {len(failed)}/{len(indices)} tasks FAILED: {failed}",
+              file=sys.stderr)
+        return 1
+    print(f"sbatch(shim): {d['job_name']} id={jobid} all {len(indices)} tasks OK",
+          file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
