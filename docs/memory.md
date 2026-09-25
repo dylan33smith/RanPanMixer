@@ -11,7 +11,10 @@ grep -n "INCORRECT\|CORRECTION" docs/memory.md   # what we got wrong
 
 ## Rules
 
-1. **Append only.** Never delete, never overwrite. Newest at the bottom.
+1. **Append only.** Never delete, never overwrite. New entries go directly
+   BELOW the APPEND marker, so everything after the marker reads
+   **newest-first**. (The rule previously read "newest at the bottom", which
+   never matched the file; the file is the source of truth for history.)
 2. **In-place correction.** Prepend `[INCORRECT] - ` to the wrong line, preserving
    its text verbatim; insert `[CORRECTION - YYYY-MM-DD]: ` directly below it. The
    wrong version stays — it is what makes the reasoning legible later.
@@ -100,6 +103,68 @@ It is a defect in the document, found by reading it, before any code was written
 ---
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
+
+## 2026-09-25 — A-DAT-missingness: `-1` conflates at least four different things
+
+**Goal.** Dylan asked how a donor can fail to traverse a parent bubble, given that a
+variant ought to have a value for every haplotype. Establish what `-1` actually means
+before choosing a `missing_policy`.
+
+**The answer for TOP-LEVEL variants is that it cannot.** Every haplotype path runs
+along the GRCh38 backbone, so a top-level variant has an allele for everyone; the
+2.25% missingness there is assembly gaps and conflicts, not structure.
+
+**For NESTED variants it can, and routinely does.** A child bubble sits inside a
+PARTICULAR parent allele. A haplotype taking a different parent allele never visits
+that part of the graph, so there is no allele to report. It is NOT APPLICABLE, not
+missing — and VCF has no way to say so, therefore `.`, therefore `-1`.
+
+Clean measured example: parent row 37624 at POS 13,205,133 (REF 13 bp; five ALTs of
+15, 1, 17, 11 and 13 bp) with child row 37625 at POS 13,205,136, three bases inside
+it. The 87 haplotypes carrying parent alleles 0, 1, 3, 4 or 5 all have a child
+allele. The one haplotype carrying **allele 2 — the 1 bp allele, i.e. the region is
+deleted** — has `-1`. The child variant does not exist on that haplotype because the
+sequence it sits in was deleted.
+
+**How much of nested missingness this explains**, over 5,735 nested records with any
+missing child call:
+
+| cause | share |
+|---|---|
+| entirely inherited from a missing PARENT call | 12.1% |
+| among haplotypes WITH a parent call, perfectly determined by which parent allele they carry | **66.1%** |
+
+**A second, unrelated cause: assembly gaps.** Run lengths of consecutive missing
+positions (strand 0, all 44 subjects): 28,052 runs, median 1, mean 20.0, max 23,478.
+**54.4% are isolated single positions** (structural / not-applicable), while **349
+runs of length >= 100 cover 448,283 entries** — those are contig breaks, not structure.
+
+**A FIFTH cause, from the converter rather than the data.**
+`external/PanMixer/tools/common/VCFtoNP.py` maps a HAPLOID genotype (one allele, no
+`|`) to `-1` on strand 1. Measured on 150,000 chr21 records: **3.135% of sample GT
+fields are haploid**, and 5.581% of the two allele slots are an explicit `.`. So some
+of the matrix's missingness is a conversion decision, not a property of the data.
+
+**The causes are distinguishable — until conversion throws them away.** `LV` and `PS`
+separate "not applicable" from "inherited"; run-length separates assembly gaps; the
+`CONFLICT` tag names conflicts; GT arity identifies the haploid case. But `VCFtoNP`
+reads only `fields[1]` (POS) and `fields[9+i].split(':')[0]` (the GT subfield) — the
+entire INFO column is discarded. By the time anything reaches the matrix, all five
+look identical, and `1/support(v)` and `pmi[hap == -1] = 0` treat them alike.
+**Recommendation for v1: emit an auxiliary REASON array during conversion.** Every
+cause is recoverable at that moment and none is recoverable afterwards.
+
+**So `-1` means at least five different things**: (1) not applicable, the parent
+allele does not contain this bubble; (2) inherited from a missing parent; (3) an
+assembly gap; (4) a CONFLICT, where the sample had multiple paths that disagreed.
+A single `missing_policy` is being asked to cover all five, and they do not want the
+same treatment: "not applicable" argues for renormalise, an assembly gap arguably
+argues for something closer to wildcard. **Consider splitting the policy by cause —
+the LV/PS tags and run-length both distinguish them, and both are currently discarded
+at VCF-to-numpy conversion.**
+
+**Provenance.** chr21, `external/PanMixer` @ `c182c38`, measured 2026-09-25.
+
 
 ## 2026-09-25 — Design note: if the chain comes from the graph, what happens to LD blocks
 

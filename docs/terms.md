@@ -353,7 +353,12 @@ Is:                   What the emission does when a donor haplotype carries -1 (
                       WILDCARD - treat missing as matching whatever the target has,
                       which makes poorly-assembled donors universally attractive;
                       MISMATCH - treat it as a difference, which penalises assembly
-                      gaps as though they were genuine variation.
+                      gaps as though they were genuine variation;
+                      RESTRICT - exclude ill-behaved positions from the chain
+                      altogether, which is what PanMixer's anchor rule does in
+                      effect. Worth keeping as a baseline precisely because it is
+                      the published behaviour, so a v1 run can be compared against
+                      it (Dylan, 2026-09-25).
 Computed by:          PLANNED
 CHANGES MEANING WITH: which positions are in the chain. It barely matters for
                       anchors (0.35% mean missingness) and matters a lot once every
@@ -365,6 +370,32 @@ Valid vs:             another run under the SAME policy. Never compare across po
 Status:               PRIMARY — an undeclared default here is a silent modelling choice.
 Aliases:              none. ⚠ NOT yet decided; do not hard-code one.
 ```
+
+⚠ **`-1` conflates FIVE conditions, and they do not want the same treatment.**
+Measured on chr21 (see `docs/memory.md`, 2026-09-25):
+
+| cause | how it arises | how common |
+|---|---|---|
+| **not applicable** | the child bubble sits inside a parent allele this haplotype does not carry — the DNA does not exist on that chromosome | 66.1% of nested missingness |
+| **inherited** | the parent call was itself missing | 12.1% of nested missingness |
+| **assembly gap** | the donor's assembly does not cover the region | 349 runs of >=100 consecutive positions, covering 448,283 entries |
+| **conflict** | the sample had multiple graph paths that disagreed, so vg wrote `.` | 1,855 records, mean 29.4 of 88 haplotypes |
+| **haploid genotype** | the VCF gave one allele, not two; the converter writes `-1` into strand 1 | 3.135% of sample GT fields |
+
+"Not applicable" argues for RENORMALISE — that donor genuinely has no allele there.
+An assembly gap argues against it — the donor almost certainly HAS an allele and we
+merely do not know it, so dropping them penalises poorly-assembled donors for reasons
+unrelated to genetics. **A single policy is being asked to cover all five.**
+
+⚠ **The causes ARE distinguishable, but the information is destroyed before the
+mechanism sees it.** `LV` and `PS` separate "not applicable" and "inherited";
+run-length separates assembly gaps; the `CONFLICT` INFO tag names conflicts;
+haploid-vs-diploid is visible in the GT itself. But
+`external/PanMixer/tools/common/VCFtoNP.py` keeps ONLY the position and the GT
+subfield (`fields[1]` and `fields[9+i].split(':')[0]`) — every INFO field is dropped.
+So by the time anything reaches the matrix, all five look identical.
+**Preserving the cause is a cheap preprocessing addition — an auxiliary reason array
+alongside the allele matrix — and is far cheaper now than reconstructing it later.**
 
 ### anchor_snp  [implementation] [dataset]
 ```
@@ -389,10 +420,16 @@ Is:                   PanMixer's per-block privacy score, eps_j = -log p(h_bj): 
                       self-information of the TARGET's ORIGINAL block under the cohort
                       model. Higher = rarer = more identifying.
 Computed by:          external/PanMixer/tools/panmixer/obfuscate.py:230-251
-CHANGES MEANING WITH: whether the scoring panel includes the target (as shipped it
-                      DOES, obfuscate.py:130,132, which pins eps_j near log(2N)); and
-                      whether the block took the HMM or the allele-frequency branch —
-                      the thresholds for scoring and sampling differ (>=1 vs <=1 anchor).
+CHANGES MEANING WITH: (a) whether the scoring panel includes the target — as shipped
+                      it DOES, capping eps_j near log(2N) = 4.4773; (b) which branch
+                      the block took, and the thresholds DISAGREE: scoring uses the
+                      HMM at >=1 anchor, sampling at >=2, so 452 chr21 blocks are
+                      scored one way and sampled the other; (c) MOST IMPORTANTLY, on
+                      the HMM branch the forward algorithm scores ONLY the anchor
+                      variants — non-anchor variants contribute nothing at all. In
+                      32% of blocks the ignored non-anchor rarity EXCEEDS eps_j
+                      itself. So eps_j is the self-information of the target's ANCHOR
+                      alleles, not of its block.
 Valid vs:             other eps_pmi values from the identical panel. **NEVER against
                       tau** — see the note below.
 Status:               DIAGNOSTIC — an axis we can plot on, never an input to our mechanism.

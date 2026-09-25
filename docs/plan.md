@@ -12,9 +12,19 @@ Read at session start. This file exists so a new session never has to grep
 - **Branch:** `main`. Remote `origin` -> `https://github.com/dylan33smith/RanPanMixer`.
 - **Phase:** `A` — foundation. Goal: an end-to-end sampler provably correct on a
   graph small enough to enumerate, plus a fair head-to-head against PanMixer.
-- **Still no mechanism code.** What changed on 2026-09-18 is that the upstream
-  dependency is in, pinned, its data is on disk, and it has been read closely
-  enough to know what we can build on. No RanPanMixer number exists yet.
+- **Still no mechanism code**, but as of 2026-09-25 there IS a pinned v1
+  specification — see `A-IMP-v1-sampler` under In Progress. The upstream dependency
+  is in, pinned, running, and has been taken apart in enough detail to know exactly
+  which parts we inherit and which we replace. No RanPanMixer number exists yet.
+- **What the investigation established** (all in `docs/memory.md`, all measured on
+  chr21): PanMixer's privacy score reads only anchor variants, so in 32% of blocks
+  the rarity it ignores exceeds the score it reports; 30.9% of its selected moves
+  change nothing while booking 7.0% of the reported privacy credit; it rewrites
+  3.13 Mb of sequence that its per-record utility accounting cannot see; `CONFLICT`
+  records become missing genotypes and are therefore released verbatim; and `-1` in
+  the matrix conflates four different conditions. None of this says the published
+  numbers are wrong — it says the metrics measure something narrower than their
+  names suggest, which matters because we were going to inherit them.
 - **PanMixer is pinned** at `c182c38` with its 16 GB of inputs downloaded and
   checksummed, and a working conda environment. The cohort is **44 individuals /
   88 haplotypes** — so `K_states` ~ 88, not the ~1000 the proposal's runtime
@@ -146,6 +156,10 @@ success only, and reports both frontiers.
 | A-FIX-docs-system | Adopt the six-file documentation system and write the verifier | verifier passes on a greenfield tree | n/a | 6 files + 20 checks | done | 2026-08-29 |
 | A-DAT-panmixer-ingest | Pin PanMixer, acquire its data, map it against the proposal | a verified reuse map + a runnable upstream | 22 agents, 0 errors | reuse map done; 2 blockers found; 4 proposal claims corrected | done | 2026-09-18 |
 | A-DAT-grch38-repin | Rebuild chr21 preprocessing on the GRCh38 30x panel; run PanMixer | get_mappings finds ~258k matches, not ~1k | 1 chr, 4 runs | 258,610 strict / 268,851 relaxed; PanMixer runs in 68 s, deterministic, 0 invariant violations | done | 2026-09-18 |
+| A-DAT-missingness | Establish what `-1` actually means before choosing a policy | a taxonomy with shares | chr21 | 4 distinct causes; 66.1% of nested missingness is "parent allele does not contain this bubble"; 349 runs >=100 are assembly gaps | done | 2026-09-25 |
+| A-DAT-anchors | Why anchors exist and whether we can drop them | the rationale, tested | chr21 | paper's reason is top-level SNPs (supported: nested are 22.5% uncalled vs 2.25%); the code's PanGenie proxy is neither necessary nor sufficient | done | 2026-09-25 |
+| A-DAT-noop-moves | Do selected moves actually change anything? | share of no-ops | 47,070 moves | 30.9% change nothing, carrying 7.0% of reported privacy credit at zero utility cost | done | 2026-09-24 |
+| A-DAT-af-table | Where the allele frequencies come from | the branch structure | chr21 | 3-way priority; 2 corrections issued; our repin puts the target in its own frequencies | done | 2026-09-24 |
 | A-DAT-conflicts | Characterise CONFLICT records and the block-spanning output semantics | what they do downstream | chr21 | conflicts become missing data -> zero privacy value AND 1.6x cost -> released verbatim; output is per-record allele indices with no coherence check | done | 2026-09-23 |
 | A-DAT-hypervariable-sites | Characterise the worst-case multi-allelic structural sites | a measured profile of the class | chr21 | 7 sites where all 88 haplotypes differ; 2,485 matrix rows for one 257 kb bubble; these score eps_pmi = 0 | done | 2026-09-22 |
 | A-EVL-readmapping | Reproduce the published chr21 read-mapping BASELINE | within ~0.1 pt of 77.83 / 95.62 / 77.01 | 5 donors, ~11M reads each | 79.05 / 95.96 / 79.23 — right regime, NOT an exact match; offset unexplained | partial | 2026-09-18 |
@@ -208,6 +222,13 @@ the state distribution at that position) but has NOT decided; see `missing_polic
 in `docs/terms.md` for the three options and their biases. This matters because the
 positions v1 adds are far worse behaved than anchors: mean missingness **11.31%**
 versus **0.35%**, with 7,555 positions over 25% missing.
+**Prerequisite for deciding it well:** `-1` conflates five distinct conditions and
+they do not want the same treatment (see `missing_policy`). They ARE distinguishable
+at conversion time — LV/PS, run-length, the CONFLICT tag, GT arity — but
+`VCFtoNP` keeps only position and genotype, so all five are identical by the time
+the mechanism sees them. **v1 preprocessing should emit an auxiliary REASON array
+beside the allele matrix**, which keeps a cause-aware policy available without
+committing to one now. Cheap now, unrecoverable later.
 
 **EXIT GATES**
 1. `A-THY-toy-enumeration` passes: sampler matches exact enumeration; exact TV <= `tau`

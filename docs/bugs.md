@@ -98,6 +98,21 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
   the wrong answer arrived as a plausible value, not an error. Existence is not a
   completion signal; a sentinel must be newer than the launch that it reports on.
 
+### Our GRCh38 repin put the target inside its own allele frequencies
+- **[2026-09-24] The 30x panel contains 39 of the 44 HPRC donors**
+  **[Symptom]** None visible — the frequencies look normal.
+  **[Cause]** `get_af.py` branch 1 draws counts from the 1000G panel alone, and its
+  comment asserts "None of the pangenome subjects appear in 1000g_phased". True for
+  Phase 3 (0 of 44 overlap) but **false for the 30x panel we substituted: 39 of 44
+  HPRC donors are present, including HG00438**. So the target's own alleles are
+  counted in the frequencies used to score it.
+  **[Proven fix]** A `loo_cohort` must drop the target from the **1000G panel** as
+  well as from the pangenome. Recorded as a requirement of the comparison design.
+  **[Side effect worth knowing]** This also suppresses the `#FIX ME` zeroing: with
+  the target in the panel its allele is always counted, so f_v is never 0 and that
+  branch never executes. Under the shipped Phase 3 panel it would.
+  **[Severity]** HIGH for us — it is a constraint-1 violation introduced by our own fix.
+
 ### Killing a duplicate process
 - **[2026-09-18] Never `pkill -f` a pattern that matches your own command line**
   **[Proven fix]** Resolve the exact PID first (`ps -o pid=,etimes=,cmd= -C python`,
@@ -134,6 +149,69 @@ Defects in the DEPENDENCY, not in our code. Recorded here because we will hit ea
 one again, and because several produce plausible NUMBERS rather than errors — the
 silent-degradation class. "Proven fix" = what we do about it. Every entry was
 verified by reading the cited line or by executing the shipped code, on 2026-09-18.
+
+### The privacy score ignores most of what is in the block
+- **[2026-09-25] eps_j scores only anchor variants, so rare non-anchor alleles are free**
+  **[Symptom]** A block containing a genuinely rare allele scores as unremarkable.
+  Worked case: block 1083 holds two common anchors (AF 0.934) and one non-anchor at
+  AF 0.00385. The allele-frequency branch would give 5.6956 nats; the code returns
+  **0.0349** — a 163x difference.
+  **[Cause]** `forward_algorithm` builds `observed` and the emission panel from
+  `anchor_indices` only, so non-anchor variants are not positions in the chain and
+  contribute nothing to the likelihood.
+  **[Measured]** Over 400 random HMM-branch blocks: median eps_j 1.079 while the
+  all-variant allele-frequency sum is 2.769; **in 32% of blocks the ignored
+  non-anchor rarity exceeds eps_j itself**.
+  **[Proven fix]** Do not treat eps_j as "the self-information of the block" — it is
+  the self-information of the block's ANCHOR alleles. For v1 we drop anchors entirely
+  and make every variant a chain position (see `A-IMP-v1-sampler` in docs/plan.md).
+  **[Severity]** HIGH, and silent: the number is plausible and monotone, just blind
+  to the rarest material.
+
+### Scoring and sampling disagree about which blocks are HMM blocks
+- **[2026-09-25] The two branch thresholds differ by one anchor**
+  **[Symptom]** A block gets an HMM-derived privacy score for a replacement that was
+  drawn from allele frequencies.
+  **[Cause]** Scoring takes the HMM when anchors >= 1
+  (`get_support_and_pmi.py`:87); sampling takes it when anchors >= 2 (:159).
+  **[Measured]** chr21: 10,954 blocks scored by HMM, 10,502 sampled by HMM, **452
+  blocks scored one way and sampled the other**.
+  **[Proven fix]** Use one threshold. v1 removes the question by routing every block
+  through one sampler, with single-variant blocks as a chain of length 1.
+  **[Severity]** MEDIUM.
+
+### The optimizer books privacy for moves that change nothing
+- **[2026-09-25] eta_j is 0 for a no-op, so the LP takes it unconditionally**
+  **[Symptom]** Selected moves that leave the released alleles identical to the
+  target's own. Worked case: block 1077, eps_j = 0.0711, replacement identical to the
+  original, so eta_j = 0.00000; `xsol` selects it on both strands and nothing changes.
+  **[Cause]** `eta_j` is `sum(utility_loss * (new != orig))`, which is zero when
+  nothing differs, while `eps_j` is always positive and is computed from the target's
+  ORIGINAL block regardless of what was sampled. Infinite value per unit cost.
+  **[Measured]** capacity 0.1, HG00438, chr21: **14,526 of 47,070 selected moves
+  (30.9%) changed nothing**, carrying **7.0%** of the total eps. They concentrate on
+  LOW-eps blocks (median eps 0.39 vs 2.19 for real moves) because a randomly drawn
+  donor is likely to match on common patterns — block 1077 has 82 of 88 donors
+  carrying the target's exact pattern.
+  **[Proven fix]** Report actual allele change, never `pmi_gain`, as the privacy
+  numerator. The utility axis is NOT inflated — eta_j is correctly 0 — so it is the
+  privacy-per-utility ratio that is overstated.
+  **[Severity]** MEDIUM, and it compounds the sampler degeneracy: the more often the
+  sampler returns the target's own alleles, the more free privacy the LP books.
+
+### Utility accounting cannot see the size of what it changes
+- **[2026-09-25] 3.13 Mb rewritten, reported as "10.5% of alleles"**
+  **[Symptom]** A run reports a modest allele-change percentage while rewriting
+  megabases of sequence.
+  **[Cause]** `1/support(v)` is per RECORD. A 257 kb allele and a 1 bp SNP cost the
+  same. Nothing in the metric suite is sensitive to base pairs.
+  **[Measured]** capacity 0.1, chr21: **3,129,810 bp rewritten — 6.7% of the
+  chromosome** — across 222 changed alleles over 1 kb, largest 257,485 bp. The same
+  run reports "68,335 of 650,541 alleles changed (10.5%)". Non-SNP records are
+  changed at a HIGHER rate than SNPs (23.3% vs 14.9%).
+  **[Proven fix]** If we adopt this weighting as `phi_t`, we inherit the blind spot.
+  Length-weighting is tracked in open question 8.
+  **[Severity]** HIGH for interpreting any published utility number.
 
 ### The released pipeline matches GRCh38 against GRCh37
 - **[2026-09-18] LD blocks and variant mappings built across two reference builds**
@@ -224,6 +302,25 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
   every reported result. A denser panel is a strictly stronger attacker, so the
   choice moves the privacy axis.
   **[Severity]** HIGH — silent in the sense that it still yields numbers.
+
+### VCF-to-numpy conversion destroys every reason a genotype is missing
+- **[2026-09-25] Five different conditions all arrive as -1**
+  **[Symptom]** Downstream code cannot tell "this haplotype has no such DNA" from
+  "we failed to assemble it", and silently treats them alike.
+  **[Cause]** `external/PanMixer/tools/common/VCFtoNP.py` reads only `fields[1]`
+  (POS) and `fields[9+i].split(':')[0]` (the GT subfield). The entire INFO column —
+  `LV`, `PS`, `CONFLICT`, `AT` — is discarded, as are REF, ALT and the record ID.
+  It also maps a HAPLOID genotype to `-1` on strand 1 (3.135% of GT fields), so a
+  conversion decision becomes indistinguishable from a data property.
+  **[Consequence]** `1/support(v)` counts all five alike, so a variant looks
+  "low-support" whether the DNA is absent by construction or merely unassembled; and
+  `pmi[haplotype == -1] = 0` zeroes the privacy score for all five.
+  **[Proven fix]** For our pipeline, emit an auxiliary REASON array beside the allele
+  matrix during conversion. The causes are all recoverable at that moment
+  (LV/PS for structure, run-length for gaps, the CONFLICT tag, GT arity) and none of
+  them is recoverable afterwards.
+  **[Severity]** HIGH for our design — it is the input to `missing_policy`, which
+  cannot be made cause-aware if the cause has already been thrown away.
 
 ### A variable named `thousand_g_alignments` is the PanGenie callset
 - **[2026-09-18] The HMM's anchor set is not what its name says**
