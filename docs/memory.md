@@ -101,6 +101,210 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-25 — Design note: if the chain comes from the graph, what happens to LD blocks
+
+**Verified fact.** PanMixer never loads a genetic map. Searching the whole codebase,
+every `recomb` hit is an output FILENAME for the RECOMB conference; the only genetic-map
+references are the unwired `external/PanMixer/starting_data/scripts/get_genetic_maps.sh`
+(which has a broken shebang, `!/bin/bash`, and is referenced only by `.gitignore`).
+Its transition "distance" is a VCF row index.
+
+**That explains the architecture.** With no recombination map, the LD blocks have to
+carry the recombination information structurally: the per-block HMM treats everything
+inside a block as one linked unit and everything across blocks as independent. Blocks
+are a discretised stand-in for a distance-dependent transition model.
+
+**Consequence for our design.** In a Li-Stephens copying model the linkage is carried
+by the DONOR PANEL and the TRANSITION PROBABILITIES, not by where block boundaries
+fall — copying a stretch from donor j reproduces whatever allele combinations j
+carries, including rare co-occurrences that exist only because they sit on one
+ancestral chromosome. So with a genome-wide chain plus distance-dependent transitions,
+LD blocks become redundant for the MODEL. The two jobs they do for PanMixer both
+disappear for us: they scope its per-block HMM (we have one chain), and they are the
+unit of its knapsack (we have no knapsack).
+
+**Practical requirement this creates.** Distance-dependent transitions need a genetic
+map in GRCh38 coordinates. The map repo PanMixer's unwired script points at
+(the joepickrell 1000-genomes-genetic-maps repo) offers `interpolated_from_hapmap` and
+`interpolated_OMNI`, both GRCh37-era. SHAPEIT4 publishes b38 maps (URL responds 302),
+which is the likely source. **Not yet acquired or verified — an open task, not a
+decision.** Falling back to bp distance with a constant rate is possible but crude.
+
+**What LD blocks would still be for.** Evaluation comparability with PanMixer
+(reporting per-block results on their partition), and possibly grouping for the
+`beta_t` weights. Neither is a modelling need.
+
+
+## 2026-09-25 — A-DAT-anchors: why anchors exist, and whether we need them
+
+**Goal.** Dylan asked why the HMM runs only over anchor variants rather than every
+variant in a block, and whether we can drop the concept. Establish the rationale
+before deciding.
+
+### The paper's rationale is about TOP-LEVEL SNPs, not external matching
+Published Methods, on choosing the branch: *"dependent on the number of top-level
+SNPs that exist inside the LD block. If 2 or more exist, enough SNPs exist to build
+an HMM, and we can synthesize more accurate new haplotype blocks. If only one
+top-level SNP exists, we do not have enough useful information to build an HMM."*
+Top-level means on the GRCh38 backbone path (LV=0). The >=2 threshold is simply
+that a Markov chain needs two positions to have a transition between them.
+
+### Why restrict to top-level SNPs — the data supports it
+Missingness per record class on chr21 (fraction of the 88 haplotypes with no called
+allele):
+
+| class | n | mean missing | records >50% missing |
+|---|---|---|---|
+| top-level SNP (the paper's V_SNPs) | 253,000 | **2.25%** | 421 |
+| top-level non-SNP | 56,335 | 3.11% | 722 |
+| **nested (LV>=1)** | 31,489 | **22.53%** | 3,515 |
+
+Nested variants are ~10x more often uncalled, because a donor whose path does not
+traverse the parent bubble has no meaningful allele at the child — and the matrix
+cannot distinguish "not applicable" from "missing". Using them as chain positions
+would feed the emission model noise. **That is a real justification.**
+
+Two candidate rationales that do NOT hold:
+- **Compute.** Anchors 273,475 vs all variants 340,824 — only **1.25x** more
+  positions (24.1M vs 30.0M operations at K=88). Negligible.
+- **Multi-allelic emissions.** Median ALT count is 1 even for non-SNP records; the
+  90-allele tail is real but rare.
+
+### But the CODE does not implement the paper's set
+| | records |
+|---|---|
+| paper's V_SNPs (LV=0 and SNP) | 253,000 |
+| code's anchors (PanGenie overlap) | 273,475 |
+| overlap | 234,532 |
+| **anchors that are NOT top-level SNPs** | **38,943** (14.2% of anchors) — of which **13,436 are NESTED** and 25,507 are non-SNP |
+| top-level SNPs that are NOT anchors | 18,468 (7.3%) |
+
+So the implementation admits 13,436 nested variants as chain positions — precisely
+the class the paper's own rationale excludes — while dropping 18,468 top-level SNPs
+that qualify. The PanGenie overlap is a proxy for "well-behaved position" that is
+neither necessary nor sufficient.
+
+### Implication for our design
+Drop the PanGenie-overlap criterion: it has no principled basis and it is what makes
+rare non-anchor variants invisible to `eps_j` (measured earlier: in 32% of blocks the
+ignored non-anchor rarity exceeds `eps_j` itself). Do NOT simply promote every
+variant to a chain position — the 22.5% missingness at nested records is a real
+obstacle. The principled replacement is to take positions from the **graph
+structure** (top-level / snarl-tree) rather than from an external callset, which is
+the same answer open question 8 is circling for `T`.
+
+**Provenance.** chr21, `external/PanMixer` @ `c182c38`, published paper Methods,
+measured 2026-09-25.
+
+
+## 2026-09-24 — A-DAT-noop-moves: 31% of selected obfuscation moves change nothing
+
+**Method.** Walked block 1077 end to end for HG00438 on chr21, then swept the whole
+capacity-0.1 run comparing each selected move's released alleles to the original.
+
+**Block 1077** (rows 34816-34820, POS 13,000,333-13,000,621): 5 variants, all 5
+anchors, so the HMM branch. Target carries `[0,0,0,0,0]` on both strands.
+- `eps_j` = **0.0711 nats** per strand, computed from the target's ORIGINAL block.
+- support(v) = 87 of 88 for every variant, so 1/support = 0.01149 each.
+- The sampled replacement came back `[0,0,0,0,0]` — **identical to the target**,
+  because the degenerate transitions copy one donor verbatim and that donor happens
+  to carry the same common alleles.
+- Changed variants = 0, so **`eta_j` = 0.00000** (it would be 0.05747 if all 5 changed).
+
+So the move offers positive privacy at **zero** utility cost. The LP takes it
+unconditionally. Confirmed in the run: `xsol[625]` is 1 on both strands, and the
+released alleles at those rows are unchanged.
+
+**Swept across the whole run: of 47,070 selected moves, 14,526 changed NOTHING
+(30.9%).** Every one contributed its `eps_j` to the reported `pmi_gain` of
+115,315.84 while altering no allele and costing no utility.
+
+### Follow-up — the inflation is 7% of eps, not 31%
+The 31% figure counts MOVES; it is not the share of privacy credit. Measured on a
+3,000-move sample of the 47,070 selected:
+
+| selected moves | n | median eps_j | mean eps_j |
+|---|---|---|---|
+| changed something | 2,112 | 2.1904 | 3.3103 |
+| **changed nothing** | 888 | **0.3898** | 0.5964 |
+
+**No-op moves carry only 7.0% of the total eps.** They concentrate on LOW-eps blocks
+— common patterns that many donors share, so a randomly drawn donor often carries
+the target's own alleles. Block 1077 is typical: 82 of 88 donors carry exactly the
+target's pattern, giving eps_j = 0.0711, and -log(82/88) = 0.0706 confirms the
+reading of eps_j as the surprisal of the target's block under the cohort.
+
+Note also what is NOT inflated: for a no-op, `eta_j` is correctly **0**, because it
+sums `1/support(v)` only over variants that differ. So the utility axis is honest;
+it is the privacy numerator that gains ~7% for nothing, and the privacy-per-utility
+ratio that is consequently overstated.
+
+**Consequence.** `pmi_gain` — the numerator of the reported "Privacy Risk" axis —
+is inflated by moves that did not touch the genome. The effect is systematic rather
+than incidental: it follows directly from `eta_j` being computed as
+`sum(utility_loss * (new != orig))` while `eps_j` is always positive and is computed
+from the original block regardless of what was sampled. It compounds the sampler
+degeneracy: the more often the sampler returns the target's own alleles, the more
+free privacy the LP books.
+
+**Provenance.** chr21, HG00438, capacity 0.1, seed 123, `external/PanMixer` @
+`c182c38`, measured 2026-09-24.
+
+
+## 2026-09-24 — A-DAT-af-table: where f_v comes from, and two corrections
+
+**Goal.** Dylan asked what population the allele frequencies in `eps_j` are computed
+from, and whether "no anchors" implies a degenerate frequency.
+
+**The table is built by a three-way priority** per variant
+(`external/PanMixer/starting_data/scripts/src/get_af.py`:27-78). Measured on chr21:
+
+| branch | source of counts | target included? | variants |
+|---|---|---|---|
+| 1. variant matches the 1000G map | **1000G only** | not under Phase 3; **YES under our 30x repin** | 258,610 (75.9%) |
+| 2. matches PanGenie but not 1000G | PanGenie **plus all pangenome haplotypes** | yes | 25,325 (7.4%) |
+| 3. novel (neither) | pangenome only, then REF padded to `NOVEL_DENOMINATOR` | yes | 56,889 (16.7%) |
+
+`NOVEL_DENOMINATOR = 2 * (N_1000G + N_pangenome)` = 2*(3202+44) = **6,492** under our
+repin, so a novel allele carried by one haplotype gets f_v = 1.54e-4, NOT 1. The
+padding exists precisely to stop a novel allele looking common because only its own
+carriers were counted; the REF allele absorbs it.
+
+**"Anchor" and "has population data" are different things.** The anchor set is the
+PanGenie map; the AF priority also consults the 1000G map. **10,460 non-anchor
+variants still receive 1000G frequencies.** A block with zero anchors can be fully
+populated with real frequencies.
+
+Median −log f_v where HG00438 carries a NON-REF allele: branch 1 = 0.63 nats,
+branch 2 = 0.43, branch 3 = **5.41**. At novel sites the target usually carries REF
+(median f_v 0.998), so most novel sites contribute ~0 — the signal is in the 11,760
+novel sites where it carries a non-REF allele.
+
+### Correction 7 — the `#FIX ME` zeroing does NOT fire on our data
+[INCORRECT] - Alleles like these have population frequency 0 in any external callset, so `-log(0)` -> infinity -> zeroed by that `#FIX ME`. **PanMixer assigns the most identifying sites on the chromosome a privacy score of exactly zero.**
+[CORRECTION - 2026-09-24]: Measured for HG00438 across all 319,092 chr21 sites where it carries a called allele: **ZERO have f_v = 0**, so the `#FIX ME` branch never executes. The reason is that the target's own allele is counted in every branch — via the pangenome counts in branches 2 and 3, and (under our 30x repin) via the panel itself in branch 1, since 39 of 44 HPRC donors including HG00438 are in the 30x panel. The zeroing is a LATENT defect whose trigger is panel-dependent: under the shipped Phase 3 panel, where 0 of 44 HPRC donors appear, a branch-1 variant whose allele no 1000G sample carries WOULD give f_v = 0 and fire it. The conclusion that the hypervariable site contributes zero privacy is still correct, but the MECHANISM is different — see Correction 8.
+
+### Correction 8 — the hypervariable site scores zero by non-anchor exclusion, not by zeroing
+The 257 kb record (row 51791) gets a perfectly good frequency: HG00438 carries
+alleles 89 and 88, each f_v = 1.540e-4, i.e. **8.78 nats** of self-information. That
+value is never used. The record is **not an anchor** (`r in align` is False), and its
+block 1639 has 92 records with 82 anchors, so the block takes the **HMM branch** —
+where the forward algorithm scores only the anchors. The most identifying record on
+the chromosome contributes nothing because it is not in the PanGenie callset, which
+is a completely different failure from the `-log(0)` zeroing.
+
+### New risk — our own repin weakened target-independence
+Branch 1 draws counts from the 1000G panel alone, and the code comment asserts "None
+of the pangenome subjects appear in 1000g_phased" — true for Phase 3 (0 of 44
+overlap, measured) but **false for our 30x substitution (39 of 44 overlap)**. So our
+rebuilt `allele_frequencies.npy` includes the target's own alleles in the
+frequencies used to score it. For PanMixer that is merely a stronger version of an
+existing self-inclusion. **For US it violates constraint 1**, so any leave-one-out
+cohort must also drop the target from the 1000G panel, not only from the pangenome.
+
+**Provenance.** chr21, HG00438, `external/PanMixer` @ `c182c38`, measured 2026-09-24.
+
+
 ## 2026-09-23 — A-DAT-conflicts: what CONFLICT records do downstream, and how blocks handle spanning variants
 
 **Goal.** Dylan asked whether all CONFLICT records behave alike, what they imply for
@@ -163,6 +367,38 @@ parent's block is not selected the parent keeps the target's TRUE allele, while
 child records in a selected block are replaced. The released VCF then asserts both
 at once. Whether those assignments jointly correspond to a walk through the graph is
 never computed, checked, or asked.
+
+### Finding 5 — the MECHANISM sees everything; only the EVALUATION filters
+An earlier note implied indel/structural records are excluded. That is wrong as a
+statement about the mechanism. Measured on our HG00438 chr21 run at capacity 0.1:
+
+| stage | records seen | non-SNP | CONFLICT |
+|---|---|---|---|
+| mechanism (PMI + knapsack + stacker) | 340,824 (100%) | 65,176 | 1,855 |
+| `af_loss` / `ld_loss` (strict 1000G mask) | 258,610 (75.9%) | 21,550 | 37 |
+| gap score (posref mask) | 268,851 (78.9%) | 29,965 | 110 |
+| gap score after the biallelic-SNP mask | 238,052 (69.8%) | **0** | 49 |
+| read mapping (`bcftools view -v snps`) | 288,020 (84.5%) | mixed records kept | **1,167** |
+
+So indels and structural variants ARE scored, selected and rewritten. In that run
+**15,206 non-SNP records changed — a 23.3% rate, HIGHER than the 14.9% for SNPs** —
+and the 257 kb hypervariable record was rewritten on both strands
+(alleles [89, 88] -> [35, 64]).
+
+**Sequence actually rewritten: 3,129,810 bp = 3.13 Mb, 6.7% of chr21.** 222 changed
+alleles exceed 1 kb; the largest single rewrite is 257,485 bp. PanMixer reports the
+same run as "68,335 of 650,541 alleles changed (10.5%)" — because `1/support(v)` is
+per RECORD, the 3.13 Mb never enters the accounting.
+
+Correction to an intermediate figure used while investigating: dropping non-SNPs
+does NOT remove most conflicts. `bcftools view -v snps` keeps mixed multi-allelic
+records, and conflicts are enriched in those (median 4 alleles), so **1,167 of
+1,855 conflicts survive** the read-mapping filter — 37% are dropped, not 84%.
+
+**Net effect on the scoring.** The biggest edits by base pairs land on exactly the
+records the read-mapping metric cannot evaluate (its graph is SNP-only), while
+`af_loss` and `ld_loss` see 75.9% of records and the gap score's biallelic path
+sees no non-SNP records at all. No metric in the suite is sensitive to the 3.13 Mb.
 
 **Provenance.** chr21, `external/PanMixer` @ `c182c38`, measured 2026-09-23.
 

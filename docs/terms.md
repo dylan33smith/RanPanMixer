@@ -344,6 +344,28 @@ Status:               DIAGNOSTIC — but a PRIMARY concern for the mechanism: th
 Aliases:              none. Do not call these "SVs" — size is not what defines them.
 ```
 
+### missing_policy  [implementation] [method]
+```
+Is:                   What the emission does when a donor haplotype carries -1 (no
+                      called allele) at a chain position. Three options:
+                      RENORMALISE - drop that donor from the state distribution at
+                      that position (leaning choice, Dylan 2026-09-25);
+                      WILDCARD - treat missing as matching whatever the target has,
+                      which makes poorly-assembled donors universally attractive;
+                      MISMATCH - treat it as a difference, which penalises assembly
+                      gaps as though they were genuine variation.
+Computed by:          PLANNED
+CHANGES MEANING WITH: which positions are in the chain. It barely matters for
+                      anchors (0.35% mean missingness) and matters a lot once every
+                      variant is a position (11.31%, with 7,555 positions over 25%
+                      missing). Nested variants are the driver: a donor whose path
+                      does not traverse the parent bubble has no allele at the child,
+                      and the matrix cannot distinguish that from missing data.
+Valid vs:             another run under the SAME policy. Never compare across policies.
+Status:               PRIMARY — an undeclared default here is a silent modelling choice.
+Aliases:              none. ⚠ NOT yet decided; do not hard-code one.
+```
+
 ### anchor_snp  [implementation] [dataset]
 ```
 Is:                   A pangenome VCF record that also appears in the PanGenie
