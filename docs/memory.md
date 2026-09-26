@@ -104,6 +104,115 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-26 — A-DAT-missingness-scope: what 11.31% and 0.35% are means OVER
+
+**Why.** `docs/terms.md` (`missing_policy`) and `docs/plan.md` quoted "11.31% versus
+0.35%" with no measurement entry behind either, and the primer then described 11.31%
+as the mean "across every variant" / "once every variant is a chain position". A
+second-round primer audit re-measured it; re-measured again here, independently.
+
+**Method.** `external/PanMixer/starting_data/chr21/pangenome.npy` (44 x 340,824 x 2, int16), missingness
+per record = share of the 88 haplotype entries equal to `-1`, averaged over the class.
+Anchors = the 273,475 keys of `pangenome_to_thousand_g_alignments.pickle` (the PanGenie
+overlap, Correction 5). Block membership from `blocks_dict.json` (100,757 entries, every
+record covered exactly once). Target included (the matrix as shipped).
+
+| position class | n | share of variants | mean missingness | records > 25% missing |
+|---|---|---|---|---|
+| all variants | 340,824 | 100.00% | 4.263% | 30,800 |
+| anchors, all | 273,475 | 80.24% | 0.351% | 925 |
+| non-anchors, all | 67,349 | 19.76% | 20.150% | 29,875 |
+| variants in multi-variant blocks | 251,737 | 73.86% | 1.582% | 8,108 |
+| non-anchors in multi-variant blocks | 29,966 | 8.79% | **11.306%** | **7,555** |
+| anchors in multi-variant blocks | 221,771 | 65.07% | 0.268% | 553 |
+| variants in blocks with >= 2 anchors | 243,327 | **71.39%** | 0.501% | 1,274 |
+| anchors in blocks with >= 2 anchors | 221,319 | 64.94% | **0.264%** | 538 |
+| variants in multi-variant blocks with <= 1 anchor | 8,410 | 2.47% | 32.853% | 6,834 |
+| singleton blocks | 89,087 | 26.14% | 11.840% | 22,692 |
+
+- Columns: n and share are record counts; missingness is the class mean of the
+  per-record missing share; the last column counts records over a quarter missing.
+- Rows: `anchors in blocks with >= 2 anchors` is what PanMixer's HMM actually steps
+  over. `all variants` is what v1 steps over, because v1 sends singletons through the
+  same sampler as T = 1 chains. `variants in blocks with >= 2 anchors` is what PanMixer
+  SAMPLES by donor copying today; everything else is drawn from allele frequencies.
+- Synthesis: **11.31% is the mean over the 29,966 non-anchor records inside
+  multi-variant blocks** — the positions v1 adds INSIDE blocks PanMixer already chains.
+  It is not the mean over every variant (4.26%), and 0.35% is the mean over all
+  anchors, not over the anchors PanMixer's HMM steps over (0.26%). The honest
+  like-for-like is **v1's positions 4.26% (30,800 over 25%) against PanMixer's HMM
+  positions 0.26% (538 over 25%)**, about 16x (derived). The "32x" (11.31 / 0.35) is a
+  ratio of two differently scoped means and is quotable only with both scopes named.
+
+**Second finding — the donor-copied share today is 71.4%, not 73.9%.** 73.86% is the
+share of variants in multi-variant blocks. But the sampler sends a multi-variant block
+with <= 1 anchor to the allele-frequency route too (8,410 variants, 2.47%), so the share
+PanMixer samples by copying a donor is **71.39%** — the figure the 2026-09-18 entry
+already gives ("10.4% of blocks ... 71.4% of variants"). `docs/plan.md` v1 REPLACE
+item 2 said 73.9%; corrected there the same day. The 8,410 are also the worst-behaved
+class in the table (32.85% mean missingness), which is presumably why they have <= 1
+anchor.
+
+## 2026-09-26 — A-DAT-primer-provenance: four primer numbers that `docs/` never logged
+
+**Why this entry exists.** A three-critic audit of the expanded primer flagged
+`274,458`, `177,865` and `3,077.60` as fabricated, and `8,661` as invented precision,
+because `grep` over `docs/` returned nothing for any of them. All four were already in
+the primer as committed on 2026-09-23. Each was re-measured from its artifact before
+anything was deleted. **All four are exact.** The defect was that they were measured
+during a session and quoted in teaching material without being logged here. They are
+logged now, so they are quotable.
+
+**1. Biallelic SNP records on chr21: 274,458 of 340,824 (80.53%).** Measured by
+loading `external/PanMixer/starting_data/chr21/biallelic_snp_mask.npy` (dtype bool,
+shape (340824,)) and summing it. The mask is built by
+`external/PanMixer/starting_data/scripts/src/build_biallelic_snp_mask.py`: a record
+qualifies iff it has exactly one ALT and both REF and ALT are a single base in ACGT.
+**Relation to the other counts:** 65,176 records are indel/structural (see the
+2026-09-23 conflicts entry), so 275,648 records are single-base; 274,458 of those are
+biallelic, so **1,190 are multi-allelic SNP records**. The two numbers are consistent;
+one is a subset of the other. `238,052` (69.8%) is a DIFFERENT quantity — the sites
+the gap-score attack keeps after the mask AND the 1000G match — and must not be quoted
+as the mask count.
+
+**2. The capacity-0.5 obfuscation run, HG00438, chr21, seed 123.** From
+`logs/pm_obf.log` (sentinel `logs/pm_obf.status` = 0), verbatim optimizer and stacker
+lines:
+
+| metric | capacity 0.1, seed 123 | capacity 0.5, seed 123 |
+|---|---|---|
+| selected moves | 47,070 | 177,865 |
+| utility_loss / max | 928.92 / 9288.85 (10.0%) | 3,077.60 / 9288.85 (33.1%) |
+| pmi_gain (nats, as reported) | 115,315.84 | 120,443.42 |
+| alleles changed / total | 68,335 / 650,541 (10.50%) | 106,549 / 649,242 (16.41%) |
+
+- Columns: two capacities from the same run script, same target, same seed.
+- Rows: `moves` and `utility_loss` are the optimizer's own log line; `changed` is
+  the stacker's. The allele denominators differ slightly between runs (650,541 vs
+  649,242); the log does not say why, and it is recorded rather than explained.
+- Synthesis: raising the budget five-fold (0.1 -> 0.5 of max loss) spends only 33.1%
+  and buys 4.4% more reported privacy (120,443.42 / 115,315.84 = 1.0445). The knapsack
+  saturates. Seed 456 at capacity 0.1 gave 47,069 moves and 928.88 — seed-stable.
+
+**3. PanMixer's Python: exactly 8,661 lines.** `git ls-files '*.py' | xargs cat | wc -l`
+inside the pinned checkout. Every `.py` on disk is tracked, so the untracked count is
+the same. `docs/data.md` previously rounded this to ~8,660.
+
+**4. The published Equation (5) carries its minus sign.** Rendered
+`paper/s41467-026-77591-0_reference.pdf` **PDF page 10** (not 9) at 300 dpi:
+`L(g_i, g*_target) = − Σ log f_j`, the sum running over the loci j in `S(g_i, g*_target)`. The minus is typeset and
+unambiguous. The "sign discrepancy" the primer once carried as unresolved was an
+artefact of text extraction dropping the glyph (this PDF has no text layer at all), not
+a defect in the paper. With the sign, the equation agrees with the paper's own prose
+("emphasizes rare allele matches"). Same page states the read-mapping donors as
+HG00138, HG00635, HG01112, HG02698 and **NA18853**, and the HMM constants
+Ne = 10,000, r = 1.26, Δx in cM, d = Δx·Ne·r, p = e^(−d/n) + (1 − e^(−d/n))/n.
+
+**Lesson.** "Not in `docs/`" means *unlogged*, not *false*. A checker that cannot
+find a number must re-measure it from the artifact before recommending deletion; the
+audit here would otherwise have deleted four true measurements and published a
+retraction of a correct one. See the matching entry in `docs/bugs.md`.
+
 ## 2026-09-25 — A-DAT-missingness: `-1` conflates at least four different things
 
 **Goal.** Dylan asked how a donor can fail to traverse a parent bubble, given that a
@@ -515,10 +624,8 @@ spelled out in full. Hence 28 MB.
    `eps_pmi` at BOTH levels. The paper's nested approximation
    p(nested) ~ p(parent) x p(nested) addresses child-vs-parent dependence but not
    the fact that the parent is itself a scored row.
-2. **The most identifying sites score ZERO.** Every allele here has population
-   frequency 0 in any external callset, so `-log(0)` -> infinity -> zeroed by the
-   `#FIX ME` in `get_support_and_pmi.py`. The sites where each haplotype is unique
-   — a perfect fingerprint — contribute nothing to PanMixer's privacy score.
+[INCORRECT] - 2. **The most identifying sites score ZERO.** Every allele here has population frequency 0 in any external callset, so `-log(0)` -> infinity -> zeroed by the `#FIX ME` in `get_support_and_pmi.py`. The sites where each haplotype is unique — a perfect fingerprint — contribute nothing to PanMixer's privacy score.
+[CORRECTION - 2026-09-26]: The conclusion stands and the mechanism is wrong. The zeroing branch never fires on this data (Correction 7: 0 of 319,092 sites have f_v = 0, because the target's own allele is counted in every frequency branch). These sites score zero because the privacy score reads anchor alleles only and they are not anchors (Correction 8). Marked in place on 2026-09-26; the copy under Correction 7 was made without marking this original.
 3. **Utility weighting ignores scale.** `1/support(v)` is per VARIANT. A move here
    rewrites up to half a megabase yet is costed like a one-base SNP (and, since
    support is 1, is among the most expensive — but for the wrong reason).
@@ -662,10 +769,8 @@ metric, as expected for an African genome against a reference-biased graph.
    real v1.36.0 binary on a v1.68.0 GAM aborts with "obsolete, invalid, or corrupt
    protobuf input". The stated combination cannot have been used as written.
 
-**VERDICT.** The installation runs the pipeline correctly and lands in the right
-regime with the right internal structure, but this is **NOT an exact reproduction**
-of the published baseline, and the residual +1.2 to +2.2 point offset is
-**unexplained**. Do not describe the read-mapping baseline as reproduced.
+[INCORRECT] - **VERDICT.** The installation runs the pipeline correctly and lands in the right regime with the right internal structure, but this is **NOT an exact reproduction** of the published baseline, and the residual +1.2 to +2.2 point offset is **unexplained**. Do not describe the read-mapping baseline as reproduced.
+[CORRECTION - 2026-09-26]: Verdict unchanged; the range was misstated. The table directly above gives +1.22 (perfect), +0.34 (gapless) and +2.22 (MAPQ60), so the offset spans **+0.34 to +2.22** points. "+1.2 to +2.2" dropped the gapless column. Caught by the 2026-09-26 primer audit.
 
 **What this does NOT establish.** Nothing about whether the paper's numbers are
 wrong. An offset of this size is consistent with an undocumented difference in read
@@ -801,9 +906,9 @@ PanMixer, a synthesis and a completeness critic. Finally re-verified every
 load-bearing claim by hand — reading the cited lines, executing the shipped HMM
 class on a synthetic panel, and measuring cross-build variant overlap directly.
 
-**Result.** The cohort is **44 individuals / 88 haplotypes**, not the paper's "47"
-(the HPRC VCF carries 45 samples, one being `chm13`, and the pipeline drops it and
-chrX). Two findings dominate, both independently reproduced:
+[INCORRECT] - **Result.** The cohort is **44 individuals / 88 haplotypes**, not the paper's "47" (the HPRC VCF carries 45 samples, one being `chm13`, and the pipeline drops it and chrX).
+[CORRECTION - 2026-09-26]: 44 / 88 is right and matches the PUBLISHED paper exactly; "47" is the superseded preprint only (Correction 4). Marked in place on 2026-09-26; the copy under Correction 4 was made without marking this original.
+Two findings dominate, both independently reproduced:
 
 1. **The released preprocessing pipeline matches GRCh38 against GRCh37.** Measured
    on chr21: 1,025 of 340,824 pangenome records match the wired 1000G Phase 3 panel

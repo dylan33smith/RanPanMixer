@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-26
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -192,7 +192,7 @@ evaluation suite. Defer the chromosome-wide chain.
 2. **One code path for every block.** A single-variant block is a chain of length
    T = 1 — a tilted categorical draw over donors — not a special case. **There is no
    allele-frequency branch in v1.** This keeps all 340,824 chr21 variants
-   cohort-supported instead of 73.9%, and removes the paper's "only one top-level
+   cohort-supported instead of the 71.4% sampled by donor copying today (73.9% sit in multi-variant blocks, but those with <= 1 anchor are frequency-drawn too; `docs/memory.md` 2026-09-26), and removes the paper's "only one top-level
    SNP, not enough information" problem, which is a limitation of INFERRING a chain
    rather than copying donors.
 3. **Exact tilted `ffbs`** in place of forward-only ancestral simulation. The forward
@@ -220,8 +220,8 @@ by `ffbs`.
 carries `-1` at a position. Dylan is leaning **renormalise** (drop that donor from
 the state distribution at that position) but has NOT decided; see `missing_policy`
 in `docs/terms.md` for the three options and their biases. This matters because the
-positions v1 adds are far worse behaved than anchors: mean missingness **11.31%**
-versus **0.35%**, with 7,555 positions over 25% missing.
+positions v1 adds are far worse behaved than anchors. Like for like, v1 steps over every variant (mean missingness **4.26%**, 30,800 over 25%) where PanMixer's HMM steps over anchors in >=2-anchor blocks (**0.26%**, 538). The non-anchor records inside multi-variant blocks are worst: **11.31%**, with 7,555
+over 25% missing (against 0.35% over all anchors; scopes in `docs/memory.md` 2026-09-26).
 **Prerequisite for deciding it well:** `-1` conflates five distinct conditions and
 they do not want the same treatment (see `missing_policy`). They ARE distinguishable
 at conversion time — LV/PS, run-length, the CONFLICT tag, GT arity — but
@@ -378,8 +378,10 @@ Ordered. Each item names what must pass before it starts and what closes it.
 7. **TRACKED (raised by Dylan 2026-09-22): do hypervariable structural sites make
    or break us?** On chr21 there are 7 sites where all 88 haplotypes carry distinct
    alleles, and 618 with >=20 alleles. They are simultaneously the most identifying
-   sites on the chromosome and the ones PanMixer scores at exactly zero (population
-   frequency 0 -> `-log(0)` -> zeroed). Our `tau` bound does not degrade with
+   sites on the chromosome and the ones PanMixer scores at exactly zero — not via
+   `-log(0)` zeroing, which never fires on our data (Correction 7), but because the
+   privacy score reads only anchor alleles and these sites are not anchors
+   (Correction 8). Our `tau` bound does not degrade with
    rarity, so this is where a path-level guarantee should show an advantage — but
    three things must be settled first: whether `output_support` can contain a valid
    traversal there at all, whether `phi_t` should be length-weighted when one block

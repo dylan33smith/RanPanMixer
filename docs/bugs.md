@@ -143,6 +143,20 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
   short and the required context does not fit on one line. Same empty output, a
   completely different reason. Check the pattern before blaming the file.
 
+### An audit reports a true number as fabricated
+- **[2026-09-26] "not found in `docs/`" was read as "invented"**
+  **[Symptom]** A checker greps `docs/` for a number quoted in teaching material,
+  finds nothing, and recommends deleting it — or worse, writes a published retraction
+  of it. Four primer numbers were flagged this way (274,458; 177,865; 3,077.60; 8,661).
+  One was already "retracted" in a draft, with an arithmetic argument that was itself
+  wrong (it treated a subset count as if it had to equal its superset).
+  **[Cause]** The numbers were measured during a session and quoted directly, never
+  logged. Absence from `docs/` is a provenance gap, not evidence of falsehood.
+  **[Proven fix]** Re-measure from the artifact BEFORE deleting anything (the mask
+  file, the run log, the checkout). All four were exact. Log them, then quote them.
+  And the upstream fix: anything measured in a session and quoted anywhere gets a
+  `docs/memory.md` line the same day. See `docs/memory.md` 2026-09-26.
+
 ## PanMixer (upstream, commit c182c38)
 
 Defects in the DEPENDENCY, not in our code. Recorded here because we will hit each
@@ -279,10 +293,14 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
   for every block". That was wrong; see Correction 3 in `docs/memory.md`.]** The
   effect is a ceiling, not a flattening: typical blocks are barely affected
   (median ratio 1.03x), the rarest are truncated hardest.
-  **[Related]** Alleles with AF exactly 0 — the novel, most identifying ones — get
+  **[Related — SUPERSEDED, see the NOTE directly below]** Alleles with AF exactly 0 — the novel, most identifying ones — get
   eps_j = 0, because `-log(0)` is +inf and then zeroed by
   `pmi_subject[pmi_subject > 1e200] = 0` (:232-240). The pipeline copy carries a
   literal `#FIX ME` at get_support_and_pmi.py:65-74.
+  **[NOTE — that zeroing branch never executes on our data: 0 of 319,092 chr21
+  sites have f_v = 0, because the target's own allele is counted in every frequency
+  branch. See Correction 7 in `docs/memory.md`. Hypervariable sites DO score zero,
+  but by being excluded as non-anchors, not by this code path.]**
   **[Proven fix]** Never use eps_pmi inside our mechanism (it is a function of the
   private input). If we plot on their axis, recompute it leave-one-out and disclose both.
   **[Severity]** HIGH for interpreting their published frontier.

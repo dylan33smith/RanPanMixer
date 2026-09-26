@@ -51,7 +51,7 @@ Verified against disk 2026-09-18. `tests/test_docs_contract.py` re-verifies.
 
 | source | what | state |
 |---|---|---|
-| `external/PanMixer` | G2Lab/PanMixer pinned at **`c182c38d5bc8bb6f00f4b0b101207c4a009ca045`** ("Merge pull request #1 from G2Lab/release_v1", 2026-06-06, MIT). 5 commits, ~8,660 Python lines. The only release; no tags, no test suite. | `OK` |
+| `external/PanMixer` | G2Lab/PanMixer pinned at **`c182c38d5bc8bb6f00f4b0b101207c4a009ca045`** ("Merge pull request #1 from G2Lab/release_v1", 2026-06-06, MIT). 5 commits, 8,661 Python lines (exact: `git ls-files` over `.py`; see `docs/memory.md` 2026-09-26). The only release; no tags, no test suite. | `OK` |
 | conda env `panmixer` | Built from PanMixer's own `environment.yaml` at `/home/ds85/miniconda3/envs/panmixer`. Resolved: python 3.11.16, bcftools 1.24, htslib 1.24, PLINK v1.9.0-b.8, numpy 2.4.6, pandas 3.0.6, scipy 1.17.1, ortools 9.15.6755. ⚠ **The pip deps are unpinned upstream**, so these are 2026-09-18 resolutions, not the authors' versions; pandas 3.x and numpy 2.x post-date the paper. | `OK` |
 | `paper/s41467-026-77591-0_reference.pdf` | The PUBLISHED PanMixer paper (Nature Communications, DOI 10.1038/s41467-026-77591-0). The version of record. | `OK` |
 | `archive_docs/Blindenbach2026_PanMixer.pdf` | The PanMixer PREPRINT, bioRxiv DOI 10.64898/2026.02.16.706152, 24 pages, CC-BY-NC-ND 4.0, sha256 `99ac1bd2...`. **Superseded by the published version**; numbers differ. | `STALE` |

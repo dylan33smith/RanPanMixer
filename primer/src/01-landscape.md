@@ -77,7 +77,9 @@ Variants also come in flavours distinguished by size and shape:
 
 SNPs are by far the most numerous and the easiest to handle; a single individual differs from the reference at millions of SNP positions. SVs are far rarer per person but touch far more total base pairs, and historically they were the hardest to detect — which matters, because the pangenome (§1.1.6) exists in large part to represent them properly.
 
-*Measured in this project:* on our rebuilt chr21 there are **340,824 variant records**, of which **274,458 are biallelic SNPs (80.5%)**; the remainder are indels, multi-allelic sites, and structural variation. The 274,458 figure is the count of set entries in the biallelic-SNP mask that the shipped preprocessing produces (`build_biallelic_snp_mask`); the chr21 artifact set is registered in `docs/data.md` and the preprocessing run is logged in `logs/pm_chr21.log`.
+*Measured in this project:* on our rebuilt chr21 there are **340,824 variant records**. The chr21 artifact set is registered in `docs/data.md` and the preprocessing run is logged in `logs/pm_chr21.log`.
+
+**274,458 of those records are biallelic SNPs — 80.5%.** "Biallelic SNP" means a single-base `REF` and exactly one single-base `ALT`, and this figure is the count of `True` entries in the biallelic-SNP mask the shipped preprocessing builds (`build_biallelic_snp_mask`): *measured in this project*. Place it among its neighbouring counts, because they are close together and easy to confuse. **65,176** records are indels or structural variants (measured in this project), so **275,648** records are single-base ones (derived: 340,824 − 65,176); **1,190** of those are *multi-allelic* SNP records — a single-base `REF` with two or more single-base `ALT`s, which the mask excludes — leaving **274,458** (derived). One number is a subset of the other; they do not have to be equal. Two further counts on this same chromosome are **different filters** and must never be quoted as the mask count: **288,020 records (84.5%)** is what `bcftools view -v snps` keeps, a looser filter that retains mixed multi-allelic records, and **238,052 records (69.8%)** is what the gap-score attack keeps after applying the mask *and* requiring a match in the 1000 Genomes panel (both measured in this project). Three filters, three counts; only **274,458** is the mask.
 
 #### 1.1.2 Genotype versus haplotype, and what "phased" means
 
@@ -144,6 +146,8 @@ D depends on the frequencies themselves, which makes raw values incomparable acr
 Note the letter collision flagged in §1.0: this **r²** has nothing to do with the recombination-rate constant *r* = 1.26 that appears in PanMixer's transition formula in Section 3.
 
 Nearby variants are typically in strong LD because recombination has not had time to break their association. Because LD decays with distance but in a lumpy way, the genome can be carved into **LD blocks**: contiguous runs of variants strongly correlated within the block and much less correlated across block boundaries. Blocks are a modelling convenience — there is no physical wall in the DNA — but they are enormously useful, because they let you treat each block as a semi-independent unit.
+
+> **Caution** — "semi-independent unit" is a statement about **correlation**, not about **geometry**, and the two come apart on real graph data. A record is assigned to a block by its **`POS` alone**, while the sequence that record describes occupies the span `[POS, POS + len(REF) − 1]`, so a long record's span crosses block boundaries. *Measured in this project* on all **340,824** chr21 records: **31,487 records (9.2%)** have their `POS` inside an earlier record's span, **15,540 of 100,757 block-dictionary entries (15.4%)** contain at least one such overlapped record, **78,937 variants (23.2%)** live in an affected entry, and **1,229 of 10,502 (11.7%)** of the entries routed to the HMM are affected. §1.1.8(c) gives the full table and the cross-check behind it. So blocks are **not** disjoint in sequence, and the verdict recorded in `docs/memory.md` is that this is structural rather than an edge case. Both the additive per-block accounting of §A.6 and our own per-block product argument in §4.16.3 assume disjointness; §4.16.8's open question 8 is where that assumption is paid for.
 
 *Measured in this project, on our rebuilt chr21.* Blocks are computed with **PLINK**'s `--blocks` routine. (PLINK is a long-established open-source genetics toolkit; `--blocks` is its confidence-interval LD-block caller, run on an external reference panel rather than on the pangenome itself.) That produces **14,137 LD blocks**. The working **block dictionary** consumed downstream, however, has **100,757 entries**, because every variant that falls inside no called LD block becomes its own one-variant entry. Stating this correctly requires naming the denominator every single time, because there are two very different denominators in play:
 
@@ -218,9 +222,283 @@ A **callset** is simply the set of variants that a particular method reported fr
 
 The two 1000 Genomes rows are the important ones. **The shipped PanMixer pipeline downloads 1000 Genomes Phase 3 — 2,504 samples, on GRCh37.** The pangenome it is matched against is on GRCh38. This project substituted the **30x GRCh38 panel — 3,202 samples, 1,002,753 chr21 records** — which is what all "our rebuilt chr21" numbers in this document are computed on. Whenever a number derived from a panel is quoted anywhere in this document, the panel that produced it is named. §1.2.1 gives the measured size of the difference.
 
+#### 1.1.8 The correspondence in full: indels, nested bubbles, missing values, cycles, and the worst site on chr21
+
+§1.1.7 stated the correspondence between a graph and a VCF in one sentence — *one bubble becomes one VCF record* — and then moved on to the file inventory. That sentence is true and it is not enough. Every hard question in this project turns out to be a question about the places where the correspondence is *awkward*: where a variant is not a single letter, where one variant sits inside another, where a haplotype has no value at all, where a path loops back on itself, and where a single VCF row is 28 megabytes long. This subsection works through all five, with the measured chr21 numbers attached, because Sections 3 and 4 both assume you have them.
+
+The organising claim, stated once now and justified over the rest of the subsection:
+
+> **Key idea** — The **graph is the primary object** and the **VCF is a projection of it**. The graph holds nodes, edges and paths; a path is a walk, and a walk is the ground truth about what one haplotype's DNA actually is. A VCF record is a *report about a region of that graph*, written in the coordinate system of one chosen backbone path. Reports are lossy. Every oddity below is a place where the report cannot carry something the walk knows — and the honest way to read a VCF built from a graph is as a flattened summary, not as the data.
+
+##### (a) An insertion and a deletion, in a VCF
+
+A SNP is easy to write in a VCF because it is a one-for-one substitution: `REF` is one base, `ALT` is one base. An insertion or a deletion is not one-for-one — one of the two sides is *shorter* — and the VCF format has no way to write an empty string in `REF` or `ALT`. The format's solution is the **padding base**.
+
+> **Definition** — **Padding base (also "anchor base", a different use of the word "anchor" from §1.1.4's).** A shared base immediately to the left of the event, included at the start of **both** `REF` and `ALT` so that neither string is empty. `POS` then points at the padding base, **not** at the first inserted or deleted base. This is the standard VCF convention, not a choice anyone in this project made.
+
+> **Definition** — **Left alignment (also "left normalisation").** In a repetitive stretch the same event can be written at several coordinates: deleting one `A` from `AAAA` gives `AAA` no matter which `A` you delete. The convention is to shift the record as far **left** (toward lower `POS`) as it can go while still describing the same alleles, and to trim any bases that are identical at the right-hand end. Two files describing the same biological event will only join on `(POS, REF, ALT)` if both were normalised the same way — which is part of why §1.2.1 calls that key fragile. (§1.2.1's *measured* 0.30%-versus-75.88% match rates are attributed in `docs/bugs.md` to a reference-build mismatch, not to normalisation; no measurement in `docs/` apportions any of that gap to normalisation, so none is claimed here.)
+
+> **Worked example** — *illustrative only.* The letters and the coordinate in this box are **invented** to show the format convention; nothing in this box is a measurement. Every measured number elsewhere in §1.1.8 is labelled as measured.
+>
+> Suppose the backbone reads `… T C A G T …` with the `C` at position 1,000.
+>
+> | | how it is written | reading |
+> |---|---|---|
+> | **SNP**, `C`→`T` at 1,000 | `POS=1000  REF=C  ALT=T` | one base for one base; no padding needed |
+> | **Insertion** of `GG` after the `C` at 1,000 | `POS=1000  REF=C  ALT=CGG` | `REF` is the padding base alone; `ALT` is the padding base plus the inserted sequence. `len(ALT) − len(REF) = +2` |
+> | **Deletion** of the `AG` that follows the `C` at 1,000 | `POS=1000  REF=CAG  ALT=C` | `REF` is the padding base plus the deleted sequence; `ALT` is the padding base alone. `len(ALT) − len(REF) = −2` |
+>
+> Three consequences worth holding on to. First, **the sign of `len(ALT) − len(REF)` is what makes a record an insertion or a deletion**, not anything in the `INFO` column. Second, **`POS` is the padding base**, so the sequence a record actually describes occupies `[POS, POS + len(REF) − 1]` — a span, not a point. That span is the reason "which block is this variant in?" is a harder question than it looks (§1.1.4, and Step 12 of Section 3). Third, in the allele-index view of §1.1.7 **all three rows above look identical**: a haplotype carrying the insertion and a haplotype carrying the SNP both just have the integer `1` in their column. The integer says *which branch*, never *how big the branch was*. Section 3's §A.5 costs an edit at one over the number of called haplotypes **per record**, with no term in base pairs; the representation gives it nothing to weight by, because the allele *lengths* are not in the matrix at all (see §1.1.8(f), which lists what the converter keeps and what it drops).
+
+*Measured in this project, on our rebuilt chr21:* of **340,824** variant records, **65,176** are non-SNP — indels and structural variants with a length change of the kind just described. That is **19.1%** of records (derived: 65,176 / 340,824), so **roughly one record in five** is an event whose `REF` and `ALT` differ in length, which is far too many to treat as an afterthought. (The 340,824 record count is registered in `docs/data.md`; the 65,176 non-SNP count and the 274,458 biallelic-SNP count are both in `docs/memory.md`. Do keep in mind that "the SNPs" is still not one well-defined set downstream: two *other* filters on this chromosome keep **288,020 records (84.5%)** and **238,052 records (69.8%)** respectively, as §1.1.1 sets out.)
+
+##### (b) The same two events in the graph, and why the graph is the primary object
+
+In the graph an insertion and a deletion are **the same shape**: a bubble in which one branch carries sequence that the other branch lacks. There is no padding base, because there is nothing to pad — a branch is a list of nodes, and a branch may simply have fewer nodes than its sibling. There is no left-alignment question either, because a node either is or is not on the walk.
+
+```
+        (a) An insertion, as a bubble
+                                  ┌──[ GG ]──┐
+        ──[ …TC ]───────────────>─┤          ├─>───────────[ AGT… ]──
+                                  └────ε─────┘          (ε = no node: the
+                                                         branch is a direct edge)
+        Haplotype 1 walks  …TC → GG → AGT…      (carries the insertion, allele 1)
+        Haplotype 2 walks  …TC ──────> AGT…     (does not, allele 0)
+
+
+        (b) A deletion, as a bubble  — structurally identical, only the
+            backbone's side of the fork has changed
+                                  ┌──[ AG ]──┐
+        ──[ …TC ]───────────────>─┤          ├─>───────────[ T… ]──
+                                  └────ε─────┘
+        Haplotype 1 walks  …TC → AG → T…        (has the sequence, allele 0 = REF)
+        Haplotype 2 walks  …TC ──────> T…       (deleted it,      allele 1 = ALT)
+```
+
+Note what just happened in panel (b): whether the bubble is called "an insertion" or "a deletion" depends **entirely on which branch the chosen backbone path takes**. The graph is symmetric; the VCF is not, because a VCF must nominate a `REF`. That asymmetry is exactly the reference bias of §1.1.6 re-appearing in the file format: the backbone's branch is the one that gets to be "normal".
+
+> **Key idea** — This is why the graph is primary and the VCF is a projection. Deconstruction (§1.1.6) has to choose a backbone, choose a coordinate for each bubble, choose which branch is `REF`, linearise every branch into a flat string, and then throw away everything that does not fit those choices. The walk existed first. Given the graph *and* the VCF rows, a haplotype's path and its allele vector are two views of one object — but given only the VCF, several things the walk knew are gone. The rest of §1.1.8 is those things.
+
+##### (c) Nested variants: a bubble inside a bubble, and the `LV` / `PS` / `AT` tags
+
+§1.1.6 said in one clause that bubbles can be nested. Here is what that means and how much of the chromosome it touches.
+
+> **Definition** — A **snarl** is the graph generalisation of a bubble: a region of the graph delimited by a pair of boundary node-sides, such that every path that enters the region through one boundary leaves through the other. A **bubble** is the simple, acyclic special case — two or more parallel branches that diverge and reconverge. Snarls **nest**: a snarl can lie wholly inside one branch of a larger snarl, and that containment relation forms a tree, the **snarl tree**. The tree's root-most snarls are *top level*; the ones inside them are their *children*.
+
+> **Definition** — A **nested variant** (equivalently a **child variant**) is a variant that sits inside another variant's allele — a bubble within a bubble. `vg deconstruct -a` (§1.1.6) emits **every level** of the snarl tree rather than only the top one, and tags each record in the `INFO` column with:
+>
+> - **`LV`** — the **level** in the snarl tree. `LV=0` is top level; `LV=1` is a child of a top-level bubble; `LV=2` a grandchild, and so on.
+> - **`PS`** — the **parent snarl**: the identifier of the bubble this record sits inside. Absent for `LV=0` records.
+> - **`AT`** — the **allele traversals**: for each of the record's own alleles, the list of graph nodes (with orientation) that the corresponding branch walks through. This is the one field that still speaks the graph's own language.
+
+```
+        A top-level bubble with a child bubble inside one of its branches
+
+                            ┌─────── ALT branch: [ AAG ] ── [ C ]* ── [ TT ] ───┐
+        ──[ backbone… ]──>──┤                                                   ├──>──[ …backbone ]──
+                            └─────── REF branch: [ AG ] ────────────────────────┘
+
+                                                        * this node is itself a bubble:
+                                                              ┌─[ C ]─┐
+                                                          ──>─┤       ├─>──
+                                                              └─[ G ]─┘
+
+        PARENT record: LV=0, the whole fork.  Its alleles are the two long branches.
+        CHILD  record: LV=1, PS = the parent's id, the little C/G fork.
+                       It exists ONLY on haplotypes that took the ALT branch above.
+```
+
+*Measured in this project, on our rebuilt chr21* (all from `docs/memory.md` and `docs/terms.md`):
+
+| Metric | Value |
+|---|---|
+| records at `LV=0` (top level) | **90.8%** |
+| records at `LV=1` | **8.2%** |
+| records at `LV=2` | **0.9%** |
+| records at `LV=3` | **0.1%** |
+| records at `LV=4` | **10 records** |
+| total records at `LV ≥ 1` (nested) | **31,489** |
+
+And measured a second, independent way — by geometry rather than by tag, taking each record's span as `[POS, POS + len(REF) − 1]` as in §1.1.8(a):
+
+| Metric | Value |
+|---|---|
+| records whose `POS` lies inside an **earlier record's span** | **31,487 = 9.2%** of 340,824 records |
+| …inside a record of `REF` length ≥ 10 kb | **19,211 = 5.6%** |
+| …inside a record of `REF` length ≥ 100 kb | **4,608 = 1.4%** |
+| block-dictionary entries containing ≥ 1 such overlapped record | **15,540 of 100,757 = 15.4%** |
+| variants living in an affected block | **78,937 = 23.2%** of 340,824 variants |
+| HMM-path blocks (≥ 2 anchors) affected | **1,229 of 10,502 = 11.7%** |
+
+The two counts — **31,489** records tagged `LV ≥ 1` and **31,487** records whose `POS` falls inside an earlier span — agree to within two records, which is the cross-check that the tag and the geometry are describing the same phenomenon (both measured in this project). The verdict recorded in `docs/memory.md` is worth quoting exactly, because it is the reason this is a Section 1 topic rather than a Section 3 footnote: *"not documentable as an edge case. Roughly a tenth of records and a quarter of variants-by-block are involved, so block disjointness … fails broadly, not locally."*
+
+> **Caution** — A nested variant and its parent are **both rows** in the VCF and therefore **both rows** in the matrix of §1.2.1. The same stretch of DNA is described twice, at two levels of resolution. Any per-row sum — a count of variants, a total privacy score, a total edit cost — therefore counts the nested region more than once. Nothing in the tooling warns you about this, because (see (e)) the tags that would tell you are discarded on the way into the matrix. And the follow-on question — what the released file *literally contains*, and therefore which allele a reconstruction should believe, when a child record's block is rewritten and its parent's block is not — is not answered here. It is answered in Section 3's walkthrough of the stacker and the VCF writer, which is where the released bytes are actually assembled.
+
+##### (d) One parent and one child, written out as VCF rows
+
+Here is a real pair from our chr21, chosen because it is small enough to read. *All values measured in this project* (`docs/memory.md`, 2026-09-25 missingness entry).
+
+The parent is **row 37624**, at **`POS` 13,205,133**, with a `REF` of **13 bp** and **five** `ALT` alleles of **15, 1, 17, 11 and 13 bp**. The child is **row 37625**, at **`POS` 13,205,136** — three bases inside the parent's span.
+
+Schematically — with `REF`/`ALT` sequences abbreviated by their lengths, because the actual strings are not what matters here, and with the sample columns collapsed to the one sample whose call is interesting. Which of the 44 samples that is, which of its two strands carries allele 2, and which allele the *other* strand carries are none of them recorded in `docs/`. The schematic therefore writes the column as *the sample carrying parent allele 2*, puts allele 2 on the right-hand strand, and shows the companion strand as `0` — **those three choices are illustrative, not measured.** What *is* measured is only that exactly one of the 88 haplotypes carries parent allele 2 and has no child call:
+
+```
+  #CHROM  POS         ID  REF      ALT                                INFO                   <the sample carrying allele 2>  …
+  chr21   13205133    .   <13bp>   <15bp>,<1bp>,<17bp>,<11bp>,<13bp>  LV=0;AT=…              0|2                             …
+  chr21   13205136    .   <…>      <…>                                LV=1;PS=<parent>;AT=…  0|.                             …
+```
+
+Read the two `GT` fields together. On the parent row this haplotype pair is `0|2`: one strand takes the reference branch, the other takes **allele 2 — the 1 bp allele**. A 13 bp `REF` replaced by a 1 bp `ALT` is, by (a)'s sign rule, a **12 bp deletion**: on that chromosome the region the child bubble lives in has been deleted. So on the child row that strand has nothing to report, and the VCF writes `.`.
+
+*Measured:* across the cohort, **87 of the 88 haplotypes** carry parent allele **0, 1, 3, 4 or 5**, and **all 87 have a child allele**. The **one** haplotype carrying parent allele **2** has `.` at the child. Nothing is broken, nothing is missing in the ordinary sense, and no sequencing failed. The child variant simply **does not exist on that chromosome**.
+
+> **Caution** — **VCF has no way to say "not applicable."** The format offers one symbol, `.`, for every kind of absence: not applicable, not sequenced, not callable, not decided. The information that these are different things is present in the graph and in the `INFO` tags, and it is gone the moment you read only `GT`.
+
+##### (e) Why a haplotype can have no value at a variant — all five causes
+
+This is the passage to read twice, because it is the one a design decision rests on.
+
+> **Question** — *Isn't the whole point of a variant that every haplotype has some value there? How can a donor fail to traverse a parent bubble at all?*
+
+The short answer has two halves, and the first half is reassuring.
+
+**For top-level variants it cannot happen.** Every haplotype in this cohort is stored as a path that runs along the **GRCh38 backbone** (§1.1.6). A top-level bubble is, by definition, a fork *on* that backbone, so every path reaches it and every path takes one of its branches. A `LV=0` variant therefore has an allele for everybody, in principle. *Measured in this project:* top-level records nevertheless show **2.25%** (SNPs) and **3.11%** (non-SNPs) mean missingness, and `docs/memory.md` attributes that residue to **assembly gaps and conflicts, not structure** — causes 3 and 4 below. (That attribution is stated in the ledger without being split between the two; the split is **not measured**, and no number for it exists.)
+
+**For nested variants it can, and routinely does** — for exactly the reason (d) shows. A child bubble sits inside **one particular parent allele**. A haplotype that took a different parent allele never visits that part of the graph.
+
+*Measured in this project,* on the class where it bites hardest:
+
+| Metric | top-level SNP | top-level non-SNP | nested (`LV ≥ 1`) |
+|---|---|---|---|
+| records | **253,000** | **56,335** | **31,489** |
+| mean haplotypes uncalled | **2.25%** | **3.11%** | **22.53%** |
+| records > 50% uncalled | **421** | **722** | **3,515** |
+
+Nested variants are roughly **ten times** more often uncalled than top-level ones (derived from the row above). Keep that ratio: it is the real justification for the "anchor" restriction you met in §1.1.4 and will meet again in Section 3.
+
+Now the full enumeration. `docs/memory.md` puts it as "`-1` means **at least five** different things" — *at least*, because the list is an inventory of causes found, not a proof that no sixth exists. They are genuinely different things that a model should arguably treat differently.
+
+1. **Not applicable — the DNA does not exist on that chromosome.** The case in (d): the haplotype took a parent allele that does not contain this child bubble. Nothing failed; there is no allele to report because there is no sequence to report it about. *Measured in this project:* over the **5,735** nested records that have any missing child call, **66.1%** of the missing child calls — among haplotypes that *do* have a parent call — are **perfectly determined by which parent allele the haplotype carries**. "Perfectly determined" is the strong claim here: knowing the parent allele tells you with certainty that the child call will be absent.
+
+2. **Inherited from a missing parent.** If the parent call is itself absent, the child's status cannot be worked out at all — you do not know which branch the haplotype took, so you do not know whether the child bubble was on its route. *Measured in this project:* **12.1%** of that same nested missingness (same denominator, 5,735 nested records).
+
+3. **An assembly gap.** The donor's assembly simply does not cover the region: a contig break, not a biological statement. Because a contig break is a *contiguous stretch* of the chromosome, this cause leaves a distinctive signature — a long **run** of consecutive missing positions in one sample. *Measured in this project,* run lengths of consecutive missing positions on strand 0 across all 44 subjects: **28,052 runs**, median **1**, mean **20.0**, maximum **23,478**. **54.4%** of runs are **isolated single positions** — that is the structural, not-applicable shape of cause 1. At the other end, **349 runs of length ≥ 100** cover **448,283** matrix entries; those are contig breaks.
+
+4. **A `CONFLICT` record.** The sample had **more than one graph path** through the region, and they disagreed, so `vg` declined to pick and wrote the genotype as `.|.`. *Measured in this project:* **1,855** chr21 records (**0.54%**) carry a `CONFLICT` tag, and at such a record a mean of **29.4 of 88** haplotypes are uncalled, against **3.6 of 88** at non-`CONFLICT` sites. The dominant cause of `CONFLICT` itself is **not established** — assembly fragmentation is the most plausible candidate recorded in `docs/memory.md`, but it *"cannot be determined from the VCF alone and has not been verified."* Do not repeat it as fact. What *is* measured is that it is not mainly about repeats: see (g).
+
+5. **A haploid genotype, turned into a missing entry by the converter.** This cause is not in the data at all — it is manufactured downstream. Where the VCF gives **one** allele rather than two (a `GT` of `0` rather than `0|0`), PanMixer's `VCFtoNP.py` writes the allele into strand 0 and **`-1` into strand 1**. *Measured in this project,* over **150,000** chr21 records: **3.135%** of sample `GT` fields are **haploid**, and **5.581%** of the two allele slots are an **explicit `.`**. So a measurable share of the matrix's missingness is a **conversion decision**, not a property of the genome.
+
+*Measured in this project,* the totals those five add up to, in the matrix of §1.2.1: **1,278,653** entries missing on chr21 = **4.26%** of all entries, spread over **52,926** sites = **15.5%** of sites having at least one missing entry.
+
+> **Open question** — **There is no measurement apportioning those 1,278,653 missing entries across the five causes.** The 66.1% and 12.1% figures are shares of *nested* missingness with denominator 5,735 nested records; 3.135% is a share of *`GT` fields*; 349 runs covering 448,283 entries is an absolute count on one strand. The denominators are all different and none of them is "all missing entries." A single apportionment table would be the right thing to have before choosing a policy, and it does not exist in `docs/`. Do not assemble one by arithmetic from the figures above; they are not commensurable.
+
+Why this matters enough to be the centre of the subsection: everything downstream treats the five alike. The edit cost of §A.5 is one over the count of **non-missing** haplotypes, so all five causes inflate it equally. The privacy score of §A.4 is set to **zero** wherever the target's own entry is missing, for all five causes equally. And the choice of what a model should *do* about a missing donor entry — Section 4 calls it the **missing-data policy** — is a live, undecided question precisely because the right answer differs by cause: "not applicable" argues that the donor should be dropped from consideration at that position, whereas an **assembly gap** means the donor almost certainly *has* an allele that we merely do not know, and dropping them penalises poorly-assembled donors for reasons that have nothing to do with genetics.
+
+> **Caution** — The scale of that decision, *measured in this project:* mean missingness at the chain positions PanMixer's HMM actually steps over — anchors inside blocks holding two or more anchors — is **0.26%**; across **every** variant, which is what v1 makes a chain position, it is **4.26%**, with **30,800** records over 25% missing. Worst is the class v1 adds *inside* blocks PanMixer already chains — the non-anchor records of multi-variant blocks — at **11.31%**, with **7,555** over 25% missing (all measured in this project; the per-class table is in `docs/memory.md`, 2026-09-26). **Each of those means is over a different set of positions; none of them is quotable without naming its set.** A policy that is harmless at 0.26% is not automatically harmless at 4.26%, still less at 11.31%. This is recorded as an **open decision** and is deliberately not resolved anywhere in this document.
+
+##### (f) The five causes at a glance
+
+Rows are the causes; the columns are what each one means, whether the VCF can still tell you which one you are looking at, and whether that distinguisher survives the conversion into the matrix. *(Measured shares as cited in (e); the field and survival columns are derived from the converter's source, `external/PanMixer/tools/common/VCFtoNP.py`.)*
+
+| Cause | What it means biologically | Measured share | Distinguishable in the VCF? From which field | Survives conversion to the matrix? |
+|---|---|---|---|---|
+| **1. Not applicable** | the child bubble is not on this haplotype's route; **the DNA does not exist** on that chromosome | **66.1%** of nested missingness (of 5,735 nested records with any missing child call) | **Yes** — `LV` and `PS` identify the record as a child and name its parent; the parent row's own `GT` then says which branch this haplotype took | **No** — the whole `INFO` column is discarded |
+| **2. Inherited** | the parent call was itself absent, so the child's status is unknowable | **12.1%** of the same nested missingness | **Yes** — same two fields, plus the parent row's `GT` being `.` | **No** — same reason |
+| **3. Assembly gap** | the donor's assembly does not cover the region; a contig break, not biology | **349 runs of ≥ 100** consecutive missing positions covering **448,283** entries (strand 0, 44 subjects) | **Partly** — by **run length**, not by a tag: a long consecutive run in one sample is the signature | **Not as such** — run length is in principle visible in the matrix, but nothing computes it and no cause label is stored |
+| **4. `CONFLICT`** | the sample had multiple graph paths through the region that disagreed, so `vg` wrote `.` | **1,855** records (**0.54%** of chr21); mean **29.4 of 88** haplotypes uncalled there | **Yes** — the `CONFLICT` `INFO` tag, which also **names the samples** | **No** — the whole `INFO` column is discarded |
+| **5. Haploid genotype** | nothing is absent biologically; the VCF gave one allele and the converter wrote `-1` into strand 1 | **3.135%** of sample `GT` fields haploid; **5.581%** of allele slots an explicit `.` (of 150,000 chr21 records) | **Yes** — `GT` **arity**: whether the field has a separator at all | **No** — the converter resolves the arity and keeps only the result |
+
+*The converter keeps exactly two things per sample per record:* `fields[1]` (the `POS`) and `fields[9+i].split(':')[0]` (the `GT` subfield). `REF`, `ALT`, the record `ID` and the **entire** `INFO` column — `LV`, `PS`, `AT`, `CONFLICT` — are dropped. (Read from the released converter source, as recorded in `docs/bugs.md`; this is a reading of code, not a measurement.) So by the time the data reaches the matrix, **all five causes look identical: the integer `-1`.**
+
+> **Key idea** — Every one of the five is recoverable at the moment of conversion, and none is recoverable afterwards. `docs/plan.md` records the resulting recommendation in five words: *"Cheap now, unrecoverable later."* The concrete form is to emit an auxiliary **reason array** alongside the allele matrix during conversion, one label per missing entry, so that a policy can later be chosen per cause instead of once for all five.
+
+##### (g) Cycles: a walk that leaves a node, returns to it, and leaves again
+
+> **Question** — *Can a pangenome graph contain loops? Isn't it a directed graph?*
+
+It is a directed graph, and it can still contain loops. Those are not contradictory: "directed" constrains which way you may traverse an edge, not whether the edge set contains a cycle. A directed graph with no cycles is a **directed acyclic graph (DAG)**; a directed graph that is *not* a DAG contains at least one cycle. A walk may then enter a node, continue forward, and arrive back at a node it has already used — and then leave it again along a different edge than last time. `docs/` makes no general claim about whether **PGGB** (§1.1.6) graphs are DAGs, so none is made here. What it does record is the specific case, *measured in this project:* our HPRC v1.0 chr21 graph contains at least one traversal that revisits nodes, so **this** graph is not a DAG. That traversal is the subject of the rest of (g).
+
+Nothing about a path "remembers" that it has been somewhere before. A path is just a **sequence of steps**, and a node may appear at more than one index in that sequence. The walk `n1 → n2 → n3 → n2 → n4` is perfectly well formed; it visits `n2` twice and spells out `n2`'s sequence twice when you read the DNA off it.
+
+**This is how a tandem duplication is encoded.** A tandem duplication is a stretch of DNA present twice in a row. In a linear reference you would have to write the second copy out as inserted sequence. In the graph you do not write it at all: the walk simply goes around the region again. The sequence is stored **once**, in the nodes; the *repetition* lives in the walk, not in the storage. That is the compactness a graph buys you.
+
+Here is the real one, *measured in this project* (`docs/memory.md`, 2026-09-22): at the chr21 site examined in (h), **allele 58** of the top-level bubble walks **10,008 node steps** over only **5,014 distinct nodes**. **4,994** of those nodes appear **exactly twice** and **20** appear **once**. At around step **5,004** the walk reaches node `>102277684`, which sits beside the bubble's *closing* boundary, and jumps back to `>102270112`, which sits beside its *opening* boundary — and then walks the whole region a second time. That is a **whole-region tandem duplication**, read directly off the traversal.
+
+> **Question** — *Then why can a duplication not just be written as an insertion variant, with the second copy as inserted sequence?*
+
+Two reasons, and the second is the deep one.
+
+1. **The copies are not identical.** Of allele 58's nodes, 4,994 appear twice but **20 appear once** — which means there are roughly **10 interior positions where the second copy diverges from the first** (measured in this project). So the region is not "this sequence, times two". It is "this sequence, then a slightly different version of this sequence". You cannot collapse it into a clean copy-number count, because there is no single thing being counted.
+2. **VCF positions are reference coordinates, and inserted sequence has none.** Suppose you did write the duplication as one big insertion. Now you want to record that the second copy differs from the first at those ~10 interior positions. There is **nowhere to put those records**: a VCF row must carry a `POS`, `POS` is a coordinate on the backbone, and the second copy is not on the backbone. The format offers no coordinate for "inside the inserted sequence." **This is precisely the limitation pangenome graphs exist to remove** — in the graph, an interior variant of the duplicated region is just another bubble on the walk, and it needs no backbone coordinate at all.
+
+That second point also explains something that otherwise looks like a bug: **why the VCF line for this site is 28 megabytes long.** The graph stores the repeat compactly, duplicating no sequence. The ~28 MB is purely a **VCF export artefact** — a VCF allele is a **flat string**, so a cyclic traversal has to be **linearised**, writing every base of both copies out in full, for every allele. *Nothing about the graph is 28 MB.*
+
+*Measured in this project,* how common this is, and one important limit on that measurement:
+
+| Metric | Value |
+|---|---|
+| records whose own `AT` field contains a **revisiting** traversal | **37 = 0.011%** of 340,824 |
+| records carrying a `CONFLICT` tag | **1,855 = 0.54%** |
+| records with **both** | **11** |
+| revisiting but **not** flagged `CONFLICT` | **26** |
+| flagged `CONFLICT` but **no** revisiting traversal | **1,844** |
+| traversals at the (h) site using **reverse** orientation (an inversion) | **0 — none** |
+
+> **Caution** — That 37-record count is a **floor, not an estimate**, and the reason is worth understanding. A record's `AT` lists the traversals of **its own** bubble. It therefore cannot reveal that a sample passed through **this** bubble twice — that fact is only visible at the **enclosing parent**. So the cross-tabulation **understates** the link for child records sitting inside a duplicated region. Concretely: the 257 kb parent at (h) **has** a revisiting allele and is **not** flagged `CONFLICT`, because at the parent level the sample `HG01891` has exactly **one** allele — number 58 — whose walk happens to loop. The conflict only materialises at the **child** records, where that single parent allele corresponds to **two passes that may disagree**, and there is no way to say in the child's `GT` which pass you mean. *Measured:* `CONFLICT=HG01891` duly appears at **`POS` 14,577,263**. The mechanism is real; **1,844 conflicts with no revisit** shows it is not the main source of conflicts genome-wide.
+
+##### (h) A site where every haplotype differs: `grch38#chr21:14569980`
+
+> **Question** — *Suppose a single position is different for every single haplotype. What would that look like in the VCF versus in the graph?*
+
+It looks like this, and it is real. *Every value in the table is measured in this project* (`docs/memory.md`, 2026-09-22; `docs/terms.md` entry `hypervariable_site`).
+
+The site is **`grch38#chr21:14569980`**, graph bubble **`>102270111>102277685`**, **`LV=0` — top level**, VCF **row 51791**.
+
+| Property | Value |
+|---|---|
+| alleles **declared** on the record | **90** (89 `ALT`) |
+| distinct alleles actually **carried by the cohort** | **88, across 88 haplotypes — every haplotype unique** |
+| `REF` length | **257,439 bp** |
+| `ALT` lengths | **257,124 – 514,768 bp** |
+| size of the **single VCF line** | **27,983,949 bytes (~28 MB)** |
+| `AC` for allele 1 | **0** — an orphan left behind by `view -s ^chm13` **without** `--trim-alt-alleles`: the sample was removed, its allele was not |
+| **nested child records** (`LV ≥ 1`, `PS` = this bubble) | **2,464** |
+| total matrix rows for this one region | **2,485 = 0.7%** of chr21's 340,824 rows |
+| distinct graph nodes inside the bubble | **7,575**; traversals span **4,971 – 10,008** nodes |
+| allele 58, structurally | a **whole-region tandem duplication** — 10,008 steps over 5,014 distinct nodes, ≈ 4,994 revisits (see (g)) |
+| inversions | **none** — 0 traversals use reverse orientation |
+| block-dictionary entries the region **spans** | **370** overlapping entries |
+
+*Measured in this project,* the class is small but not unique: **7** chr21 sites have **≥ 88** declared alleles, **155** have **≥ 44**, and **618** have **≥ 20**.
+
+**Now the question that this site is really about.** How can **one** VCF record describe a region in which thousands of interior differences exist? Look at the last two rows of the table against the row above them. There are **2,464 nested child records** here, so the nested decomposition **did** happen — the interior differences *are* broken out into their own rows, one bubble at a time, and they are exactly the `LV ≥ 1` records of (c). The top-level record is emitted **in addition to** all 2,464 of them, and there are two reasons it has to be:
+
+1. **Some alleles cannot be expressed as a combination of the children.** Allele 58 traverses the region **twice** (see (g)). No set of independent per-site substitutions can encode "this whole region is duplicated" — a duplication is a statement about the *shape of the walk*, and the child records only describe *which branch at each fork*. If you kept only the children you would lose allele 58 entirely.
+2. **VCF has no syntax for "this allele = this combination of child variants."** A VCF allele is a flat string and nothing else. There is no way to write "allele 58 is: take the parent's REF branch, go round twice, and at such-and-such a child bubble take allele 2." So a top-level traversal has to be **spelled out in full**, base by base — all 257,124 to 514,768 of them, ninety times over. **Hence 28 MB.**
+
+So the answer to "one record or thousands?" is **both, simultaneously, by design**: one top-level record that can express walk-shape but costs 28 MB to write, plus 2,464 child records that are cheap but cannot express walk-shape. They describe the same DNA at two resolutions, and — per (c)'s caution — every one of the 2,485 is a separate row in the matrix.
+
+##### (i) Why that site is at once the worst case for privacy and an opportunity
+
+**Worst case for privacy, by construction.** Every one of the 88 haplotypes carries a **distinct** allele here. That is not a variant, it is a **fingerprint**: learning a person's allele at this one site distinguishes them from all 87 others in the cohort outright. Put it in the self-information terms of §1.1.3. *Measured in this project:* the target `HG00438` carries alleles **89** and **88** at this record, each with a frequency of **`f_v` = 1.540 × 10⁻⁴**. That figure is the value `docs/memory.md` gives for an allele carried by a single haplotype at a **novel** site — one matched in no external panel — where the denominator is padded to `NOVEL_DENOMINATOR = 2 × (N_1000G + N_pangenome)` = 2 × (3,202 + 44) = **6,492** (derived, and it carries the panel: our pinned **1000 Genomes 30x GRCh38 panel** of 3,202 samples plus the 44 pangenome individuals; under the shipped Phase 3 panel of 2,504 samples the denominator would be a different number). 1 / 6,492 = 1.540 × 10⁻⁴ (derived), and −log(1.540 × 10⁻⁴) = **8.78 nats** of self-information per allele (derived). For scale, *measured in this project* across the sites where `HG00438` carries a non-reference allele, the median self-information is **0.63 nats** where the variant matched the 1000 Genomes 30x panel and **0.43 nats** where it matched the PanGenie callset instead. So this one record carries **roughly fourteen times** the self-information of a typical 1000-Genomes-matched non-reference call (derived: 8.78 / 0.63 = 13.9; against the PanGenie-matched median of 0.43 nats the ratio is 20.4, also derived). On the arithmetic of §1.1.3 and §1.3.1 it is, in `docs/memory.md`'s own words, the most identifying record on the chromosome.
+
+**And yet** — this is the part to carry into Section 3 — the score PanMixer computes for the block containing it **never reads this record at all**. *Measured in this project:* the record is **not an anchor** (§1.1.4: it is not in the PanGenie callset), and the block it lands in — **block 1639, 92 records of which 82 are anchors** — therefore takes the haplotype-model branch, where the score is computed over the block's **anchors only**. The 8.78 nats are computed and then never used.
+
+> **Caution** — State that finding in its correct form, which is narrower than it first sounds. It is **not** a claim that the published results are wrong; we have reproduced none of the paper's figures. It is a claim about **what the metric measures**: the per-block privacy score is the self-information of the block's **anchor alleles**, not of the block. A reader who takes the name at face value will over-read it. §A.4.3 gives this its own treatment with the measured comparison. **And a retraction belongs here.** An earlier version of this primer explained this site's zero score by a `−log(0)` code path: a frequency of exactly 0 makes `−log f_v` infinite, and the released code detects the overflow and clamps the value to **0** — the minimum rather than the maximum — at the line that carries a literal `#FIX ME` comment. **That explanation is withdrawn.** *Measured in this project:* across all **319,092** chr21 sites where `HG00438` carries a called allele, **zero** have `f_v = 0`, so that branch never fires on our data. The original reasoning failed because it assumed a very rare allele would come back from the frequency table with a frequency of exactly 0. It cannot here, for two reasons: the table counts **the target's own allele** in every one of its three branches, and at a **novel** site it floors the frequency by padding the denominator to `NOVEL_DENOMINATOR` = 6,492, so an allele carried by a single haplotype comes out at **1.540 × 10⁻⁴** rather than 0 (measured in this project; the division is derived). The clamp is therefore a **latent** defect with a panel-dependent trigger, not the mechanism operating at this site; the mechanism here is non-anchor exclusion (§A.4.3).
+
+**Simultaneously an opportunity — to evaluate, not yet a claim.** Three specific reasons, each with its own caveat, and **nothing here is measured about our mechanism, because our mechanism does not exist yet:**
+
+- A **path-level** guarantee of the kind Section 4 builds is stated in terms of how distinguishable two whole releases are, and does not weaken as an allele gets rarer. This record, by contrast, contributes nothing to the score PanMixer computes for its block — *measured in this project*, by the mechanism established just above: the record is **not an anchor**, and its block takes the anchor-only HMM branch. (Do **not** state this as "the frequency-based score collapses where rarity is extreme": `docs/memory.md` Correction 7 retracts exactly that explanation for this site, having measured that the record receives a perfectly ordinary `f_v`. The zero contribution is an anchor-set effect, not a frequency effect.) If that contrast holds up, this site class is where the two approaches should differ most visibly.
+- The **segmentation** could be better. This one region spans **370** overlapping block-dictionary entries (measured in this project), because block occupancy is decided by a record's `POS` alone (see Step 12: every variant is placed by a binary search on its position) while its span is 257,439 bp. A **snarl-tree** segmentation would make it **one** unit instead of 370, with units disjoint by construction and every boundary a real graph cut point — so switching donors at a boundary would be **graph-valid by construction**. The standing objection is that snarls are not LD blocks; `docs/memory.md` records that this objection is weak for a copying model, because the linkage is carried by the donor panel and the transition probabilities rather than by where the boundaries fall. This is **not decided** — what the model's positions should be is an explicitly reserved question.
+- **Cost should probably be sensitive to scale.** Rewriting this record changes up to half a megabase; §A.5's per-record cost charges the same for it as for a one-base SNP. *Measured in this project* at capacity 0.1 on chr21 for `HG00438`, this record **was** rewritten on both strands — alleles **[89, 88] → [35, 64]** — and the largest single allele rewrite in that run was **257,485 bp**. Whether a length-weighted cost is the right correction is an open design question, not a decision.
+
+Three caveats stay attached to all of that: whether a sampled release can even contain a **valid** traversal here (an independent per-variant sampler would happily produce a combination of child alleles that no real walk realises); whether cost should be length-weighted given that one unit can span 257 kb; and how to avoid **double-counting** the top-level record and its 2,464 children, given (c). None is settled.
+
+> **Note** — This site recurs throughout the document, so it is worth a bookmark: `grch38#chr21:14569980`, row 51791, 90 declared alleles, 88 distinct, 257,439 bp of `REF`, 28 MB of text, 2,464 children, 370 blocks, one tandem-duplicated allele. Whenever a later section says "the hypervariable site," this is it.
+
 #### In plain words (biology)
 
-You have two copies of every autosome, one from each parent; a haploid human genome is about 3.1 billion base pairs, so a diploid cell holds about twice that, spread across 22 numbered autosomes plus X or Y — 24 distinct chromosome sequences in the species, 23 pairs in a person. At millions of positions people carry different DNA letters. Those positions are variants, the alternatives are alleles, and we label them 0 for "same as the reference" and 1, 2, … for the alternatives; a variant with just one alternative is biallelic, with more it is multi-allelic. A genotype tells you *which two* alleles you carry at a position but not which physical chromosome copy each sits on; a haplotype tells you the whole ordered run of alleles along one copy, and working out which is which is called phasing. Haplotypes are far more identifying than genotypes. Most variants are rare, and rare variants are exactly the ones that pick a person out of a crowd, because the information in seeing an allele of frequency f is about −log f — bits if you use log base 2, nats if you use natural log. Because chromosomes are reshuffled only once or twice per generation, nearby variants travel together; that correlation is linkage disequilibrium, it lets us chop the genome into blocks, and it means deleting one variant does not really hide it because its neighbours predict it. Genetic distance for this purpose is measured in centiMorgans, not base pairs. Sequencing machines emit short reads, which are either aligned onto a reference or assembled into long contiguous sequence; alignment can only find what the reference has a slot for, which is why a single linear reference systematically under-detects variation in people unlike its donors. A pangenome graph fixes that by storing many genomes at once as paths through one shared graph, where each branch point (bubble) is a variant. A VCF file is a big table with one row per variant and one column per sample holding small integers, and because each bubble maps to one row, the graph and the table are two views of the same data. On our rebuilt chr21 that table is 340,824 rows by 88 haplotypes, and it is carved into 100,757 block-dictionary entries — of which 88.4% *of entries* are singletons, which is only about 26% *of variants*.
+You have two copies of every autosome, one from each parent; a haploid human genome is about 3.1 billion base pairs, so a diploid cell holds about twice that, spread across 22 numbered autosomes plus X or Y — 24 distinct chromosome sequences in the species, 23 pairs in a person. At millions of positions people carry different DNA letters. Those positions are variants, the alternatives are alleles, and we label them 0 for "same as the reference" and 1, 2, … for the alternatives; a variant with just one alternative is biallelic, with more it is multi-allelic. A genotype tells you *which two* alleles you carry at a position but not which physical chromosome copy each sits on; a haplotype tells you the whole ordered run of alleles along one copy, and working out which is which is called phasing. Haplotypes are far more identifying than genotypes. Most variants are rare, and rare variants are exactly the ones that pick a person out of a crowd, because the information in seeing an allele of frequency f is about −log f — bits if you use log base 2, nats if you use natural log. Because chromosomes are reshuffled only once or twice per generation, nearby variants travel together; that correlation is linkage disequilibrium, it lets us chop the genome into blocks, and it means deleting one variant does not really hide it because its neighbours predict it. Genetic distance for this purpose is measured in centiMorgans, not base pairs. Sequencing machines emit short reads, which are either aligned onto a reference or assembled into long contiguous sequence; alignment can only find what the reference has a slot for, which is why a single linear reference systematically under-detects variation in people unlike its donors. A pangenome graph fixes that by storing many genomes at once as paths through one shared graph, where each branch point (bubble) is a variant. A VCF file is a big table with one row per variant and one column per sample holding small integers, and because each bubble maps to one row, the graph and the table are two views of the same data. On our rebuilt chr21 that table is 340,824 rows by 88 haplotypes, and it is carved into 100,757 block-dictionary entries — of which 88.4% *of entries* are singletons, which is only about 26% *of variants*. That correspondence is exact for a SNP and awkward for everything else: an insertion or a deletion has to be written with a shared padding base so neither `REF` nor `ALT` is empty, so a record really describes a *span* rather than a point, and in the graph both are just a bubble where one branch carries sequence the other lacks — which is why the graph is the primary object and the VCF a projection of it. Bubbles also nest, one inside a branch of another, and on our chr21 **31,489 records are nested** (measured in this project), **9.2%** of records (derived), which is why a haplotype can legitimately have **no value at all** at a variant — at least five different things produce that absence, from "the DNA does not exist on that chromosome" through an assembly gap to a `CONFLICT` and a merely haploid genotype, and the conversion into the matrix reduces all five to the same `-1`. The graph can also contain **cycles**, so a walk may leave a node, come back and leave again, which is how a tandem duplication is stored compactly — and because the two copies are not identical, the repeat cannot be collapsed into a clean count. At the extreme sits one chr21 site where all **88** haplotypes carry **88 distinct alleles** in a single **28 MB** VCF line with **2,464** nested children (measured in this project): the most identifying record on the chromosome, and the case every later section is tested against. §1.1.8 works all of this through.
 
 ---
 
@@ -295,7 +573,7 @@ Here is the translation that makes the abstraction concrete. Throughout this pro
 | HMM ingredient | Symbol | What it is here |
 |---|---|---|
 | **Number of positions** | T | Sites (or blocks) along a chromosome, left to right |
-| **States** | 1…K | The K haplotypes in the reference panel — "which panel haplotype am I currently copying from?" |
+| **States** | 1…K | The K haplotypes in the **copying panel** — "which panel haplotype am I currently copying from?" See the Definition below: in this project the copying panel is the *cohort's own* haplotypes, not an external reference panel |
 | **Initial distribution** | pi(i) | Which panel haplotype the copying starts on. Usually uniform, 1/K each |
 | **Transitions** | A(i, j) | The chance of *switching* which haplotype you copy from between consecutive positions. This is how **recombination** enters the model |
 | **Emissions** | e_t(i) | Given that you are copying haplotype i at position t, how likely is the allele you actually observed. This is how **mutation and sequencing error** enter |
@@ -666,7 +944,7 @@ real data.**
 | 3. Backward sample | alpha column t, plus the state already drawn at t+1 | Draw state t with probability proportional to alpha_t(i) · A(i, z_{t+1}) | The state at t; repeat down to t = 1 | Produces a *jointly* coherent path; independent per-site draws would not |
 | 4. Read off the haplotype | The sampled state sequence | Emit each sampled state's panel allele at its site | A synthetic haplotype: a mosaic of panel haplotypes | This is the object released by the mechanism in Section 4 |
 
-> **The short version.** An HMM here answers "which panel haplotype is this new genome
+> **Key idea** — An HMM here answers "which panel haplotype is this new genome
 > copying from, position by position?" You never see the answer directly, only the
 > alleles it produced. The **forward algorithm** sums over the astronomically many
 > possible answers efficiently, by noticing that paths through the same state can be
@@ -679,7 +957,17 @@ real data.**
 
 #### 1.2.3 The Li–Stephens copying model
 
-The **Li–Stephens model** is the HMM above given a specific biological interpretation: **the states are panel haplotypes, and the hidden state at site t says "which panel haplotype is my chromosome copying from right here."** Because real chromosomes are mosaics of ancestral chromosomes (§1.1.4), any new haplotype ought to look like a *patchwork of existing ones with occasional switches*, plus a sprinkling of mismatches for new mutations and errors. That is exactly this model: **transitions = recombination, emissions = mutation.**
+> **Definition** — **Three different things get called "a panel", and confusing them is the single most common way to misread this project.**
+>
+> - The **pangenome graph** is the data structure. It is not a panel at all; it is the object built *from* a cohort of assembled genomes, and a genome is a path through it (§1.1.6).
+> - The **cohort** is that set of assembled genomes: here **44 individuals = 88 haplotypes**, measured in this project. The graph was built from them and they are public.
+> - The **copying panel** is the set of haplotypes an HMM's states range over — the K in this section. In PanMixer the copying panel is **the cohort's own 88 haplotypes** when a block is scored, and **86** when a replacement is sampled, because the target's own two are removed first. It is *not* an external collection.
+> - The **external reference panel** is 1000 Genomes: 3,202 samples on the build-correct data, measured in this project. PanMixer never copies from it. It supplies three other things — the LD block boundaries (Step 8), the population allele frequencies for one branch of the frequency table (Step 13), and the database the linkage attack searches (Step 21).
+>
+> So when this section says "the K haplotypes in the panel", read **copying panel**, and on this project's data read **the cohort's own haplotypes, minus the target**. §A.3 states the further restriction that matters for PanMixer: its chain is per block, over that block's anchor positions only.
+
+
+The **Li–Stephens model** is the HMM above given a specific biological interpretation: **the states are the copying panel's haplotypes, and the hidden state at site t says "which of them is my chromosome copying from right here."** Because real chromosomes are mosaics of ancestral chromosomes (§1.1.4), any new haplotype ought to look like a *patchwork of existing ones with occasional switches*, plus a sprinkling of mismatches for new mutations and errors. That is exactly this model: **transitions = recombination, emissions = mutation.**
 
 Two parameters carry all the biology:
 
@@ -707,7 +995,7 @@ Why this appears here: one natural way to frame "how much privacy protection can
 | 0.1 | **47,070** | 928.92 | **10.0%** |
 | 0.5 | **177,865** | 3,077.60 | **33.1%** |
 
-*(Raw output in `logs/pm_obf.log`; summarised in `docs/memory.md` under 2026-09-18.)*
+*(Both rows are measured in this project; the source is `logs/pm_obf.log`, logged in `docs/memory.md` under 2026-09-26.)*
 
 Two things to read off this. At capacity 0.1 the budget binds exactly — the mechanism spends what it is allowed. At capacity 0.5 the knapsack **saturates below its stated budget**: it runs out of moves worth taking before it runs out of capacity, so capacity stops being a meaningful knob at the top end. Second, and separately, the *denominator* against which those percentages are computed is itself a constructed quantity — twice the sum of all per-move utility losses (9,288.85 for this subject-chromosome) — and the total achievable loss is strictly less than it. So "33.1% of the budget" is a fraction of a number the mechanism can never reach. Both facts have to be stated together, or the saturation looks mysterious.
 
@@ -855,10 +1143,10 @@ For orientation, the symbols that recur in Sections 2 through 4, stated in words
 | **beta_t (β_t)** | the non-negative weight of block t in the utility, summing to 1 across blocks |
 | **phi_t (φ_t)** | the per-block agreement score between input and output paths, between 0 and 1 |
 
-Sections 2 through 4 take all of this apart: **Section 2** examines the problem itself in detail, with no solution attached; **Section 3** dissects PanMixer's theory and its shipped implementation step by step, including four defects measured here; and **Section 4** does the same for this project's mechanism and compares the two.
+Sections 2 through 4 take all of this apart: **Section 2** examines the problem itself in detail, with no solution attached; **Section 3** dissects PanMixer's theory and its shipped implementation step by step, including ten places where the released code departs from the published Methods, measured here; and **Section 4** does the same for this project's mechanism and compares the two.
 
 ---
 
-### In plain words
+### In plain words — Section 1
 
-A human carries two copies of each autosome — 24 distinct chromosome sequences exist in the species, 23 pairs in a person, about 3.1 billion base pairs per haploid copy and roughly twice that per diploid cell — and at millions of positions those copies differ from each other and from other people's. A variant is such a position, an allele is one of the alternatives there, a genotype is the unordered pair you carry, and a haplotype is the ordered run of alleles along one physical chromosome copy. Haplotypes are much more identifying than genotypes, and rare alleles much more identifying than common ones, because the information in an observation is minus the logarithm of its frequency — bits with log base 2, nats with natural log. Because chromosomes are reshuffled only once or twice per generation, nearby variants travel together (linkage disequilibrium, measured as r²), which both lets us cut the genome into blocks and means that deleting a variant does not hide it, since its neighbours predict it; genetic distance for this purpose is counted in centiMorgans, not base pairs. Genomics has traditionally aligned everyone to one linear reference sequence, which systematically under-detects variation in people unlike that reference's donors, because a read carrying sequence the reference lacks has nowhere to align. A pangenome graph replaces that with many genomes woven into one graph where every branch point is a variant and every individual is a path — and a graph can be flattened into a VCF table, one row per branch point, one column per haplotype, holding small integers. That table is the data model: measured here on chromosome 21 it is 340,824 rows by 88 haplotypes (44 individuals, after the pipeline drops the CHM13 reference cell line — which is human — and chrX), carved into 100,757 block-dictionary entries of which 88.4% **of entries** are singletons holding one variant each, accounting for 26.1% **of variants**, while the 10.4% of entries carrying two or more anchors hold 71.4% of variants. Coordinates matter absolutely: the shipped pipeline joins a GRCh38 pangenome against a GRCh37 panel (1000 Genomes Phase 3, 2,504 samples), which we measured as 1,025 matching records where the build-correct 30x GRCh38 panel (3,202 samples, 1,002,753 chr21 records) gives 258,610. The statistical engine throughout is the hidden Markov model in its Li–Stephens form, where the hidden state is "which existing haplotype am I copying from right now," the transitions encode recombination measured in centiMorgans, the emissions encode mutation, and a forward pass plus a backward sampling pass draws a coherent mosaic haplotype in O(T·K) time — unless the switch rate is computed from the wrong quantity, in which case the mosaic collapses into verbatim copying, which is what we measured on 300 of 300 chr21 blocks for subject HG00438. On the privacy side, genomes are immutable, implicate relatives who never consented, and are so identifying that a few dozen independent variants pin down a person; the attacks to know are re-identification, linkage against an external database, membership inference, and reconstruction by imputation. The defence is randomization: make the release a random draw whose distribution barely depends on the secret. Total variation distance measures "barely," and it has an exact operational meaning — with equal priors the best possible attacker succeeds with probability (1 + TV)/2, since the optimal test picks the larger likelihood and max(a,b) = (a+b)/2 + |a−b|/2. Bounding the likelihood ratio at every output, which is what differential privacy's epsilon does, is the stronger pointwise version, and the two calibrations coincide exactly at epsilon = 2·arctanh(tau). Keep two kinds of claim rigidly apart: a theorem that bounds *every* attacker under stated assumptions, and an experiment showing that *the attacks we ran* failed. And keep the notation of the two works apart too: PanMixer writes η for utility loss and ε for privacy risk, while this project writes η_τ for tilt strength and ε_τ for a budget. This project lives in two settings — protecting someone whose genome is inside the public graph (PanMixer's problem) and protecting an external person whose mapped path through a fixed public graph is what gets released (our problem) — and the rest of the document takes each apart in turn.
+A human carries two copies of each autosome — 24 distinct chromosome sequences exist in the species, 23 pairs in a person, about 3.1 billion base pairs per haploid copy and roughly twice that per diploid cell — and at millions of positions those copies differ from each other and from other people's. A variant is such a position, an allele is one of the alternatives there, a genotype is the unordered pair you carry, and a haplotype is the ordered run of alleles along one physical chromosome copy. Haplotypes are much more identifying than genotypes, and rare alleles much more identifying than common ones, because the information in an observation is minus the logarithm of its frequency — bits with log base 2, nats with natural log. Because chromosomes are reshuffled only once or twice per generation, nearby variants travel together (linkage disequilibrium, measured as r²), which both lets us cut the genome into blocks and means that deleting a variant does not hide it, since its neighbours predict it; genetic distance for this purpose is counted in centiMorgans, not base pairs. Genomics has traditionally aligned everyone to one linear reference sequence, which systematically under-detects variation in people unlike that reference's donors, because a read carrying sequence the reference lacks has nowhere to align. A pangenome graph replaces that with many genomes woven into one graph where every branch point is a variant and every individual is a path — and a graph can be flattened into a VCF table, one row per branch point, one column per haplotype, holding small integers. That table is the data model: measured here on chromosome 21 it is 340,824 rows by 88 haplotypes (44 individuals, after the pipeline drops the CHM13 reference cell line — which is human — and chrX), carved into 100,757 block-dictionary entries of which 88.4% **of entries** are singletons holding one variant each, accounting for 26.1% **of variants**, while the 10.4% of entries carrying two or more anchors hold 71.4% of variants. Coordinates matter absolutely: the shipped pipeline joins a GRCh38 pangenome against a GRCh37 panel (1000 Genomes Phase 3, 2,504 samples), which we measured as 1,025 matching records where the build-correct 30x GRCh38 panel (3,202 samples, 1,002,753 chr21 records) gives 258,610. The statistical engine throughout is the hidden Markov model in its Li–Stephens form, where the hidden state is "which existing haplotype am I copying from right now," the transitions encode recombination measured in centiMorgans, the emissions encode mutation, and a forward pass plus a backward sampling pass draws a coherent mosaic haplotype in O(T·K) time — unless the switch rate is computed from the wrong quantity, in which case the mosaic collapses into verbatim copying, which is what we measured on 300 of 300 chr21 blocks for subject HG00438. On the privacy side, genomes are immutable, implicate relatives who never consented, and are so identifying that a few dozen independent variants pin down a person; the attacks to know are re-identification, linkage against an external database, membership inference, and reconstruction by imputation. The defence is randomization: make the release a random draw whose distribution barely depends on the secret. Total variation distance measures "barely," and it has an exact operational meaning — with equal priors the best possible attacker succeeds with probability (1 + TV)/2, since the optimal test picks the larger likelihood and max(a,b) = (a+b)/2 + |a−b|/2. Bounding the likelihood ratio at every output, which is what differential privacy's epsilon does, is the stronger pointwise version, and the two calibrations coincide exactly at epsilon = 2·arctanh(tau). Keep two kinds of claim rigidly apart: a theorem that bounds *every* attacker under stated assumptions, and an experiment showing that *the attacks we ran* failed. And keep the notation of the two works apart too: PanMixer writes η for utility loss and ε for privacy risk, while this project writes η_τ for tilt strength and ε_τ for a budget. This project lives in two settings — protecting someone whose genome is inside the public graph (PanMixer's problem) and protecting an external person whose mapped path through a fixed public graph is what gets released (our problem) — and the rest of the document takes each apart in turn. Two refinements sit on top of that picture, and both are load-bearing later. First, the graph-to-table correspondence is exact only for a SNP: an insertion or a deletion has to be written with a shared padding base, so a record describes a **span** rather than a point; bubbles **nest**, so on our chr21 **31,489 records** sit inside another record's allele (measured in this project, **9.2%** of records, derived) and the same DNA is described twice at two resolutions; a haplotype can legitimately have **no value at all** at a variant, for at least five distinguishable reasons that the conversion into the matrix collapses into a single `-1`; the graph can contain **cycles**, which is how a tandem duplication is stored without writing the second copy out at all; and at the extreme one chr21 site carries **88 distinct alleles across 88 haplotypes** in a single **28 MB** VCF line with **2,464** nested children (all measured in this project) — the most identifying record on the chromosome, and the case every later section is tested against. §1.1.8 works all of that through. Second, and following from it, an LD block is a statement about **correlation**, not about **geometry**: **15,540 of 100,757** block-dictionary entries (**15.4%**, measured in this project) contain a record whose sequence span crosses a block boundary, so blocks are **not** disjoint in sequence, and every later piece of accounting that adds up block by block is leaning on an assumption the data does not quite grant.

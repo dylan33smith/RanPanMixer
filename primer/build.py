@@ -28,9 +28,36 @@ for i, tt in enumerate(tocs, 1):
 nav.append("</ol></nav>")
 nav = "".join(nav)
 
+WN = D / "00-whatsnew.md"
+if WN.exists():
+    md.reset()
+    whatsnew = '<aside class="whatsnew">' + md.convert(WN.read_text()) + "</aside>"
+else:
+    whatsnew = ""
+
+import datetime
+WORDS = round(sum(len(((D / f).read_text()).split()) for f in order), -2)
+STAMP = datetime.date.today().strftime("%-d %b %Y")
+
 body = "\n".join(bodies)
+# Python-Markdown merges blockquotes separated only by a blank line into ONE
+# <blockquote>, so a Caution followed by a Question renders as a single box styled
+# by whichever role came first. Split every blockquote at each role-word paragraph
+# so each callout gets its own box and its own colour.
+_ROLE_START = r"(?=<p><strong>(?:Definition|Worked example|Example|Caution|Defect|Open question|Question|Note|Key idea)[^<]*</strong>)"
+def _split_callouts(m):
+    parts = [x for x in re.split(_ROLE_START, m.group(1)) if x.strip()]
+    if len(parts) <= 1:
+        return m.group(0)
+    return "".join(f"<blockquote>\n{x.strip()}\n</blockquote>" for x in parts)
+if body.count("<blockquote>") != body.count("</blockquote>"):
+    raise SystemExit("unbalanced blockquotes in rendered body")
+if re.search(r"<blockquote>(?:(?!</blockquote>).)*<blockquote>", body, flags=re.S):
+    raise SystemExit("nested blockquote found; the callout splitter assumes none")
+body = re.sub(r"<blockquote>(.*?)</blockquote>", _split_callouts, body, flags=re.S)
+
 # Callout detection: paragraphs/blockquotes that open with a role word get a semantic class.
-body = re.sub(r"<blockquote>\s*<p><strong>(Definition|Worked example|Example|Caution|Defect|Open question|Note|Key idea)([^<]*)</strong>",
+body = re.sub(r"<blockquote>\s*<p><strong>(Definition|Worked example|Example|Caution|Defect|Open question|Question|Note|Key idea)([^<]*)</strong>",
               lambda m: f'<blockquote class="callout c-{m.group(1).lower().split()[0]}"><p><strong>{m.group(1)}{m.group(2)}</strong>', body)
 # Wrap tables for horizontal overflow
 body = body.replace("<table>", '<div class="tw"><table>').replace("</table>", "</table></div>")
@@ -46,6 +73,7 @@ HEAD = """<title>Pangenome Privacy Primer</title>
   --accent:#17587F; --accent-soft:#E4EEF5;
   --warn:#9C4E15; --warn-soft:#F7ECE2;
   --ok:#2C6349; --ok-soft:#E4F0EA;
+  --ask:#5B4396; --ask-soft:#EDE9F6;
   --code-bg:#EEF2F5;
   --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
   --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
@@ -57,6 +85,7 @@ HEAD = """<title>Pangenome Privacy Primer</title>
   --accent:#71B4DE; --accent-soft:#162833;
   --warn:#D4884A; --warn-soft:#2A1F16;
   --ok:#6FB694; --ok-soft:#152720;
+  --ask:#AE9BE0; --ask-soft:#211B31;
   --code-bg:#1B222A;
 }}
 :root[data-theme="dark"]{
@@ -65,6 +94,7 @@ HEAD = """<title>Pangenome Privacy Primer</title>
   --accent:#71B4DE; --accent-soft:#162833;
   --warn:#D4884A; --warn-soft:#2A1F16;
   --ok:#6FB694; --ok-soft:#152720;
+  --ask:#AE9BE0; --ask-soft:#211B31;
   --code-bg:#1B222A;
 }
 body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.62;}
@@ -114,6 +144,12 @@ blockquote{margin:0 0 1.3rem;padding:.9rem 1.1rem;border-left:3px solid var(--ac
 blockquote p:last-child{margin-bottom:0;}
 blockquote.c-defect,blockquote.c-caution{border-left-color:var(--warn);background:var(--warn-soft);}
 blockquote.c-worked,blockquote.c-example{border-left-color:var(--ok);background:var(--ok-soft);}
+blockquote.c-question{border-left-color:var(--ask);background:var(--ask-soft);}
+blockquote.c-question>p:first-child>strong:first-child{font-family:var(--sans);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ask);display:block;margin-bottom:.3rem;}
+.whatsnew{border:1px solid var(--rule);border-left:3px solid var(--accent);background:var(--surface);border-radius:0 6px 6px 0;padding:1.1rem 1.3rem;margin:0 0 2rem;}
+.whatsnew h3{font-family:var(--sans);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 .7rem;}
+.whatsnew p,.whatsnew li{font-size:.94rem;max-width:74ch;}
+.whatsnew p:last-child,.whatsnew ul:last-child{margin-bottom:0;}
 hr{border:0;border-top:1px solid var(--rule);margin:2.4rem 0;}
 h3[id^="in-plain-words"],h3:where(:not(:first-child)){scroll-margin-top:1.5rem;}
 .sec h3{scroll-margin-top:1.5rem;}
@@ -156,15 +192,24 @@ page = f"""{HEAD}
   <p class="eyebrow">RanPanMixer · Orientation</p>
   <h1>Releasing a Genome Without Revealing the Person</h1>
   <p class="standfirst">A ground-up primer on pangenome graphs, genomic privacy attacks, the PanMixer tool, and the randomized path-release mechanism this project is building. Written for a reader with basic biology and basic computer science, and nothing else.</p>
-  <div class="meta"><span>Four sections</span><span>~53,600 words</span><span>Compiled 18 Sep 2026</span></div>
+  <div class="meta"><span>{len(order)} sections</span><span>~{WORDS:,} words</span><span>Compiled {STAMP}</span></div>
   {HERO}
 </header>
 <div class="layout">
 {nav}
 <main class="prose">
+{whatsnew}
 {body}
 </main>
 </div>
 </div>"""
+# Fail loudly on anchor collisions: md.reset() between files means python-markdown
+# never de-duplicates ids ACROSS sections, so two identical headings in different
+# files silently send a TOC link to the wrong place.
+_ids = re.findall(r'\bid="([^"]+)"', page)
+_dups = sorted({i for i in _ids if _ids.count(i) > 1})
+if _dups:
+    raise SystemExit("duplicate anchor ids (rename the headings): " + ", ".join(_dups))
+
 OUT.write_text(page)
-print(f"wrote {OUT}  {len(page):,} bytes")
+print(f"wrote {OUT}  {len(page.encode()):,} bytes")

@@ -360,10 +360,14 @@ Is:                   What the emission does when a donor haplotype carries -1 (
                       the published behaviour, so a v1 run can be compared against
                       it (Dylan, 2026-09-25).
 Computed by:          PLANNED
-CHANGES MEANING WITH: which positions are in the chain. It barely matters for
-                      anchors (0.35% mean missingness) and matters a lot once every
-                      variant is a position (11.31%, with 7,555 positions over 25%
-                      missing). Nested variants are the driver: a donor whose path
+CHANGES MEANING WITH: which positions are in the chain. It barely matters for the
+                      anchors PanMixer's HMM steps over (0.26% mean missingness,
+                      538 over 25%) and matters a lot for v1, which steps over every
+                      variant (4.26%, 30,800 over 25%). Worst are the non-anchor
+                      records inside multi-variant blocks, the positions v1 adds
+                      inside blocks PanMixer already chains (11.31%, 7,555 over 25%).
+                      Scopes measured in `docs/memory.md` 2026-09-26; never quote
+                      one of these means without naming its set. Nested variants are the driver: a donor whose path
                       does not traverse the parent bubble has no allele at the child,
                       and the matrix cannot distinguish that from missing data.
 Valid vs:             another run under the SAME policy. Never compare across policies.
