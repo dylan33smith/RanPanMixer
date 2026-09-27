@@ -171,7 +171,8 @@ HG00101 80.5%, HG00102 80.5%.
 - Synthesis (⚠ the invisible share is corrected to 9.9% above): **both bounds move the wrong way.** 80.4% is an UPPER bound on retainable
   fidelity, because having a record is necessary but not sufficient — the allele must also
   be carried by a donor, and 8,823 declared alleles have zero cohort support (2026-09-27
-  entry above). And 19.6% is a LOWER bound on invisibility, because these are 1000G samples
+  entry above). And the invisible share — 9.9% as corrected, not the 19.6% written here — is
+  itself a LOWER bound, because these are 1000G samples
   whose variants are by construction already known; a genuinely novel variant is invisible
   to this measurement too. The measurement is also SNV-biased, since 1000G short-read calls
   under-ascertain exactly the structural variation the graph is richest in.
