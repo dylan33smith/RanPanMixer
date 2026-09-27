@@ -104,6 +104,65 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-27 — A-DAT-cohort-support: alleles v1 cannot emit, and what v1 still needs externally
+
+**Question (Dylan).** If v1 routes every block through the tilted sampler, what external
+data is still required? And since the target is external and never enters the cohort,
+how are target-unique variants handled?
+
+**Result 1 — external dependencies shrink to two for the mechanism.**
+
+| dependency | role in v1 | status |
+|---|---|---|
+| 1000 Genomes panel | `plink --blocks` boundaries only | present (30x GRCh38) |
+| GRCh38 genetic map | `Delta_x` in cM for transition constants | **NOT ACQUIRED — blocks exit gate 3** |
+| 1000 Genomes panel | evaluation: attack DB, AF/LD site sets, Beagle reference | present |
+| PanGenie callset | **nothing in v1**; needed only to run the RESTRICT `missing_policy` baseline | optional |
+
+Dropping anchors removes PanGenie from the mechanism's critical path entirely. Note also
+that block boundaries do not affect correctness — the per-block factorisation gives the
+same `tau` for any segmentation with `sum beta_b` = 1 — so plink blocks are inherited for
+HEAD-TO-HEAD COMPARABILITY with PanMixer, not out of necessity.
+
+**Result 2 — alleles declared in the VCF that no donor carries.** Measured from
+`external/PanMixer/starting_data/chr21/pangenome.npy` (44 x 340,824 x 2) against
+`num_alleles.npy`, counting support over all 88 haplotypes:
+
+| quantity | count | denominator | share |
+|---|---|---|---|
+| declared allele slots | 767,324 | — | — |
+| declared alleles with ZERO cohort support | 8,823 | 767,324 slots | 1.15% |
+| sites with >= 1 unsupported declared allele | 6,809 | 340,824 sites | 2.00% |
+| sites where the unsupported allele is REF | 4,885 | 340,824 sites | 1.43% |
+| sites monomorphic across all 88 haplotypes | 4,713 | 340,824 sites | 1.38% |
+| sites with no called haplotype at all | 1 | 340,824 sites | 0.00% |
+
+- Columns: counts, then the denominator each share is taken over. Slots and sites are
+  different denominators and must not be mixed.
+- Rows: "declared" means the allele index is below `num_alleles[site]`, i.e. the VCF lists
+  it. "Zero cohort support" means no haplotype of the 88 carries it.
+- Synthesis: v1's output support is cohort-supported paths, so **the sampler cannot emit
+  these 8,823 alleles.** On 1.43% of sites the unreachable allele is REF, so a target
+  carrying reference there cannot be matched by any donor state. The consequence is a
+  `phi_t` penalty — **pure utility loss, and bounded at about 2% of sites. No privacy
+  consequence**: `Y_D` is fixed and target-independent, so common support (condition 1)
+  holds regardless. Monomorphic sites are released deterministically, which is also safe
+  because the determinism is identical for every target and cancels in the likelihood
+  ratio; determinism only breaks the bound when it depends on the input.
+
+**Framing to keep.** In PanMixer the target is DATA — a column inside the matrix every
+cohort statistic is computed over, which is how departure (c) arises. In v1 the target is
+a PARAMETER: it never enters the matrix, `support_D`, or the state set, and touches the
+mechanism only through `phi_t` comparing the target's block against each donor's, inside `psi_t`. Adding it to the cohort would
+break the `R_D` cancellation in Step 3 of the Theorem 1 proof — not a weaker bound, no bound.
+
+**Three senses of "target-unique", only one of which is a real gap.** (i) An allele absent
+from `G`: unreachable by the mechanism because `p = Map(g, G)` is a traversal of `G`; lost
+at mapping time, a limitation of the setting. (ii) A combination unique to the target: the
+ordinary case, and exactly what the mosaic produces — conditional on the transition
+constants actually recombining (exit gate 3). (iii) An allele in `G` with no cohort
+support: the measured 1.15% above.
+
 ## 2026-09-27 — A-DAT-lv-nesting: the biallelic SNP mask is blind to snarl level
 
 **Question.** Does `build_biallelic_snp_mask.py` (Step 11) use the `LV` tag? No — and
