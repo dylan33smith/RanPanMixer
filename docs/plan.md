@@ -182,7 +182,12 @@ evaluation suite. Defer the chromosome-wide chain.
   site-to-block assignment by position. Blocks stay exactly as PanMixer builds them.
 - The data model: the int16 (subjects, sites, 2) matrix with `-1` for missing, and
   the block dictionary.
-- The donor panel: 2(N-1) = 86 haplotypes, the target's own two removed.
+- The donor panel: 2(N-1) = 86 haplotypes, the target's own two removed. ⚠ This is a
+  COMPARISON choice, not a requirement of our design. Our target is EXTERNAL, so nothing
+  needs removing and the theory has K = 88; v1 matches PanMixer's donor set so the two
+  arms sample from the same states in a head-to-head. Removing both haplotypes (never
+  just one) is what departure (c) gets wrong — on the toy, leaving the target in scores a
+  perfect 1.0000, removing one gives 0.8571, removing both gives the honest 0.5714.
 - The evaluation suite, unchanged, by emitting `new_haplotypes`.
 
 **REPLACE**
