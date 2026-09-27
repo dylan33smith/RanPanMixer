@@ -104,6 +104,57 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-27 — A-DAT-representability: a fifth of a real target never reaches the mechanism
+
+**Raised by Dylan.** A target variant absent from both the graph and every external callset
+never enters any VCF. The release is a path through `G`, so that variant cannot be emitted —
+but it also has no record, hence no chain position, hence no `phi_t` term and no `beta_t`
+weight. It is removed AND unmeasured. Is anything accounting for it?
+
+**Answer: no, and the magnitude is large.** Measured on six 1000 Genomes samples that are
+not among the HPRC 44, chr21, using the strict (POS, REF, ALT) mapping:
+
+| metric | per target |
+|---|---|
+| non-reference calls | 60,561 |
+| with an exact record in the graph | 48,678 (80.4%) |
+| **invisible: no record, no chain position** | **11,883 (19.6%)** |
+
+Per-sample spread was tight: HG00096 80.3%, HG00097 80.1%, HG00099 80.3%, HG00100 80.6%,
+HG00101 80.5%, HG00102 80.5%.
+
+- Columns: one typical external target.
+- Rows: "invisible" means no exact-match record exists, so no chain position is created.
+- Synthesis: **both bounds move the wrong way.** 80.4% is an UPPER bound on retainable
+  fidelity, because having a record is necessary but not sufficient — the allele must also
+  be carried by a donor, and 8,823 declared alleles have zero cohort support (2026-09-27
+  entry above). And 19.6% is a LOWER bound on invisibility, because these are 1000G samples
+  whose variants are by construction already known; a genuinely novel variant is invisible
+  to this measurement too. The measurement is also SNV-biased, since 1000G short-read calls
+  under-ascertain exactly the structural variation the graph is richest in.
+
+**The consequence for our utility claim.** `u(p, y) = sum beta_t phi_t` is defined over
+chain positions, and chain positions come from VCF rows. So **u can equal 1.0 while the
+release retains only about 80% of the target's variation.** Every downstream instrument
+inherits the blind spot: AF loss, LD loss and read mapping all operate on the graph's site
+set and none can see a variant with no row.
+
+**Not inherited from PanMixer.** Their target is a cohort member, so their haplotypes ARE
+the VCF rows by construction and nothing they carry is inexpressible. This gap belongs to
+the external-target setting and has no upstream precedent.
+
+**Privacy is untouched.** The invisible variants cannot be emitted, so they are maximally
+protected; and the mechanism's behaviour does not branch on whether the target had one, so
+nothing leaks. This is a measurement and utility defect, not a privacy defect.
+
+**Fix, and the shape it must take.** Dylan proposed adding a record at those locations.
+That cannot be done inside the mechanism: a target-specific record makes `output_support`
+target-dependent, which is the §4.4 Alice/Bob counterexample — disjoint supports, TV = 1,
+no guarantee. The safe inversion is to record at MAPPING time as an audit artifact that
+never touches `output_support`, `baseline_model`, `beta_t`, `phi_t` or the tilt — the same
+pattern as the REASON array. Reporting rule now in `target_fidelity`: the quantity has a
+ceiling below 1 independent of `tau`, and must never be quoted without it.
+
 ## 2026-09-27 — A-DAT-cohort-support: alleles v1 cannot emit, and what v1 still needs externally
 
 **Question (Dylan).** If v1 routes every block through the tilted sampler, what external

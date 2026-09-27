@@ -230,6 +230,15 @@ the mechanism sees them. **v1 preprocessing should emit an auxiliary REASON arra
 beside the allele matrix**, which keeps a cause-aware policy available without
 committing to one now. Cheap now, unrecoverable later.
 
+**SECOND PREREQUISITE — the representability audit.** `Map(g, G)` must emit, beside the
+path, a count of target variants it could NOT represent. Measured 2026-09-27: about 19.6%
+of a real external target's chr21 non-reference calls have no record in `G`, so they never
+become chain positions, never enter `phi_t`, and are invisible to AF loss, LD loss and read
+mapping alike. Silently dropped and silently unmeasured. **This count is an audit artifact
+only.** Adding a record for a target-specific variant would make `output_support` depend on
+the target and void Theorem 1 by the §4.4 disjoint-support argument — the fix is to measure
+the loss, never to represent it. See `target_fidelity` for the reporting rule.
+
 **EXIT GATES**
 1. `A-THY-toy-enumeration` passes: sampler matches exact enumeration; exact TV <= `tau`
    across a grid of `tau` and many input pairs; `log_z_p` within [0, `eta_tau`] on

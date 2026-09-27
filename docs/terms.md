@@ -564,7 +564,19 @@ Computed by:          external/PanMixer/tools/downstream/privacy/MIA_privacy.py:
                       ORIGINAL haplotypes, mechanism-agnostically.
 CHANGES MEANING WITH: the site set it is measured over, and whether a half-missing
                       genotype is treated as hom-ref (MIA_privacy.py:49-51 does).
-Valid vs:             the other arm at matched empirical privacy.
+⚠ CEILING:            In the EXTERNAL-target setting this quantity has a maximum BELOW 1
+                      that does not depend on `tau`. The release is a path through `G`, so
+                      a target variant with no record in `G` cannot be retained at any
+                      `tau`, including `tau` -> 1. Measured 2026-09-27 on six 1000G samples
+                      outside the HPRC 44: about 19.6% of a target's chr21 non-reference
+                      calls have no exact record in the graph. **Never report
+                      target_fidelity without its ceiling**, or a perfect result is
+                      indistinguishable from a mediocre one. Note also that `u(p, y)` is
+                      defined over chain positions, which come from VCF rows, so u can
+                      reach 1.0 while a fifth of the target's variation was dropped before
+                      the mechanism ran. u is fidelity-on-what-the-graph-can-see.
+Valid vs:             the other arm at matched empirical privacy, and only against a
+                      stated ceiling computed on the same graph.
 Status:               PRIMARY — without this axis our tau = 0 point looks like a free lunch.
 Aliases:              none
 ```
