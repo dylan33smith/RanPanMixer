@@ -231,8 +231,9 @@ beside the allele matrix**, which keeps a cause-aware policy available without
 committing to one now. Cheap now, unrecoverable later.
 
 **SECOND PREREQUISITE — the representability audit.** `Map(g, G)` must emit, beside the
-path, a count of target variants it could NOT represent. Measured 2026-09-27: about 19.6%
-of a real external target's chr21 non-reference calls have no record in `G`, so they never
+path, a count of target variants it could NOT represent. Measured 2026-09-27: about **9.9%**
+of a real external target's chr21 non-reference calls have no record in `G` — and they carry
+**20.5%** of its `-log f` information — so they never
 become chain positions, never enter `phi_t`, and are invisible to AF loss, LD loss and read
 mapping alike. Silently dropped and silently unmeasured. **This count is an audit artifact
 only.** Adding a record for a target-specific variant would make `output_support` depend on

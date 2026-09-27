@@ -104,6 +104,45 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-27 — A-DAT-representability-split: 9.9% invisible, carrying 20.5% of the information
+
+**Why.** The earlier entry today put the invisible share at 19.6%. Its median allele
+frequency came out at 0.28 — implausible, since a variant that common should appear in 88
+haplotypes. Re-measured by splitting on whether the graph has ANY record at the position.
+
+**Method.** Same three 1000G samples outside the HPRC 44 (HG00096, HG00097, HG00099), chr21.
+Three categories per target non-reference call: exact (POS, REF, ALT) match into the graph;
+POS present but no exact match; POS absent entirely. Allele frequency is leave-one-out over
+the 3,202-sample panel with the target's own two haplotypes removed, singleton-floored at
+0.5 counts. Information is `sum of -log f`, which is the published linkage score of Eq. 5.
+
+| category | share of sites | median AF | MAF < 1% | share of information | ratio |
+|---|---|---|---|---|---|
+| exact match — measured | 80.2% | 0.47 | 0.3% | 68.3% | 0.85x |
+| POS only, alt differs — measured | 9.9% | 0.35 | 1.1% | 11.1% | 1.13x |
+| **no record — INVISIBLE** | **9.9%** | **0.20** | **16.9%** | **20.5%** | **2.07x** |
+
+- Columns: pooled over three targets; per-sample spread was under 2 points in every cell.
+- Rows: only the third is invisible. The second HAS a chain position, because a record
+  exists at that POS — the mismatch is a REF/ALT spelling difference, typically a
+  multi-allelic graph context, and `phi_t` scores it as an ordinary mismatch.
+- Synthesis: **one tenth of a real target's variants have no record at all, and they carry
+  one fifth of its identifying information** — a 2.07x over-representation, with rare
+  variants enriched about 56-fold (16.9% under MAF 1%, against 0.3% among exact matches).
+
+**The framing that matters (Dylan).** This loss is NOT ON THE `tau` DIAL. It is fixed by the
+graph's coverage and happens before `psi_t` is evaluated, so no `tau` recovers it: at
+`tau` -> 1, with no privacy guarantee at all, the release still cannot express those alleles.
+**The utility ceiling is therefore about 79.5% of the target's information, not 100%**, and
+every target_fidelity number must be read against it. The same fact read from the privacy
+side: 20.5% of the linkage score is annihilated unconditionally, for every target, for free.
+Bad for a clinician, good for a privacy claim, and controlled by neither of us.
+
+**Caveat for reporting.** The middle category is measured but unfair to the mechanism: the
+target's exact allele is unavailable for a join reason, so `phi_t` records a mismatch the
+sampler could not have avoided. Separate it when reporting utility, or the mechanism is
+charged for a representation artifact.
+
 ## 2026-09-27 — A-DAT-representability: a fifth of a real target never reaches the mechanism
 
 **Raised by Dylan.** A target variant absent from both the graph and every external callset
@@ -118,14 +157,18 @@ not among the HPRC 44, chr21, using the strict (POS, REF, ALT) mapping:
 |---|---|
 | non-reference calls | 60,561 |
 | with an exact record in the graph | 48,678 (80.4%) |
-| **invisible: no record, no chain position** | **11,883 (19.6%)** |
+[INCORRECT] - | **invisible: no record, no chain position** | **11,883 (19.6%)** |
+[CORRECTION - 2026-09-27]: 19.6% conflates two categories. Only about half of it — **9.9%** —
+has no record at all. The other **9.9%** has a record at that POS with a different REF/ALT
+spelling, so a chain position DOES exist and `phi_t` does measure it. See the
+A-DAT-representability-split entry above. The 80.4% exact-match figure is unchanged.
 
 Per-sample spread was tight: HG00096 80.3%, HG00097 80.1%, HG00099 80.3%, HG00100 80.6%,
 HG00101 80.5%, HG00102 80.5%.
 
 - Columns: one typical external target.
 - Rows: "invisible" means no exact-match record exists, so no chain position is created.
-- Synthesis: **both bounds move the wrong way.** 80.4% is an UPPER bound on retainable
+- Synthesis (⚠ the invisible share is corrected to 9.9% above): **both bounds move the wrong way.** 80.4% is an UPPER bound on retainable
   fidelity, because having a record is necessary but not sufficient — the allele must also
   be carried by a donor, and 8,823 declared alleles have zero cohort support (2026-09-27
   entry above). And 19.6% is a LOWER bound on invisibility, because these are 1000G samples

@@ -568,8 +568,13 @@ CHANGES MEANING WITH: the site set it is measured over, and whether a half-missi
                       that does not depend on `tau`. The release is a path through `G`, so
                       a target variant with no record in `G` cannot be retained at any
                       `tau`, including `tau` -> 1. Measured 2026-09-27 on six 1000G samples
-                      outside the HPRC 44: about 19.6% of a target's chr21 non-reference
-                      calls have no exact record in the graph. **Never report
+                      outside the HPRC 44: about **9.9%** of a target's chr21 non-reference
+                      calls have NO record in the graph at all, and those carry **20.5%** of
+                      the target's total `-log f` information (2.07x over-representation).
+                      A further 9.9% have a record at that POS under a different REF/ALT
+                      spelling; those ARE measured, and should be reported separately since
+                      `phi_t` charges the mechanism for a join artifact. Ceiling on
+                      retainable information: about **79.5%**. **Never report
                       target_fidelity without its ceiling**, or a perfect result is
                       indistinguishable from a mediocre one. Note also that `u(p, y)` is
                       defined over chain positions, which come from VCF rows, so u can
