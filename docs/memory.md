@@ -104,6 +104,48 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-27 — A-DAT-lv-nesting: the biallelic SNP mask is blind to snarl level
+
+**Question.** Does `build_biallelic_snp_mask.py` (Step 11) use the `LV` tag? No — and
+no PanMixer Python reads the INFO column at all (`grep -rn "LV=\|INFO" --include=*.py`
+over the pinned checkout returns nothing). Step 11 re-reads `pangenome.vcf.gz` directly,
+so INFO is present in the line it parses; it splits with `maxsplit=5` and tests only REF
+and ALT.
+
+**Method.** One pass over `external/PanMixer/starting_data/chr21/pangenome.vcf.gz`,
+parsing `LV=` out of INFO per record, cross-tabulated against
+`biallelic_snp_mask.npy`. All 340,824 records carry an LV tag; none missing.
+
+| snarl level | all records | share | inside the mask | share of mask |
+|---|---|---|---|---|
+| LV=0 (top level) | 309,335 | 90.76% | 252,039 | 91.83% |
+| LV=1 | 28,029 | 8.22% | 20,153 | 7.34% |
+| LV=2 | 3,228 | 0.95% | 2,141 | 0.78% |
+| LV=3 | 222 | 0.07% | 119 | 0.04% |
+| LV>=4 | 10 | 0.00% | 6 | 0.00% |
+| **nested (LV>0)** | **31,489** | **9.24%** | **22,419** | **8.17%** |
+
+- Columns: all chr21 records, versus the 274,458 records the mask marks True.
+- Rows: `LV` is the snarl-tree level written by `vg deconstruct -a`, 0 = top level.
+- Synthesis: **9.24% of records are nested.** This independently reproduces the 9.2%
+  recorded on 2026-09-22 for records whose POS lies inside an earlier record's span —
+  two different methods (tag-based here, coordinate-based there) agreeing to rounding,
+  which is a useful cross-check on both.
+
+**Why it matters.** The mask is the site set for the gap-score attack (Step 21), which
+assigns each site a Hardy-Weinberg genotype probability and sums `-log` across sites,
+treating loci as independent evidence. 8.17% of that set is nested, and a nested allele
+is conditional on its parent traversal, so those sites are not independent evidence.
+The published Methods DO state a conditional-independence approximation for nested
+variants — `p_hat(a_nested) ~ p(a_parent) * p(a_nested)` — but on the SAMPLING side
+only; nothing equivalent appears in the scoring or attack path. **Magnitude unmeasured:**
+whether this materially moves the gap score is not established here, and the
+correlation may be weak in practice. Structure only.
+
+**For v1.** `LV` and `PS` are two of the fields the REASON array should carry (see
+`missing_policy`): they are what distinguishes "this donor's parent allele does not
+contain the child bubble" from the other four causes of a `-1`.
+
 ## 2026-09-26 — A-DAT-missingness-scope: what 11.31% and 0.35% are means OVER
 
 **Why.** `docs/terms.md` (`missing_policy`) and `docs/plan.md` quoted "11.31% versus
