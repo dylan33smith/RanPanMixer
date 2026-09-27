@@ -200,8 +200,10 @@ evaluation suite. Defer the chromosome-wide chain.
 4. **Re-derive the transition constants from the published Methods** (Ne = 10,000,
    r = 1.26, distance in centiMorgans, d = distance * Ne * r) — NOT from PanMixer's
    code, whose constant is the reciprocal of Ne and whose distance is a VCF row
-   index. ⚠ Needs a GRCh38 genetic map, **not yet acquired**. Interim fallback: base
-   pairs with a constant cM/Mb rate, stated explicitly wherever a number is reported.
+   index. ✅ **GRCh38 genetic map ACQUIRED 2026-09-27** — `external/genetic_maps/chr21.b38.gmap`,
+   verified byte-identical between the SHAPEIT4 and Beagle distributions. The interim
+   base-pair fallback is no longer needed. ⚠ 7.63% of chr21 variants fall below the map
+   span and get flat cM, so 296 multi-variant blocks cannot recombine at all.
 5. **No knapsack.** Every block is resampled from the tilted distribution; nothing is
    released verbatim by default.
 
@@ -246,9 +248,16 @@ the loss, never to represent it. See `target_fidelity` for the reporting rule.
    every draw; `tau` = 0 reproduces `baseline_model` exactly.
 2. One code path: singleton blocks provably traverse the same sampler with T = 1, and
    no allele-frequency branch exists in the source.
-3. Transition constants give measured switch mass of order 0.1 to 1 at realistic
-   separations, and a sampled block is demonstrably NOT a single donor copied verbatim
-   (PanMixer fails this 300/300).
+3. ⚠ **MIS-SPECIFIED — must be rewritten before it is used as a gate** (see
+   `docs/memory.md` 2026-09-27, A-DAT-genetic-map). As written it demands switch mass of
+   order 0.1 to 1 between adjacent chain positions, but those sit about 12 bp apart, where
+   the biologically correct value is the measured 0.0026 — the gate would reject a correct
+   model. Its second clause, "a sampled block is demonstrably NOT a single donor copied
+   verbatim", fails for about 91% of blocks even with the correct map, because an LD block
+   is by definition a stretch with little recombination and v1 chains within one block.
+   Replacement candidates, all measured 2026-09-27: expected donor switches per chromosome
+   (3,622.6, against PanMixer's ~0); median P(mosaic) among blocks with >= 20 variants
+   (0.2747); or measured segment length against the analytic n/(Ne*r) = 0.0068 cM.
 4. The missing-data policy is chosen, implemented, and covered by a test that fails
    if the behaviour changes.
 5. Emits `new_haplotypes` so the inherited evaluation suite runs unmodified.

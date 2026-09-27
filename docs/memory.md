@@ -104,6 +104,67 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-27 — A-DAT-genetic-map: map acquired, and exit gate 3 is mis-specified
+
+**Why.** The GRCh38 genetic map was the last unacquired input for `A-IMP-cohort-hmm`.
+Earlier this session I reported the SHAPEIT4 b38 maps as returning 302 — that was wrong,
+a redirect I failed to follow. Both candidates return 200 and were downloaded.
+
+**Result 1 — the two candidate maps are the same map.** SHAPEIT4 and Beagle both yield
+chr21 with **44,618 positions, identical positions, identical cM, maximum absolute
+difference 0**. The choice is format and provenance only, not content. Two independent
+distributions agreeing exactly is evidence the map is not a single-source artifact. Both
+registered in `docs/data.md`; the SHAPEIT4 copy is the working file, being pinnable by
+commit SHA rather than served from a lab webserver.
+
+**Result 2 — 7.63% of our chain positions sit outside the map.** Map span is
+10,326,676 - 46,680,243 bp; our chr21 variants span 5,713,651 - 46,699,788. So **26,018
+variants (7.63%) fall below the map start** and 592 (0.17%) above. That region is the
+acrocentric p-arm and heterochromatin, where no recombination map exists for a real
+reason. Interpolation clamps, giving flat cM, so **296 multi-variant blocks there have
+P(mosaic) = 0 exactly** and can only ever be one donor copied verbatim. This is the hazard
+flagged from Pickrell's README, confirmed on our data; it is a property of the region, not
+of the map we picked.
+
+**Result 3 — the transitions work, and exit gate 3 as written does not test them.**
+Map interpolated onto all 340,824 chr21 positions, published formula (Ne = 10,000,
+r = 1.26, d = `Delta_x` * Ne * r, total switch mass = (n-1)(1-exp(-d/n))/n, n = 86):
+
+| quantity | value |
+|---|---|
+| median `Delta_x` between adjacent chain positions | 1.811e-05 cM (about 12 bp) |
+| per-step switch mass, median | 0.0026 |
+| per-step switch mass, p75 / p90 | 0.0098 / 0.0304 |
+| steps with switch mass in [0.1, 1] | 3.0% |
+| expected donor switches across chr21 | **3,622.6** |
+| P(block is a mosaic), median over 11,670 multi-variant blocks | 0.0866 |
+| P(block is a mosaic), median over the 3,523 blocks with >= 20 variants | 0.2747 |
+| PanMixer shipped, same measurement | 5.8e-12; 300/300 blocks single-donor |
+
+- Columns: one map, one formula, our real chain positions.
+- Rows: per-step figures are between ADJACENT variants; block figures span a whole block.
+- Synthesis: median per-step switch mass is **4.5e8 times** PanMixer's, and the model gives
+  mosaic segments of a few kb, consistent with the analytic n/(Ne*r) = 86/12,600 =
+  0.0068 cM. **But exit gate 3 asks for "switch mass of order 0.1 to 1 at realistic
+  separations", and that target is biologically wrong at this density.** Adjacent chr21
+  variants are about 12 bp apart; switch mass near 0.1 there would mean roughly one
+  ancestral recombination per 12 bp. The measured 0.0026 is the CORRECT value.
+
+**Exit gate 3's second clause is mis-specified too, and more subtly.** It requires that
+"a sampled block is demonstrably NOT a single donor copied verbatim". With the correct map
+the median multi-variant block still has only **8.7%** chance of containing a switch, so
+about 91% of blocks WILL be one donor copied verbatim. That is NOT PanMixer's failure
+repeated: theirs was 100% from an arithmetic bug at 5.8e-12; ours is ~91% because **an LD
+block is by definition a stretch with little recombination**, and v1's chain scope is one
+block. The mosaic emerges ACROSS blocks — precisely the scope v1 defers. Inside v1 the tilt
+acts on donor SELECTION per block, not on within-block recombination.
+
+**OPEN — needs restating before implementation (Dylan).** Exit gate 3 should be rewritten
+against quantities meaningful at block scope. Candidates: expected donor switches per
+chromosome (3,622.6); median P(mosaic) among blocks with >= 20 variants (0.2747); or
+agreement between measured segment length and the analytic n/(Ne*r). Also open: whether to
+extrapolate cM below 10.33 Mb or accept 296 permanently single-donor blocks.
+
 ## 2026-09-27 — A-DAT-representability-split: 9.9% invisible, carrying 20.5% of the information
 
 **Why.** The earlier entry today put the invisible share at 19.6%. Its median allele
