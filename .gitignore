@@ -1,0 +1,11 @@
+# data/ is a symlink to /data/ds85/RanPanMixer/data (tens of GB). Never committed.
+/data
+
+# Run logs: keep the folder, not its contents.
+/logs/*
+!/logs/.gitkeep
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.claude/
