@@ -32,13 +32,19 @@ Read at session start. This file exists so a new session never has to grep
 - **The headline from the ingest:** *"reuse PanMixer's cohort HMM as `baseline_model`"
   is not available.* Its Li-Stephens sampler, as shipped, never recombines — it
   reduces to a uniform draw over donor haplotypes copied verbatim per block. What
-  we do inherit is its DATA, its BLOCK structure, its forward recursion, and its
-  EVALUATION suite. See the 2026-09-18 entry in `docs/memory.md` and the upstream
-  section of `docs/bugs.md`; both findings were reproduced by hand.
+  we inherit is its DATA (the GRCh38-rebuilt allele matrix and data model) and its
+  forward recursion. Its BLOCK structure is **not** inherited — under model C the
+  chain steps variant to variant and LD blocks play no role in the mechanism — and
+  its cohort-level utility metrics (`af_loss`, `ld_loss`) do not apply to a release
+  that never edits the cohort. See the 2026-09-18 entry in `docs/memory.md` and the
+  upstream section of `docs/bugs.md`; both findings were reproduced by hand.
 - **The binding constraint right now** is the GRCh37/GRCh38 build mismatch in
-  PanMixer's released pipeline. Until preprocessing is rebuilt on the GRCh38 30x
-  panel, nothing derived from their variant-match set is usable by either arm —
-  not the LD blocks, not the attack database, not `af_loss`, not `ld_loss`.
+  PanMixer's released pipeline. Nothing derived from their variant-match set is
+  usable by the **PanMixer arm or the head-to-head** — not the LD blocks, not the
+  attack database, not `af_loss`, not `ld_loss`. ⚠ **Our own sampler depends on
+  none of them.** Under model C it consumes only `G`, the cohort allele matrix, the
+  GRCh38 genetic map, and the target path; there is no external panel in the
+  mechanism's input set at all.
 - **The one thing most likely to go wrong** is unchanged and now has a concrete
   shape: an implementation that quietly lets `output_support` or `baseline_model`
   depend on the target. On PanMixer's data that is the DEFAULT, not an accident —
@@ -135,7 +141,8 @@ No reported result has been reproduced.
 ## Reporting contract
 
 Two results are comparable only if their config stamps match on:
-**graph+cohort id (including which individual was held out) · `tau` · utility id**.
+**graph+cohort id · `tau` · utility id** — plus `loo_id` for comparison-arm runs only
+(our target is external; a genuine release holds out nobody).
 
 Metrics are rows, configurations are columns. Every table carries a provenance
 line and is followed by one bullet per column, one bullet per row, and a prose
@@ -173,22 +180,43 @@ success only, and reports both frontiers.
 
 ### [A-IMP-v1-sampler] v1 SPECIFICATION — pinned 2026-09-25
 
-**Scope decision (Dylan).** Maximise reuse of PanMixer and change exactly ONE thing:
-the sampler. Keep its blocks, its data model, its donor panel and its whole
-evaluation suite. Defer the chromosome-wide chain.
+**Scope decision (Dylan, 2026-09-25; NARROWED 2026-09-28).** The original wording was
+*"maximise reuse of PanMixer and change exactly ONE thing, the sampler — keep its blocks,
+its data model, its donor panel and its whole evaluation suite."* That went too far: it
+imported PanMixer's threat model, in which the target is a cohort member, into a design
+whose target is external to `G`, `D`, every panel and the attack database. **Narrowed:**
+we reuse PanMixer's DATA and its forward recursion. Blocks as a chain unit, the
+donor-panel-minus-target, and the cohort-distortion metrics are COMPARISON-ARM choices,
+not properties of our design. **The chromosome-wide chain is no longer deferred — model C
+is the architecture (decided 2026-09-28), with model B retained as a fallback if the PI
+wants closer parity with PanMixer.**
 
 **INHERIT UNCHANGED**
-- plink LD block boundaries computed on the 1000 Genomes panel, and the
-  site-to-block assignment by position. Blocks stay exactly as PanMixer builds them.
-- The data model: the int16 (subjects, sites, 2) matrix with `-1` for missing, and
-  the block dictionary.
-- The donor panel: 2(N-1) = 86 haplotypes, the target's own two removed. ⚠ This is a
-  COMPARISON choice, not a requirement of our design. Our target is EXTERNAL, so nothing
-  needs removing and the theory has K = 88; v1 matches PanMixer's donor set so the two
-  arms sample from the same states in a head-to-head. Removing both haplotypes (never
-  just one) is what departure (c) gets wrong — on the toy, leaving the target in scores a
-  perfect 1.0000, removing one gives 0.8571, removing both gives the honest 0.5714.
-- The evaluation suite, unchanged, by emitting `new_haplotypes`.
+- The data model: the int16 (subjects, sites, 2) matrix with `-1` for missing,
+  row-aligned to the chromosome's VCF record order.
+- The forward recursion's log-space stay/switch form, with constants re-derived from
+  the published Methods (see REPLACE item 4).
+
+**COMPARISON-ARM ONLY — not properties of the design**
+- plink LD block boundaries and the site-to-block assignment. Under **model C** the
+  chain unit is the individual variant and blocks play no role in the mechanism. They
+  are retained only for the model-B fallback and for parity runs against PanMixer.
+  ⚠ Do NOT compute them from the 44-sample cohort: measured 2026-09-28, that gives
+  7,858 blocks covering 50.4% of variants against 14,137 / 74.2% from the panel, with
+  the largest block 2,562 variants against 618. Only 44% of SNPs clear MAF 0.05 in 88
+  haplotypes. If blocks are wanted, they need a large external panel.
+- The donor panel is **K = 88, the full cohort.** Our target is external to `D`, so no
+  haplotype is removed. The head-to-head arm instead uses 2(N-1) = 86, because there a
+  cohort member stands in as target and externality has to be simulated. Removing both
+  of that stand-in's haplotypes (never just one) is what PanMixer's departure (c) gets
+  wrong — PanMixer-side toy: leaving the target in scores 1.0000, removing one 0.8571,
+  removing both the honest 0.5714.
+- PanMixer's ATTACK evaluators and its read-mapping utility, by **optionally** emitting
+  `new_haplotypes`. ⚠ `af_loss` and `ld_loss` are NOT inherited: they are
+  cohort-distortion metrics, undefined for an external-target release that never edits
+  the cohort. Our utility axes are `target_fidelity` (always against its ceiling) and
+  `utility_retained`. The claim our guarantee actually makes — two-target
+  indistinguishability — is tested by NOTHING in their suite and is ours to write.
 
 **REPLACE**
 1. **Drop the anchor concept entirely.** Every variant in a block is a chain
@@ -247,18 +275,29 @@ only.** Adding a record for a target-specific variant would make `output_support
 the target and void Theorem 1 by the §4.4 disjoint-support argument — the fix is to measure
 the loss, never to represent it. See `target_fidelity` for the reporting rule.
 
-**OPEN DECISION — THE CHAIN ARCHITECTURE. Three options, to be settled with Dylan's PI.**
-Raised 2026-09-27 from first principles rather than from PanMixer's implementation. The
-pinned text above describes **model A**, which was inherited as a DESCRIPTION OF PANMIXER'S
-CODE and never argued for on its own terms. Measurements are chr21, the acquired GRCh38
-map, published constants (Ne = 10,000, r = 1.26, n = 86). Analytic segment length for
-reference: n/(Ne*r) = 0.0068 cM, about **4.5 kb**.
+**DECIDED 2026-09-28 — THE CHAIN ARCHITECTURE IS MODEL C.** Raised 2026-09-27 from first
+principles rather than from PanMixer's implementation; settled by Dylan 2026-09-28.
+**Model B is retained as a fallback** if the PI wants closer parity with PanMixer; model A
+is ruled out. The text that preceded this decision described **model A**, which was
+inherited as a DESCRIPTION OF PANMIXER'S CODE and never argued for on its own terms.
+Measurements are chr21, the acquired GRCh38 map, published constants (Ne = 10,000,
+r = 1.26, n = 86). Analytic segment length for reference: n/(Ne*r) = 0.0068 cM, ~**4.5 kb**.
 
 | model | chain | E[donor switches] | mean segment | alphas | status |
 |---|---|---|---|---|---|
-| **A** per-block chains, no inter-block transitions | 100,757 separate | 104,379 | 0.39 kb | 69 MB | what is pinned |
-| **B** one chain, units = **blocks**, blocks atomic | 100,757 | 3,532 | 11.60 kb | 69 MB | candidate |
-| **C** one chain, units = **variants** | 340,824 | 7,155 | 5.73 kb | 234 MB | candidate |
+| **A** per-block chains, no inter-block transitions | 100,757 separate | 104,379 | 0.39 kb | 69 MB | RULED OUT |
+| **B** one chain, units = **blocks**, blocks atomic | 100,757 | 3,532 | 11.60 kb | 69 MB | fallback |
+| **C** one chain, units = **variants** | 340,824 | 7,155 | 5.73 kb | 234 MB | **DECIDED** |
+
+**What choosing C removes from the project**, and the reason it was chosen: with the
+individual variant as the chain unit there are no LD blocks in the mechanism, hence no
+PLINK run and **no external panel in the mechanism's input set at all**; no anchor
+concept, hence **no PanGenie callset** (measured 2026-09-28: it has exactly two live
+consumers, both of which our design deletes, and no evaluator reads it); and no
+allele-frequency table. C also deletes the singleton special case — there are no T = 1
+chains, no per-block `Z_b`, one forward pass and one backward sample. **It is simpler than
+what was pinned, not harder.** The external panel survives only as the attack database in
+the evaluation, where cohort overlap must be removed before it is loaded.
 
 - **A is the worst of the three and in the wrong direction** — 11x too much recombination.
   Its fresh-uniform start per block is algebraically the `d` -> infinity limit of the
@@ -277,9 +316,11 @@ reference: n/(Ne*r) = 0.0068 cM, about **4.5 kb**.
 - **Blocks are a poor chain unit on this data regardless**: 89,087 of the 100,757 entries
   (88.4%) are orphan variants that fell in NO called plink block, so a "block boundary" is
   mostly a bookkeeping outcome rather than a recombination site.
-- **"Stay close to PanMixer" does not favour any of them.** All three reuse the same plink
-  blocks, data model, donor panel and evaluation suite. PanMixer contains no backward pass
-  at all, so the chain is our code under every option.
+- **"Stay close to PanMixer" does not favour any of them.** All three reuse the same data
+  model and donor panel; PanMixer contains no backward pass at all, so the chain is our
+  code under every option. ⚠ They do NOT all reuse the plink blocks — that was the
+  original wording and it is wrong for C, which has no blocks — nor the evaluation suite,
+  whose utility half does not apply to any of them.
 
 **What does NOT change between them:** the privacy budget. `eta_tau` is identical and
 `beta` still sums to 1 over the whole path, so the §4.10.4 thin-budget problem is untouched
@@ -318,11 +359,37 @@ influence. Break the chain at genuine discontinuities — the unmapped region be
    (0.2747); or measured segment length against the analytic n/(Ne*r) = 0.0068 cM.
 4. The missing-data policy is chosen, implemented, and covered by a test that fails
    if the behaviour changes.
-5. Emits `new_haplotypes` so the inherited evaluation suite runs unmodified.
+5. Every chain position carries a genuine interpolated cM — no clamped values survive
+   into the chain. Interpolate with `left=nan, right=nan` and assert no NaN remains
+   after the coordinate cut, so the failure is loud rather than silent.
 
-**MEASURED CONTEXT (chr21).** 11,670 multi-variant blocks plus 89,087 singletons =
-100,757 chains covering all 340,824 variants; K = 88 states, 86 after removing the
-target; `ffbs` cost about 30M operations. Compute is not a constraint.
+*(The former gate 5 — "emits `new_haplotypes` so the inherited evaluation suite runs
+unmodified" — is not a gate of the mechanism. It is one option for one comparison and
+now lives under `[A-EVL-headtohead]`.)*
+
+**MEASURED CONTEXT (chr21).** Under model C the chain is one pass over all 340,824
+variants, less the coordinate cut below (306,480 positions). K = 88 states — our target
+is external to the cohort, so no haplotype is removed; K = 86 applies only in the
+head-to-head arm, where a cohort member stands in as target. `ffbs` cost is about 30M
+operations at K = 88. Compute is not a constraint.
+
+**COORDINATE CUT (decided 2026-09-28).** The chain starts at chr21 **12,968,320**,
+keeping 306,480 of 340,824 variants (89.92%). Below that, `np.interp`'s clamping plus the
+map's own zero-cM centromeric plateau give **34,345 consecutive positions with identical
+cM**, so `P(switch) = 0` and the sampler emits one donor's real haplotype verbatim across
+7.25 Mb — departure (b) at ~200x the scale of the worst block. Five independent reasons
+support the cut: GRCh38 chr21 5.01-10.81 Mb is placeholder model sequence with 25
+fabricated N-gaps; 1000G's strict accessibility mask rules 99.98% of those variants
+inaccessible; our cohort matrix is 36.76% missing there against 6.57% elsewhere; deCODE's
+pedigree map assigns 0.0 cM/Mb to every 1 Mb bin from 0-13 Mb; and a four-generation
+pedigree observed zero p-arm allelic crossovers in 107 transmissions.
+⚠ **REVISIT.** This is a pragmatic cut to get v1 running, not a settled answer. Maps that
+nominally cover the region exist (pyrho hg38 from 5,088,754 bp; the Eagle redistribution
+has 66 markers there) but spend ~10 cM across intervals defined by two markers, i.e.
+interpolation across a void. Two smaller zero-distance defects also remain unaddressed:
+**592 variants above the map end** (a 593-position zero-distance run at the telomere) and
+**618 interior zero-cM map intervals** holding ~1,650 kept variants. The interior ones are
+real map plateaus and are correct to leave; the telomeric run is not and needs a decision.
 
 ## Backlog
 
@@ -364,9 +431,16 @@ Ordered. Each item names what must pass before it starts and what closes it.
 - **Prerequisite:** none for the toy version.
 - **Exit gate:** `phi_t(a,b) = 1 - (sum_v w_v 1[a_v != b_v]) / W_t` with
   `w_v = 1/support_D(v)`, `phi_t` = 1 when `W_t` = 0; asserted in [0,1] at runtime,
-  not documented; `beta_t` summing to 1 asserted; support computed on the
-  leave-one-out cohort; `-1` masked before comparing; `diploid_utility` using MEAN
-  with a test that catches a SUM.
+  not documented; `beta_t` summing to 1 asserted; support computed on the FULL cohort
+  (our target is external, so there is nothing to hold out — leave-one-out support
+  applies only to the head-to-head arm); `-1` masked before comparing;
+  `diploid_utility` using MEAN with a test that catches a SUM.
+  ⚠ Under model C this collapses: `phi_v` is an indicator (1 if the drawn donor carries
+  the target's allele at `v`, else 0) and `beta_v = w_v / sum_u w_u`. Bounded in [0,1]
+  and additive by construction, with no per-block normaliser.
+  ⚠ `support(v)` needs no computation: measured 2026-09-28, the pangenome VCF's own
+  `INFO/AN` field is bit-identical to `np.sum(pangenome != -1, axis=(0,2))` across all
+  340,824 chr21 records.
 
 ### [A-IMP-ffbs-sampler] Algorithm 1
 - **Why:** the mechanism. No backward pass exists anywhere upstream.
@@ -374,7 +448,14 @@ Ordered. Each item names what must pass before it starts and what closes it.
 - **Exit gate:** forward alphas STORED for all t (PanMixer keeps only the running
   vector); tilt potentials multiplied in; per-position normalization; `log_z_p`
   range-asserted; O(TK) `stay_switch` path agreeing with an O(TK^2) dense
-  reference; no argmax anywhere. Also emits `new_haplotypes` (see `docs/terms.md`).
+  reference; no argmax anywhere. May ALSO emit `new_haplotypes` for the comparison
+  arm (see `docs/terms.md`), but that is optional and not part of this gate.
+  ⚠ **Never materialise the transition matrix.** Li-Stephens `A` is
+  `(1-s_t)*I + (s_t/K)*J` — rank-one plus diagonal — so the forward step is
+  `alpha_t(j) = [(1-s_t)*alpha_{t-1}(j) + (s_t/K)*sum_i alpha_{t-1}(i)] * tilt_t(j)`,
+  O(K) per position from one scalar sum. The backward draw is O(K) the same way.
+  Store only the per-position switch scalar `s_t` (T floats) and the alphas
+  (T x K). A materialised `A` per position would be 340,824 x 88 x 88 x 8 B = ~21 TB.
 
 ### [A-LCK-preregister] Freeze the evaluation before looking at it
 - **Why:** the proposal requires the utility function be chosen before any attack

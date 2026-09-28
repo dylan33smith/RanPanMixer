@@ -491,8 +491,13 @@ CHANGES MEANING WITH: the MAF strata, which are read from pangenome_mask.npy —
                       stratum is 0/0. Also with the row count: comparing a 44-row
                       cohort AF to a 45-row one shifts every frequency by ~1/45.
 Valid vs:             the other arm at the identical site set and row count.
-Status:               SECONDARY — a COHORT-level metric, near-blind to target fidelity.
-                      Never quote it as evidence a release preserved the TARGET.
+Status:               PANMIXER-ONLY. ⚠ **This is not a metric this project computes.**
+                      Its signal is the change in the COHORT's allele frequencies caused
+                      by overwriting one member's genotype column. We never modify the
+                      cohort, so the quantity is not defined for our release object —
+                      running it on our output would measure the distortion of pretending
+                      our external target were cohort member k. Our utility axes are
+                      `target_fidelity` (always against its ceiling) and `utility_retained`.
 Aliases:              "U_AF"
 ```
 
@@ -507,7 +512,11 @@ CHANGES MEANING WITH: the window — the shipped KB_WINDOW_SIZE = 5 is compared 
                       mismatch makes it return (0.0, 0) rather than raising.
 Valid vs:             the other arm at the identical window and site set. Run it both
                       as-shipped (for parity with the paper) and corrected, reporting both.
-Status:               SECONDARY — cohort-level, same blindness as af_loss.
+Status:               PANMIXER-ONLY — same as `af_loss`: a cohort-distortion metric that
+                      is not defined for a release which never edits the cohort. Not a
+                      metric this project computes. The honest analogue, if one is wanted,
+                      is the LD DECAY CURVE of our release ensemble against the cohort's
+                      over R draws at real distances — a different quantity, not `ld_loss`.
 Aliases:              "U_LD"
 ```
 
@@ -526,15 +535,23 @@ Aliases:              none
 
 ### new_haplotypes  [implementation] [dataset]
 ```
-Is:                   THE integration artifact: the released allele vector for one
+Is:                   PanMixer's integration artifact: the released allele vector for one
                       target, shape (n_sites, 2) int16, -1 = missing, row-aligned to
                       that chromosome's pangenome VCF record order. Every PanMixer
                       attack and utility evaluator consumes exactly this file.
-Computed by:          PLANNED for us; PanMixer writes it from tools/panmixer/stacker.py
+Computed by:          PanMixer writes it from tools/panmixer/stacker.py. OPTIONAL for us.
 CHANGES MEANING WITH: the site axis. It is positional — a row-order mismatch silently
-                      scores the wrong variants rather than erroring.
+                      scores the wrong variants rather than erroring. ⚠ The shape
+                      assertion in PanMixer's gap-score evaluators is VACUOUS (both sides
+                      equal site_mask.sum() by construction), so nothing upstream catches
+                      this. Ship a `sites.tsv` beside any emitted copy and verify it.
 Valid vs:             another new_haplotypes over the identical site axis and cohort.
-Status:               PRIMARY — our sampler MUST emit this, or the benchmark is not shared.
+Status:               COMPARISON-ARM ONLY. Emitting it is the cheapest way to run
+                      PanMixer's ATTACK evaluators on our release unmodified, and it is
+                      worth doing for the head-to-head. It is NOT a requirement of the
+                      mechanism, and emitting it does not make PanMixer's cohort-level
+                      utility metrics applicable to us — `af_loss` and `ld_loss` would
+                      run and return meaningless numbers.
 Aliases:              "the release", "the obfuscated haplotypes"
 ```
 
@@ -547,11 +564,18 @@ Computed by:          PLANNED
 CHANGES MEANING WITH: which artifacts were actually recomputed. Recomputing only the
                       donor panel (what PanMixer does) is NOT a loo_cohort.
 Valid vs:             the same held-out individual in the other arm.
-Status:               PRIMARY
-Aliases:              "LOO". ⚠ Even a full loo_cohort is an APPROXIMATION of our
-                      threat model: the PGGB graph TOPOLOGY was built from all HPRC
-                      assemblies, so G itself saw the target. Never claim full
-                      externality on PanMixer's data.
+Status:               COMPARISON-ARM ONLY. ⚠ **Not a concept our mechanism needs.** Our
+                      target is external to `G`, `D` and every panel, so there is nothing
+                      to hold out: `K = 88`, unconditionally. `loo_cohort` exists solely
+                      for the head-to-head arm, where a cohort member stands in as target
+                      and externality must therefore be SIMULATED. See `target_fidelity`,
+                      which reasons correctly about a genuinely external target throughout
+                      and is the model for how these entries should read.
+Aliases:              "LOO". ⚠ Even a full loo_cohort is an APPROXIMATION of the
+                      external-target setting: the PGGB graph TOPOLOGY was built from all
+                      HPRC assemblies, so G itself saw the stand-in. That is a limit of
+                      the comparison arm, not of our design — with a real external target
+                      the graph never saw them.
 ```
 
 ### target_fidelity  [utility] [evaluation]

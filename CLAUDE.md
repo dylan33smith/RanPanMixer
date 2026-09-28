@@ -13,17 +13,28 @@ It carries **no findings, no results, no numbers** — those live in `docs/`.
 ## Project Core
 
 - **Mission:** implement and validate the cohort-tilted `tau`-private path release
-  of `paper/Private_Genome_Path_Release.pdf`, on top of PanMixer's cohort HMM.
-  Success = a sampler whose released paths retain measurable utility while the
-  proven `tv_bound` holds and no implemented attacker beats `p_succ_bound`.
-- **What this is NOT:** PanMixer protects cohort members by editing the graph.
-  This protects an *external target's mapped path* and never modifies the graph.
-- **Environment:** single Linux workstation. No data acquired yet — every path in
-  `docs/data.md` is `PLANNED` until it is built and its row is updated.
-- **Stack:** Python. NumPy/SciPy for the sampler. PanMixer is pinned at `c182c38`
-  under `external/PanMixer` (a symlink to `/data` — it writes inside its own tree
-  and assumes SLURM, which this machine does not have). Its conda env is `panmixer`.
-  Check before assuming any library is installed.
+  of `paper/Private_Genome_Path_Release.pdf`. Success = a sampler whose released
+  paths retain measurable utility while the proven `tv_bound` holds and no
+  implemented attacker beats `p_succ_bound`. PanMixer supplies the cohort DATA and
+  an optional comparison arm — **not** the mechanism: its shipped sampler never
+  recombines, so reusing its HMM as `baseline_model` is not available.
+- **What this is NOT:** PanMixer protects cohort members by rewriting one member's
+  genotype column in the cohort VCF; it does not modify the graph either. The
+  difference is the object released and who is protected. We release an *external
+  target's mapped path* — a standalone object, never a column in the cohort file.
+- **THE TARGET IS EXTERNAL** — not in `G`, `D`, any panel, or the attack database.
+  Nothing in the mechanism is a function of the target except the tilt, and a
+  PanMixer property stated about a cohort-member target does not transfer. ⚠ Sole
+  exception: the optional **head-to-head arm**, where a cohort member stands in as
+  target; every `K = 86`, leave-one-out and cohort-distortion quantity — including
+  `af_loss`/`ld_loss` entirely — belongs to that arm alone.
+- **Environment:** single Linux workstation. PanMixer's inputs and the GRCh38
+  genetic map are acquired; our mechanism artifacts are `PLANNED`. Every
+  `docs/data.md` path carries its own state — read the row, do not assume.
+- **Stack:** Python, NumPy/SciPy. PanMixer is pinned at `c182c38` under
+  `external/PanMixer` (symlink to `/data`; it writes inside its own tree and assumes
+  SLURM, absent here). Its conda env is `panmixer`; `pytest` is NOT in it — use
+  `python3`. Check before assuming any library is installed.
 
 ## Documentation Architecture
 
@@ -34,8 +45,7 @@ It carries **no findings, no results, no numbers** — those live in `docs/`.
 - `docs/memory.md` — **never read on startup; `grep` it.** Chronological ledger.
 - `docs/bugs.md` — **`grep` by symptom.** [Symptom] -> [Proven fix].
 
-Also present: `paper/` (the proposal and manuscript drafts), `archive_docs/`
-(read-only source material), `tests/` (code tests + the docs contract).
+Every other directory is a row in `docs/data.md`'s storage table.
 
 ## Standing Constraints (hard rules; rationale lives in `docs/memory.md`)
 
@@ -43,9 +53,10 @@ Also present: `paper/` (the proposal and manuscript drafts), `archive_docs/`
    only — never from the target.** Any target-dependent pruning of the HMM state
    space voids Theorem 1. This is the easiest way to buy utility and silently
    lose the guarantee; it is the single rule most likely to be broken by accident.
-   ⚠ On PanMixer's data, target inclusion is the DEFAULT — its allele frequencies,
-   support counts and scoring panel all include the target, because there the
-   target is a cohort member. Recompute leave-one-out; see `docs/data.md`.
+   For us this holds **by construction** — the target is external, so `K = 88` and
+   nothing is held out. ⚠ On PanMixer's data target inclusion is the DEFAULT, which
+   is correct there and is not a requirement on us; leave-one-out belongs to the
+   head-to-head arm alone. See `docs/plan.md` `[A-EVL-headtohead]`.
 2. **The utility must be globally bounded in [0,1].** If a raw utility has range
    `delta_u != 1`, the calibration is `eta_tau = arctanh(tau)/delta_u`. An
    unnormalized utility does not weaken the bound — it removes it.
@@ -82,8 +93,7 @@ table of arms invites cherry-picking which metrics to show.
 1. Report the full metric set every time, including rows that did not move.
    `n/a` with a reason; never an omitted row.
 2. **Every number is stamped with its `tau`, its denominator and its `n`.** A
-   utility or attacker figure without a `tau` is uninterpretable, not merely
-   imprecise.
+   utility or attacker figure without a `tau` is uninterpretable, not imprecise.
 3. Row labels are the exact `docs/terms.md` identifier. Mark gate metrics with `*`.
 4. Order rows by importance: primary -> gates -> structure -> context -> demoted.
 5. Carry a provenance line: `<GRAPH> · <COHORT> · <TAU> · <UTILITY> · n draws`.
@@ -105,8 +115,7 @@ table of arms invites cherry-picking which metrics to show.
 ## Naming
 
 - **Work items:** `<phase>-<KIND>-<slug>`, `KIND` in `THY IMP DAT EVL ATK FIX LCK`,
-  slug lowercase-hyphenated and meaningful. Current phase letter: `A`.
-  Example: `A-IMP-ffbs-sampler`.
+  slug lowercase-hyphenated. Current phase letter: `A`. E.g. `A-IMP-ffbs-sampler`.
 - **Directories/files:** `<phase>_<TARGET>[_<variant>]`. Never two names differing
   only in case. Put the varying parameter — above all `tau` — IN the filename.
   No brace/glob shorthand in docs (write `tau_0p10/`, `tau_0p25/`).

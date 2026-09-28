@@ -40,7 +40,7 @@ Verified against disk 2026-09-18. `tests/test_docs_contract.py` re-verifies.
 | `archive_docs` | read-only source material: the framework PDF and the PanMixer paper | `OK` |
 | `tests` | the docs contract | `OK` |
 | `scripts` | our operational scripts: the local `sbatch` shim and pipeline runners. NOT mechanism code. | `OK` |
-| `primer` | the onboarding primer: `primer/src/*.md` (the four sections, the editable source of truth), `primer/build.py` (assembles them into HTML), `primer/primer.html` (the built page, published as an Artifact). Teaching material, NOT one of the six working docs and not a source of project facts. | `OK` |
+| `primer` | the onboarding primer: `primer/src/*.md` (five files: `00-whatsnew.md` plus the four sections; the editable source of truth), `primer/build.py` (assembles them into HTML), `primer/primer.html` (the built page, published as an Artifact). Teaching material, NOT one of the six working docs and not a source of project facts. | `OK` |
 | `logs` | tmux run logs and status sentinels (gitignored) | `OK` |
 | `external/PanMixer` | symlink -> `/data/ds85/RanPanMixer/external/PanMixer`. **PanMixer writes all its data inside its own tree** (`BASE_PATH = dirname(constants.py)`, no env override), and `/home` is 95% full, so the checkout lives on `/data`. Gitignored. | `OK` |
 | `external/genetic_maps` | symlink -> `/data/ds85/RanPanMixer/genetic_maps`. GRCh38 genetic maps, acquired 2026-09-27. Working file `external/genetic_maps/chr21.b38.gmap`. Gitignored. | `OK` |
@@ -95,16 +95,24 @@ A release that cannot answer "at what tau, under what utility" is not quotable.
 | `tau` | float | the privacy parameter. Absent = the record is unusable. |
 | `eta_tau` | float | stored, not recomputed at read time, so a calibration change is detectable |
 | `utility_id` | str | identifies phi_t, its weights, and the beta_t scheme |
-| `graph_id` | str | graph + cohort + block segmentation + **which leave-one-out cohort** |
+| `graph_id` | str | graph + cohort + chain segmentation. ⚠ NOT a leave-one-out id: our target is external, so nothing is held out |
+| `loo_id` | str/null | the held-out stand-in, **comparison arm only**. `null` for a genuine external-target release |
 | `seed` | int | the private random draw |
 | `state_path` | int[T] | sampled Z_1:T |
 | `log_z_p` | float | must satisfy 0 <= log_z_p <= eta_tau |
 | `released_at` | date | one release per genome; re-releases compose |
 
-**Integration contract.** Our sampler must ALSO emit PanMixer's artifact —
-`new_haplotypes.npy`, shape `(n_sites, 2)` int16 with `-1` for missing, row-aligned
-to the chr VCF — because every PanMixer evaluator consumes exactly that file.
-Emitting it makes their whole attack and utility stack run on our output unchanged.
+**Integration contract (COMPARISON ARM ONLY).** Our sampler MAY also emit PanMixer's
+artifact — `new_haplotypes.npy`, shape `(n_sites, 2)` int16 with `-1` for missing,
+row-aligned to the chr VCF — because every PanMixer evaluator consumes exactly that file.
+⚠ It is NOT a requirement of the mechanism, and emitting it does NOT make their whole
+stack meaningful on our output: `af_loss`, `ld_loss` and the Beagle attack will run and
+return numbers that mean nothing for a release which never edits the cohort. Only the
+gap-score attack transfers, and only after its "self" becomes the external target's true
+path and the target is excluded from the attack database.
+⚠ The row-order coupling is UNCHECKED upstream — the shape assertion in their gap-score
+evaluators is vacuous (both sides equal `site_mask.sum()` by construction). Ship a
+`sites.tsv` (chrom, pos, ref, alt) beside any emitted copy and verify it before scoring.
 
 ## 5. Datasets — LIVE
 
@@ -130,13 +138,15 @@ Emitting it makes their whole attack and utility stack run on our output unchang
 | `paper/s41467-026-77591-0_reference.pdf` | 2026-09-18 | **The PUBLISHED PanMixer paper** (Nature Communications, DOI 10.1038/s41467-026-77591-0, Article in Press, 12 pages, sha256 `2bbba736...`), supplied by Dylan. **The version of record — all reproduction targets come from here.** | LIVE |
 | `archive_docs/Blindenbach2026_PanMixer.pdf` | 2026-09-18 | The bioRxiv PREPRINT, 24 pages. Superseded: it says 47 individuals (published: 44), `eps_private` 0.001 (published: 0.002), AF divergence 0.004/0.004/0.002 (published: 0.006/0.006/0.005), and it has no Data availability section and no membership-inference analysis. Retained because this project's first analysis was made against it. | SUPERSEDED |
 | `logs/pm_download.sha256` | 2026-09-18 | sha256 of the three downloaded VCFs. | LIVE |
-| `primer/primer.html` + `primer/src/` | 2026-09-20 | Teaching primer for onboarding: the landscape, the problem, PanMixer dissected, and our mechanism. ~57k words, built from `primer/src/` by `primer/build.py`. v2 expanded the hidden-Markov-model subsection (1.2.2) with full derivations of the forward algorithm and backward sampling, worked arithmetic, and a brute-force cross-check. URL: https://claude.ai/artifact/HzUWmUmxAPwXUSq3oFy8sb | LIVE |
+| `primer/primer.html` + `primer/src/` | 2026-09-20 | Teaching primer for onboarding: a what-changed preface plus the landscape, the problem, PanMixer dissected, and our mechanism. ~57k words, built from `primer/src/` by `primer/build.py`. v2 expanded the hidden-Markov-model subsection (1.2.2) with full derivations of the forward algorithm and backward sampling, worked arithmetic, and a brute-force cross-check. URL: https://claude.ai/artifact/HzUWmUmxAPwXUSq3oFy8sb | LIVE |
 
 ## 8. Reproducibility contract
 
-A result is reproducible here only if all five are recorded: the graph+cohort id
-(**including which individual was held out**), `tau`, the utility id, the number
-of draws, and the seed. Two results are comparable only when the first three match.
+A result is reproducible here only if all five are recorded: the graph+cohort id,
+`tau`, the utility id, the number of draws, and the seed. Two results are comparable only
+when the first three match. ⚠ A held-out individual is recorded **only for comparison-arm
+runs** (`loo_id`); a genuine external-target release holds out nobody, and requiring one
+would make a condition no real release can satisfy into a gate on every result.
 
 **The private input is the target path.** The `PLANNED` target directory must
 never be committed, copied into an artifact directory, or quoted in any document.
