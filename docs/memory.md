@@ -104,6 +104,73 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-27 — A-THY-chain-architecture: three models, measured, and a toy that shows the tilt vanishing
+
+**Why.** Dylan asked whether "the HMM is per block and the chain never crosses a block
+boundary" is the right framing for OUR mechanism, explicitly from first principles rather
+than from the docs. It is not: that sentence is a FINDING ABOUT PANMIXER'S CODE which
+leaked into our spec as though it were a design principle. Nothing in the proposal or in
+Theorem 1 requires it.
+
+**First-principles position.** `baseline_model` is a model of what a plausible haplotype
+looks like: a mosaic whose segment boundaries fall where recombination happened, at a rate
+set by genetic position in centiMorgans. **LD blocks appear nowhere in that.** They are a
+statistical summary of where recombination has historically been rare — downstream of the
+same process the transition model already encodes. Using blocks INSTEAD of the map
+substitutes a coarse proxy for the real quantity; using both double-counts.
+
+**The three options, measured on chr21** (acquired GRCh38 map, Ne = 10,000, r = 1.26,
+n = 86; analytic segment n/(Ne*r) = 0.0068 cM ~ 4.5 kb):
+
+| model | chain | E[switches] | mean segment | alphas |
+|---|---|---|---|---|
+| A: per-block chains, no inter-block (pinned) | 100,757 separate | 104,379 | 0.39 kb | 69 MB |
+| B: one chain, units = blocks | 100,757 | 3,532 | 11.60 kb | 69 MB |
+| C: one chain, units = variants | 340,824 | 7,155 | 5.73 kb | 234 MB |
+
+- Columns: one map, one formula, our real positions.
+- Rows: A is the pinned spec; B and C are candidates.
+- Synthesis: **A is 11x too scrambled and is the worst of the three.** Its fresh-uniform
+  reset per block is algebraically the `d` -> infinity limit of the switch formula. Measured
+  inter-block switch mass is median **0.0022** against the **0.9884** independence implies,
+  and 98.5% of block pairs are below half of it. B discards **51%** of the recombination
+  (the within-block half); C is nearest the analytic segment length.
+
+**Supporting measurements.** 89,087 of 100,757 block-dictionary entries (88.4%) are orphan
+variants in NO called plink block, so block boundaries are mostly bookkeeping, not
+recombination sites. Map resolution is 407 bp median against 60 bp variant spacing, so the
+map already resolves finer than blocks do. The largest block is 618 variants over 39.5 kb
+which C recombines through 73% of the time and B emits as one donor verbatim.
+
+**Numerical findings.** An unnormalised forward pass underflows float64 after about **183
+positions**; per-column normalisation (`log_z_p` = sum of log `c_t`) removes it entirely and
+is preferred over log-space (cheaper, and `alpha_t` is already the distribution backward
+sampling needs). **Storage must be float64**: float32 resolution 1.2e-07 against a
+per-position tilt of 5.5e-06 is only 46x of headroom.
+
+**The toy (4 donors, 7 variants, 3 blocks), model B.** Forward pass reproduces `Z_p` exactly
+against enumeration over all 64 paths (1.330113 both ways); `log_z_p` = 0.285264 inside
+[0, 0.5493]; E[u] moves 0.5000 -> 0.5386 at tau = 0.5.
+
+**The tilt vanishing, shown directly.** Tiling the same 3-block pattern to longer chains,
+holding tau = 0.5:
+
+| T blocks | max psi | E[u] gain |
+|---|---|---|
+| 3 | 1.2654 | +3.86e-02 |
+| 300 | 1.0024 | +3.72e-04 |
+| 30,000 | 1.0000235 | +3.73e-06 |
+| 100,755 | 1.0000070 | +1.11e-06 |
+
+Exactly 1/T, and **identical under all three architectures** — the chain choice does not
+touch the budget. The same toy at T = 3 gives E[u] gains of +0.0402 (A), +0.0386 (B),
++0.0371 (C): A buys marginally the most utility precisely BY discarding the linkage
+constraint, which is also why its output is least haplotype-like.
+
+**Status: OPEN, deferred to Dylan's PI**, written up as a decision in `docs/plan.md`. If C
+is chosen the factorisation argument becomes unnecessary and the singleton special case
+disappears, making C simpler than what is pinned rather than harder.
+
 ## 2026-09-27 — A-DAT-genetic-map: map acquired, and exit gate 3 is mis-specified
 
 **Why.** The GRCh38 genetic map was the last unacquired input for `A-IMP-cohort-hmm`.

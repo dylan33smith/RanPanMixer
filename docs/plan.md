@@ -247,6 +247,59 @@ only.** Adding a record for a target-specific variant would make `output_support
 the target and void Theorem 1 by the §4.4 disjoint-support argument — the fix is to measure
 the loss, never to represent it. See `target_fidelity` for the reporting rule.
 
+**OPEN DECISION — THE CHAIN ARCHITECTURE. Three options, to be settled with Dylan's PI.**
+Raised 2026-09-27 from first principles rather than from PanMixer's implementation. The
+pinned text above describes **model A**, which was inherited as a DESCRIPTION OF PANMIXER'S
+CODE and never argued for on its own terms. Measurements are chr21, the acquired GRCh38
+map, published constants (Ne = 10,000, r = 1.26, n = 86). Analytic segment length for
+reference: n/(Ne*r) = 0.0068 cM, about **4.5 kb**.
+
+| model | chain | E[donor switches] | mean segment | alphas | status |
+|---|---|---|---|---|---|
+| **A** per-block chains, no inter-block transitions | 100,757 separate | 104,379 | 0.39 kb | 69 MB | what is pinned |
+| **B** one chain, units = **blocks**, blocks atomic | 100,757 | 3,532 | 11.60 kb | 69 MB | candidate |
+| **C** one chain, units = **variants** | 340,824 | 7,155 | 5.73 kb | 234 MB | candidate |
+
+- **A is the worst of the three and in the wrong direction** — 11x too much recombination.
+  Its fresh-uniform start per block is algebraically the `d` -> infinity limit of the
+  Li-Stephens switch formula, i.e. it asserts consecutive blocks are infinitely far apart
+  genetically. Measured truth: median inter-block switch mass **0.0022** against the 0.9884
+  that independence implies, with **98.5%** of block pairs below half of it. Consecutive
+  blocks are as tightly linked as adjacent variants within one (median gap 1.52e-05 cM
+  versus 1.81e-05 cM).
+- **B discards 51% of the recombination** — the within-block half — but block sizes are
+  median 1 and p90 3, so the loss concentrates in the tail. The largest block is 618
+  variants over 39.5 kb, which the correct model recombines through 73% of the time and
+  which B emits as one donor verbatim. That is a mild form of departure (b): the release
+  carries another individual's real haplotype intact over tens of kb.
+- **C is the correct Li-Stephens model** and lands nearest the analytic segment length.
+  Costs 165 MB more and about 3x the operations, on a budget of 29M — not a constraint.
+- **Blocks are a poor chain unit on this data regardless**: 89,087 of the 100,757 entries
+  (88.4%) are orphan variants that fell in NO called plink block, so a "block boundary" is
+  mostly a bookkeeping outcome rather than a recombination site.
+- **"Stay close to PanMixer" does not favour any of them.** All three reuse the same plink
+  blocks, data model, donor panel and evaluation suite. PanMixer contains no backward pass
+  at all, so the chain is our code under every option.
+
+**What does NOT change between them:** the privacy budget. `eta_tau` is identical and
+`beta` still sums to 1 over the whole path, so the §4.10.4 thin-budget problem is untouched
+by this choice. Demonstrated on the toy: the per-position tilt and the utility gain both
+fall as 1/T regardless of what a position is.
+
+**If C is chosen**, the spec's per-block factorisation argument is no longer needed — it
+justified decomposing into independent per-block samplers, and C has one chain, so Theorem 1
+applies to the whole path directly. C also DELETES the singleton special case: there are no
+T = 1 chains, no per-block `Z_b`, one forward pass and one backward sample. It is simpler
+than what is pinned, not harder.
+
+**Numerical requirements, common to B and C.** Normalise every column
+(`alpha_t` = `r_t`/`c_t`, `log_z_p` = sum of log `c_t`); an unnormalised forward pass
+underflows float64 after about **183 positions** and we need up to 340,824. Use **float64**
+for the stored alphas: float32 resolution is 1.2e-07 while the per-position tilt is about
+5.5e-06, only 46x above the noise floor, so rounding would consume the target's entire
+influence. Break the chain at genuine discontinuities — the unmapped region below
+10,326,676 bp, the centromere, long assembly gaps — never at block boundaries.
+
 **EXIT GATES**
 1. `A-THY-toy-enumeration` passes: sampler matches exact enumeration; exact TV <= `tau`
    across a grid of `tau` and many input pairs; `log_z_p` within [0, `eta_tau`] on
