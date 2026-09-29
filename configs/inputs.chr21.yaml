@@ -60,9 +60,12 @@ inputs:
 # Fixed BEFORE any target file is opened, so R_D stays a function of D alone.
 # ---------------------------------------------------------------------------
 chain_span:
-  start: 12968320
-  end: null            # chromosome end; see telomere note below
-  keeps: 306480        # of 340,824 chr21 variant records = 89.92%
+  start: 12968320      # exclusive
+  end:   46680243      # inclusive -- the genetic map's last marker
+  keeps: 305887        # of 340,824 chr21 variant records = 89.75%
+  dropped_below: 34345
+  dropped_above: 592
+  provisional: true    # Dylan to settle with his PI; this is the cut that lets v1 run
   why: >
     Below 12,968,320 the clamped interpolation and the map's own zero-cM
     centromeric plateau give 34,345 consecutive positions at IDENTICAL cM, so
@@ -98,8 +101,15 @@ target_selection:
     - NOT a first-degree relative of any HPRC member # 78 such samples
     - excluded from the attack database at evaluation time
 
-  pool: configs/eligible_targets.chr21.txt   # 3,085 samples
-  pool_derivation: 3202 - 39 (HPRC in panel) - 78 (1st-degree relatives) = 3085
+  pool: configs/clean_pool.chr21.txt          # 1,399 samples -- USE THIS ONE
+  wide_pool: configs/eligible_targets.chr21.txt  # 3,085, HPRC-relatedness only
+  pool_derivation: >
+    3202 - 39 (HPRC members in panel) - 78 (1st-degree relatives of HPRC) = 3085,
+    then - 1686 that have a first-degree relative ANYWHERE in the 3,202 = 1399.
+    The last rule matters because if a target's own parent or child sits in the
+    ATTACK DATABASE, the attack can match the relative instead of the target,
+    which confounds the measurement in the optimistic direction. 55% of the wide
+    pool fails it.
 
   relatedness_warning: >
     NOT a formality. The 39 HPRC donors present in the 30x panel are the
@@ -109,13 +119,29 @@ target_selection:
     That would inflate apparent fidelity and confound the privacy measurement.
     The pool above already excludes them.
 
-  known_good:                      # verified 2026-09-29: eligible, unrelated
-    - HG00096
-    - HG00097
-    - HG00099
-    - HG00100
-    - HG00101
-    - HG00102
+  selected: configs/targets.chr21.txt    # the 10 test targets, extracted 2026-09-29
+  selection_method: >
+    Two per super-population, all from the strict 1,399 pool. HG00096 and HG00097
+    carried over from the 2026-09-27 representability run for continuity; the
+    other eight drawn with random.Random(20260929) so the choice is reproducible.
+    Spread is deliberate -- the HPRC cohort is multi-continental, so a target's
+    ancestry relative to the cohort should strongly affect how well a mosaic of
+    cohort haplotypes reproduces it, and an all-GBR set would hide that.
+  selected_detail:   # sample: [super_pop, pop, chr21 non-ref calls]
+    HG00096: [EUR, GBR, 61495]
+    HG00097: [EUR, GBR, 60677]
+    HG01323: [AMR, PUR, 61831]
+    HG01468: [AMR, CLM, 59953]
+    HG02389: [EAS, CDX, 59944]
+    HG03757: [SAS, STU, 64279]
+    HG04211: [SAS, ITU, 64515]
+    NA19056: [EAS, JPT, 59421]
+    NA19350: [AFR, LWK, 78744]
+    NA20294: [AFR, ASW, 79217]
+  sanity_check: >
+    Non-reference counts run 59,421 (NA19056, EAS) to 79,217 (NA20294, AFR) --
+    the AFR samples carry the most, as expected from African populations' higher
+    diversity. A useful smoke test that the spread is real.
 
   ceiling: >
     A held-out panel sample UNDERSTATES the representability problem. Measured
@@ -143,3 +169,28 @@ not_used:
     No privacy score and no allele-frequency sampling branch to feed. Note that
     support(v) needs no computation either: INFO/AN in the graph VCF is
     bit-identical to the non-missing count across all 340,824 chr21 records.
+
+# ---------------------------------------------------------------------------
+# Attack database -- EVALUATION ONLY, never an input to the mechanism.
+# ---------------------------------------------------------------------------
+attack_database:
+  path: data/attack/1000g_30x_chr21_attackdb.vcf.gz
+  built: 2026-09-29
+  samples: 3192                      # 3,202 minus the 10 test targets
+  excluded: data/attack/excluded_targets.txt
+  why_exclude_targets: >
+    The gap score is self minus the maximum over the database. If the target is
+    in the database it is its own rank-1 hit and the gap is trivially zero --
+    PanMixer's departure (e). The target's true path is the "self" reference; the
+    database supplies the COMPETING candidates.
+
+  open_question_hprc_members: >
+    39 HPRC cohort members are STILL in this database, deliberately, because the
+    right answer is not obvious and belongs in a threat-model conversation.
+    The release is a mosaic of cohort haplotypes, so it will match cohort members
+    well -- but that identifies DONORS, not the target. Leaving them in inflates
+    max(others), shrinks the gap, and makes privacy look BETTER, which is the
+    dangerous direction. Removing them makes the attack stronger and is the
+    conservative choice. Rebuild without them (and without their 78 first-degree
+    relatives, which is the part an obvious fix misses) before quoting any
+    privacy number.
