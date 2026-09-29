@@ -117,9 +117,49 @@ Three inputs, and only three. What model C removed is as important as what it ke
 
 | # | input | source | size | state |
 |---|---|---|---|---|
-| 1 | **HPRC v1.0 PGGB graph**, per-chromosome GFA | `human-pangenomics` S3, `pangenomes/freeze/freeze1/pggb/` ⚠ note the `vcfs/` component is absent for graph files | chr21 **434,772,428 B**; whole genome 15.64 GB gz / 86.5 GB raw | `PLANNED` |
-| 2 | **GRCh38 genetic map** | already held | `chr21.b38.gmap`, 44,618 rows | `OK` |
-| 3 | **The target** | not acquired; form undecided | — | `PLANNED` |
+| 1 | **HPRC v1.0 PGGB graph**, chr21 GFA | `.../freeze1/pggb/chroms/chr21.hprc-v1.0-pggb.gfa.gz` (note: graph files are under `chroms/`, NOT the `vcfs/` prefix) | **434,772,428 B**, sha256 `85222d4f...` | `OK` — staged 2026-09-29 |
+| 2 | **GRCh38 genetic map** | SHAPEIT4, corroborated byte-identical by Beagle | `chr21.b38.gmap`, 971,965 B, sha256 `95557a75...`, 44,618 rows | `OK` — staged 2026-09-29 |
+| 3 | **The target** | a held-out 1000G 30x sample, until a real external genome exists | one sample column | `OK` (pool selected) |
+
+Staged on the `pipeline` branch under `data/raw/`, with the full manifest at
+`pipeline:configs/inputs.chr21.yaml`. PGGB freeze1 publishes **no `.gbz`, `.og` or
+`.snarls`** — GFA is the only form.
+
+### Target selection (decided 2026-09-29)
+
+Until a real external genome is available, the target is a **held-out sample from the
+1000 Genomes 30x GRCh38 panel**. That panel is phased and GRCh38-called, so a sample
+column *is* a path once joined to our site list — which is exactly the format the
+pipeline wants, and it avoids `vg giraffe` entirely (HPRC marks short-read mapping
+**"untested"** for the PGGB graph). The project already used this for the 2026-09-27
+representability measurement.
+
+**Eligibility — all four must hold:**
+
+| rule | count |
+|---|---|
+| in the 3,202-sample 30x panel | 3,202 |
+| NOT one of the 44 HPRC cohort members | −39 (the 39 present in the panel) |
+| NOT a first-degree relative of any HPRC member | −78 |
+| excluded from the attack database at evaluation time | — |
+| **eligible pool** | **3,085** — `pipeline:configs/eligible_targets.chr21.txt` |
+
+⚠ **The relatedness rule is not a formality.** The 39 HPRC donors in the panel are the
+**children** of trios, and their **78 parents sit in the unrelated-2504 set** — so a
+target drawn at random from the 2504 has a **~3.1% chance of being a cohort member's
+parent**, sharing about half its genome with a donor haplotype. That would inflate
+apparent fidelity and confound the privacy measurement. Verified against the 1000G
+pedigree (`1kGP.3202_samples.pedigree_info.txt`), 2026-09-29.
+
+**Known-good targets:** HG00096, HG00097, HG00099, HG00100, HG00101, HG00102 — the same
+six used for the representability measurement, re-verified eligible 2026-09-29.
+
+⚠ **A held-out panel sample UNDERSTATES the representability problem.** Measured on these
+six: ~80.4% of a target's chr21 non-reference calls have an exact record in the graph;
+**9.9% have no record at all and carry 20.5% of the target's `-log f` information**. That
+9.9% is a LOWER bound — a 1000G sample's variants are by construction already catalogued,
+so a genuinely novel genome fares worse. Always report `target_fidelity` against this
+ceiling.
 
 **Dropped from the input set, with the reason:**
 

@@ -220,9 +220,9 @@ not to do and becomes something the interface cannot express.
 
 | # | input | what it is | state |
 |---|---|---|---|
-| 1 | **The pangenome graph** | HPRC v1.0 PGGB, published as GFA. chr21 = 434,772,428 B; whole genome 15.64 GB compressed / 86.5 GB uncompressed. `vg deconstruct` is **pipeline step 1**, not an assumed input (Dylan, 2026-09-28) | NOT STAGED |
+| 1 | **The pangenome graph** | HPRC v1.0 PGGB, published as GFA (no `.gbz`/`.snarls` for freeze1). chr21 = 434,772,428 B, sha256 `85222d4f...`. `vg deconstruct` is **pipeline step 1**, not an assumed input (Dylan, 2026-09-28) | `OK` — staged 2026-09-29 |
 | 2 | **A genetic map** | GRCh38 cM table. A DOWNLOADED artifact with cM already computed — not something estimated from our data. Columns `pos / chr / cM`, 44,618 rows for chr21 | `OK` — `external/genetic_maps/chr21.b38.gmap` |
-| 3 | **The target** | handled by the SEPARATE target stage below | NOT ACQUIRED |
+| 3 | **The target** | a phased GRCh38 VCF, handled by the SEPARATE target stage below. Test targets: held-out 1000G 30x samples, pool of 3,085 | `OK` (pool selected) |
 
 **What model C removed from this list.** No LD blocks means no PLINK, so **no external
 panel in the mechanism's input set**. No anchors means **no PanGenie callset** (measured
@@ -275,13 +275,22 @@ independent — preprocessing is embarrassingly parallel across them, and a driv
 1..22. chr21 alone is one invocation today.
 
 **Target as a separate command** (Dylan, 2026-09-28) so a new target does not re-run the
-cohort stage. ⚠ **OPEN — what form does the target arrive in?** The cleanest is a **VCF
-called against GRCh38**, with the mapping being a join on `(POS, REF, ALT)` against
-`sites.tsv`; that is how the 9.9%-unrepresentable figure was measured, and it sidesteps
-`vg giraffe` entirely — which matters, because HPRC marks short-read mapping **"untested"**
-for the PGGB graph (supported for Minigraph-Cactus). If targets arrive as reads or
-assemblies instead, that is a materially harder step and it shapes the CLI. **Decide before
-writing `preprocess-target`.**
+cohort stage. ✅ **ANSWERED 2026-09-29 — the target arrives as a phased GRCh38 VCF**, and
+the mapping is a join on `(POS, REF, ALT)` against `sites.tsv`. No alignment step, and no
+`vg giraffe` — which matters, because HPRC marks short-read mapping **"untested"** for the
+PGGB graph. ⚠ If a real target later arrives as reads or an assembly, that is a materially
+harder step and this decision reopens.
+
+**The test target, until a real external genome exists** (Dylan, 2026-09-29): a held-out
+sample from the 1000G 30x panel, which is phased and GRCh38-called, so a sample column IS
+a path once joined to our site list. Eligibility is **not** simply "panel minus cohort":
+the 39 HPRC donors in the panel are trio CHILDREN and their **78 parents sit in the
+unrelated-2504 set**, so a random draw has a **~3.1% chance of being a cohort member's
+parent**, sharing about half its genome with a donor haplotype. Pool = 3,202 − 39 − 78 =
+**3,085**, listed at `pipeline:configs/eligible_targets.chr21.txt`; the rule and the
+pedigree check are in `docs/data.md`. ⚠ A panel sample UNDERSTATES representability —
+9.9% of its calls have no record in the graph and that is a LOWER bound, since its
+variants are already catalogued by construction.
 
 #### What we deliberately do NOT produce
 
