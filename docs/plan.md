@@ -332,6 +332,27 @@ and — under model C — `blocks_dict.json`, `simple_blocks_idx.npy` and the PL
 Keep the block build as a SEPARATE optional script so the model-B fallback stays one command
 away, but it is off the main path.
 
+#### ⚠ TWO THINGS THE FIRST RUN SURFACED THAT NEED A DECISION (2026-09-29)
+
+**1. `absent_policy` — 19.0% of the tilt budget is currently inert.** Measured: of the
+**305,886** chain positions, only **252,025** have a target allele at all, because 24.1% of
+pangenome records have no matching record in the 1000G panel the target comes from. Under
+the default `absent_policy = "missing"` those positions have no `phi_v`, so they can never
+tilt — they contribute to the `beta_v` normaliser and never to utility. **19.0% of the
+budget is spent on positions that cannot move.** Identical across all ten targets, because
+it is a property of the two site sets rather than of any individual.
+The alternative, `absent_policy = "reference"`, fills them with allele 0 and recovers the
+full budget — but it INVENTS a call: absence from a panel means the site was not in the
+callset, not that the sample is reference there. Both are implemented and recorded in each
+target's provenance. **Not decided.** The honest framing is that "missing" understates
+achievable utility and "reference" overstates confidence in the target's path.
+
+**2. A site with `support(v) = 0` would make `w_v = 1/support(v)` infinite.** There is
+exactly one on chr21, at **pos 8,460,681**, and it is currently **outside `chain_span`** —
+so nothing divides by zero today. That is luck, not design: the cut is PROVISIONAL, and
+moving it toward the p arm brings the site into the chain. **Guard `support == 0` explicitly
+when the utility is written**, rather than relying on the coordinate cut to keep it away.
+
 #### Exit gates
 
 1. Runs end to end from the graph + the genetic map with no PanMixer artifact on the input

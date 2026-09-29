@@ -32,13 +32,25 @@ def sha256_file(path: str | Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def _repo_root(start: Path) -> Path | None:
+    """Walk up until a .git is found. Counting `parents[n]` is brittle: the first
+    version used parents[2] from src/store.py, which lands OUTSIDE the repo, so
+    every artifact recorded git_rev "unknown" while looking fine."""
+    for d in [start, *start.parents]:
+        if (d / ".git").exists():
+            return d
+    return None
+
+
 def git_rev(repo: str | Path | None = None) -> str:
     """The commit the code was at. 'unknown' rather than an exception --
     provenance should never be the thing that fails a run."""
+    root = Path(repo) if repo else _repo_root(Path(__file__).resolve())
+    if root is None:
+        return "unknown"
     try:
         out = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(repo) if repo else None,
+            ["git", "rev-parse", "HEAD"], cwd=str(root),
             capture_output=True, text=True, check=True,
         )
         return out.stdout.strip()
@@ -94,7 +106,7 @@ def save(
         "inputs": inputs,
         "params": params,
         "axis_digest": axis_digest,
-        "git_rev": git_rev(Path(__file__).resolve().parents[2]),
+        "git_rev": git_rev(),
         "note": note,
     }
     Path(str(written) + PROV_SUFFIX).write_text(
@@ -122,7 +134,7 @@ def attach_prov(path: str | Path, *, inputs: dict, params: dict,
         "inputs": inputs,
         "params": params,
         "axis_digest": axis_digest,
-        "git_rev": git_rev(Path(__file__).resolve().parents[2]),
+        "git_rev": git_rev(),
         "note": note,
     }
     Path(str(path) + PROV_SUFFIX).write_text(

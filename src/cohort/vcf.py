@@ -6,6 +6,8 @@ converter that gets rewritten repeatedly.
 """
 from __future__ import annotations
 
+import gzip
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -33,10 +35,25 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
     vg 1.68 -- but a chrY smoke test (2:01, 34,014 records) produced 17 clean
     sample columns, so grouping is auto-detected and correct.
     """
+    gfa = Path(gfa)
     out_vcf = Path(out_vcf); out_vcf.parent.mkdir(parents=True, exist_ok=True)
+
+    # vg cannot read a gzipped GFA -- it fails with "invalid Graph message", which
+    # is not obviously a compression error. Decompress beside the output first.
+    # (This path was initially untested because the first chr21 run decompressed by
+    # hand; the CLI would have failed on the manifest's .gz path.)
+    if gfa.suffix == ".gz":
+        plain = out_vcf.parent / gfa.with_suffix("").name
+        if not plain.exists() or plain.stat().st_size == 0:
+            print(f"    decompressing {gfa.name} -> {plain.name}")
+            with gzip.open(gfa, "rb") as fi, open(plain, "wb") as fo:
+                shutil.copyfileobj(fi, fo, length=1 << 24)
+        gfa = plain
+
     _run([str(vg), "deconstruct", "-P", ref_prefix, "-a", "-t", str(threads), str(gfa)],
          stdout_path=out_vcf)
-    return {"vcf": str(out_vcf), "sha256": store.sha256_file(out_vcf)}
+    return {"vcf": str(out_vcf), "gfa_used": str(gfa),
+            "sha256": store.sha256_file(out_vcf)}
 
 
 def drop_chm13(in_vcf: Path, out_vcf: Path, *, drop: str = "chm13") -> dict:
