@@ -537,7 +537,7 @@ unmodified" — is not a gate of the mechanism. It is one option for one compari
 now lives under `[A-EVL-headtohead]`.)*
 
 **MEASURED CONTEXT (chr21).** Under model C the chain is one pass over all 340,824
-variants, less the coordinate cut below (306,480 positions). K = 88 states — our target
+variants, less the coordinate cut at both ends (305,887 positions). K = 88 states — our target
 is external to the cohort, so no haplotype is removed; K = 86 applies only in the
 head-to-head arm, where a cohort member stands in as target. `ffbs` cost is about 30M
 operations at K = 88. Compute is not a constraint.

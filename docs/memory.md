@@ -1358,6 +1358,10 @@ chr21 with `K_states` = 88, so FFBS is ~9M operations.
 [CORRECTION - 2026-09-28]: The block structure is correct; reading it as OUR chain length is
 not. Model C was adopted 2026-09-28 — one chain position per VARIANT — so T is 340,824 raw
 and 306,480 after the `chain_span` cut, roughly 3x the figure above, and FFBS is ~30M
+[CORRECTION - 2026-09-29]: 306,480 was the ONE-SIDED cut (p arm only). The telomeric end
+was closed on 2026-09-29 for the same reason — 592 variants above the map end formed a
+593-position zero-distance run — so the figure is **305,887** (340,824 - 34,345 - 592),
+89.75%. The FFBS cost is unchanged in magnitude.
 operations. `K_states` = 88 is right and stands. LD blocks play no role in our mechanism at
 all under C.
 

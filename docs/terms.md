@@ -305,9 +305,9 @@ Is:                   T, the number of ordered positions in the hidden Markov ch
                       the steps the sampler takes along the chromosome, at each of
                       which it picks a donor haplotype and emits that donor's allele.
 Computed by:          PLANNED — one position per VCF record inside `chain_span`.
-                      chr21: 306,480 positions (340,824 records less the 34,344 below
+                      chr21: 305,887 positions (340,824 records less the 34,345 below
                       the coordinate cut).
-CHANGES MEANING WITH: the model. C = 340,824 raw / 306,480 after the cut; B = 100,757
+CHANGES MEANING WITH: the model. C = 340,824 raw / 305,887 after the cut; B = 100,757
                       LD-block entries. Runtime and numerical headroom both scale with
                       it — see beta_t for why finer T costs float32 headroom but NOT
                       privacy budget.
@@ -328,7 +328,7 @@ CHANGES MEANING WITH: the VCF. A re-sort, a re-filter or a different `vg` versio
                       which row is which SILENTLY, because every join in the pipeline is
                       positional. ⚠ Distinct from T: `n_sites` is the axis, T is the
                       number of CHAIN positions, which is `n_sites` restricted to
-                      `chain_span` (chr21: 306,480 of 340,824).
+                      `chain_span` (chr21: 305,887 of 340,824).
 Valid vs:             the same VCF, verified by the `sites.tsv` digest.
 Status:               SECONDARY
 Aliases:              "the site axis", "rows". Never "T".
@@ -433,7 +433,7 @@ end** (map ends 46,680,243; positions run to 46,699,788) formed a **593-position
 zero-distance run** — structurally the identical defect to the p arm, 58x shorter. They are
 excluded, on the same principle: extrapolating there would invent genetic distance in a
 subtelomeric region, which is exactly what we declined to do at the other end. Cost: 592 of
-306,480 = **0.19%**. The invariant *every chain position carries a genuine interpolated cM*
+306,479 = **0.19%**. The invariant *every chain position carries a genuine interpolated cM*
 is now literally true, which is what makes the `assert no NaN` gate meaningful.
 
 ⚠ **ONE ZERO-DISTANCE CASE REMAINS, and it is correct to leave.** **618 interior map
