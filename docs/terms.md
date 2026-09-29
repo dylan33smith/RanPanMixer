@@ -158,32 +158,73 @@ Aliases:              "u". Never "similarity" — phi_t is the similarity; u is 
 
 ### phi_t  [utility]
 ```
-Is:                   The local per-block similarity phi_t(a, b) in [0,1] between the
-                      target's traversal and a candidate traversal at block t. The
-                      paper's worked example is a population-weighted k-mer Jaccard:
-                      sum_x w(x) min(1[x in K(a)], 1[x in K(b)]) over
-                      sum_x w(x) max(...), where w downweights ubiquitous human
-                      k-mers and upweights population-informative ones.
+Is:                   The local per-position similarity in [0,1] between the target's
+                      allele and a candidate donor's allele at chain position v.
+                      ✅ **UNDER MODEL C (decided 2026-09-28) THIS COLLAPSES TO AN
+                      INDICATOR**: phi_v = 1 if the drawn donor carries the target's
+                      allele at v, else 0. There is no block to aggregate over, no
+                      per-block normaliser, and no aggregation choice to make.
 Computed by:          PLANNED — src/ranpanmixer/utility.py
-CHANGES MEANING WITH: the k-mer length, the weighting function w, and whether K(.)
-                      is a set or a multiset. Two phi_t with different k are
-                      different metrics; do not average them.
-Valid vs:             the same phi_t on the same block segmentation.
+CHANGES MEANING WITH: the missing_policy (an excluded donor has no phi_v at all), and
+                      whether the target's own allele is missing at v — in which case
+                      the position contributes no tilt and every donor gets factor 1.
+Valid vs:             the same phi_v on the same site axis.
 Status:               PRIMARY
-Aliases:              "block similarity", "local agreement"
+Aliases:              "local agreement". ⚠ Historically "phi_t" / "block similarity",
+                      from the per-block design; under C the index is a variant, not
+                      a block. Write phi_v.
+⚠ THE k-MER JACCARD IS NOT THIS. The proposal's worked example — a population-weighted
+                      k-mer Jaccard, sum_x w(x) min(1[x in K(a)], 1[x in K(b)]) over
+                      sum_x w(x) max(...) — is RULED OUT as the in-sampler potential
+                      for two independent reasons. Structural: a k-mer straddling two
+                      positions depends on both at once and a Jaccard's denominator is
+                      a union over the whole span, so it does not decompose into
+                      per-position factors and ffbs cannot draw from the tilted
+                      distribution exactly — and an approximate draw carries NO bound.
+                      Practical: it needs sequence, and the data model is integer
+                      allele indices. ✅ DEFERRED 2026-09-28 to a post-build
+                      evaluation/reporting tool, where nothing has to factor. Keep it
+                      out of the mechanism.
 ```
 
 ### beta_t  [utility]
 ```
-Is:                   Non-negative per-block weights with sum_t beta_t = 1. They
+Is:                   Non-negative per-position weights with sum_v beta_v = 1. They
                       decide which parts of the path the mechanism tries to preserve.
-Computed by:          PLANNED
-CHANGES MEANING WITH: whether they are uniform (1/T) or length-weighted. The
-                      normalization is what keeps u_path inside [0,1]; weights that
-                      do not sum to 1 break the calibration, not just the emphasis.
+                      Under model C: beta_v = w_v / sum_u w_u with w_v = 1/support(v).
+Computed by:          PLANNED. ⚠ support(v) needs NO computation — measured 2026-09-28,
+                      the pangenome VCF's own INFO/AN field is bit-identical to
+                      np.sum(pangenome != -1, axis=(0,2)) across all 340,824 chr21
+                      records.
+CHANGES MEANING WITH: whether they are uniform (1/T) or support-weighted, and whether
+                      length-weighting is ever adopted. The normalization is what keeps
+                      u_path inside [0,1]; weights that do not sum to 1 break the
+                      calibration, not just the emphasis.
 Valid vs:             the same weighting scheme.
 Status:               SECONDARY
 Aliases:              none
+⚠ THE BUDGET IS INVARIANT IN T. Since u = sum_v beta_v phi_v with sum beta = 1, u lands
+                      in [0,1] however the path is partitioned, and the total tilt
+                      between a perfectly-matching and a non-matching path is exp(eta_tau)
+                      regardless of T. Partitioning finer does NOT spread the budget
+                      thinner: each position moves less and there are proportionally
+                      more of them. Measured at tau = 0.5 (eta = 0.5493): per-position
+                      tilt 1.0000055 at T = 100,757 (blocks) against 1.0000016 at
+                      T = 340,824 (variants), total exp(eta) = 1.7321 either way.
+                      Model C is in fact BETTER on utility at matched tau, because a
+                      block design must take a whole block from one donor while C can
+                      collect partial credit position by position.
+⚠ THE REAL CONSEQUENCE OF FINE T IS NUMERICAL. The per-position tilt under C is only
+                      **13.5x** the float32 resolution of 1.19e-07, against 45.7x under
+                      a block partition. float64 for the stored alphas is load-bearing,
+                      not a preference — float32 would consume a meaningful fraction of
+                      the target's entire influence.
+⚠ THE THIN-BUDGET PROBLEM IS A PROPERTY OF tau, NOT OF T. At tau = 0.5 the best-matching
+                      path is only 1.73x more likely than the worst; that is what
+                      tau = 0.5 MEANS. exp(arctanh(tau)) = 1.1055 / 1.2910 / 1.7321 /
+                      4.3589 at tau = 0.1 / 0.25 / 0.5 / 0.9 (derived). If the achieved
+                      utility is too low, the lever is tau — a weaker privacy claim —
+                      not a different segmentation.
 ```
 
 ### psi_t  [implementation] [mechanism]
@@ -258,18 +299,140 @@ Aliases:              "the PanMixer transitions"
 
 ### T_blocks  [implementation] [dataset]
 ```
-⚠ UNSETTLED: what counts as a position is open question 8 in docs/plan.md. Do not
-   hard-code a segmentation until that is decided.
+✅ SETTLED 2026-09-28 (was open question 8): **one chain position per VARIANT** —
+   model C. Model B (one position per LD block) is the retained fallback.
 Is:                   T, the number of ordered positions in the hidden Markov chain —
                       the steps the sampler takes along the chromosome, at each of
                       which it picks a donor haplotype and emits that donor's allele.
-Computed by:          PLANNED — set by the block segmentation of G
-CHANGES MEANING WITH: the segmentation policy (LD blocks vs graph subpaths vs fixed
-                      anchors). Runtime and privacy granularity both scale with it.
-Valid vs:             the same segmentation.
+Computed by:          PLANNED — one position per VCF record inside `chain_span`.
+                      chr21: 306,480 positions (340,824 records less the 34,344 below
+                      the coordinate cut).
+CHANGES MEANING WITH: the model. C = 340,824 raw / 306,480 after the cut; B = 100,757
+                      LD-block entries. Runtime and numerical headroom both scale with
+                      it — see beta_t for why finer T costs float32 headroom but NOT
+                      privacy budget.
+Valid vs:             the same model and the same chain_span.
 Status:               SECONDARY
-Aliases:              "T", "blocks", "sites". Pick one per table and stay with it.
+Aliases:              "T", "sites". ⚠ The name `T_blocks` is now a misnomer under C,
+                      where a position is a variant and no blocks exist in the
+                      mechanism. Retained so existing references resolve; write "T".
 ```
+
+### n_sites  [implementation] [dataset]
+```
+Is:                   The length of the SITE AXIS — the number of VCF records for a
+                      chromosome, and therefore the first dimension every preprocessing
+                      artifact is indexed by. chr21: **340,824**.
+Computed by:          PLANNED — the record count of the deconstructed per-chromosome VCF.
+CHANGES MEANING WITH: the VCF. A re-sort, a re-filter or a different `vg` version changes
+                      which row is which SILENTLY, because every join in the pipeline is
+                      positional. ⚠ Distinct from T: `n_sites` is the axis, T is the
+                      number of CHAIN positions, which is `n_sites` restricted to
+                      `chain_span` (chr21: 306,480 of 340,824).
+Valid vs:             the same VCF, verified by the `sites.tsv` digest.
+Status:               SECONDARY
+Aliases:              "the site axis", "rows". Never "T".
+```
+
+### allele_lengths  [implementation] [dataset]
+```
+Is:                   The length in base pairs of every declared allele at every record —
+                      ragged, `num_alleles[i]` entries for row i. chr21: 767,324 declared
+                      alleles over 340,824 records, max 90 at one site.
+Computed by:          PLANNED — emitted by our VCF-to-matrix step, which is the only
+                      moment REF/ALT are in hand.
+CHANGES MEANING WITH: nothing, but its ABSENCE changes several things. Carried because
+                      the integer allele matrix knows an allele's INDEX and not one base
+                      of its SEQUENCE, hence not its length — so without this array no
+                      downstream quantity can see how much sequence an edit rewrote.
+                      PanMixer's per-record utility has exactly this blindness: 3.13 Mb
+                      was rewritten on one measured run and no metric in its suite could
+                      see it. Needed for any length-weighted utility, and cheap:
+                      **2.9 MB as int32 against 118.3 MB for the sequences themselves**,
+                      whose distribution is extreme — 10 records hold 58.1% of chr21's
+                      total ALT bytes.
+Valid vs:             the same site axis.
+Status:               SECONDARY — not consumed by the v1 mechanism; carried because it is
+                      cheap NOW and unrecoverable later without re-reading the VCF.
+Aliases:              none
+```
+
+### chain_span  [dataset] [method]
+```
+Is:                   The coordinate interval of a chromosome the chain actually runs
+                      over. ✅ chr21 (decided 2026-09-28): **POS > 12,968,320**, keeping
+                      306,480 of 340,824 variants (89.92%). Everything below is excluded
+                      from the chain and from the release.
+Computed by:          PLANNED — a fixed coordinate rule in the preprocessing config.
+CHANGES MEANING WITH: the chromosome and the genetic map. It is a property of the
+                      ASSEMBLY and the MAP, never of the target — which is what makes it
+                      safe: it is fixed before the target is opened, so R_D stays a
+                      function of D alone and Theorem 1 is untouched. ⚠ NEVER let an
+                      exclusion become target-dependent (e.g. "drop positions where the
+                      target is missing"); that would leak.
+Valid vs:             the same span. Any utility or fidelity number must name it, since
+                      the denominator changes with it.
+Status:               PRIMARY — a release that does not state its span is not quotable.
+Aliases:              "the coordinate cut"
+```
+
+**WHAT THE p ARM IS, and why chr21's is excluded.** Every chromosome has a pinch point,
+the **centromere**, dividing it into a short arm — **p**, from French *petit* — and a long
+arm, **q** (simply the next letter). On most chromosomes both arms carry genes. But five
+human chromosomes — **13, 14, 15, 21 and 22** — are **acrocentric**: the centromere sits
+very near one end, so the p arm is small and consists almost entirely of repetitive DNA plus
+long tandem arrays of **rDNA** genes (the ones encoding ribosomal RNA). Those arrays are
+near-identical *between* the five acrocentric chromosomes, which is why assemblers cannot
+place them uniquely and why GRCh38 fills them with N. chr21's p arm is the 0–~12 Mb region.
+
+**The live defect the cut fixes.** `np.interp` clamps by default, so all 26,018 variants
+below the map's start (10,326,676) receive the map's first value; and the map's own first
+interval (10,326,676 → 12,968,320, spanning the centromere) carries **dcM = 0.000000**.
+Together that is **34,345 consecutive positions with identical cM**, so `Delta_x = 0`,
+`P(switch) = 0`, and the sampler emits **one donor's real haplotype verbatim across
+7.25 Mb** — departure (b) at roughly 200x the scale of the worst single block. This is a
+privacy failure, not a utility one, and it is silent.
+
+**Five independent reasons, each sufficient** (all measured or cited 2026-09-28):
+
+| leg | evidence |
+|---|---|
+| the sequence is not real | GRCh38 chr21 5,010,000–10,814,560 is placeholder model sequence: 25 contigs separated by fabricated N-gaps, 22 of them exactly 50 kb. Base-pair distance there is fictitious |
+| unmappable | 1000G's own strict accessibility mask rules **26,014 of 26,018** (99.98%) of those variants inaccessible to short reads |
+| our own data is thin | cohort matrix is **36.76%** missing below the cut against **6.57%** above |
+| no measured recombination | deCODE's pedigree map (4.5M observed crossovers) assigns **0.0 cM/Mb to every 1 Mb bin from 0–13 Mb** |
+| none observed directly | a four-generation CEPH pedigree: *"Not a single allelic recombination was observed on the p-arm"* — 107 transmissions across ~38 Mbp of acrocentric short arms |
+
+⚠ **REVISIT — this is a pragmatic cut to get v1 running, not a settled answer.** Recorded
+here so it can be picked up once the base mechanism works:
+- **Maps that nominally cover the region exist.** pyrho hg38 (Spence & Song 2019, Zenodo
+  11437540) covers chr21 from **5,088,754 bp** and gives every variant a distinct cM; the
+  Eagle redistribution of our own HapMap map carries **66 markers** and 0.6166 cM inside the
+  cut region. Both were rejected because they spend ~10 cM across intervals defined by two
+  markers — 23–26% of chr21's genetic length attributed to a region with zero observed
+  crossovers. That is interpolation across a void, not measurement.
+- **The graph DOES carry the p arm.** The same HPRC graph's CHM13-backbone VCF has
+  **185,414 records** in `chm13#chr21:1-10,000,000` against 22,746 for GRCh38, which cannot
+  express anything below 5,010,001. Recovering it would mean a CHM13-backbone build with its
+  own segmentation — it recovers sequence, not genetic distance — and missingness there is
+  **43.9%** against 1.5% on the q arm, which collides hard with RENORMALISE.
+- **T2T maps cannot simply be lifted back.** 774,011 bp of the liftable p arm lands on CHM13
+  chr13/14/15/22, and the part reaching hs1 chr21 spreads from 2.48 to 44.74 Mb, so any cM
+  assignment built that way is non-monotonic in GRCh38 coordinates.
+- **What the cut costs is UNMEASURED.** The share of a target's `-log f` information
+  discarded by excluding the p arm has not been computed. Compute it and report it beside
+  the `target_fidelity` ceiling.
+
+⚠ **TWO SMALLER ZERO-DISTANCE DEFECTS REMAIN, and the cut does not touch them.**
+- **592 variants sit ABOVE the map end** (map ends 46,680,243; positions run to 46,699,788),
+  giving a **593-position zero-distance run** at the telomere — structurally the same defect,
+  58x shorter. **Undecided.** Do not clamp it silently.
+- **618 interior map intervals have dcM = 0**, covering 2.71 Mb, with ~1,650 kept variants
+  inside them. These are REAL map plateaus and `P(switch) = 0` between two variants with no
+  genetic separation is the CORRECT model. Leave them.
+
+⚠ **INTERPOLATE WITH `left=nan, right=nan`**, then assert no NaN survives the cut. That one
+change converts a silent 34,345-position failure into a crash.
 
 ### K_states  [implementation] [dataset]
 ```
@@ -346,10 +509,12 @@ Aliases:              none. Do not call these "SVs" — size is not what defines
 
 ### missing_policy  [implementation] [method]
 ```
-Is:                   What the emission does when a donor haplotype carries -1 (no
-                      called allele) at a chain position. Three options:
-                      RENORMALISE - drop that donor from the state distribution at
-                      that position (leaning choice, Dylan 2026-09-25);
+Is:                   What the mechanism does when a donor haplotype carries -1 (no
+                      called allele) at a chain position. ✅ **DECIDED 2026-09-28:
+                      RENORMALISE** - drop that donor from the state distribution at
+                      that position. The rejected options are kept below because a
+                      run under one is not comparable to a run under another.
+                      Alternatives considered:
                       WILDCARD - treat missing as matching whatever the target has,
                       which makes poorly-assembled donors universally attractive;
                       MISMATCH - treat it as a difference, which penalises assembly
@@ -370,13 +535,36 @@ CHANGES MEANING WITH: which positions are in the chain. It barely matters for th
                       one of these means without naming its set. Nested variants are the driver: a donor whose path
                       does not traverse the parent bubble has no allele at the child,
                       and the matrix cannot distinguish that from missing data.
+                      ⚠ RENORMALISE acts on the STATE SPACE, not the transition. Our
+                      baseline is a pure prior over donor paths driven by cM distance
+                      and knows nothing about alleles; the target enters only through
+                      the tilt. A donor missing at v has no allele, so phi_v is
+                      undefined for it and it is excluded from the state set at v.
+                      The path therefore CANNOT sit on that donor at v.
+                      ⚠ CONSEQUENCE TO MEASURE: leaving a donor and returning costs
+                      TWO switch events (~0.0026^2 at typical 12 bp spacing), so ffbs
+                      will prefer to switch away and STAY away. Missingness acts as a
+                      switch TRIGGER, not a one-position blip — and it is spatially
+                      clustered (28,052 runs on strand 0, mean length 20, max 23,478),
+                      so expect systematic donor switching in badly-assembled regions.
+                      Measure this once the sampler runs; it is not a reason to change
+                      the policy now.
+                      ⚠ GUARD REQUIRED: measured 2026-09-28 on chr21, 1 site of 340,824
+                      has all 88 donors missing and 89 sites leave <= 1 donor. The
+                      renormalised denominator can be zero. Declare the fallback
+                      (uniform over all donors), count how often it fires, and report it.
 Valid vs:             another run under the SAME policy. Never compare across policies.
-Status:               PRIMARY — an undeclared default here is a silent modelling choice.
-Aliases:              none. ⚠ NOT yet decided; do not hard-code one.
+Status:               PRIMARY — DECIDED. An undeclared default here would be a silent
+                      modelling choice; RENORMALISE is the declared one.
+Aliases:              none
 ```
 
-⚠ **`-1` conflates FIVE conditions, and they do not want the same treatment.**
-Measured on chr21 (see `docs/memory.md`, 2026-09-25):
+⚠ **`-1` conflates FOUR conditions on chr21, and they do not want the same treatment.**
+Measured (see `docs/memory.md`, 2026-09-25 and 2026-09-28). A fifth cause — haploid
+genotypes — was expected and **does not occur on this data**: all 237,594 non-piped GT
+fields have exactly one distinct value, `.`, so there are ZERO true haploid genotypes and
+the converter's `len(genotype) == 1` branch only ever fires on an explicit missing call.
+The row is retained struck-through because it is a real hazard for any OTHER input VCF.
 
 | cause | how it arises | how common |
 |---|---|---|
@@ -384,12 +572,17 @@ Measured on chr21 (see `docs/memory.md`, 2026-09-25):
 | **inherited** | the parent call was itself missing | 12.1% of nested missingness |
 | **assembly gap** | the donor's assembly does not cover the region | 349 runs of >=100 consecutive positions, covering 448,283 entries |
 | **conflict** | the sample had multiple graph paths that disagreed, so vg wrote `.` | 1,855 records, mean 29.4 of 88 haplotypes |
-| **haploid genotype** | the VCF gave one allele, not two; the converter writes `-1` into strand 1 | 3.135% of sample GT fields |
+| ~~**haploid genotype**~~ | ~~the VCF gave one allele, not two; the converter writes `-1` into strand 1~~ | **DOES NOT OCCUR on chr21** — all 237,594 non-piped GT fields are `.` (measured 2026-09-28) |
 
 "Not applicable" argues for RENORMALISE — that donor genuinely has no allele there.
 An assembly gap argues against it — the donor almost certainly HAS an allele and we
 merely do not know it, so dropping them penalises poorly-assembled donors for reasons
-unrelated to genetics. **A single policy is being asked to cover all five.**
+unrelated to genetics. **A single policy is being asked to cover all four.** RENORMALISE was chosen knowing this:
+it is CORRECT for "not applicable", which is the largest class (66.1% of nested missingness),
+and it does penalise poorly-assembled donors for a defect that is not theirs. That cost was
+accepted deliberately (Dylan, 2026-09-28) on the grounds that released pangenomes should be
+well assembled; if they are not, it is something to note in the writeup rather than model
+around at this stage.
 
 ⚠ **The causes ARE distinguishable, but the information is destroyed before the
 mechanism sees it.** `LV` and `PS` separate "not applicable" and "inherited";
@@ -661,6 +854,30 @@ Valid vs:             tau, on a support small enough to enumerate exactly. Nothi
 Status:               DIAGNOSTIC — never a headline number.
 Aliases:              "measured TV". Never write "the TV distance" for the estimate;
                       that name belongs to the exact quantity.
+```
+
+### two_target_indistinguishability  [privacy] [evaluation] [gate]
+```
+Is:                   The test our guarantee ACTUALLY makes, and the reason the
+                      evaluation cannot simply be inherited. Run the mechanism on two
+                      admissible targets X and Y under identical settings, draw R
+                      releases of each, and estimate the distance between the two
+                      release distributions. The theorem says it is <= tau for EVERY
+                      such pair; PanMixer's design cannot bound it at all, because it
+                      releases unselected blocks verbatim, so two inputs differing in
+                      an unselected block have DISJOINT supports and TV = 1.
+Computed by:          PLANNED — ours to write. ⚠ **NOTHING in PanMixer's evaluation
+                      suite tests this** (established 2026-09-28 by reading every
+                      evaluator). Their metrics test their claim.
+CHANGES MEANING WITH: the estimator and the support size — see tv_empirical: plug-in TV
+                      over a large support is biased UPWARD, so a value above tau at
+                      scale is the estimator misbehaving, not a violated theorem. Only
+                      exact enumeration on a toy support can falsify Theorem 1.
+                      Also with the PAIR: the bound is over all pairs, so a single
+                      favourable pair proves nothing. Report the worst pair found.
+Valid vs:             tau, at matched settings, on a stated support.
+Status:               PRIMARY — this is the headline privacy claim.
+Aliases:              "the matched-pair experiment", cf. `A-ATK-matched-pair`
 ```
 
 ---

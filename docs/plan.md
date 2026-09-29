@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-09-27
+**Last updated:** 2026-09-28
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -9,13 +9,34 @@ Read at session start. This file exists so a new session never has to grep
 
 ## Current state
 
-- **Branch:** `main`. Remote `origin` -> `https://github.com/dylan33smith/RanPanMixer`.
+- **Branches:** `main` (docs, the PanMixer investigation). `pipeline` — an ORPHAN
+  branch started 2026-09-28 holding the build, with `scripts/ configs/ logs/` and a
+  gitignored `data/` symlink to `/data/ds85/RanPanMixer/data`. Remote `origin` ->
+  `https://github.com/dylan33smith/RanPanMixer`.
 - **Phase:** `A` — foundation. Goal: an end-to-end sampler provably correct on a
-  graph small enough to enumerate, plus a fair head-to-head against PanMixer.
-- **Still no mechanism code**, but as of 2026-09-25 there IS a pinned v1
-  specification — see `A-IMP-v1-sampler` under In Progress. The upstream dependency
-  is in, pinned, running, and has been taken apart in enough detail to know exactly
-  which parts we inherit and which we replace. No RanPanMixer number exists yet.
+  graph small enough to enumerate. A head-to-head against PanMixer is now an
+  OPTION for the writeup, not a requirement of the design — see below.
+- **Still no mechanism code.** As of 2026-09-28 the architecture is settled
+  (model C), the preprocessing input and output sets are specified, and the
+  documentation has been corrected where the PanMixer comparison had been forced
+  onto a different problem. No RanPanMixer number exists yet.
+- **⚠ THE SCOPE CORRECTION OF 2026-09-28.** The v1 scope decision — *"maximise reuse
+  of PanMixer, change exactly ONE thing"* — imported PanMixer's threat model, in
+  which the target is a cohort member, into a design whose target is EXTERNAL to
+  `G`, `D`, every panel and the attack database. An audit of the six docs plus the
+  primer filed 91 findings; adversarial verification upheld 76 and found 51 more.
+  Dylan's words: *"Boundaries aren't a weak function of the target's genotypes
+  because the target is completely outside of any other dataset."* Corrected in
+  commit `1f8ea3f` (`CLAUDE.md`, `terms.md`, `plan.md`, `data.md`). **When in doubt,
+  the question to ask is: is this sentence about PanMixer, or about us?**
+- **How heavily to lean on the comparison is now an open question for the PI.** The
+  claim this project makes — a bound on TV between the releases of ANY two input
+  paths — is a PROOF, and PanMixer's design structurally cannot make it: it releases
+  unselected blocks verbatim, so two inputs differing in an unselected block have
+  disjoint supports and TV = 1. A head-to-head on their metrics may not be needed at
+  all. What IS needed is the toy enumeration and a utility curve. See
+  `two_target_indistinguishability` in `docs/terms.md` — nothing in PanMixer's suite
+  tests it.
 - **What the investigation established** (all in `docs/memory.md`, all measured on
   chr21): PanMixer's privacy score reads only anchor variants, so in 32% of blocks
   the rarity it ignores exceeds the score it reports; 30.9% of its selected moves
@@ -160,6 +181,10 @@ success only, and reports both frontiers.
 
 | ID | Intervention | Endpoint | n | Result | Verdict | memory |
 |---|---|---|---|---|---|---|
+| A-FIX-panmixer-framing | Audit the docs for PanMixer framing forced onto our different problem | every instance found and scoped | 6 files, 12 agents | 91 filed, 76 upheld, 51 more found by verifiers; CLAUDE.md constraint 1 was re-seeding it every session | done | 2026-09-28 |
+| A-DAT-genetic-map-parm | Can any map give chr21 genetic distance below 10.3 Mb? | a defensible rule for every variant | chr21, 10 agents | no usable map; `np.interp` clamping + the map's own centromeric plateau give 34,345 zero-distance positions = 7.25 Mb emitted verbatim; cut at 12,968,320 | done | 2026-09-28 |
+| A-DAT-input-set | What does the mechanism actually need as input? | a minimal, verified input set | full checkout | model C needs only graph + genetic map + target; PanGenie and the external panel drop out; `INFO/AN` == `support(v)` bit-identical | done | 2026-09-28 |
+| A-DAT-evaluation-fit | Which PanMixer evaluators transfer to our release object? | a per-evaluator verdict | full suite | only the gap score, and only after 3 changes; `af_loss`/`ld_loss` undefined for us; nothing in their suite tests our actual claim | done | 2026-09-28 |
 | A-FIX-docs-system | Adopt the six-file documentation system and write the verifier | verifier passes on a greenfield tree | n/a | 6 files + 20 checks | done | 2026-08-29 |
 | A-DAT-panmixer-ingest | Pin PanMixer, acquire its data, map it against the proposal | a verified reuse map + a runnable upstream | 22 agents, 0 errors | reuse map done; 2 blockers found; 4 proposal claims corrected | done | 2026-09-18 |
 | A-DAT-grch38-repin | Rebuild chr21 preprocessing on the GRCh38 30x panel; run PanMixer | get_mappings finds ~258k matches, not ~1k | 1 chr, 4 runs | 258,610 strict / 268,851 relaxed; PanMixer runs in 68 s, deterministic, 0 invariant violations | done | 2026-09-18 |
@@ -178,7 +203,109 @@ success only, and reports both frontiers.
 
 ## In Progress
 
-### [A-IMP-v1-sampler] v1 SPECIFICATION — pinned 2026-09-25
+### [A-IMP-preprocess] THE PREPROCESSING PIPELINE — specified 2026-09-28
+
+**What this is.** Everything up to the point the sampler can run. Written fresh, not
+ported: we copy functions from PanMixer where they are right, but the file structure and
+the pipeline are ours, so that nothing is inherited without a decision. Under model C this
+is a much smaller job than it was under the v1 spec.
+
+**TWO STAGES, TWO DIRECTORY TREES, ENFORCED BY THE SIGNATURE.** Standing constraint 1 says
+the baseline is built from `G` and `D` only. Rather than enforce that by discipline — which
+`docs/plan.md` open question 4 has flagged as inadequate since the start — the **cohort
+stage takes no target argument at all.** Target leakage stops being something to remember
+not to do and becomes something the interface cannot express.
+
+#### Inputs — the whole set
+
+| # | input | what it is | state |
+|---|---|---|---|
+| 1 | **The pangenome graph** | HPRC v1.0 PGGB, published as GFA. chr21 = 434,772,428 B; whole genome 15.64 GB compressed / 86.5 GB uncompressed. `vg deconstruct` is **pipeline step 1**, not an assumed input (Dylan, 2026-09-28) | NOT STAGED |
+| 2 | **A genetic map** | GRCh38 cM table. A DOWNLOADED artifact with cM already computed — not something estimated from our data. Columns `pos / chr / cM`, 44,618 rows for chr21 | `OK` — `external/genetic_maps/chr21.b38.gmap` |
+| 3 | **The target** | handled by the SEPARATE target stage below | NOT ACQUIRED |
+
+**What model C removed from this list.** No LD blocks means no PLINK, so **no external
+panel in the mechanism's input set**. No anchors means **no PanGenie callset** (measured
+2026-09-28: exactly two live consumers, both deleted by our design; no evaluator reads it;
+saves a 5.06 GB download). No allele-frequency branch means **no `allele_frequencies.npy`
+and no `get_af.py`** with its three-dataset entanglement. The external panel survives only
+as the attack database in the evaluation, where cohort overlap must be removed before it is
+loaded.
+
+⚠ **We do our own deconstruct, and it will NOT match PanMixer's VCF.** Measured on chrY,
+`vg` 1.68 recovers 99.55% of the published VCF's sites by POS but only **92.7% by
+(POS, REF, ALT)**, concentrated at multi-allelic sites, because the published file was built
+with `vg` 1.36. Accepted knowingly (Dylan, 2026-09-28). Two consequences: we must apply
+chrX removal and `chm13` removal ourselves (the published VCF carries 45 samples, we need
+44); and **if the head-to-head is ever run, both arms must run on the SAME VCF.**
+
+#### Outputs — cohort stage (`preprocess-cohort --chrom 21`, no target argument)
+
+| file | shape / dtype | what it is for |
+|---|---|---|
+| `haplotypes.npy` | `(88, n_sites)` int16 | the donor panel. Flattened from `(44, n, 2)` because the HMM's states are HAPLOTYPES, not people |
+| `reason.npy` | `(88, n_sites)` int8 | why each `-1` is missing. **FOUR** codes on chr21, not five — see `missing_policy` |
+| `positions.npy` | `(n_sites,)` int64 | bp position per row |
+| `genetic_pos.npy` | `(n_sites,)` float64 | cM per row, interpolated with `left=nan, right=nan` |
+| `support.npy` | `(n_sites,)` int32 | non-missing haplotype count. ⚠ Read `INFO/AN` — measured bit-identical, no computation needed |
+| `allele_lengths` | ragged int32 | length of every declared allele. 2.9 MB against 118.3 MB for the sequences; needed for length-weighted utility and rewrite accounting |
+| `sites.tsv` | `n_sites` rows | row -> `(chrom, pos, ref, alt, n_alt, LV, PS)`. The join back to the VCF, the only place nesting survives, and the row-order check for any artifact handed to another tool |
+| `haplotype_ids.npy` | `(88,)` | which donor is which `(sample, strand)` |
+| `manifest.json` | — | input URLs + checksums, tool versions, parameters, `chain_span`, and a digest of `sites.tsv` |
+
+#### Outputs — target stage (`preprocess-target --target <id> --chrom 21`)
+
+| file | shape / dtype | what it is for |
+|---|---|---|
+| `path.npy` | `(n_sites, 2)` int16 | the target's allele at each row. **The private input.** |
+| `representability.json` | — | count and total `-log f` of target variants with NO record in the graph. ⚠ AUDIT ONLY — adding a record for a target-specific variant would make `output_support` target-dependent and void Theorem 1 |
+
+#### Layout
+
+```
+data/
+  raw/            chr21.hprc-v1.0-pggb.gfa.gz , chr21.b38.gmap
+  cohort/chr21/   haplotypes.npy reason.npy positions.npy genetic_pos.npy
+                  support.npy allele_lengths.npy sites.tsv haplotype_ids.npy manifest.json
+  targets/<id>/chr21/   path.npy representability.json manifest.json
+```
+
+**Per chromosome, not all in one go.** The chain cannot cross chromosomes — they are
+independent — preprocessing is embarrassingly parallel across them, and a driver can loop
+1..22. chr21 alone is one invocation today.
+
+**Target as a separate command** (Dylan, 2026-09-28) so a new target does not re-run the
+cohort stage. ⚠ **OPEN — what form does the target arrive in?** The cleanest is a **VCF
+called against GRCh38**, with the mapping being a join on `(POS, REF, ALT)` against
+`sites.tsv`; that is how the 9.9%-unrepresentable figure was measured, and it sidesteps
+`vg giraffe` entirely — which matters, because HPRC marks short-read mapping **"untested"**
+for the PGGB graph (supported for Minigraph-Cactus). If targets arrive as reads or
+assemblies instead, that is a materially harder step and it shapes the CLI. **Decide before
+writing `preprocess-target`.**
+
+#### What we deliberately do NOT produce
+
+`allele_frequencies.npy`, the anchor mapping, `biallelic_snp_mask.npy`, the PanGenie matrix,
+and — under model C — `blocks_dict.json`, `simple_blocks_idx.npy` and the PLINK outputs.
+Keep the block build as a SEPARATE optional script so the model-B fallback stays one command
+away, but it is off the main path.
+
+#### Exit gates
+
+1. Runs end to end from the graph + the genetic map with no PanMixer artifact on the input
+   side, and no target argument reachable by the cohort stage.
+2. Every chain position inside `chain_span` carries a genuine interpolated cM; asserts no
+   NaN survives.
+3. `support.npy` equals `INFO/AN` (a free correctness check that the matrix and the VCF are
+   row-aligned), and `num_alleles` bounds every observed allele index.
+4. `reason.npy` distinguishes all four causes, with a test that fails if a cause is
+   collapsed.
+5. `sites.tsv` digest recorded in `manifest.json`, and re-verified by anything that consumes
+   a downstream artifact.
+
+---
+
+### [A-IMP-v1-sampler] v1 SAMPLER SPECIFICATION — pinned 2026-09-25, NARROWED 2026-09-28
 
 **Scope decision (Dylan, 2026-09-25; NARROWED 2026-09-28).** The original wording was
 *"maximise reuse of PanMixer and change exactly ONE thing, the sampler — keep its blocks,
@@ -524,9 +651,16 @@ Ordered. Each item names what must pass before it starts and what closes it.
    stated in every result. Resolving it properly may need to ask the authors.
 3. **What `tau` is defensible.** `tau` = 0.10 bounds equal-prior identification at
    0.55. A policy question we can inform but not settle; pre-register either way.
-4. **How to certify `output_support` independence.** Currently enforced by
-   discipline; it should be enforced by construction. On PanMixer's data, target
-   inclusion is the default, which makes this urgent rather than theoretical.
+4. **ANSWERED 2026-09-28 — enforced by construction, not discipline.** The
+   preprocessing splits into a COHORT stage and a TARGET stage writing to separate
+   directory trees, and **the cohort stage takes no target argument at all**, so
+   target leakage is not expressible through the interface. `chain_span` is likewise
+   a fixed coordinate rule derived from the assembly and the map, frozen before the
+   target file is opened. ⚠ Residual to hold: never let an exclusion become
+   target-dependent (e.g. "drop positions where the target is missing") — that
+   would leak, and it is the one shape of this error the directory split does not
+   catch. Note also that on PanMixer's data target inclusion IS the default; that is
+   correct for their threat model and is not a constraint we inherit.
 5. **Composition across releases.** One release per genome is an operational rule,
    not a theorem. The head-to-head's frontier is k correlated releases and is an
    evaluation device only.
@@ -550,8 +684,25 @@ Ordered. Each item names what must pass before it starts and what closes it.
    locally. This is a design decision, not an edge case to document. Leading option:
    derive `T` from the snarl tree rather than from plink intervals, which makes
    blocks disjoint by construction. See the 2026-09-22 entry in `docs/memory.md`.
-8. **OPEN — what is a chain position? (`T`) — raised by Dylan 2026-09-22, to
-   discuss with his PI; deliberately NOT decided here.**
+8. **ANSWERED 2026-09-28 (Dylan): ONE VARIANT PER POSITION — model C.** Model B
+   (one position per LD block) is the retained fallback if the PI wants closer
+   parity with PanMixer; model A is ruled out. The reasoning that settled it is in
+   the chain-architecture table above: A's fresh-uniform restart per block is
+   algebraically the infinite-genetic-distance limit and produces 104,379 donor
+   switches against ~3,532 for B and ~7,155 for C, where the analytic segment
+   length says ~4.5 kb. C lands nearest, is the correct Li-Stephens model, and is
+   SIMPLER than what was pinned — no singleton special case, no per-block `Z_b`,
+   one forward pass, one backward sample. It also removes the external panel, the
+   PanGenie callset and the allele-frequency table from the input set entirely.
+   ⚠ Two sub-questions bundled here were also answered: **anchors are dropped**
+   (no external callset in the mechanism), and the double-counting worry is moot
+   under C, where every row is its own position. ⚠ STILL OPEN, carried forward: a
+   path containing a tandem duplication visits a position TWICE, so "the allele of
+   path p at position v" is not well-defined for such a path — which `u_path` and
+   `phi_v` both assume it is. That is now a `nested_variant` question, not a
+   segmentation question.
+   *The original framing and the three candidates are preserved below.*
+   **[SUPERSEDED — retained for the reasoning]**
    `T` is the number of positions in the hidden Markov chain: the number of steps
    the sampler takes from one end of the chromosome to the other. At each position
    it decides which cohort haplotype to copy from and emits whatever that donor

@@ -104,6 +104,158 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-28 — A-FIX-panmixer-framing + A-DAT-genetic-map-parm + A-DAT-input-set + A-DAT-evaluation-fit
+
+**Goal.** Start the build. Create a clean branch, decide the chain architecture, settle the
+preprocessing input and output sets, and correct the documentation where the PanMixer
+comparison had been forced onto a problem it does not describe.
+
+**Method.** Two adversarially-verified workflows (10 and 12 agents) plus hand verification.
+Every number below is measured in this project on chr21 unless labelled otherwise.
+
+### Decisions (Dylan)
+
+1. **Model C is the chain architecture** — one chain over the chromosome, units = individual
+   VARIANTS. Model B (units = LD blocks) is the retained fallback; **model A is ruled out**.
+   This answers open question 8, raised 2026-09-22 and deferred to the PI.
+2. **The scope decision is narrowed.** *"Maximise reuse of PanMixer, change exactly ONE
+   thing"* imported PanMixer's threat model — target-as-cohort-member — into a design whose
+   target is EXTERNAL to everything. Dylan: *"Boundaries aren't a weak function of the
+   target's genotypes because the target is completely outside of any other dataset."*
+3. **Write fresh, do not port.** Copy functions from PanMixer where they are right, but the
+   file structure and pipeline are ours, so nothing is inherited without a decision.
+4. **The pipeline starts from our own inputs and produces all outputs.** `vg deconstruct` is
+   pipeline step 1. Accepted knowingly: our VCF will not match PanMixer's.
+5. **`missing_policy` = RENORMALISE.** The cost — penalising poorly-assembled donors for a
+   defect that is not theirs — was accepted deliberately, to be noted in the writeup rather
+   than modelled around at this stage.
+6. **Target mapping is a separate stage and a separate command**, so a new target does not
+   re-run the cohort stage.
+7. **`chain_span` for chr21 starts at 12,968,320**, flagged for revisit.
+8. **The k-mer Jaccard is deferred** to a post-build evaluation/reporting tool.
+
+### The framing audit
+
+91 findings filed across `CLAUDE.md`, the five docs and the three primer sections;
+adversarial verification **upheld 76, rejected 15, and found 51 further instances** the
+auditors missed. The rejections were almost all the predicted failure mode — a correct
+description of PanMixer read as a claim about us.
+
+Highest-leverage: **`CLAUDE.md` constraint 1** ended with an unscoped *"Recompute
+leave-one-out"* inside the hard rules, in the file auto-loaded every session — so the error
+regenerated every session. Also `terms.md`'s `loo_cohort`, which defined OUR cohort as
+`HPRC \ {target}` at Status PRIMARY; `plan.md`'s exit gate 5, which made PanMixer benchmark
+compatibility a blocking gate of the sampler; and `03-panmixer.md:2363`, which asserted
+block boundaries are a function of the target's genotypes — flatly false of our setting and
+internally contradicted by line 1220 of the same file.
+
+### The genetic map, and the p arm
+
+**The defect found is worse than the one we were looking for.** `np.interp` clamps by
+default, so all 26,018 variants below the map's start (10,326,676) take its first value —
+and the map's own first interval (10,326,676 -> 12,968,320, spanning the centromere) carries
+**dcM = 0.000000**. Together: **34,345 consecutive positions with identical cM**, so
+`Delta_x = 0`, `P(switch) = 0`, and the sampler emits **one donor's real haplotype verbatim
+across 7.25 Mb** — departure (b) at ~200x the scale of the worst single block. A privacy
+failure, not a utility one, and silent.
+
+**No map fixes it.** deCODE 2019 (native hg38, highest resolution) starts at **14,143,522**,
+worse — it would leave 47,805 variants (14.03%) unmapped against 26,018 (7.63%). The 1000G
+hg38 map has a single value-0 interval over chr21:0–10,326,676. Bherer 2017 is GRCh37 and
+starts later still. pyrho hg38 (Spence & Song 2019) DOES cover from **5,088,754 bp** and
+would give every variant a distinct cM — but it spends **9.98 cM (ACB) / 9.15 (CEU) across a
+single 3.4 Mb interval defined by only two markers**, attributing 23–26% of chr21's genetic
+length to a region with zero observed crossovers. Interpolation across a void.
+
+**Why the region is like that — the p arm.** Every chromosome has a centromere dividing it
+into a short arm (**p**, French *petit*) and a long arm (**q**). Five human chromosomes —
+13, 14, 15, 21, 22 — are **acrocentric**: the centromere sits near one end, so the p arm is
+small and is almost entirely repetitive DNA plus tandem arrays of **rDNA** genes. Those
+arrays are near-identical BETWEEN the five, so assemblers cannot place them uniquely and
+GRCh38 fills them with N. chr21's p arm is 0–~12 Mb.
+
+Five independent legs support excluding it: GRCh38 chr21 5,010,000–10,814,560 is placeholder
+model sequence (25 contigs, fabricated N-gaps, 22 of exactly 50 kb); 1000G's strict
+accessibility mask rules **26,014 of 26,018** (99.98%) inaccessible; our cohort matrix is
+**36.76%** missing there against 6.57% elsewhere; deCODE's pedigree map assigns **0.0 cM/Mb
+to every 1 Mb bin from 0–13 Mb**; and a four-generation CEPH pedigree recorded *"Not a
+single allelic recombination was observed on the p-arm"* across 107 transmissions.
+
+⚠ **Two smaller zero-distance defects remain and the cut does not touch them**: 592 variants
+above the map end give a 593-position zero-distance run at the telomere (UNDECIDED), and 618
+interior map intervals with dcM = 0 hold ~1,650 kept variants (correct to leave — real map
+plateaus). ⚠ **What the cut costs is unmeasured** — the share of a target's `-log f`
+discarded has not been computed.
+
+### The input set
+
+- **PanGenie drops out entirely.** Exactly two live consumers, both deleted by our design;
+  no evaluator reads it. Saves a 5.06 GB download.
+- **The external panel drops out of the mechanism** under model C — no blocks, no PLINK.
+  It survives only as the attack database.
+- **`INFO/AN` is bit-identical to `support(v)`.** `np.array_equal` is True across all
+  340,824 chr21 records. Support needs no computation, and the comparison doubles as a free
+  row-alignment check.
+- **Do NOT compute LD blocks from the 44-sample cohort** (for the B fallback): 7,858 blocks
+  covering 50.4% of variants against 14,137 / 74.2% from the panel; largest block 2,562
+  against 618. Only 44% of SNPs clear MAF 0.05 in 88 haplotypes.
+- **The haploid-genotype cause of `-1` does not exist on chr21.** All 237,594 non-piped GT
+  fields have exactly one distinct value, `.`. Four causes, not five.
+- **The graph is published only as GFA** for PGGB freeze1 — no GBZ, no snarls. chr21 =
+  434,772,428 B; whole genome 15.64 GB compressed / 86.5 GB uncompressed.
+- **`vg` 1.68 does not reproduce `vg` 1.36.** On chrY it recovers 99.55% of the published
+  VCF's sites by POS but only **92.7% by (POS, REF, ALT)**, concentrated at multi-allelic
+  sites. Also: the published VCF carries 45 samples, our local chr21 carries 44 — `chm13`
+  removed by PanMixer's own step — so a rebuild does not drop in as a replacement.
+- **The graph buys little the VCF lacks**: 98.37% of consecutive top-level snarls share a
+  boundary node, so donor switching is provably a valid graph walk from `AT` alone; all
+  340,824 alleles are explicit sequences. The one irreplaceable use is mapping a target's
+  reads — and HPRC marks short-read mapping **"untested"** for PGGB.
+- **The graph does carry the p arm**: the CHM13-backbone VCF has **185,414 records** in
+  `chm13#chr21:1-10 Mb` against 22,746 for GRCh38. But that recovers sequence, not genetic
+  distance, and missingness there is 43.9%.
+
+### The evaluation
+
+**Nothing in PanMixer's suite tests the claim we make.** Read every evaluator:
+- `af_loss` and `ld_loss` reconstruct an edited cohort (`new_pangenome[subject_index] =
+  released_array`). We never edit the cohort, so they are not defined for our release
+  object. ⚠ A `--dont_replace` flag exists that skips the substitution, so this is
+  conditional rather than structural — but the decision stands regardless: Dylan,
+  *"we don't use af_loss for our project at all."*
+- **The gap score is the one that transfers**, after three changes: "self" becomes the
+  external target's true path; the attack DB excludes the target; the AF source is disjoint
+  from the cohort. ⚠ Not reusable verbatim — `score_genotypes_remove_missing` writes
+  `test_hist.png` to the working directory on every call, 11x per row.
+- **Their shape assertion is vacuous.** Both sides equal `site_mask.sum()` by construction,
+  so a differently-ordered release is silently mis-scored rather than erroring. This is the
+  row-order hazard, located.
+- **Two of their metrics are broken**: `ld_loss`'s window is **5 bp, not 5 kb** (7,629 pairs
+  on chr21 instead of ~10.6M), and the haplotype gap score sets `ref_af = alt_af`, so
+  reference matches are weighted by the alt frequency.
+- The test we need is **two-target indistinguishability** — new entry in `docs/terms.md`.
+
+### Two implementation facts worth not rediscovering
+
+- **The budget is invariant in T.** `u = sum_v beta_v phi_v` with `sum beta = 1`, so the
+  total tilt between a perfectly-matching and a non-matching path is `exp(eta_tau)` however
+  the path is partitioned. At tau = 0.5: per-position tilt 1.0000055 at T = 100,757 against
+  1.0000016 at T = 340,824, total 1.7321 either way. Finer T does NOT spread the budget
+  thinner. ⚠ What it DOES cost is float32 headroom: the per-position tilt under C is only
+  **13.5x** the float32 resolution against 45.7x under blocks, so float64 stored alphas are
+  load-bearing. And the thin-budget problem is a property of **tau**, not of T.
+- **Never materialise `A`.** Li-Stephens `A = (1-s_t)*I + (s_t/K)*J` is rank-one plus
+  diagonal, so the forward step is O(K) from one scalar sum and the backward draw likewise.
+  A materialised `A` per position would be 340,824 x 88 x 88 x 8 B = **~21 TB**.
+
+**Provenance.** Workflows `wf_1dd6bfa5-5a8` (inputs, 10 agents) and `wf_d0195c3c-52d`
+(framing audit, 12 agents), both adversarially verified; `wf_785b6f66-755` applied the primer
+corrections. Doc corrections in commit `1f8ea3f`. No mechanism has been run and no
+RanPanMixer number exists.
+
+---
+
+
 ## 2026-09-27 — A-THY-chain-architecture: three models, measured, and a toy that shows the tilt vanishing
 
 **Why.** Dylan asked whether "the HMM is per block and the chain never crosses a block
@@ -797,8 +949,17 @@ of the pangenome subjects appear in 1000g_phased" — true for Phase 3 (0 of 44
 overlap, measured) but **false for our 30x substitution (39 of 44 overlap)**. So our
 rebuilt `allele_frequencies.npy` includes the target's own alleles in the
 frequencies used to score it. For PanMixer that is merely a stronger version of an
-existing self-inclusion. **For US it violates constraint 1**, so any leave-one-out
+existing self-inclusion. [INCORRECT] - **For US it violates constraint 1**, so any leave-one-out
 cohort must also drop the target from the 1000G panel, not only from the pangenome.
+[CORRECTION - 2026-09-28]: The measurement is right and the implication is wrong. 39 of 44
+HPRC donors including HG00438 really are in the 30x panel — that is true of the pipeline as
+built, and it matters for the BENCHMARK, where a cohort member stands in as target. It is
+not a constraint-1 violation of our MECHANISM, whose target is external to every panel by
+construction. Two further reasons this is now moot: under model C the mechanism uses no
+external panel at all, and it computes no allele-frequency table (decided 2026-09-28). The
+overlap still needs removing from the ATTACK DATABASE — and note the fix is incomplete, because
+all 39 overlaps lie in the 698 samples the 30x release ADDED beyond Phase 3 to complete trios,
+so dropping the 39 named samples leaves their first-degree relatives in.
 
 **Provenance.** chr21, HG00438, `external/PanMixer` @ `c182c38`, measured 2026-09-24.
 
@@ -1192,8 +1353,13 @@ positive-value moves fit — so capacity is not a tight knob at the top end.
 
 **Result — block structure.** 14,137 plink LD blocks but 100,757 entries in
 `blocks_dict.json`, **88.4% singletons**. Only **10.4% of blocks** take the HMM
-path, though those hold **71.4% of variants**. For us: `T_blocks` ~ 100,757 on
+path, though those hold **71.4% of variants**. [INCORRECT] - For us: `T_blocks` ~ 100,757 on
 chr21 with `K_states` = 88, so FFBS is ~9M operations.
+[CORRECTION - 2026-09-28]: The block structure is correct; reading it as OUR chain length is
+not. Model C was adopted 2026-09-28 — one chain position per VARIANT — so T is 340,824 raw
+and 306,480 after the `chain_span` cut, roughly 3x the figure above, and FFBS is ~30M
+operations. `K_states` = 88 is right and stands. LD blocks play no role in our mechanism at
+all under C.
 
 **Provenance.** `external/PanMixer` @ `c182c38` · chr21 rebuilt on the 30x GRCh38
 panel (sha256 `a925c112...`) · HG00438 · capacity 0.1 and 0.5 · seeds 123, 456 ·
@@ -1295,6 +1461,7 @@ These were checked against paper and code by dedicated agents and by hand.
 
 [INCORRECT] - PanMixer-compatible LD blocks or graph subpaths and the cohort HMM can serve as the target-independent prior R_D.
 [CORRECTION - 2026-09-18]: Only the block BOUNDARIES (plink on an external panel) and the transition FORM are target-independent as shipped. The allele-frequency table includes the target at PanGenie-matched and novel sites (get_af.py:41-53,68-73); the support counts include the target (obfuscate.py:208); the forward/PMI panel includes the target (:130,132); and the site-to-block assignment ranges over sites private to the target. Every one must be recomputed leave-one-out before R_D satisfies the theorem's hypotheses.
+[CORRECTION - 2026-09-28]: The catalogue above is accurate about PANMIXER and the final sentence is wrong about US. It reads as a precondition on our R_D; it is not. Our target is EXTERNAL to G, D, every panel and the attack database, so none of those artifacts can contain it and there is nothing to recompute: K = 88, and constraint 1 holds by construction. Leave-one-out is a requirement of the HEAD-TO-HEAD ARM ALONE, where a cohort member stands in as target and externality must be simulated. This entry is directly contradicted by the 2026-09-25 entry in this same file ("In v1 the target is a PARAMETER: it never enters the matrix, `support_D`, or the state set"). See CLAUDE.md constraint 1 and `loo_cohort` in docs/terms.md, both corrected in commit 1f8ea3f.
 
 [INCORRECT] - PanMixer samples a candidate constrained to differ from the target's own block.
 [CORRECTION - 2026-09-18]: The PAPER says this (p.10 lines 653-654); the released CODE implements no such constraint — `sample_block_prior` is an unconditional prior draw with no comparison to the original and no rejection loop. So its candidate generator is already target-independent given the panel. PanMixer's target-dependence comes instead from the knapsack SELECTION and from releasing unselected blocks verbatim. Note the consequence: because a no-op resample is possible while eps_j stays positive, the LP can buy privacy credit at zero utility cost from moves that change nothing.

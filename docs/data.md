@@ -45,6 +45,34 @@ Verified against disk 2026-09-18. `tests/test_docs_contract.py` re-verifies.
 | `external/PanMixer` | symlink -> `/data/ds85/RanPanMixer/external/PanMixer`. **PanMixer writes all its data inside its own tree** (`BASE_PATH = dirname(constants.py)`, no env override), and `/home` is 95% full, so the checkout lives on `/data`. Gitignored. | `OK` |
 | `external/genetic_maps` | symlink -> `/data/ds85/RanPanMixer/genetic_maps`. GRCh38 genetic maps, acquired 2026-09-27. Working file `external/genetic_maps/chr21.b38.gmap`. Gitignored. | `OK` |
 | `src/ranpanmixer` | the mechanism: HMM, utility, sampler, attacks, eval | `PLANNED` |
+
+### The `pipeline` branch (started 2026-09-28)
+
+An ORPHAN branch holding the build, with no history from `main`. Layout:
+
+Paths below are written `pipeline:<path>` because they exist on that branch, not in
+this worktree — the storage-layout check above resolves bare paths against `main`.
+
+| path | contents | state on `pipeline` |
+|---|---|---|
+| pipeline:`scripts/` | the preprocessing pipeline and, later, the sampler. Written fresh — functions may be copied from PanMixer, the structure is ours | exists, empty |
+| pipeline:`configs/` | run parameters and the input manifest (URLs, sha256, `chain_span`, tool versions) | exists, empty |
+| pipeline:`logs/` | run logs and status sentinels (contents gitignored) | exists, empty |
+| pipeline:`data/` | symlink -> `/data/ds85/RanPanMixer/data`. Gitignored: the inputs are tens of GB | symlink live, target empty |
+
+**Planned data layout.** Two trees, because the split is what enforces standing
+constraint 1 — the cohort stage takes no target argument, so target leakage is not
+expressible through the interface.
+
+```
+data/
+  raw/            chr21.hprc-v1.0-pggb.gfa.gz , chr21.b38.gmap
+  cohort/chr21/   haplotypes.npy reason.npy positions.npy genetic_pos.npy
+                  support.npy allele_lengths.npy sites.tsv haplotype_ids.npy manifest.json
+  targets/<id>/chr21/   path.npy representability.json manifest.json
+```
+
+⚠ **Nothing is staged yet.** `/data/ds85/RanPanMixer/data` has zero entries.
 | `artifacts/releases` | sampled sanitized paths, one directory per (graph, tau) | `PLANNED` |
 | `artifacts/eval` | utility and attack measurements | `PLANNED` |
 
@@ -82,6 +110,36 @@ Paths are written in full so the docs contract can check them. None are committe
 ⚠ **Not downloadable from this repo:** the five read FASTQs the mapping utility
 needs, `chr21.fa` / `hg38_cleaned.fa`, and the three `.npy` files of the 30x
 attack database. No script in the checkout produces any of them.
+
+## 3b. OUR pipeline's input set (model C, decided 2026-09-28)
+
+Three inputs, and only three. What model C removed is as important as what it kept.
+
+| # | input | source | size | state |
+|---|---|---|---|---|
+| 1 | **HPRC v1.0 PGGB graph**, per-chromosome GFA | `human-pangenomics` S3, `pangenomes/freeze/freeze1/pggb/` ⚠ note the `vcfs/` component is absent for graph files | chr21 **434,772,428 B**; whole genome 15.64 GB gz / 86.5 GB raw | `PLANNED` |
+| 2 | **GRCh38 genetic map** | already held | `chr21.b38.gmap`, 44,618 rows | `OK` |
+| 3 | **The target** | not acquired; form undecided | — | `PLANNED` |
+
+**Dropped from the input set, with the reason:**
+
+| dropped | why |
+|---|---|
+| PanGenie callset (`PG.vcf.gz`, 5.06 GB) | fed only the anchor set and one allele-frequency branch, both deleted by model C. No evaluator reads it (measured 2026-09-28) |
+| the external 1000G panel, for the MECHANISM | fed only PLINK LD block boundaries, which model C does not use. Survives as the attack database in the evaluation only |
+| `allele_frequencies.npy` and `get_af.py` | no privacy score and no allele-frequency sampling branch to feed |
+
+⚠ **`vg deconstruct` is pipeline step 1, and our VCF will not match PanMixer's.** Measured
+on chrY: `vg` 1.68 recovers 99.55% of the published VCF's sites by POS but only **92.7% by
+(POS, REF, ALT)**, concentrated at multi-allelic sites, because the published file was built
+with `vg` 1.36. Accepted knowingly. We must also apply chrX and `chm13` removal ourselves —
+the published VCF carries 45 samples, we need 44. **If the head-to-head is ever run, both
+arms must run on the SAME VCF.**
+
+⚠ **The graph is published only as GFA for PGGB freeze1** — no `.gbz`, no `.snarls`. The two
+`.gbz` files on disk under `/data/ds85/RanPanMixer/runs/` are outputs of our own
+`vg autoindex` read-mapping baseline, built from the VCF plus `chr21_ucsc.fa`, so they carry
+no information the VCF does not.
 
 ## 4. Record schema — released path
 

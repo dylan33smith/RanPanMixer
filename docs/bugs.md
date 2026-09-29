@@ -111,7 +111,16 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
   **[Side effect worth knowing]** This also suppresses the `#FIX ME` zeroing: with
   the target in the panel its allele is always counted, so f_v is never 0 and that
   branch never executes. Under the shipped Phase 3 panel it would.
-  **[Severity]** HIGH for us — it is a constraint-1 violation introduced by our own fix.
+  [INCORRECT] - **[Severity]** HIGH for us — it is a constraint-1 violation introduced by our own fix.
+  **[CORRECTION - 2026-09-28]** **[Severity]** HIGH for the COMPARISON ARM; **not applicable
+  to our mechanism.** The measurement is right — 39 of 44 HPRC donors including HG00438 are
+  in the 30x panel — and it matters wherever a cohort member stands in as target. It is not
+  a constraint-1 violation of our design, whose target is external to every panel by
+  construction. Doubly moot since 2026-09-28: under model C the mechanism uses no external
+  panel and computes no allele-frequency table at all. ⚠ The overlap still must be removed
+  from the ATTACK DATABASE, and the obvious fix is incomplete: all 39 overlaps sit in the
+  698 samples the 30x release ADDED beyond Phase 3 to complete trios, so dropping the 39
+  named samples leaves their first-degree relatives in the database.
 
 ### Killing a duplicate process
 - **[2026-09-18] Never `pkill -f` a pattern that matches your own command line**
