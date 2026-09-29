@@ -134,6 +134,27 @@ columns. chr21 produced **45** (44 donors + chm13), as it should.
 | sites at support 0 | 1 | 1 |
 | max alleles at one record | 90 | 90 |
 
+**⚠ AND THE ALLELE INDICES DIFFER — the most important finding of the run.** "340,849 vs
+340,824" understates it badly. On the strict (POS, REF, ALT) key only **94.9%** of records
+match: 17,454 are ours-only and 17,429 theirs-only. But comparing on (POS, REF) and then
+asking whether the ALT *set* matches shows the cause:
+
+| | records |
+|---|---|
+| same ALT set, order may differ | **339,358** |
+| genuinely different ALT set | 386 |
+| (POS, REF) only in ours | 1,105 |
+| (POS, REF) only in theirs | 1,080 |
+
+So the 5.1% mismatch is **almost entirely ALT REORDERING**: `T -> TAA,TA,TAAA` in ours
+against `T -> TAA,TAAA,TA` in theirs, the same variant with the alleles listed in a
+different order. **Allele index 1 in our VCF is not allele index 1 in theirs** at those
+sites. Any PanMixer-derived artifact joined positionally to ours — the allele matrix, a
+released `new_haplotypes`, the attack database masks — would be silently wrong there, with
+no error and no shape mismatch. This is precisely the hazard `site_axis_digest` exists to
+catch, and it is now a measured fact rather than a worry: the two VCFs' axes genuinely are
+different objects. **Never mix artifacts across the two builds.**
+
 ⚠ **vg 1.68 calls 89,395 more genotypes than 1.36 on the same graph** — and emits **zero**
 bare-`.` GT fields where 1.36 emitted 237,594, writing `.|.` instead. Both counts were
 verified independently with bcftools against both VCFs. Two consequences: the "haploid
