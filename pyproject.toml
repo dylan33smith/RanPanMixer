@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ranpanmixer"
+version = "0.1.0"
+description = "Randomized tau-private path release against a public pangenome graph"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pyyaml"]
+
+# src-layout: modules live directly under src/, so after `pip install -e .`
+# the imports are `import sites`, `from cohort import arrays`.
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["cohort", "target"]
+py-modules = ["sites", "store", "cli"]
+
+[project.scripts]
+prep-cohort = "cli:cohort_main"
+prep-target = "cli:target_main"

@@ -275,6 +275,31 @@ data/
 independent — preprocessing is embarrassingly parallel across them, and a driver can loop
 1..22. chr21 alone is one invocation today.
 
+⚠ **chr21 IS A TESTING SCOPE. THE PRODUCT IS GENOME-WIDE** (Dylan, 2026-09-29). Working on
+one small chromosome is a way to iterate in minutes instead of days; it is not the
+deliverable. Most of the extension really is just the driver loop — but three things are
+NOT, and they should be visible now rather than discovered later:
+
+1. **`beta_v` must sum to 1 over whatever scope `tau` covers.** Today it sums to 1 over
+   chr21, which silently means "`tau` per chromosome". A genome-wide `tau` needs a
+   genome-wide normaliser, so each chromosome gets a SHARE of the budget rather than all
+   of it. Running 22 chromosomes each normalised to 1 would be 22 independent releases of
+   the same person and would compose — exactly what standing constraint 4 forbids. This is
+   the same scope algebra already recorded for per-block vs genome-wide: the product of
+   the per-scope tilted samplers equals the global one provided the weights sum to 1
+   ACROSS the whole scope. **Decide before any multi-chromosome run.**
+2. **`chain_span` is per chromosome and must be derived, not copied.** Each chromosome has
+   its own map span and its own centromere, and chr13, 14, 15, 21 and 22 are all
+   acrocentric, so four more will have the same unassembled p-arm problem. The rule
+   ("start where the map carries real markers") generalises; the numbers do not.
+3. **The graph is 15.64 GB compressed / 86.5 GB raw genome-wide.** Per-chromosome GFAs
+   total 15.89 GB and are the better form, because deconstruct is per-chromosome anyway
+   and a single-shot whole-genome run would need several hundred GB of RAM against our
+   251 GB.
+
+Compute is otherwise not a constraint: alphas are per chromosome, so memory does not grow
+with the genome, and chr21's ~30M operations scale linearly.
+
 **Target as a separate command** (Dylan, 2026-09-28) so a new target does not re-run the
 cohort stage. ✅ **ANSWERED 2026-09-29 — the target arrives as a phased GRCh38 VCF**, and
 the mapping is a join on `(POS, REF, ALT)` against `sites.tsv`. No alignment step, and no

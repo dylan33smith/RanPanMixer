@@ -1,0 +1,196 @@
+# Input manifest — chr21
+#
+# Everything the preprocessing pipeline starts from. Three inputs and no more:
+# the graph, a genetic map, and a target. Under model C the mechanism uses no
+# external panel and no PanGenie callset at all.
+#
+# Paths are relative to the branch root. data/ is a symlink to
+# /data/ds85/RanPanMixer/data and is gitignored — the inputs are 435 MB.
+
+chrom: chr21
+
+inputs:
+
+  graph:
+    path: data/raw/chr21.hprc-v1.0-pggb.gfa.gz
+    url: https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/pggb/chroms/chr21.hprc-v1.0-pggb.gfa.gz
+    bytes: 434772428
+    sha256: 85222d4fee4af880930b43f8a98c004c44530d7eca7004908cb40e5196567977
+    acquired: 2026-09-29
+    what: >
+      HPRC v1.0 PGGB graph, chr21, as GFA. PGGB freeze1 publishes NO .gbz, .og
+      or .snarls — GFA is the only form. The whole-genome file is 15.64 GB
+      compressed / 86.5 GB raw; per-chromosome is both cheaper and what upstream
+      used, since deconstruct is per-chromosome anyway.
+    notes: >
+      vg deconstruct is pipeline step 1. Our VCF will NOT match the published
+      one: measured on chrY, vg 1.68 recovers 99.55% of the published VCF's
+      sites by POS but only 92.7% by (POS, REF, ALT), concentrated at
+      multi-allelic sites, because the published file was built with vg 1.36.
+      Accepted deliberately. We must also apply chrX and chm13 removal
+      ourselves — the published VCF carries 45 samples, we need 44.
+
+  genetic_map:
+    path: data/raw/chr21.b38.gmap
+    source: SHAPEIT4 genetic_maps.b38.tar.gz (odelaneau/shapeit4 @ 43a9a497)
+    corroborated_by: Beagle plink.GRCh38.map.zip — chr21 byte-identical
+    bytes: 971965
+    sha256: 95557a75b5851160ed4d7904b17d7718e62dc6f422614437870d6f2130d9d36d
+    acquired: 2026-09-27
+    what: >
+      A DOWNLOADED table with cM already computed, not something estimated from
+      our data. Columns pos / chr / cM, 44,618 rows. Provenance is HapMap Phase
+      II lifted to GRCh38.
+    span_bp:  [10326676, 46680243]
+    span_cm:  [0.584144, 62.786478]
+    notes: >
+      Interpolate with numpy.interp, left=nan, right=nan — NEVER the default
+      clamp — then assert no NaN survives the chain_span cut. Linear
+      interpolation between markers is what Beagle, SHAPEIT4, hap-ibd and
+      GLIMPSE all do; a cubic spline would be actively wrong (overshoot can
+      produce negative genetic distance).
+
+  target:
+    # Supplied per run by preprocess-target, not by this manifest.
+    # See target_selection below.
+    path: null
+
+# ---------------------------------------------------------------------------
+# chain_span — the coordinate interval the chain actually runs over.
+# Fixed BEFORE any target file is opened, so R_D stays a function of D alone.
+# ---------------------------------------------------------------------------
+chain_span:
+  start: 12968320      # exclusive
+  end:   46680243      # inclusive -- the genetic map's last marker
+  keeps: 305887        # of 340,824 chr21 variant records = 89.75%
+  dropped_below: 34345
+  dropped_above: 592
+  provisional: true    # Dylan to settle with his PI; this is the cut that lets v1 run
+  why: >
+    Below 12,968,320 the clamped interpolation and the map's own zero-cM
+    centromeric plateau give 34,345 consecutive positions at IDENTICAL cM, so
+    P(switch) = 0 and the sampler would emit one donor's real haplotype verbatim
+    across 7.25 Mb. Five independent reasons support the cut; see chain_span in
+    docs/terms.md for the full table and the REVISIT list.
+  unresolved:
+    - >
+      592 variants sit ABOVE the map end (46,680,243 vs positions to
+      46,699,788), giving a 593-position zero-distance run at the telomere.
+      Same defect, 58x smaller. UNDECIDED — do not clamp it silently.
+    - >
+      618 interior map intervals have dcM = 0 over 2.71 Mb, holding ~1,650 kept
+      variants. These are REAL map plateaus; P(switch) = 0 between two variants
+      with no genetic separation is CORRECT. Leave them.
+
+# ---------------------------------------------------------------------------
+# Target selection — for testing, until a real external target is available.
+# ---------------------------------------------------------------------------
+target_selection:
+  method: held-out sample from the 1000 Genomes 30x GRCh38 panel
+  rationale: >
+    Standard practice, and already used in this project: the 2026-09-27
+    representability measurement used six 1000G samples outside the HPRC 44 as
+    stand-in external targets. The panel is phased and GRCh38-called, so a
+    sample column IS a path once joined to our site list — which is exactly the
+    target format the pipeline wants, and it avoids vg giraffe entirely (HPRC
+    marks short-read mapping "untested" for the PGGB graph).
+
+  eligibility:                      # ALL must hold
+    - in the 3,202-sample 30x panel
+    - NOT one of the 44 HPRC cohort members          # 39 of 44 are in the panel
+    - NOT a first-degree relative of any HPRC member # 78 such samples
+    - excluded from the attack database at evaluation time
+
+  pool: configs/clean_pool.chr21.txt          # 1,399 samples -- USE THIS ONE
+  wide_pool: configs/eligible_targets.chr21.txt  # 3,085, HPRC-relatedness only
+  pool_derivation: >
+    3202 - 39 (HPRC members in panel) - 78 (1st-degree relatives of HPRC) = 3085,
+    then - 1686 that have a first-degree relative ANYWHERE in the 3,202 = 1399.
+    The last rule matters because if a target's own parent or child sits in the
+    ATTACK DATABASE, the attack can match the relative instead of the target,
+    which confounds the measurement in the optimistic direction. 55% of the wide
+    pool fails it.
+
+  relatedness_warning: >
+    NOT a formality. The 39 HPRC donors present in the 30x panel are the
+    CHILDREN of trios, and their 78 parents are in the unrelated-2504 set — so a
+    target picked at random from the 2504 has a ~3.1% chance of being the parent
+    of a cohort member, sharing about half its genome with a donor haplotype.
+    That would inflate apparent fidelity and confound the privacy measurement.
+    The pool above already excludes them.
+
+  selected: configs/targets.chr21.txt    # the 10 test targets, extracted 2026-09-29
+  selection_method: >
+    Two per super-population, all from the strict 1,399 pool. HG00096 and HG00097
+    carried over from the 2026-09-27 representability run for continuity; the
+    other eight drawn with random.Random(20260929) so the choice is reproducible.
+    Spread is deliberate -- the HPRC cohort is multi-continental, so a target's
+    ancestry relative to the cohort should strongly affect how well a mosaic of
+    cohort haplotypes reproduces it, and an all-GBR set would hide that.
+  selected_detail:   # sample: [super_pop, pop, chr21 non-ref calls]
+    HG00096: [EUR, GBR, 61495]
+    HG00097: [EUR, GBR, 60677]
+    HG01323: [AMR, PUR, 61831]
+    HG01468: [AMR, CLM, 59953]
+    HG02389: [EAS, CDX, 59944]
+    HG03757: [SAS, STU, 64279]
+    HG04211: [SAS, ITU, 64515]
+    NA19056: [EAS, JPT, 59421]
+    NA19350: [AFR, LWK, 78744]
+    NA20294: [AFR, ASW, 79217]
+  sanity_check: >
+    Non-reference counts run 59,421 (NA19056, EAS) to 79,217 (NA20294, AFR) --
+    the AFR samples carry the most, as expected from African populations' higher
+    diversity. A useful smoke test that the spread is real.
+
+  ceiling: >
+    A held-out panel sample UNDERSTATES the representability problem. Measured
+    2026-09-27 on these six: ~80.4% of a target's chr21 non-reference calls have
+    an exact record in the graph; 9.9% have no record at all and carry 20.5% of
+    the target's -log f information. That 9.9% is a LOWER bound, because a 1000G
+    sample's variants are by construction already catalogued — a genuinely novel
+    genome would fare worse. Report target_fidelity against this ceiling, always.
+
+# ---------------------------------------------------------------------------
+# Deliberately NOT inputs. Recorded so the absences are decisions, not oversights.
+# ---------------------------------------------------------------------------
+not_used:
+  pangenie_callset: >
+    Fed only the anchor set and one allele-frequency branch, both deleted by
+    model C. No evaluator reads it. Saves a 5.06 GB download.
+  external_panel_for_mechanism: >
+    Fed only the PLINK LD block boundaries, which model C does not use. The
+    panel survives ONLY as the attack database in the evaluation, where cohort
+    overlap must be removed before it is loaded. NOTE the obvious removal is
+    incomplete: all 39 HPRC overlaps sit in the 698 samples the 30x release
+    ADDED beyond Phase 3 to complete trios, so dropping those 39 leaves their
+    78 first-degree relatives in the database.
+  allele_frequency_table: >
+    No privacy score and no allele-frequency sampling branch to feed. Note that
+    support(v) needs no computation either: INFO/AN in the graph VCF is
+    bit-identical to the non-missing count across all 340,824 chr21 records.
+
+# ---------------------------------------------------------------------------
+# Attack database -- EVALUATION ONLY, never an input to the mechanism.
+# ---------------------------------------------------------------------------
+attack_database:
+  path: data/attack/1000g_30x_chr21_attackdb.vcf.gz
+  built: 2026-09-29
+  samples: 3192                      # 3,202 minus the 10 test targets
+  excluded: data/attack/excluded_targets.txt
+  why_exclude_targets: >
+    The gap score is self minus the maximum over the database. If the target is
+    in the database it is its own rank-1 hit and the gap is trivially zero --
+    PanMixer's departure (e). The target's true path is the "self" reference; the
+    database supplies the COMPETING candidates.
+
+  open_question_hprc_members: >
+    39 HPRC cohort members are STILL in this database, deliberately, because the
+    right answer is not obvious and belongs in a threat-model conversation.
+    The release is a mosaic of cohort haplotypes, so it will match cohort members
+    well -- but that identifies DONORS, not the target. Leaving them in inflates
+    max(others), shrinks the gap, and makes privacy look BETTER, which is the
+    dangerous direction. Removing them makes the attack stronger and is the
+    conservative choice. Rebuild without them (and without their 78 first-degree
+    relatives, which is the part an obvious fix misses) before quoting any
+    privacy number.
