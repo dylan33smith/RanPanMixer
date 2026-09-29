@@ -542,8 +542,16 @@ is external to the cohort, so no haplotype is removed; K = 86 applies only in th
 head-to-head arm, where a cohort member stands in as target. `ffbs` cost is about 30M
 operations at K = 88. Compute is not a constraint.
 
-**COORDINATE CUT (decided 2026-09-28).** The chain starts at chr21 **12,968,320**,
-keeping 306,480 of 340,824 variants (89.92%). Below that, `np.interp`'s clamping plus the
+**COORDINATE CUT (decided 2026-09-28; closed at both ends 2026-09-29).** The chain runs
+over **12,968,320 < POS <= 46,680,243** — exactly where the genetic map carries real
+markers — keeping **305,887** of 340,824 variants (89.75%). ⚠ **PROVISIONAL: Dylan to
+settle with his PI.** It is the cut that lets v1 run, not a defended answer.
+The telomeric end was closed for the same reason as the p arm: 592 variants sat above the
+map end forming a 593-position zero-distance run, and extrapolating there would invent
+genetic distance in a subtelomeric region. Cost 0.19%. Closing both ends makes
+`genetic_pos_valid` and explicit chain segments unnecessary — inside the span every
+position has a real cM, and a long variant-free stretch produces a large `Delta_x` and
+therefore near-uniform switching, which is already correct. Below that, `np.interp`'s clamping plus the
 map's own zero-cM centromeric plateau give **34,345 consecutive positions with identical
 cM**, so `P(switch) = 0` and the sampler emits one donor's real haplotype verbatim across
 7.25 Mb — departure (b) at ~200x the scale of the worst block. Five independent reasons

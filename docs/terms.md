@@ -360,9 +360,14 @@ Aliases:              none
 ### chain_span  [dataset] [method]
 ```
 Is:                   The coordinate interval of a chromosome the chain actually runs
-                      over. ✅ chr21 (decided 2026-09-28): **POS > 12,968,320**, keeping
-                      306,480 of 340,824 variants (89.92%). Everything below is excluded
-                      from the chain and from the release.
+                      over. ✅ chr21 (decided 2026-09-28, closed at both ends 2026-09-29):
+                      **12,968,320 < POS <= 46,680,243** — the interval over which the
+                      genetic map carries real markers — keeping **305,887** of 340,824
+                      variants (89.75%). Everything outside is excluded from the chain
+                      and from the release.
+                      ⚠ **PROVISIONAL — Dylan to settle with his PI.** This is the cut
+                      that lets v1 run, not a defended answer. Revisit it before any
+                      result is published; the full option set is in the REVISIT block.
 Computed by:          PLANNED — a fixed coordinate rule in the preprocessing config.
 CHANGES MEANING WITH: the chromosome and the genetic map. It is a property of the
                       ASSEMBLY and the MAP, never of the target — which is what makes it
@@ -423,13 +428,24 @@ here so it can be picked up once the base mechanism works:
   discarded by excluding the p arm has not been computed. Compute it and report it beside
   the `target_fidelity` ceiling.
 
-⚠ **TWO SMALLER ZERO-DISTANCE DEFECTS REMAIN, and the cut does not touch them.**
-- **592 variants sit ABOVE the map end** (map ends 46,680,243; positions run to 46,699,788),
-  giving a **593-position zero-distance run** at the telomere — structurally the same defect,
-  58x shorter. **Undecided.** Do not clamp it silently.
-- **618 interior map intervals have dcM = 0**, covering 2.71 Mb, with ~1,650 kept variants
-  inside them. These are REAL map plateaus and `P(switch) = 0` between two variants with no
-  genetic separation is the CORRECT model. Leave them.
+✅ **THE TELOMERIC END IS NOW CUT TOO (2026-09-29).** The **592 variants above the map
+end** (map ends 46,680,243; positions run to 46,699,788) formed a **593-position
+zero-distance run** — structurally the identical defect to the p arm, 58x shorter. They are
+excluded, on the same principle: extrapolating there would invent genetic distance in a
+subtelomeric region, which is exactly what we declined to do at the other end. Cost: 592 of
+306,480 = **0.19%**. The invariant *every chain position carries a genuine interpolated cM*
+is now literally true, which is what makes the `assert no NaN` gate meaningful.
+
+⚠ **ONE ZERO-DISTANCE CASE REMAINS, and it is correct to leave.** **618 interior map
+intervals have dcM = 0**, covering 2.71 Mb, with ~1,650 kept variants inside them. These are
+REAL map plateaus, and `P(switch) = 0` between two variants with no genetic separation is
+the CORRECT model, not a defect.
+
+✅ **WHAT CLOSING BOTH ENDS SIMPLIFIES.** Two planned artifacts fall away. `genetic_pos_valid`
+is unnecessary — inside the span every position has a real cM by construction. And explicit
+chain SEGMENTS are unnecessary: a long variant-free stretch inside the span produces a large
+`Delta_x`, hence a switch probability approaching uniform, which is already the correct
+behaviour. The chain does not need to be broken by hand anywhere inside `chain_span`.
 
 ⚠ **INTERPOLATE WITH `left=nan, right=nan`**, then assert no NaN survives the cut. That one
 change converts a silent 34,345-position failure into a crash.

@@ -151,8 +151,29 @@ parent**, sharing about half its genome with a donor haplotype. That would infla
 apparent fidelity and confound the privacy measurement. Verified against the 1000G
 pedigree (`1kGP.3202_samples.pedigree_info.txt`), 2026-09-29.
 
-**Known-good targets:** HG00096, HG00097, HG00099, HG00100, HG00101, HG00102 — the same
-six used for the representability measurement, re-verified eligible 2026-09-29.
+⚠ **A FIFTH RULE, added 2026-09-29: no first-degree relative anywhere in the 3,202.** The
+eligibility table above only excludes relatives of *HPRC* members. But if a target's own
+parent or child sits in the **attack database**, the attack can match the relative instead
+of the target, which confounds the measurement in the optimistic direction. Measured:
+**1,686 of the 3,085 eligible samples (55%) have a first-degree relative in the panel.**
+The strict pool is therefore **1,399**, at `pipeline:configs/clean_pool.chr21.txt`.
+
+**THE TEST TARGET SET (selected 2026-09-29): 10 samples, two per super-population.** All
+are in the strict 1,399 pool. HG00096 and HG00097 are carried over from the 2026-09-27
+representability run for continuity; the other eight were drawn with a fixed seed
+(`random.Random(20260929)`) so the selection is reproducible.
+
+| sample | super-pop | pop | | sample | super-pop | pop |
+|---|---|---|---|---|---|---|
+| HG00096 | EUR | GBR | | HG03757 | SAS | STU |
+| HG00097 | EUR | GBR | | HG04211 | SAS | ITU |
+| HG01323 | AMR | PUR | | NA19056 | EAS | JPT |
+| HG01468 | AMR | CLM | | NA19350 | AFR | LWK |
+| HG02389 | EAS | CDX | | NA20294 | AFR | ASW |
+
+Population spread is deliberate: the HPRC cohort is multi-continental, so a target's
+ancestry relative to the cohort should strongly affect how well a mosaic of cohort
+haplotypes can reproduce it. An all-GBR target set would hide that entirely.
 
 ⚠ **A held-out panel sample UNDERSTATES the representability problem.** Measured on these
 six: ~80.4% of a target's chr21 non-reference calls have an exact record in the graph;
