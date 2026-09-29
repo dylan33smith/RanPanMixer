@@ -594,6 +594,71 @@ So by the time anything reaches the matrix, all five look identical.
 **Preserving the cause is a cheap preprocessing addition — an auxiliary reason array
 alongside the allele matrix — and is far cheaper now than reconstructing it later.**
 
+### reason_array  [implementation] [dataset]
+```
+Is:                   An auxiliary array row- and slot-aligned to the allele matrix,
+                      holding a small integer code per entry saying WHY that entry is
+                      `-1`. Shape `(88, n_sites)` int8, code 0 = called.
+Computed by:          PLANNED — our VCF-to-matrix step, which is the only moment the
+                      INFO column is in hand.
+CHANGES MEANING WITH: the code set and the precedence rule (below). Two reason arrays
+                      built under different precedence are NOT comparable.
+Valid vs:             the same code set, same precedence, same site axis.
+Status:               PRIMARY — `missing_policy` is only expressible if the cause
+                      survives conversion, and it does not survive by default.
+Aliases:              "the REASON array", "cause codes"
+```
+
+✅ **DESIGN DECIDED 2026-09-29 — three per-cell codes plus a SEPARATE RUN TABLE.**
+The four causes are not the same kind of object, and collapsing them into one per-cell
+code would bake an unvalidated threshold into the stored data.
+
+- **Per-cell codes**, for the causes determinable from the record itself:
+  `0` called · `1` not applicable (nested child whose parent allele this haplotype does
+  not carry — from `LV`/`PS`) · `2` inherited (the parent record's own call was missing)
+  · `3` conflict (the `CONFLICT` tag names this sample) · `4` uncategorised no-call.
+- **A separate run table**, `(sample, strand, start_row, end_row)`, listing every run of
+  consecutive `-1`. Assembly gaps are NOT given a per-cell code.
+
+**Why the split — measured on chr21, 2026-09-29, over all 1,278,653 `-1` entries:**
+
+| test applied per cell | cells | share |
+|---|---|---|
+| in a run of >= 100 consecutive `-1` | 1,056,726 | 82.64% |
+| at a `CONFLICT` record | 54,626 | 4.27% |
+| at a nested record (`LV` > 0) | 624,261 | 48.82% |
+
+Those exceed 100% because they overlap heavily: **long-run AND nested = 470,679 cells,
+37% of all missingness**; long-run and conflict 39,095; conflict and nested 25,596; all
+three 20,001; and **58,409 (4.57%) match none of the three**, which is why code 4 exists.
+
+⚠ **Reason 1 — assembly gap is a property of a RUN, not of a cell.** The other three are
+readable off the record. Classifying assembly gaps per cell means choosing a length
+threshold, and the threshold is load-bearing: **>= 10 -> 92.06%**, >= 50 -> 85.85%,
+>= 100 -> 82.64%, >= 500 -> 75.38%, **>= 1000 -> 68.67%** of all `-1` (measured). A
+23-point swing on an arbitrary number. `docs/memory.md` is explicit that the >= 100
+figure was *the length at which runs were counted, not a validated decision rule*.
+Keeping runs as intervals lets any threshold be applied, changed or swept downstream
+without re-reading the VCF — which is the same argument that justified the array itself.
+
+⚠ **Reason 2 — precedence would otherwise be silent.** 470,679 cells are both inside a
+long run and at a nested record, and the two call for OPPOSITE handling: not-applicable
+means the DNA genuinely is not on that chromosome and RENORMALISE is correct, while an
+assembly gap means the donor almost certainly carries an allele we cannot see. One code
+per cell forces a winner; the split lets both facts be recorded and the conflict resolved
+by a policy that can be stated and changed.
+
+⚠ **PRECEDENCE AMONG THE PER-CELL CODES** must still be declared, because conflict and
+nested also co-occur (25,596 cells). Pinned order: **3 conflict > 1 not applicable >
+2 inherited > 4 uncategorised.** Conflict wins because the `CONFLICT` tag is an explicit
+statement by the caller that it could not choose, which is strictly more informative than
+the structural inference.
+
+⚠ **"Inherited" costs a second pass.** It needs the PARENT's call — `PS` -> parent row ->
+that sample's genotype there — so it cannot be decided while streaming the child's line.
+Cheap, but it shapes the converter: build the matrix and the `PS` index first, then fill
+code 2 in a second pass.
+
 ### anchor_snp  [implementation] [dataset]
 ```
 Is:                   A pangenome VCF record that also appears in the PanGenie

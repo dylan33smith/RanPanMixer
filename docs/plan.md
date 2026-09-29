@@ -244,7 +244,8 @@ chrX removal and `chm13` removal ourselves (the published VCF carries 45 samples
 | file | shape / dtype | what it is for |
 |---|---|---|
 | `haplotypes.npy` | `(88, n_sites)` int16 | the donor panel. Flattened from `(44, n, 2)` because the HMM's states are HAPLOTYPES, not people |
-| `reason.npy` | `(88, n_sites)` int8 | why each `-1` is missing. **FOUR** codes on chr21, not five — see `missing_policy` |
+| `reason.npy` | `(88, n_sites)` int8 | why each `-1` is missing. Codes 0-4; see `reason_array` |
+| `missing_runs.tsv` | `(sample, strand, start_row, end_row)` | every run of consecutive `-1`. Assembly gaps are recorded as INTERVALS, not per-cell codes, so no length threshold is baked into the artifact — see `reason_array` |
 | `positions.npy` | `(n_sites,)` int64 | bp position per row |
 | `genetic_pos.npy` | `(n_sites,)` float64 | cM per row, interpolated with `left=nan, right=nan` |
 | `support.npy` | `(n_sites,)` int32 | non-missing haplotype count. ⚠ Read `INFO/AN` — measured bit-identical, no computation needed |
@@ -307,8 +308,11 @@ away, but it is off the main path.
    NaN survives.
 3. `support.npy` equals `INFO/AN` (a free correctness check that the matrix and the VCF are
    row-aligned), and `num_alleles` bounds every observed allele index.
-4. `reason.npy` distinguishes all four causes, with a test that fails if a cause is
-   collapsed.
+4. `reason.npy` carries codes 0-4 under the pinned precedence (conflict > not applicable
+   > inherited > uncategorised), with a test that fails if the precedence changes;
+   `missing_runs.tsv` reproduces the measured chr21 totals (1,056,726 cells in runs
+   >= 100, and the >= 10 / >= 1000 endpoints at 92.06% / 68.67%), proving no threshold
+   was baked in.
 5. `sites.tsv` digest recorded in `manifest.json`, and re-verified by anything that consumes
    a downstream artifact.
 
