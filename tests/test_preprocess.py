@@ -238,6 +238,79 @@ def test_tiny_gmap_spans_less_than_the_fixture():
     )
 
 
+# ---------------------------------------------------------------------------
+# Regressions. Both of these were live bugs caught by running on real data.
+# ---------------------------------------------------------------------------
+
+def test_sites_tsv_survives_a_huge_alt_field():
+    """REGRESSION. The hypervariable chr21 record declares 90 alleles and its ALT
+    string is ~23 MB. Python's csv module refuses fields over 128 KB by default,
+    so load_sites() raised `_csv.Error: field larger than field limit` on real
+    data. The dev slice was chosen to contain that record, which is how it
+    surfaced in seconds rather than after a full chromosome build."""
+    out = REPO / "tests" / "_tmp"; out.mkdir(parents=True, exist_ok=True)
+    big = ",".join("ACGT" * 50_000 for _ in range(2))      # ~400 KB, over the limit
+    rows = [("c", 10, "A", "G", 1, 0, ""), ("c", 20, "A", big, 2, 0, "")]
+    sites_mod.write_sites_tsv(out / "sites.tsv", rows)
+    np.save(out / "in_chain.npy", np.array([True, True]))
+    s = sites_mod.load_sites(out / "sites.tsv")
+    assert s.n_sites == 2 and len(s.alt[1]) == len(big)
+
+
+def test_a_bare_dot_genotype_is_two_missing_cells():
+    """REGRESSION-ADJACENT. A GT of '.' with no separator means BOTH haplotypes
+    are unknown, so it contributes 2 missing cells, not 1. A naive text count of
+    '.' tokens sees one and undercounts -- which is exactly how an apparent
+    909-cell discrepancy appeared when cross-checking against bcftools.
+
+    vg 1.36 emitted 237,594 such fields on chr21; vg 1.68 emits none, writing
+    '.|.' instead. The asymmetry is preserved because it is real for other VCFs.
+    """
+    sys.path.insert(0, str(SRC))
+    from cohort import arrays as A
+    assert A._parse_gt(".") == (-1, -1)
+    assert A._parse_gt(".|.") == (-1, -1)
+    assert A._parse_gt("0") == (0, -1), "a lone real allele fills strand 0 only"
+    assert A._parse_gt("0|1") == (0, 1)
+    assert A._parse_gt("2/3") == (2, 3), "unphased separators must parse too"
+
+
+def test_reason_precedence_is_the_pinned_order():
+    """conflict > not applicable > inherited > uncategorised, verified on the
+    fixture's deliberate collision at pos 720 where S3 is both conflict-named and
+    would otherwise be inherited."""
+    sys.path.insert(0, str(SRC))
+    from cohort import arrays as A
+    out = REPO / "tests" / "_tmp" / "prec"
+    A.build(TINY / "tiny.vcf", out)
+    pos = np.load(out / "positions.npy")
+    rea = np.load(out / "reason.npy")
+    ids = list(np.load(out / "haplotype_ids.npy"))
+    r = int(np.flatnonzero(pos == 720)[0])
+    s3 = [i for i, v in enumerate(ids) if str(v).startswith("S3:")]
+    s4 = [i for i, v in enumerate(ids) if str(v).startswith("S4:")]
+    s2 = [i for i, v in enumerate(ids) if str(v).startswith("S2:")]
+    assert all(rea[h, r] == A.CONFLICT for h in s3), "conflict must beat inherited"
+    assert all(rea[h, r] == A.INHERITED for h in s4), "parent missing -> inherited"
+    assert all(rea[h, r] == A.NOT_APPLICABLE for h in s2), "parent called -> not applicable"
+
+
+def test_an_cross_check_is_not_vacuous():
+    """The support-vs-INFO/AN check must be able to FAIL. PanMixer's equivalent
+    assertion compares two things that are equal by construction, so it never
+    fires. Ours compares parsed genotypes against a field the caller wrote, and
+    the fixture carries one deliberately wrong AN to prove it."""
+    sys.path.insert(0, str(SRC))
+    from cohort import arrays as A
+    out = REPO / "tests" / "_tmp" / "an"
+    A.build(TINY / "tiny.vcf", out)
+    hap = np.load(out / "haplotypes.npy"); an = np.load(out / "an_info.npy")
+    pos = np.load(out / "positions.npy")
+    mism = np.flatnonzero((hap != -1).sum(axis=0) != an)
+    assert len(mism) == 1, f"expected exactly the one planted error, got {len(mism)}"
+    assert pos[mism[0]] == 1300
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]

@@ -103,6 +103,33 @@ def save(
     return written
 
 
+def attach_prov(path: str | Path, *, inputs: dict, params: dict,
+                axis_digest: str | None = None, note: str = "") -> Path:
+    """Attach a provenance sidecar to a file written elsewhere.
+
+    `sites.tsv` is streamed by sites.write_sites_tsv so its digest can be
+    computed in the same pass, which means it does not go through save(). It is
+    also the most important artifact in the tree -- the one that defines what
+    every row means -- so it must not be the one thing without a record. This is
+    the narrow, deliberate exception, and it still produces the same sidecar.
+    """
+    path = Path(path)
+    prov = {
+        "artifact": path.name,
+        "sha256": sha256_file(path),
+        "shape": None,
+        "dtype": "tsv",
+        "inputs": inputs,
+        "params": params,
+        "axis_digest": axis_digest,
+        "git_rev": git_rev(Path(__file__).resolve().parents[2]),
+        "note": note,
+    }
+    Path(str(path) + PROV_SUFFIX).write_text(
+        json.dumps(prov, indent=2, sort_keys=True) + "\n")
+    return path
+
+
 def load_prov(path: str | Path) -> dict:
     """The provenance record for an artifact, or a clear failure."""
     p = Path(str(path) + PROV_SUFFIX)

@@ -16,12 +16,20 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
 COLUMNS = ["chrom", "pos", "ref", "alt", "n_alt", "lv", "ps"]
+
+# The hypervariable chr21 record at 14,569,980 declares 90 alleles and its ALT
+# string is ~28 MB -- one record holding a quarter of the chromosome's total ALT
+# bytes. Python's csv module refuses fields over 128 KB by default, so reading
+# sites.tsv fails on real data without this. Found by the dev slice, which was
+# chosen to contain exactly that record.
+csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 
 @dataclass(frozen=True)

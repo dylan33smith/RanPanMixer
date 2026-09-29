@@ -196,6 +196,26 @@ def test_data_md_layout_rows_marked_ok_exist_on_disk():
     )
 
 
+def test_data_md_keeps_all_of_its_sections():
+    """REGRESSION 2026-09-29. A scripted block-replacement in commit fa8c730 spliced
+    from "### The pipeline branch" to "## 3b." and silently deleted sections 2 and 3
+    -- the upstream-dependency pins and the whole PanMixer input-data table with its
+    checksums. All 20 checks passed on the mutilated file, which is the failure this
+    suite exists to prevent: the docs decayed and nothing noticed.
+
+    Numbered sections are load-bearing structure, so assert they are all present.
+    """
+    text = _read(DATA)
+    found = set(re.findall(r"^## (\d+[a-z]?)\. ", text, re.M))
+    expected = {"1", "2", "3", "3b", "4", "5", "6", "7", "8"}
+    missing = expected - found
+    assert not missing, (
+        f"docs/data.md is missing section(s) {sorted(missing)}. Present: {sorted(found)}.\n"
+        f"A section was probably deleted by an unintended block replacement -- recover it "
+        f"from git rather than rewriting it from memory."
+    )
+
+
 # ---------------------------------------------------------------------------
 # 5. Every directory that exists is registered
 # ---------------------------------------------------------------------------

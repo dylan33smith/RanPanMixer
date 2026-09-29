@@ -104,6 +104,99 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-29 — A-IMP-preprocess: the preprocessing pipeline, built and run end to end
+
+**Goal.** Implement preprocessing for the cohort and one target, verify every step, and
+audit the result. First code this project has that is its own rather than PanMixer's.
+
+**Result: it runs, and every artifact cross-checks.** 17 unit tests, 28 consistency checks
+on the real output, all passing. Still no mechanism and no RanPanMixer number.
+
+### Our own chr21 build, and how it differs from PanMixer's
+
+`vg deconstruct` on the chr21 PGGB GFA, **8:22 wall / 9.5 GB peak at -t 32** — far cheaper
+than the 1-4 h estimated. ⚠ **Sample grouping was the risk and it is settled**: paths are
+PanSN `SAMPLE#HAP#CONTIG` with each assembly split across many contigs, and `-H` is
+deprecated in vg 1.68, but a chrY smoke test (2:01, 34,014 records) produced 17 clean sample
+columns. chr21 produced **45** (44 donors + chm13), as it should.
+
+**Our VCF is NOT the published one, and every derived number must say which it is.**
+
+| quantity | OURS (vg 1.68) | PanMixer's (vg 1.36) |
+|---|---|---|
+| chr21 records | **340,849** | 340,824 (+25) |
+| sample columns before chm13 | 45 | 45 |
+| missing matrix cells | **1,189,258** (3.965%) | 1,278,653 (4.26%) |
+| bare `.` GT fields | **0** | 237,594 |
+| declared alleles | **767,376** | 767,324 |
+| T inside `chain_span` | **305,886** | 305,887 |
+| dropped below span / above | **34,371** / 592 | 34,345 / 592 |
+| sites at support 0 | 1 | 1 |
+| max alleles at one record | 90 | 90 |
+
+⚠ **vg 1.68 calls 89,395 more genotypes than 1.36 on the same graph** — and emits **zero**
+bare-`.` GT fields where 1.36 emitted 237,594, writing `.|.` instead. Both counts were
+verified independently with bcftools against both VCFs. Two consequences: the "haploid
+genotype" cause of a `-1` does not merely happen to be always `.` on our data, it **does not
+occur at all**; and the chrY divergence measured on 2026-09-28 (92.7% of tuples matching)
+was atypical — chr21 differs by 25 records in 340,824, i.e. 0.007%.
+
+### Verified, not assumed
+
+- **`INFO/AN` == the non-missing count, exactly, at all 340,849 sites.** The prior
+  measurement was on PanMixer's VCF; it holds on ours too. That makes the cross-check a
+  free row-alignment canary, and it is not vacuous — the tiny fixture carries one
+  deliberately wrong `AN` and the check fires on exactly that record.
+- **Reason codes hand-verified.** Every count on the fixture matches hand calculation,
+  including the precedence collision at pos 720 where S3 is both conflict-named and
+  would-be-inherited: conflict wins, as pinned.
+- **Code 4 is not "unexplained".** 571,182 uncategorised cells, of which **99.3% sit in a
+  run of >= 10 consecutive missing** — they are assembly gaps, which deliberately get no
+  per-cell code and live in `missing_runs.tsv` as intervals instead. The bucket is behaving
+  exactly as designed.
+- **The coordinate cut is doing its job.** 8,327 records sit in [10,326,676, 12,968,320] —
+  inside the genetic map but outside `chain_span` — and every one carries cM **0.584144
+  exactly**. That is the centromeric plateau the cut exists to exclude, observed directly.
+- **Representability on all 10 targets** (in-region, so a partial fixture cannot report its
+  own window as a failure): mean **80.0% exact / 10.2% invisible / 21.5% of information
+  invisible**, against the 2026-09-27 figures of 80.4% / 9.9% / 20.5% measured on six
+  samples and the published VCF. Independent reproduction.
+
+**⚠ NEW FINDING — representability is ancestry-dependent.** The two AFR targets are the
+worst on both axes: NA19350 and NA20294 carry the most non-reference calls (78,595 and
+79,060 against ~60,000 for EUR/EAS) and have the lowest exact-match rate (**78.9%** against
+81.1% for HG01468, AMR). The cohort represents a EUR target better than an AFR one. This is
+exactly what the deliberately multi-continental target set was chosen to expose, and it is
+a utility-ceiling effect that a single-population test set would have hidden entirely.
+
+### Two real bugs, both found by running on real data
+
+1. **`_csv.Error: field larger than field limit`** — `load_sites` could not read its own
+   output. The hypervariable record's ALT string is **23.2 MB** and Python's csv module
+   refuses fields over 128 KB. Fixed with `csv.field_size_limit`. Found in seconds because
+   the dev slice was chosen to contain that record.
+2. **`sites.tsv` had no provenance sidecar** — the one artifact that defines what every row
+   means was the only one written outside the `store.save()` chokepoint, because
+   `write_sites_tsv` streams it to compute the digest in the same pass. Added
+   `store.attach_prov()` as the narrow, deliberate exception.
+
+Both now have regression tests. A third apparent bug was **my own audit check** being
+wrong, not the code: "all cM outside the span are NaN" is false by design, because the
+centromeric plateau is inside the map and outside the span.
+
+**One fixture error of my own**, caught by the canary it was meant to test: record 522 had
+`AN=4` where the truth is 5. Corrected, so only the deliberate error at 1300 remains.
+
+### Provenance
+
+`data/cohort/chr21/` 240 MB, 12 artifacts each with a sidecar, one axis digest
+`251b554f...` across all of them and all ten target paths. `data/targets/<id>/chr21/` holds
+`path.npy` + `representability.json` per target. Dev fixture at `data/dev/` is the identical
+code path via `--root`. `pyyaml` was added to the `panmixer` conda env (absent upstream).
+
+---
+
+
 ## 2026-09-28 — A-FIX-panmixer-framing + A-DAT-genetic-map-parm + A-DAT-input-set + A-DAT-evaluation-fit
 
 **Goal.** Start the build. Create a clean branch, decide the chain architecture, settle the

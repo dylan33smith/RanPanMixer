@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-09-28
+**Last updated:** 2026-09-29
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -16,10 +16,17 @@ Read at session start. This file exists so a new session never has to grep
 - **Phase:** `A` — foundation. Goal: an end-to-end sampler provably correct on a
   graph small enough to enumerate. A head-to-head against PanMixer is now an
   OPTION for the writeup, not a requirement of the design — see below.
-- **Still no mechanism code.** As of 2026-09-28 the architecture is settled
-  (model C), the preprocessing input and output sets are specified, and the
-  documentation has been corrected where the PanMixer comparison had been forced
-  onto a different problem. No RanPanMixer number exists yet.
+- **PREPROCESSING IS BUILT AND HAS RUN (2026-09-29).** `src/` holds our own code —
+  the first in this project that is not PanMixer's. The cohort stage and all ten
+  target stages completed on chr21; 17 unit tests and 28 consistency checks on the
+  real output pass. **Still no mechanism code and no RanPanMixer number.**
+- ⚠ **WE NOW HAVE OUR OWN chr21 VCF, AND IT IS NOT PANMIXER'S.** `vg deconstruct`
+  at vg 1.68 gives **340,849 records** against the published 340,824, and **1,189,258**
+  missing matrix cells against 1,278,653 — vg 1.68 calls 89,395 more genotypes and
+  emits **zero** bare-`.` GT fields where 1.36 emitted 237,594. **Every figure in
+  these docs must now say which VCF it belongs to.** The table in `docs/memory.md`
+  2026-09-29 is the mapping. Derived on OUR build: T = **305,886**, dropped
+  **34,371** below the span and **592** above, **767,376** declared alleles.
 - **⚠ THE SCOPE CORRECTION OF 2026-09-28.** The v1 scope decision — *"maximise reuse
   of PanMixer, change exactly ONE thing"* — imported PanMixer's threat model, in
   which the target is a cohort member, into a design whose target is EXTERNAL to

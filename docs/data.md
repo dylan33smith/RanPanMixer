@@ -44,7 +44,7 @@ Verified against disk 2026-09-18. `tests/test_docs_contract.py` re-verifies.
 | `logs` | tmux run logs and status sentinels (gitignored) | `OK` |
 | `external/PanMixer` | symlink -> `/data/ds85/RanPanMixer/external/PanMixer`. **PanMixer writes all its data inside its own tree** (`BASE_PATH = dirname(constants.py)`, no env override), and `/home` is 95% full, so the checkout lives on `/data`. Gitignored. | `OK` |
 | `external/genetic_maps` | symlink -> `/data/ds85/RanPanMixer/genetic_maps`. GRCh38 genetic maps, acquired 2026-09-27. Working file `external/genetic_maps/chr21.b38.gmap`. Gitignored. | `OK` |
-| `src/ranpanmixer` | the mechanism: HMM, utility, sampler, attacks, eval | `PLANNED` |
+| `src` | our code. Preprocessing is BUILT (2026-09-29): `src/cohort/` (no target argument exists), `src/target/`, `src/sites.py`, `src/store.py`, `src/cli.py`. The mechanism — HMM, utility, sampler, attacks, eval — is still `PLANNED`. | `OK` |
 
 ### The build (consolidated into `main`, 2026-09-29)
 
@@ -79,6 +79,41 @@ Preprocessing is already per-chromosome and parallel across chromosomes, so
 extending it is a driver loop — but see `docs/plan.md` for the one thing that is
 NOT just a loop: `beta_v` must sum to 1 over whatever scope `tau` covers, so a
 genome-wide `tau` means a genome-wide normaliser, not 22 per-chromosome ones.
+
+## 2. Upstream dependencies
+
+| source | what | state |
+|---|---|---|
+| `external/PanMixer` | G2Lab/PanMixer pinned at **`c182c38d5bc8bb6f00f4b0b101207c4a009ca045`** ("Merge pull request #1 from G2Lab/release_v1", 2026-06-06, MIT). 5 commits, 8,661 Python lines (exact: `git ls-files` over `.py`; see `docs/memory.md` 2026-09-26). The only release; no tags, no test suite. | `OK` |
+| `external/genetic_maps` | GRCh38 genetic map, the last unacquired input for `A-IMP-cohort-hmm`. TWO independent distributions of the SAME map: SHAPEIT4 `genetic_maps.b38.tar.gz` (github.com/odelaneau/shapeit4, pinned at commit `43a9a49703f15e37b4d20e703e0d2b04e0fa5cec`, 23,440,558 B, sha256 `04f97acc6524d75e1dbc397e72cf6776b2f1e33f72a06ee477ef69359a97c69e`) and Beagle `plink.GRCh38.map.zip` (Browning lab, 47,469,980 B, sha256 `521549889b9ce0236142a4fb7db45d3f00035ec645e01465490d55f5b8ef26d6`). **chr21 verified byte-identical between them** — 44,618 positions, identical cM, max abs diff 0 — so the Beagle copy is corroboration, not a second input. ⚠ PanMixer ships `external/PanMixer/starting_data/scripts/get_genetic_maps.sh`, which fetches a **GRCh37** map and is unwired. | `OK` |
+| conda env `panmixer` | Built from PanMixer's own `environment.yaml` at `/home/ds85/miniconda3/envs/panmixer`. Resolved: python 3.11.16, bcftools 1.24, htslib 1.24, PLINK v1.9.0-b.8, numpy 2.4.6, pandas 3.0.6, scipy 1.17.1, ortools 9.15.6755. ⚠ **`pyyaml` 6.0.3 added by us 2026-09-29** — absent upstream, and `src/cli.py` needs it to read the input manifest. ⚠ **`pytest` is NOT in this env**, so both test suites run under plain `python3` and `tests/test_preprocess.py` is self-running for that reason. ⚠ **The pip deps are unpinned upstream**, so these are 2026-09-18 resolutions, not the authors' versions; pandas 3.x and numpy 2.x post-date the paper. | `OK` |
+| `paper/s41467-026-77591-0_reference.pdf` | The PUBLISHED PanMixer paper (Nature Communications, DOI 10.1038/s41467-026-77591-0). The version of record. | `OK` |
+| `archive_docs/Blindenbach2026_PanMixer.pdf` | The PanMixer PREPRINT, bioRxiv DOI 10.64898/2026.02.16.706152, 24 pages, CC-BY-NC-ND 4.0, sha256 `99ac1bd2...`. **Superseded by the published version**; numbers differ. | `STALE` |
+| Eizenga et al. 2020, *Pangenome graphs* | Background on graph construction and path representation. | reference |
+
+## 3. PanMixer input data (inside the checkout, on `/data`)
+
+Paths are written in full so the docs contract can check them. None are committed.
+
+| path | what | state |
+|---|---|---|
+| `external/PanMixer/starting_data/pangenome.vcf.gz` | HPRC v1.0 PGGB GRCh38 deconstructed VCF, 5.70 GB, sha256 `ead25541...`. **45 samples, one of which is `chm13`** -> 44 individuals = 88 haplotypes after the pipeline drops it. Contigs are PanSN-named `grch38#chr1`..`grch38#chr22`, `grch38#chrX`. chr21: 340,824 unique (POS,REF,ALT), POS max 46,699,788. | `OK` |
+| `external/PanMixer/starting_data/PG.vcf.gz` | PanGenie callset, Zenodo 7669083 `grch38_all-samples_bi_all`, 5.06 GB, sha256 `e8c0c48d...`, 368 samples. Source of the "anchor SNP" set. | `OK` |
+| `external/PanMixer/starting_data/chr21/1000g_phased.vcf.gz` | ⚠ **Now a SYMLINK to the 30x GRCh38 panel.** PanMixer's code hardcodes this filename, so re-pointing the slot lets the pinned checkout run UNMODIFIED on the build-correct data. The original GRCh37 file is retained beside it as `DEPRECATED_1000g_phase3_grch37.vcf.gz`. | `OK` |
+| `external/PanMixer/starting_data/chr21/DEPRECATED_1000g_phase3_grch37.vcf.gz` | 1000G **Phase 3** chr21, 0.21 GB, sha256 `1942e070...`, 2,504 samples. ⚠ **`assembly=b37`, `hs37d5.fa`, contig `21` length 48,129,895 — GRCh37.** This is what the released pipeline wires in. See the standing blocker. | `OK` |
+| `external/PanMixer/starting_data/chr21/1000g_30x_phased.vcf.gz` | 1000G 30x **GRCh38** chr21, 0.43 GB, sha256 `a925c112...`, 3,202 samples, contig `chr21` length 46,709,983, 1,002,752 unique (POS,REF,ALT). The build-correct panel, from the URL in the repo's own unwired `get_blocks_grch38.sh`. **258,610 exact matches against the pangenome (75.88%) vs 1,025 (0.30%) for Phase 3.** | `OK` |
+| `external/PanMixer/starting_data/pangenome_no_X.vcf.gz` | Autosome-only pangenome (pipeline step 2, `remove_X`). Being written by the local run; log `logs/pm_prep1.log` (its .status sentinel is written only on exit, so its absence means still running). | `BUILDING` |
+| `external/PanMixer/starting_data/chr21/pangenome.npy` etc. | The preprocessed numpy model: `(n_subjects, n_sites, 2)` int16 allele codes, `-1` = missing, site axis row-aligned to the chr21 VCF record order. | `PLANNED` |
+| `external/PanMixer/downloaded_tools/vg` | vg v1.68.0 binary, 49 MB. Needed for read-mapping utility only. | `OK` |
+| `external/PanMixer/downloaded_tools/beagle.27Feb25.75f.jar` | Beagle 27Feb25, 0.3 MB. Needed for the reconstruction attack. ⚠ `environment.yaml` ships no `java`. | `OK` |
+| `external/PanMixer/read_fastqs` | chr21 read slices for the paper's five external donors (HG00138 EUR, HG00635 EAS, HG01112 AMR, HG02698 SAS, NA18853 AFR), extracted from the 1000G 30x CRAMs. ~880 MB per donor paired, 4.3 GB total. ⚠ `constants.py` substitutes HG01600 for NA18853; we follow the PAPER. | `OK` |
+| `external/PanMixer/starting_data/references` | GRCh38 analysis-set FASTA (for CRAM decoding), plus chr21 extracted from it and from UCSC hg38. ⚠ The two chr21 copies are the same length but the analysis set masks 2.05 Mb more (8,671,409 N vs 6,621,364 N); measured to make no difference to read mapping here. | `OK` |
+| the 1000G Phase 3 panel for chr1-chr20, chr22 | Only chr21 was downloaded; the paper's tradeoff curves are all-autosome. | `PLANNED` |
+| `external/genetic_maps/chr21.b38.gmap` | chr21 extracted, 971,965 B, columns pos/chr/cM with a header. Span **10,326,676 - 46,680,243 bp**, **0.5841 - 62.7865 cM**, monotonic, no duplicate positions. ⚠ **26,018 of our 340,824 chr21 variants (7.63%) fall BELOW the map start** and 592 (0.17%) above; interpolation clamps both, so cM is flat there and the sampler cannot recombine. 618 interior intervals (1.4%, 2.71 Mb) also have zero cM change. | `OK` |
+
+⚠ **Not downloadable from this repo:** the five read FASTQs the mapping utility
+needs, `chr21.fa` / `hg38_cleaned.fa`, and the three `.npy` files of the 30x
+attack database. No script in the checkout produces any of them.
 
 ## 3b. OUR pipeline's input set (model C, decided 2026-09-28)
 

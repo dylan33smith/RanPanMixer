@@ -14,3 +14,6 @@ __pycache__/
 /artifacts/
 /external/
 .venv/
+
+# test scratch output
+/tests/_tmp/
