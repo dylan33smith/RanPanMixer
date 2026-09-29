@@ -374,19 +374,42 @@ global tilted distribution: taking the product over blocks of
 the `beta_t` sum to 1, and each `phi_t` lies in [0,1]. Theorem 1 needs nothing more.
 **So per-block now and genome-wide later is a scope choice, not a weaker guarantee.**
 
+**⚠ MODEL C DOES NOT REMOVE THE DOUBLE-COUNT (raised 2026-09-28, open).** A parent record
+and its nested children are separate ROWS of the allele matrix, so under C they are separate
+CHAIN POSITIONS — the hypervariable chr21 region at 14,569,980 contributes **2,485 positions**
+(one top-level record plus 2,464 nested children) for what is one stretch of DNA, and each
+gets its own `beta_v`. So that locus draws 2,485/340,824 of the budget. C dissolves the
+plink-versus-snarl segmentation question and the block-boundary incoherence, but NOT this:
+the double-count is a property of the VCF's representation, not of the segmentation.
+Options not yet assessed: collapse a parent and its descendants into one position, weight by
+`LV`, or length-weight `beta_v`. **Not decided; measure the inflation first.**
+
 **CONSTRAINT THIS IMPOSES.** `phi_t` must decompose along the chain positions inside
 a block. A whole-block similarity that does not decompose cannot be sampled exactly
 by `ffbs`.
 
-**OPEN DECISION — the missing-data policy.** What the emission does when a donor
-carries `-1` at a position. Dylan is leaning **renormalise** (drop that donor from
-the state distribution at that position) but has NOT decided; see `missing_policy`
-in `docs/terms.md` for the three options and their biases. This matters because the
+**DECIDED 2026-09-28 — the missing-data policy is RENORMALISE.** A donor carrying `-1`
+at a position is dropped from the state distribution there; see `missing_policy` in
+`docs/terms.md` for the rejected options and their biases. Dylan accepted the known cost
+deliberately: RENORMALISE is CORRECT for "not applicable" (the largest class, 66.1% of
+nested missingness — the DNA genuinely is not on that chromosome) and does penalise
+poorly-assembled donors for a defect that is not theirs. Released pangenomes should be
+well assembled; if they are not, that is something to note in the writeup rather than
+model around at this stage.
+⚠ It acts on the STATE SPACE, not the transition — our baseline knows nothing about
+alleles, so an excluded donor simply cannot be occupied at that position.
+⚠ TO MEASURE once the sampler runs: leaving a donor and returning costs TWO switch
+events, so `ffbs` will prefer to switch away and STAY away — missingness acts as a switch
+TRIGGER, not a blip, and it is spatially clustered (28,052 runs, mean 20, max 23,478).
+⚠ GUARD REQUIRED: 1 chr21 site of 340,824 has all 88 donors missing and 89 leave <= 1, so
+the renormalised denominator can be zero. Declare the fallback, count it, report it. This matters because the
 positions v1 adds are far worse behaved than anchors. Like for like, v1 steps over every variant (mean missingness **4.26%**, 30,800 over 25%) where PanMixer's HMM steps over anchors in >=2-anchor blocks (**0.26%**, 538). The non-anchor records inside multi-variant blocks are worst: **11.31%**, with 7,555
 over 25% missing (against 0.35% over all anchors; scopes in `docs/memory.md` 2026-09-26).
-**Prerequisite for deciding it well:** `-1` conflates five distinct conditions and
-they do not want the same treatment (see `missing_policy`). They ARE distinguishable
-at conversion time — LV/PS, run-length, the CONFLICT tag, GT arity — but
+**Still a prerequisite, for a cause-aware refinement later:** `-1` conflates **four**
+distinct conditions on chr21 (see `missing_policy`; a fifth, haploid genotypes, was
+expected and does NOT occur — all 237,594 non-piped GT fields have exactly one distinct
+value, `.`). They ARE distinguishable at conversion time — LV/PS, run-length, the
+CONFLICT tag — but
 `VCFtoNP` keeps only position and genotype, so all five are identical by the time
 the mechanism sees them. **v1 preprocessing should emit an auxiliary REASON array
 beside the allele matrix**, which keeps a cause-aware policy available without
@@ -460,20 +483,26 @@ applies to the whole path directly. C also DELETES the singleton special case: t
 T = 1 chains, no per-block `Z_b`, one forward pass and one backward sample. It is simpler
 than what is pinned, not harder.
 
-**Numerical requirements, common to B and C.** Normalise every column
-(`alpha_t` = `r_t`/`c_t`, `log_z_p` = sum of log `c_t`); an unnormalised forward pass
-underflows float64 after about **183 positions** and we need up to 340,824. Use **float64**
-for the stored alphas: float32 resolution is 1.2e-07 while the per-position tilt is about
-5.5e-06, only 46x above the noise floor, so rounding would consume the target's entire
-influence. Break the chain at genuine discontinuities — the unmapped region below
-10,326,676 bp, the centromere, long assembly gaps — never at block boundaries.
+**Numerical requirements.** Normalise every column (`alpha_t` = `r_t`/`c_t`,
+`log_z_p` = sum of log `c_t`); an unnormalised forward pass underflows float64 after about
+**183 positions** and we need up to 340,824. Use **float64** for the stored alphas — under
+model C this is load-bearing, not a preference. float32 resolution is 1.19e-07 while the
+per-position tilt at tau = 0.5 is **1.61e-06 under C**, only **13.5x** the noise floor,
+against 5.45e-06 and **45.7x** under a block partition. Rounding would consume a meaningful
+fraction of the target's entire influence. Alpha storage is **240 MB** under C and **71 MB**
+under the model-B fallback, both at K = 88; a K = 86 head-to-head figure is ~2.3% smaller
+and must say so. ⚠ Break the chain at genuine discontinuities — outside `chain_span`, the
+centromere, long assembly gaps — never at block boundaries.
 
 **EXIT GATES**
 1. `A-THY-toy-enumeration` passes: sampler matches exact enumeration; exact TV <= `tau`
    across a grid of `tau` and many input pairs; `log_z_p` within [0, `eta_tau`] on
    every draw; `tau` = 0 reproduces `baseline_model` exactly.
-2. One code path: singleton blocks provably traverse the same sampler with T = 1, and
-   no allele-frequency branch exists in the source.
+2. One code path, and under model C there is no special case to test: every chain
+   position is a variant, so no singleton/T = 1 branch exists at all. What the gate still
+   tests is that **no allele-frequency branch exists in the source**. (The original
+   wording was written against the block-structured spec, where singletons were the
+   special case; retained here only for the model-B fallback.)
 3. ⚠ **MIS-SPECIFIED — must be rewritten before it is used as a gate** (see
    `docs/memory.md` 2026-09-27, A-DAT-genetic-map). As written it demands switch mass of
    order 0.1 to 1 between adjacent chain positions, but those sit about 12 bp apart, where
