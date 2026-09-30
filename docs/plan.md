@@ -1147,11 +1147,16 @@ Ordered. Each item names what must pass before it starts and what closes it.
   `log_z_p` violated its own stated invariant. Fixed and regression-tested by mutation.
   ⚠ **A patched assertion is not a gate.** The bracket catches one error class; the toy
   gate catches the ones nobody predicted.
-- **Prerequisite:** none. The toy already exists; the work is a diploid `enumerate_baseline`
-  and `release_distribution` over the product support, which is K^(2T) and so needs the toy
-  shrunk (K = 3, T = 4 gives 531,441 pairs, enumerable) or the two chains enumerated
-  separately and combined, which is only valid BECAUSE the mean factorises — so enumerating
-  them jointly is the check that the factorisation is real.
+- **Prerequisite:** none, and ⚠ **MEASURED 2026-09-30: the toy does NOT need shrinking** —
+  this entry first claimed the product support is K^(2T) and would need K = 3, T = 4. Wrong:
+  the support is pairs of OUTPUT paths, and the toy has 96 of those, so **9,216 ordered
+  pairs** — trivially enumerable on the existing fixture.
+  **The hard part is the INPUT space, not the support.** 2,673 distinct haploid inputs give
+  7,144,929 diploid inputs and 5.1e+13 pairs of them, so the exhaustive all-pairs sweep the
+  haploid gate runs is not available. The gate needs CONSTRUCTED extremal pairs instead —
+  `toy.sharp_pair` generalises, since a diploid pair differing on both haplotypes everywhere
+  still drives `u_p - u_q` to +/-1 — plus a seeded random sample, with the sample size and
+  the seed recorded so the coverage is stated rather than implied.
 - **Exit gate:** exact TV <= `tau` and `ratio_spread <= exp(epsilon_tau)` over pairs of
   DIPLOID inputs; `log_z_p` in [0, `eta_tau`] for the pair; `tau` = 0 reproduces the product
   baseline; and the mutation (full `eta_tau` per haplotype rather than half) fails at least
@@ -1166,9 +1171,14 @@ Ordered. Each item names what must pass before it starts and what closes it.
      upstream so it cannot fire and a loud failure beats a silent fallback. **That is the
      implementer overriding a written decision and it needs Dylan's sign-off either way.**
   2. **Duplicate-haplotype collapse is not implemented** — no collapse, no policy, no
-     assertion that duplicates are absent. So **every K = 88 in this project is a
-     PRE-COLLAPSE number**, including the runtime and alpha-storage figures, and none said
-     so. Whether duplicates OCCUR on this cohort is unmeasured. Measure first.
+     assertion that duplicates are absent. ✅ **MEASURED 2026-09-30 AND IT IS BENIGN HERE:
+     all 88 haplotypes are distinct** over the 305,886 chain positions, and the closest pair
+     differs at **32,741** of them (10.7%). So every K = 88 this project quotes is correct;
+     what was missing is that nothing said so and nothing checked. Downgraded from a
+     correctness gap to a missing ASSERTION plus a label — but the assertion is worth adding,
+     because both the uniform initial distribution and the per-state switch probability
+     `s_t` divided by K are both functions of K, so a duplicate would put twice the prior mass on one
+     haplotype, and a different cohort or a shorter `chain_span` could produce one.
   3. **Standing constraint 4 is unenforced.** No release cache, and `docs/data.md`'s
      "(target_id, tau, utility_id, seed) ... collisions must raise, never overwrite" exists
      in no code. `--seeds` is labelled an evaluation device but nothing structurally stops
