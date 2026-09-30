@@ -184,6 +184,64 @@ target's own path, `u_path` = 1. Both are columns, not prose asides.
 `docs/terms.md`). The head-to-head aligns the arms on MEASURED empirical attack
 success only, and reports both frontiers.
 
+## ⚠⚠ DEFERRED BY DECISION — REVISIT BEFORE ANY RESULT IS PUBLISHED ⚠⚠
+
+Three things are knowingly left wrong-or-suboptimal so v1 can run (Dylan, 2026-09-30).
+None is a bug; each is a decision to carry a known cost now and pay it later. **A number
+produced before these are settled is a v1 number and must say so.**
+
+### R1. `beta_v` is NOT normalised over `readable` — 18.5% of the tilt budget is inert
+
+**Carrying:** `beta_v` sums to 1 over all 305,886 chain positions, but only **253,846**
+(83.0%) are readable, so `u` can never exceed **0.815**. We pay the full `tau` for 81.5% of
+the leverage, and the released path at the other 17% is a pure prior draw with no reference
+to the target at all.
+**The fix, when we take it:** normalise over `in_chain & readable` — max `u` = 1.000, nothing
+invented, and `readable.npy` is already emitted and verified target-independent.
+**⚠ The catch that makes this urgent rather than cosmetic:** per standing constraint 5 the
+utility function must be pre-registered BEFORE any attack outcome is inspected. Changing the
+normaliser after seeing results is not available. **Decide before `A-LCK-preregister`.**
+**⚠ And it does not generalise as written** — see R4.
+
+### R2. `chain_span` stays at 12,968,320 < POS <= 46,680,243
+
+**Carrying:** 89.74% of chr21; the p arm and 592 telomeric variants are not released at all.
+**The fix, when we take it:** nothing cheap. Every map that covers the p arm interpolates
+across a void (pyrho spends ~10 cM on two markers), the graph carries the sequence only on a
+CHM13 backbone at 43.9% missingness, and T2T maps do not lift back monotonically. The full
+option set with measurements is in `chain_span` in `docs/terms.md`.
+**Who decides:** Dylan with his PI.
+
+### R3. `w_v = 1/support(v)` is inherited, not argued for
+
+**Carrying:** `support(v)` counts donors with a CALLED allele, so this upweights
+**poorly-called** positions — which is not the same as **informative** ones. A site where 87
+of 88 donors are called but the target carries a singleton is highly informative and gets low
+weight. It came from PanMixer, where it was a *cost* weight doing a different job.
+**Why it is survivable for now, measured:** on this cohort it is nearly uniform. Median
+support is **88**; **98.6%** of chain positions have support >= 80 and hold **96.8%** of the
+weight; the top 1% of positions by weight hold only 2.8%. The 88x ratio exists in principle
+and applies to almost nothing.
+**The fix, when we take it:** decide what `beta_v` should actually emphasise — probably
+rarity (`-log f`) rather than call rate. Also a pre-registration item.
+
+### R4. ⚠ NEW — `readable` is target-independent ONLY because our targets share one panel
+
+Raised 2026-09-30. `readable.npy` is computed from the target VCF's **site list**, and it is
+identical across our ten targets **only because all ten were cut from the same 1000G panel
+and therefore share one site list**. For a genuinely novel genome — the real setting — each
+target arrives from its own calling pipeline with its own site list, so `readable` would
+**differ per target**, and normalising `beta_v` over it would be target-dependent after all:
+the exact constraint-1 violation R1 is meant to avoid.
+**So R1's fix works in the test harness and does not, as written, survive contact with a real
+target.** Before adopting it, `readable` must be redefined as a function of something fixed
+and public — `G` itself, or a named reference callset pinned in advance — never of the
+target's own VCF.
+**This is the clearest example so far of something that works in the test setup and breaks in
+the deployed one.** Do not let it through on the strength of the ten-target check.
+
+---
+
 ## Ledger — Phase A
 
 | ID | Intervention | Endpoint | n | Result | Verdict | memory |

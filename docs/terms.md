@@ -611,6 +611,46 @@ So by the time anything reaches the matrix, all five look identical.
 **Preserving the cause is a cheap preprocessing addition — an auxiliary reason array
 alongside the allele matrix — and is far cheaper now than reconstructing it later.**
 
+### target_encoding  [dataset] [method]
+```
+Is:                   The form a target genome arrives in, and therefore what
+                      `Map(g, G)` has to do to turn it into a path over G's sites.
+Computed by:          n/a -- a property of the input we must build around.
+CHANGES MEANING WITH: the encoding. The three that matter:
+                      **VCF** (what we have): SPARSE. Lists the target's variants
+                      and is SILENT everywhere else. Turning it into a dense path
+                      requires INFERRING reference wherever it is silent -- and
+                      "silent" conflates "this person is reference here" with "this
+                      site was never in my callset". That conflation is the whole
+                      of `absent_policy`, and getting it wrong at multi-allelic
+                      records is what produced 6,309 fabricated reference calls per
+                      target on 2026-09-29.
+                      **gVCF**: DENSE. Records reference-confident BLOCKS as well as
+                      variants, so "this person is reference from X to Y, with this
+                      confidence" is stated rather than inferred. ⚠ **A gVCF would
+                      dissolve `absent_policy` entirely** -- the ambiguity is an
+                      artifact of the sparse encoding, not of the biology.
+                      **Reads / assembly** (BAM, CRAM, FASTA): needs calling or
+                      alignment first. Aligning straight to the graph with
+                      `vg giraffe` would give a path directly and skip the join
+                      altogether -- but HPRC marks short-read mapping "untested" for
+                      the PGGB graph, so that route is not free either.
+Valid vs:             the same encoding. A fidelity number from a VCF target and one
+                      from a gVCF target are not comparable, because the second knows
+                      something the first had to guess.
+Status:               PRIMARY -- it determines what the private input even is.
+Aliases:              none
+```
+
+⚠ **A SEPARATE REPRESENTATION MISMATCH, independent of sparseness.** Even a VCF that covers
+every site can disagree with the graph about HOW a site is written. `bcftools norm -m-any` --
+an extremely common normalisation, and what the 1000G panel ships -- splits a multi-allelic
+record into one biallelic record per ALT. The graph keeps them together. So `C -> T,G` in the
+graph is two records in the panel and a strict `(POS, REF, full-ALT)` join matches neither.
+This is **not** a panel quirk: any target VCF normalised that way has it. `split_alt_join`
+handles it, restricted to records the target's VCF fully covers, because only then is
+"carries none of our alts" a conclusive statement rather than a gap.
+
 ### reason_array  [implementation] [dataset]
 ```
 Is:                   An auxiliary array row- and slot-aligned to the allele matrix,
