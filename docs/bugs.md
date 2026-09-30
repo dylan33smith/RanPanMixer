@@ -442,9 +442,95 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
 
 ## Mechanism / sampler
 
-No entries yet — no code exists. When the first one lands, the classes most worth
-watching are already known from the proposal and are written as constraints in
-`CLAUDE.md`: a target-dependent `output_support` or `baseline_model`, an
-unnormalized `u_path`, `beta_t` not summing to 1, a `diploid_utility` that sums
-instead of averaging, and argmax substituted for `ffbs`. Every one of them
-produces a plausible path and no error.
+The classes most worth watching were known from the proposal before any code
+existed and are written as constraints in `CLAUDE.md`: a target-dependent
+`output_support` or `baseline_model`, an unnormalized `u_path`, `beta_t` not
+summing to 1, a `diploid_utility` that sums instead of averaging, and argmax
+substituted for `ffbs`. Every one of them produces a plausible path and no error.
+Each now has a test. The entries below are what the first build actually hit,
+which was mostly a DIFFERENT set.
+
+### `log_z_p` lands ~1000x outside `[0, eta_tau]` and the tempting fix is fatal
+- **[2026-09-30] The forward normaliser is not the tilt normaliser when a mask is applied**
+  **[Symptom]** `log_z_p` from `sum_t log c_t` is **-584.81** on chr21 against a
+  bracket of `[0, 0.5493]` at `tau` = 0.5. On the toy it is -0.575 against
+  `[0, 0.5493]`. The sampler is otherwise correct and every other check passes, so
+  the obvious reading is that the assertion is too strict.
+  **[Cause]** `missing_policy` = RENORMALISE enters as a 0/1 potential, so `R_D` is
+  the Li-Stephens chain CONDITIONED on never occupying a donor with no called
+  allele — and that conditioning has its own normaliser, which `sum_t log c_t`
+  contains along with the tilt.
+  **[Proven fix]** `log_z_p` = the tilted pass's `sum_t log c_t` MINUS
+  `baseline_log_norm(hmm)`, an untilted pass whose only potentials are the mask.
+  It is target-independent by construction, so compute it once per cohort and
+  cache it. Verified against brute-force `log sum_y R_D(y) exp(eta u)` on the toy:
+  agree to < 1e-12 across the whole `tau` grid and 417 inputs.
+  **[Severity]** ⚠ Silent, and the WORKAROUND is the danger, not the bug. Widening
+  the bracket to accommodate the wrong quantity would have retired the cheapest
+  correctness assertion in the project while leaving it in place as decoration.
+  `tests/test_mechanism.py::test_log_z_p_needs_the_baseline_subtraction_and_says_so_when_it_is_missing`
+  asserts the failure fires.
+
+### RENORMALISE as a renormalised transition row divides by zero
+- **[2026-09-30] A masked transition row sums to exactly 0 across a zero-cM step**
+  **[Symptom]** Reading `missing_policy` as "mask row `j` to the allowed set and
+  renormalise" works everywhere except at a zero-distance step, where it produces
+  `0/0`. On a chromosome where zero-cM steps are rare it would surface as a handful
+  of NaNs late in a long run.
+  **[Cause]** Across a step with `Delta_x = 0` the transition IS the identity, so a
+  donor available at `t-1` and unavailable at `t` has nowhere to go: the masked row
+  is all zeros and there is no chain to renormalise. Measured: **1,058
+  zero-distance steps inside chr21 `chain_span`** against 4.26% mean missingness,
+  so it is reachable on the real data rather than a contrived case.
+  **[Proven fix]** Apply the mask as a 0/1 POTENTIAL, not as a modified transition
+  — which is also the form `docs/plan.md` had already pre-registered. A genuinely
+  dead-ended chain then raises, naming the position and the cause, instead of
+  returning NaN. See the `log_z_p` entry above for the consequence.
+  **[Severity]** Would have been silent on a chromosome with no zero-cM steps and
+  wrong on every chromosome that has them.
+
+### A test that reads prose rather than behaviour keeps lying
+- **[2026-09-30] The "no argmax" gate fired on the docstrings explaining why there is no argmax**
+  **[Symptom]** `test_no_map_decoding_anywhere_in_the_mechanism` reported five
+  offenders in `ffbs.py`, all of them lines of prose warning against MAP decoding.
+  **[Cause]** The check searched the source TEXT. This is the SECOND time this
+  exact mistake has been made here — `tests/test_preprocess.py` records it for the
+  shared-parser check and states the lesson in the docstring — which suggests the
+  text-grep formulation is the natural thing to reach for and needs a standing
+  answer, not another one-off fix.
+  **[Proven fix]** Walk the AST and match `ast.Name.id` / `ast.Attribute.attr`.
+  Docstrings are string constants and comments are absent from the tree, so prose
+  cannot trip it while real uses cannot hide from it.
+  **[Severity]** Noisy rather than silent — but a gate that cries wolf gets
+  weakened, and weakening this one would have removed the only structural defence
+  against a decoder that carries no guarantee.
+
+### A Monte-Carlo gate reports 19.9 sigma on a provably correct sampler
+- **[2026-09-30] Largest deviation divided by the SMALLEST standard error**
+  **[Symptom]** `test_ffbs_matches_the_exact_release_distribution` failed at
+  `tau` = 0 — the one setting where the sampler is just a draw from `R_D` — while
+  the state-path JOINT test on the same sampler passed comfortably.
+  **[Cause]** `np.abs(got - want).max() / se.min()`. The max deviation is at a
+  high-probability path and the min standard error at a low-probability one, so the
+  ratio compares two different paths.
+  **[Proven fix]** Divide elementwise, then take the max:
+  `(np.abs(got - want) / se).max()`. Reports 1.96-2.67 over 40,000 draws.
+  **[Severity]** A false FAILURE, which is the benign direction — but it pointed at
+  the sampler, and the natural response to a failing statistical gate is to loosen
+  its threshold, which would have blinded it for real.
+
+### A utility figure quoted against a ceiling of 1 that is actually 0.815
+- **[2026-09-30] `utility_retained` has no meaning without `u_ceiling`**
+  **[Symptom]** `utility_retained` = 0.6940 on HG00096 looks like 69.4% of
+  achievable. It is 85.1%.
+  **[Cause]** `docs/terms.md` defined the ceiling as "the target's own path,
+  u = 1 by construction". True for a target with a call at every weighted position;
+  false for a real external target. Under `beta` scope `chain`, 16.4% of the chr21
+  weight sits at positions where the target has no call, so the ceiling is
+  **0.815455** over 253,846 of 305,886 chain positions — deferred decision R1
+  measured rather than predicted.
+  **[Proven fix]** `u_ceiling` is now a PRIMARY term, computed per target and per
+  `beta` scope, stamped on every release record, and emitted as its own row by the
+  scoring script. Report both or neither.
+  **[Severity]** Silent and bidirectional — against 1 it understates the mechanism,
+  against 0.8155 unlabelled it overstates it.

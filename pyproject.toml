@@ -13,7 +13,7 @@ dependencies = ["numpy", "pyyaml"]
 # the imports are `import sites`, `from cohort import arrays`.
 [tool.setuptools]
 package-dir = { "" = "src" }
-packages = ["cohort", "target"]
+packages = ["cohort", "mechanism", "target"]
 py-modules = ["sites", "store", "cli"]
 
 [project.scripts]

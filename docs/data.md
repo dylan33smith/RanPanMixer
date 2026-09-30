@@ -41,10 +41,10 @@ Verified against disk 2026-09-18. `tests/test_docs_contract.py` re-verifies.
 | `tests` | the docs contract | `OK` |
 | `scripts` | our operational scripts: the local `sbatch` shim and pipeline runners. NOT mechanism code. | `OK` |
 | `primer` | the onboarding primer: `primer/src/*.md` (five files: `00-whatsnew.md` plus the four sections; the editable source of truth), `primer/build.py` (assembles them into HTML), `primer/primer.html` (the built page, published as an Artifact). Teaching material, NOT one of the six working docs and not a source of project facts. | `OK` |
-| `logs` | tmux run logs and status sentinels (gitignored) | `OK` |
+| `logs` | tmux run logs and status sentinels (gitignored). ⚠ Also where the scoring script writes its emitted tables and release records — see the artifact registry. | `OK` |
 | `external/PanMixer` | symlink -> `/data/ds85/RanPanMixer/external/PanMixer`. **PanMixer writes all its data inside its own tree** (`BASE_PATH = dirname(constants.py)`, no env override), and `/home` is 95% full, so the checkout lives on `/data`. Gitignored. | `OK` |
 | `external/genetic_maps` | symlink -> `/data/ds85/RanPanMixer/genetic_maps`. GRCh38 genetic maps, acquired 2026-09-27. Working file `external/genetic_maps/chr21.b38.gmap`. Gitignored. | `OK` |
-| `src` | our code. Preprocessing is BUILT (2026-09-29): `src/cohort/` (no target argument exists), `src/target/`, `src/sites.py`, `src/store.py`, `src/cli.py`. The mechanism — HMM, utility, sampler, attacks, eval — is still `PLANNED`. | `OK` |
+| `src` | our code. Preprocessing BUILT 2026-09-29: `src/cohort/` (no target argument exists), `src/target/`, `src/sites.py`, `src/store.py`, `src/cli.py`. **The MECHANISM is BUILT 2026-09-30:** `src/mechanism/` — `hmm.py` (`baseline_model`; no target parameter, asserted from the AST), `utility.py`, `ffbs.py`, `calibration.py`, plus `toy.py` and `exact.py`, which read NOTHING from disk and are the falsification target. Attacks and evaluation are still `PLANNED`. | `OK` |
 
 ### The build (consolidated into `main`, 2026-09-29)
 
@@ -235,8 +235,12 @@ A release that cannot answer "at what tau, under what utility" is not quotable.
 | `graph_id` | str | graph + cohort + chain segmentation. ⚠ NOT a leave-one-out id: our target is external, so nothing is held out |
 | `loo_id` | str/null | the held-out stand-in, **comparison arm only**. `null` for a genuine external-target release |
 | `seed` | int | the private random draw |
-| `state_path` | int[T] | sampled Z_1:T |
-| `log_z_p` | float | must satisfy 0 <= log_z_p <= eta_tau |
+| `state_path` | int[T] or int[T,2] | sampled Z_1:T; (T,2) when `ploidy` = 2 |
+| `released_path` | int16[T] or int16[T,2] | the alleles actually released. The quotable object |
+| `log_z_p` | float | must satisfy 0 <= log_z_p <= eta_tau. ⚠ For a diploid release it is the SUM of the two haplotype values, each in [0, eta_tau/2] — so the bracket holds for the release as a whole, at the real `tau` |
+| `u_achieved` | float | `utility_retained` for this draw. Meaningless without the next field |
+| `u_ceiling` | float | ADDED 2026-09-30. The largest `u` this target could reach at any `tau` under this `beta` scope. **0.815455** on HG00096 chr21 at scope `chain`, not 1 |
+| `ploidy` | int | ADDED 2026-09-30. 1 or 2. A diploid target's two haplotypes are ONE private input and get ONE release — one `tau`, one `log_z_p`, one bracket |
 | `released_at` | date | one release per genome; re-releases compose |
 
 **Integration contract (COMPARISON ARM ONLY).** Our sampler MAY also emit PanMixer's
@@ -275,6 +279,8 @@ evaluators is vacuous (both sides equal `site_mask.sum()` by construction). Ship
 | `paper/s41467-026-77591-0_reference.pdf` | 2026-09-18 | **The PUBLISHED PanMixer paper** (Nature Communications, DOI 10.1038/s41467-026-77591-0, Article in Press, 12 pages, sha256 `2bbba736...`), supplied by Dylan. **The version of record — all reproduction targets come from here.** | LIVE |
 | `archive_docs/Blindenbach2026_PanMixer.pdf` | 2026-09-18 | The bioRxiv PREPRINT, 24 pages. Superseded: it says 47 individuals (published: 44), `eps_private` 0.001 (published: 0.002), AF divergence 0.004/0.004/0.002 (published: 0.006/0.006/0.005), and it has no Data availability section and no membership-inference analysis. Retained because this project's first analysis was made against it. | SUPERSEDED |
 | `logs/pm_download.sha256` | 2026-09-18 | sha256 of the three downloaded VCFs. | LIVE |
+| `logs/A_HG00096_chr21_v1.md` + `.releases.json` | 2026-09-30 | **The first RanPanMixer mechanism result.** Metrics-as-rows table over `tau` = 0 / 0.05 / 0.10 / 0.25 / 0.50 / 0.90, HG00096 diploid, chr21, `indicator/w=inv_support/beta=chain`, 3 draws per `tau`, seeds 1000-1002. Emitted by `scripts/run_mechanism_chr21.py`, never hand-assembled. The `.releases.json` carries one record per draw under the section 4 schema. ⚠ **A v1 DIAGNOSTIC RUN, NOT A PRE-REGISTERED RESULT** — `A-LCK-preregister` has not run and deferred decisions R1-R5 are unsettled. Headline: `utility_retained` = 0.6940 against `u_ceiling` 0.8155 at EVERY `tau`, and the released path is bit-identical from `tau` = 0 to 0.9. | LIVE |
+| `src/mechanism/toy.py` (the toy cohort) | 2026-09-30 | The falsification fixture: K = 4, T = 7, hand-written, reads nothing from disk. 16,384 state paths -> 2,304 with mass -> 96 output paths in `Y_D`. Registered as an artifact because `A-THY-toy-enumeration` is a result that depends on its exact structure, and `toy_cohort()` asserts each feature at construction so a degenerate edit cannot pass silently. | LIVE |
 | `primer/primer.html` + `primer/src/` | 2026-09-20 | Teaching primer for onboarding: a what-changed preface plus the landscape, the problem, PanMixer dissected, and our mechanism. ~57k words, built from `primer/src/` by `primer/build.py`. v2 expanded the hidden-Markov-model subsection (1.2.2) with full derivations of the forward algorithm and backward sampling, worked arithmetic, and a brute-force cross-check. URL: https://claude.ai/artifact/HzUWmUmxAPwXUSq3oFy8sb | LIVE |
 
 ## 8. Reproducibility contract

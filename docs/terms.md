@@ -114,7 +114,9 @@ Is:                   R_D, the target-independent probability distribution over 
                       output support Y_D, constructed ONLY from the public graph G
                       and the public cohort D. Realized as the cohort haplotype HMM
                       (rho, A_2:T). Every y in Y_D must have R_D(y) > 0.
-Computed by:          PLANNED — src/ranpanmixer/hmm.py:CohortHMM
+Computed by:          src/mechanism/hmm.py:CohortHMM (built 2026-09-30). ⚠ Realized as the
+                      Li-Stephens chain CONDITIONED on never occupying a donor with no
+                      called allele -- see the missing_policy correction below.
 CHANGES MEANING WITH: the cohort D, the block segmentation, and the state-collapse
                       policy for duplicate haplotypes. A baseline fitted with ANY
                       target-derived quantity is not R_D and voids Theorem 1.
@@ -130,7 +132,11 @@ Is:                   Y_D, the fixed set of cohort-supported output paths the
                       mechanism may emit. May be complete cohort haplotype paths,
                       synthetic paths from the cohort model, or mosaics of
                       cohort-supported local traversals.
-Computed by:          PLANNED — implied by the HMM state space and transition sparsity
+Computed by:          src/mechanism/hmm.py, implied by the state mask and the switch
+                      scalars; enumerated exactly by src/mechanism/exact.py on the toy.
+                      ⚠ A Delta_x = 0 step makes Y_D strictly smaller: switching donors
+                      there has probability 0, so those output paths are not in Y_D at
+                      any tau. Asserted target-independent over the whole tau grid.
 CHANGES MEANING WITH: the transition sparsity pattern (which concatenations are
                       graph-valid). MUST be fixed independently of the target:
                       target-specific candidate lists introduce target-dependent
@@ -145,7 +151,9 @@ Aliases:              "Y_D", "the support"
 Is:                   The bounded utility u(p, y) in [0,1]: how well releasing y
                       preserves utility for input path p. Blockwise construction:
                       u(p,y) = sum_t beta_t * phi_t(p_t, y_t).
-Computed by:          PLANNED — src/ranpanmixer/utility.py
+Computed by:          src/mechanism/utility.py:u_of_output (built 2026-09-30). The [0,1]
+                      bound is ASSERTED at runtime, not documented -- _assert_bounded
+                      raises rather than returning an out-of-range value.
 CHANGES MEANING WITH: the choice of phi_t, the weights beta_t, and above all its
                       RANGE. The theorem assumes range exactly [0,1]; see eta_tau.
 Valid vs:             the same utility function at another tau. NEVER across
@@ -156,6 +164,35 @@ Aliases:              "u". Never "similarity" — phi_t is the similarity; u is 
                       weighted aggregate.
 ```
 
+
+### u_ceiling  [utility] [gate]
+```
+Is:                   The largest u_path a GIVEN target could achieve at any tau:
+                      sum of beta_v over the positions where that target has a call.
+                      It is the honest denominator for utility_retained, and it is
+                      BELOW 1 whenever the target has no call at a weighted position.
+Computed by:          src/mechanism/utility.py:u_ceiling (built 2026-09-30)
+CHANGES MEANING WITH: the beta_v SCOPE, which is deferred decision R1, and the
+                      target. Measured 2026-09-30 on HG00096, chr21, scope="chain":
+                      **0.815455** over 253,846 of 305,886 chain positions --
+                      independently reproducing the 0.815 that R1 predicted from the
+                      weight arithmetic. Under scope="chain_readable" it is 1.000 for
+                      a target drawn from the same panel `readable` was built from.
+Valid vs:             the same scope and the same target. ⚠ NEVER quote
+                      utility_retained against an implicit ceiling of 1 -- that
+                      understates the mechanism by exactly this factor. And never
+                      quote it against this number without saying so, which
+                      overstates it. Report both, always.
+Status:               PRIMARY — mark * in tables.
+Aliases:              none. ⚠ NOT target_fidelity's ceiling, which is a different
+                      loss in the opposite direction: that one is about target
+                      variants with NO record in G (about 9.9% of non-reference
+                      calls, 20.5% of the -log f information). This one is about
+                      graph positions where we cannot READ the target. `docs/plan.md`
+                      item 1b keeps the three losses apart; conflating them inverts
+                      the conclusion.
+```
+
 ### phi_v  [utility]
 ```
 Is:                   The local per-position similarity in [0,1] between the target's
@@ -164,7 +201,7 @@ Is:                   The local per-position similarity in [0,1] between the tar
                       INDICATOR**: phi_v = 1 if the drawn donor carries the target's
                       allele at v, else 0. There is no block to aggregate over, no
                       per-block normaliser, and no aggregation choice to make.
-Computed by:          PLANNED — src/ranpanmixer/utility.py
+Computed by:          src/mechanism/utility.py:phi_v (built 2026-09-30)
 CHANGES MEANING WITH: the missing_policy (an excluded donor has no phi_v at all), and
                       whether the target's own allele is missing at v — in which case
                       the position contributes no tilt and every donor gets factor 1.
@@ -193,7 +230,9 @@ Aliases:              "local agreement". ⚠ RENAMED from `phi_t` 2026-09-29. Th
 Is:                   Non-negative per-position weights with sum_v beta_v = 1. They
                       decide which parts of the path the mechanism tries to preserve.
                       Under model C: beta_v = w_v / sum_u w_u with w_v = 1/support(v).
-Computed by:          PLANNED. ⚠ support(v) needs NO computation — measured 2026-09-28,
+Computed by:          src/mechanism/utility.py:beta_v (built 2026-09-30), which takes an
+                      explicit `scope` -- see u_ceiling and deferred decision R1.
+                      ⚠ support(v) needs NO computation — measured 2026-09-28,
                       the pangenome VCF's own INFO/AN field is bit-identical to
                       np.sum(pangenome != -1, axis=(0,2)) across all 340,849 chr21
                       records.
@@ -226,6 +265,29 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
                       4.3589 at tau = 0.1 / 0.25 / 0.5 / 0.9 (derived). If the achieved
                       utility is too low, the lever is tau — a weaker privacy claim —
                       not a different segmentation.
+⚠ REFINED 2026-09-30, MEASURED: tau IS A VERY WEAK LEVER, AND THE LEVER IS sum beta^2.
+                      The two paragraphs above are correct and are about the wrong
+                      quantity for predicting utility. The tilt can only move mass within
+                      the range of u that R_D actually REACHES, and that range is not
+                      [0,1]: measured on chr21, HG00096, scope "chain",
+                      Var_Q(u) = 4.046e-06, so sd(u) = 2.011e-03 around E_Q[u] = 0.6951.
+                      The achievable gain is about eta_tau * Var = 2.222e-06 at
+                      tau = 0.5 — a signal-to-noise ratio against a single draw of about
+                      1:900, needing ~8.3e+05 draws to resolve. MEASURED CONSEQUENCE: the
+                      released path is BIT-IDENTICAL at tau = 0, 0.1, 0.5 and 0.9 for a
+                      fixed seed — 0 of 611,772 positions differ.
+                      The reason is exact, not empirical: sum_v eta_tau * beta_v =
+                      eta_tau, since beta sums to 1, so the expected number of positions
+                      the tilt moves is of order eta_tau (0.549 at tau = 0.5, 1.47 at
+                      tau = 0.9) and CANNOT grow with T. sum_v beta_v is pinned at 1 but
+                      sum_v beta_v^2 is NOT — it is 3.27e-06 under the near-uniform
+                      w_v = 1/support(v) — and that is what sets Var_R(u) and hence the
+                      gain. ⚠ This makes deferred decision R3 (rarity weighting instead
+                      of call rate) the highest-value open question, and it is a
+                      PRE-REGISTRATION item under constraint 5. Whether Var_R(u) itself
+                      shrinks with T is NOT established and must not be claimed: the
+                      mosaic's segment count is set by the chromosome's genetic length,
+                      not by T. See `docs/memory.md` 2026-09-30.
 ```
 
 ### psi_t  [implementation] [mechanism]
@@ -233,7 +295,9 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
 Is:                   The local potential psi_t(j) = exp(eta_tau * beta_t * phi_t(p_t, h_t,j)).
                       The ONLY place the private target enters the sampler. The cohort
                       HMM (rho, A) stays fixed.
-Computed by:          PLANNED — src/ranpanmixer/sampler.py
+Computed by:          src/mechanism/utility.py:tilt_potentials (built 2026-09-30), which
+                      also multiplies in the allowed-state mask so that applying one and
+                      forgetting the other is not expressible.
 CHANGES MEANING WITH: eta_tau, and therefore tau. Potentials cached across tau values
                       are a correctness hazard.
 Valid vs:             nothing; an intermediate quantity.
@@ -245,7 +309,9 @@ Aliases:              "the tilt potential", "the emission"
 ```
 Is:                   Q^tau_p(y) = R_D(y) * exp(eta_tau * u(p,y)) / Z_p, the
                       distribution the sanitized path is drawn from for input path p.
-Computed by:          PLANNED — never materialized explicitly; sampled from via ffbs.
+Computed by:          never materialized explicitly; sampled from via ffbs. Materialized
+                      ONLY on the toy, by src/mechanism/exact.py:release_distribution,
+                      which is where the bound is checked.
 CHANGES MEANING WITH: tau, R_D, u_path. All three must be stamped on any figure
                       derived from it.
 Valid vs:             another release distribution at matched tau, R_D and u_path.
@@ -258,7 +324,9 @@ Aliases:              "Q_p", "the tilted distribution"
 Is:                   The log normalizing constant, log Z_p = sum_t log c_t, where
                       c_t is the forward-pass per-position normalizer. Theory pins it:
                       0 <= log Z_p <= eta_tau, for every input path p.
-Computed by:          PLANNED — src/ranpanmixer/sampler.py, forward pass
+Computed by:          src/mechanism/ffbs.py:log_z_p (built 2026-09-30) = the tilted
+                      forward pass's sum_t log c_t MINUS baseline_log_norm.
+                      ⚠ THE SUBTRACTION IS NOT OPTIONAL — see baseline_log_norm.
 CHANGES MEANING WITH: tau. The bound scales with eta_tau, so a log_z_p quoted
                       without its tau cannot be checked.
 Valid vs:             its own theoretical bracket. This is the cheapest correctness
@@ -268,13 +336,70 @@ Status:               DIAGNOSTIC
 Aliases:              "the normalizer", "Z_p" (Z_p is the unlogged form)
 ```
 
+
+### baseline_log_norm  [implementation] [diagnostic]
+```
+Is:                   The log conditioning constant of R_D: sum_t log c_t from an
+                      UNTILTED forward pass, whose only potentials are the
+                      allowed-state mask. It exists because missing_policy =
+                      RENORMALISE enters as a 0/1 potential rather than as a
+                      renormalised transition row, so R_D is the Li-Stephens chain
+                      CONDITIONED on never occupying a donor with no called allele,
+                      and that conditioning has its own normaliser.
+Computed by:          src/mechanism/ffbs.py:baseline_log_norm (built 2026-09-30)
+CHANGES MEANING WITH: the cohort and the chain span — and NOTHING ELSE. It is
+                      target-independent by construction (its potentials are the mask
+                      alone), which is what lets it be computed once per cohort and
+                      reused across every target and every tau. Measured 2026-09-30 on
+                      our chr21 build, K = 88, T = 305,886: **-584.8135**, in 1.9 s.
+Valid vs:             itself, as a cached constant. Asserted equal to the tau = 0
+                      pass through the target-facing code path.
+Status:               DIAGNOSTIC — but load-bearing. ⚠ log_z_p IS THE TILTED PASS
+                      MINUS THIS. Forgetting the subtraction puts log_z_p at about
+                      -584 against a bracket of [0, 0.549], and the tempting "fix" of
+                      widening the bracket would discard the cheapest correctness
+                      check in the project.
+Aliases:              none. Never "Z_base" in a table; it is not a reportable number.
+```
+
+### ratio_spread  [privacy] [evaluation] [gate]
+```
+Is:                   max_y (Q_p(y)/Q_q(y)) divided by min_y of the same ratio, over
+                      the output support, for a pair of admissible inputs p, q.
+                      Theory pins it: the ratio is
+                      exp(eta_tau (u_p(y) - u_q(y))) * Z_q/Z_p, and the Z factor is
+                      common to every y, so it CANCELS OUT of the spread -- leaving
+                      exp(eta_tau * range_y(u_p - u_q)), which is at most
+                      exp(2 eta_tau) = exp(epsilon_tau) because each utility is in
+                      [0,1].
+Computed by:          src/mechanism/exact.py:ratio_spread, on the toy support only
+CHANGES MEANING WITH: the PAIR. The bound is over all pairs, so one favourable pair
+                      proves nothing; report the worst found. Nothing else -- there is
+                      no estimator here and no support-size bias, which is exactly
+                      what distinguishes it from tv_empirical.
+Valid vs:             exp(epsilon_tau), at matched tau, on a stated support.
+Status:               PRIMARY — mark * in tables. ⚠ IT IS THE ONLY GATE WITH POWER
+                      against a miscalibrated tilt. Measured 2026-09-30 on the toy: a
+                      constructed input pair SATURATES it exactly at every tau tested,
+                      while the worst exact TV reaches only 27.4-43.1% of tau. So a
+                      tilt applied with epsilon_tau in place of eta_tau -- twice the
+                      intended exponent, a one-token error, the highest-severity error
+                      class in the project -- PASSES the TV gate at every tau and
+                      passes the log_z_p bracket below tau = 0.5, and fails only this
+                      one. See `docs/memory.md` 2026-09-30.
+Aliases:              "the pointwise bound". Never "the likelihood ratio" bare -- that
+                      is the per-y quantity; this is its range over the support.
+```
+
 ### ffbs  [implementation] [mechanism]
 ```
 Is:                   Forward-filtering / backward-sampling: the exact sampler for
                       Q^tau_p. Forward pass computes per-position normalized alpha_t;
                       backward pass draws Z_T ~ Categorical(alpha_T) then walks back
                       sampling Z_t | Z_t+1. Algorithm 1 of the proposal.
-Computed by:          PLANNED — src/ranpanmixer/sampler.py
+Computed by:          src/mechanism/ffbs.py (built 2026-09-30). ✅ VERIFIED against exact
+                      enumeration 2026-09-30: output distribution and state-path JOINT
+                      both within Monte-Carlo error at K=4, T=7.
 CHANGES MEANING WITH: nothing — it is EXACT, not approximate, given the potentials.
 Valid vs:             a brute-force enumeration of Q^tau_p on a toy graph. That
                       equivalence is the primary implementation gate.
@@ -289,7 +414,11 @@ Is:                   PanMixer's transition model: probability a_t of remaining 
                       the same donor state, b_t of switching, for every other state.
                       Its rank-one-plus-diagonal structure is what reduces the
                       forward recursion from O(TK^2) to O(TK).
-Computed by:          PLANNED — src/ranpanmixer/hmm.py
+Computed by:          src/mechanism/hmm.py:switch_mass_from_cm (built 2026-09-30).
+                      `switch_mass` is s_t, the coefficient of J in A = (1-s)I + (s/K)J,
+                      i.e. the TOTAL mass; the per-state value is s_t/K and the chance of
+                      leaving a state is s_t(K-1)/K. The decomposition is cross-checked
+                      against the published closed form at construction.
 CHANGES MEANING WITH: whether b_t is the per-target or the total switch mass.
                       Getting that wrong rescales every transition by K.
 Valid vs:             a dense-transition HMM giving identical forward values. That
@@ -451,6 +580,36 @@ behaviour. The chain does not need to be broken by hand anywhere inside `chain_s
 ⚠ **INTERPOLATE WITH `left=nan, right=nan`**, then assert no NaN survives the cut. That one
 change converts a silent 34,371-position failure into a crash.
 
+
+### donor_switches  [implementation] [evaluation]
+```
+Is:                   The number of positions at which a RELEASED path changes donor
+                      haplotype, counted on the sampled state path. The measured
+                      counterpart of E[donor switches] under the prior, and the
+                      quantity the model-C architecture decision turned on.
+Computed by:          src/mechanism/ffbs.py:Release.record (built 2026-09-30);
+                      the prior expectation is CohortHMM.expected_switches.
+CHANGES MEANING WITH: the PLOIDY — a diploid release reports the sum over both
+                      haplotypes, so halve it before comparing against a per-haplotype
+                      figure. And with the chain architecture: measured 2026-09-28,
+                      104,379 under model A, 3,532 under B, 7,155 under C, against an
+                      analytic segment length of n/(Ne*r) = 0.0068 cM (~4.5 kb).
+                      ⚠ Also with the genetic map, which is what makes it a useful
+                      canary: PanMixer's shipped sampler gives ~0 because its distance
+                      is a VCF row index.
+Valid vs:             expected_switches under the same cohort and chain_span, and
+                      against the analytic segment length. Measured 2026-09-30 on our
+                      chr21 build at K = 88: prior expectation **7,021.0** per
+                      haplotype, against the **7,155** the model-C decision predicted
+                      independently; realised **14,169** for a diploid release
+                      (7,084 per haplotype), IDENTICAL at every tau from 0 to 0.9.
+Status:               SECONDARY — structure, not a gate. But a value near 0 or near T
+                      means the transition model is broken, which is exactly how
+                      PanMixer's defect would have shown up had anyone looked.
+Aliases:              "switches", "recombinations". ⚠ Never "crossovers" — those are a
+                      biological event; this is a copying-model bookkeeping count.
+```
+
 ### K_states  [implementation] [dataset]
 ```
 Is:                   K, the number of cohort haplotype states. At most ~2n for a
@@ -471,9 +630,18 @@ Is:                   For a diploid target, the haplotype pair is ONE private in
                       u_diploid(p, y) = (u(p1, y1) + u(p2, y2)) / 2. The average keeps
                       the joint utility in [0,1], so the same tau covers the complete
                       diploid release.
-Computed by:          PLANNED
+Computed by:          src/mechanism/utility.py:diploid_utility (built 2026-09-30).
+                      ✅ THE MEAN FACTORISES EXACTLY, which is what makes it samplable:
+                      exp(eta (u1+u2)/2) = exp((eta/2) u1) exp((eta/2) u2), so the two
+                      haplotype chains are INDEPENDENT at HALF the exponent and log Z_p is
+                      the sum of the two, landing in [0, eta/2] + [0, eta/2] = [0, eta_tau].
+                      One diploid release, one tau, one bracket. ffbs.release handles
+                      ploidy 1 and 2 through the same entry point.
 CHANGES MEANING WITH: the aggregator. A SUM instead of a MEAN leaves [0,1] and
                       doubles the effective tilt — the guarantee no longer holds.
+                      ⚠ Running each haplotype at the FULL eta_tau is that SUM in
+                      disguise: measured on the toy at tau = 0.5, the two log Z_p values
+                      then sum past eta_tau.
 Valid vs:             a haploid release only after the aggregator is stated.
 Status:               PRIMARY
 Aliases:              none
@@ -610,6 +778,22 @@ subfield (`fields[1]` and `fields[9+i].split(':')[0]`) — every INFO field is d
 So by the time anything reaches the matrix, all five look identical.
 **Preserving the cause is a cheap preprocessing addition — an auxiliary reason array
 alongside the allele matrix — and is far cheaper now than reconstructing it later.**
+
+
+✅ **HOW RENORMALISE IS ACTUALLY IMPLEMENTED (2026-09-30), and why the obvious reading is
+wrong.** "Drop that donor from the state distribution at that position" invites masking
+row `j` of the transition to the allowed set and renormalising it. **That is not well
+defined.** Across a step with `Delta_x = 0` the transition is the identity, so a donor
+available at `t-1` and unavailable at `t` has a masked row summing to **exactly zero** --
+there is no chain to renormalise and the division is by zero. Measured on our chr21 build:
+**1,058 zero-distance steps inside `chain_span`**, against 4.26% mean missingness, so this
+is reachable on the real data rather than a contrived case.
+
+So the mask enters as a **0/1 POTENTIAL** and `R_D` is the Li-Stephens chain CONDITIONED on
+never occupying an unavailable donor. The forward pass normalises it away. ⚠ The
+consequence is `baseline_log_norm`: the conditioning constant is part of `sum_t log c_t`,
+so `log_z_p` is that sum MINUS the baseline's own, and a dead-end chain now raises rather
+than dividing by zero.
 
 ### target_encoding  [dataset] [method]
 ```
