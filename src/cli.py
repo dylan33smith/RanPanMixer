@@ -74,7 +74,7 @@ def cohort_main(argv=None) -> int:
         print(f"  run    {step}")
         if step == "deconstruct":
             summary[step] = vcf.deconstruct(Path(cfg["inputs"]["graph"]["path"]),
-                                            temp / "deconstruct.vcf")
+                                            temp / "deconstruct.vcf", cfg=cfg)
         elif step == "cohort-vcf":
             src = a.from_vcf or (temp / "deconstruct.vcf")
             summary[step] = vcf.drop_chm13(src, temp / "cohort44.vcf.gz")
@@ -107,6 +107,7 @@ def _manifest(out: Path, cfg: dict, chrom: str) -> dict:
     man = {
         "chrom": chrom,
         "chain_span": cfg["chain_span"],
+        "tools": cfg.get("tools", {}),
         "artifacts": arts,
         "axis_digests_seen": sorted(digests),
         "axis_consistent": len(digests) <= 1,
@@ -127,6 +128,10 @@ def target_main(argv=None) -> int:
                    help="defaults to data/targets/<id>/<chrom>/target.<chrom>.vcf.gz")
     p.add_argument("--absent-policy", default="missing", choices=["missing", "reference"],
                    help="what a site absent from the target VCF means")
+    p.add_argument("--no-split-alt-join", action="store_true",
+                   help="disable recovery of multi-allelic records from the panel's "
+                        "biallelic decomposition (on by default; disabling it discards "
+                        "target information we hold)")
     a = p.parse_args(argv)
 
     from target import path as tpath  # noqa: E402
@@ -135,7 +140,8 @@ def target_main(argv=None) -> int:
                           f"target.{a.chrom}.vcf.gz")
     rep = tpath.build(tv, a.root / "cohort" / a.chrom,
                       a.root / "targets" / a.target / a.chrom,
-                      sample=a.target, absent_policy=a.absent_policy)
+                      sample=a.target, absent_policy=a.absent_policy,
+                      split_alt_join=not a.no_split_alt_join)
     print(json.dumps(rep, indent=2))
     return 0
 

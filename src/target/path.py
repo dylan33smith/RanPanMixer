@@ -73,7 +73,8 @@ def _parse_gt(field: str) -> tuple[int, int]:
 
 
 def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
-          sample: str, absent_policy: str = "missing") -> dict:
+          sample: str, absent_policy: str = "missing",
+          split_alt_join: bool = True) -> dict:
     """Emit path.npy (n_sites, 2) and representability.json.
 
     ⚠ representability is an AUDIT ARTIFACT ONLY. About 9.9% of a real target's
@@ -89,11 +90,28 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
     outdir.mkdir(parents=True, exist_ok=True)
 
     s = sites_mod.load_sites(cohort_dir / "sites.tsv")
+    # ⚠ check_axis was dead code until 2026-09-29 -- defined, unit-tested, and never
+    # called from src/, so a cohort directory mixing two site axes was consumed
+    # without error. Verify every cohort array this stage will read.
+    for art in ("in_chain.npy", "positions.npy", "support.npy"):
+        f = cohort_dir / art
+        if f.exists():
+            store.check_axis(f, s.digest)
     strict: dict[tuple[int, str, str], int] = {}
     pos_seen: dict[int, int] = {}
+    # SPLIT-ALT INDEX. The 1000G panel is entirely decomposed into biallelic
+    # records -- every one of its 1,002,752 chr21 records declares exactly one ALT
+    # -- while 7.9% of ours are multi-allelic. A strict full-ALT-string match can
+    # therefore NEVER succeed on those 27,021 records, for a purely notational
+    # reason. That threw away target information we actually hold: 8,377 records
+    # are recoverable by matching each of OUR alts against its own panel record and
+    # mapping back to OUR allele numbering. Keyed (pos, ref, one_alt) -> (row, j)
+    # where j is the 1-based index of that alt in our record.
+    split_ix: dict[tuple[int, str, str], tuple[int, int]] = {}
     for i in range(s.n_sites):
-        strict.setdefault((int(s.pos[i]), s.ref[i], s.alt[i]), i)
-        pos_seen.setdefault(int(s.pos[i]), i)
+        pos_i, ref_i = int(s.pos[i]), s.ref[i]
+        strict.setdefault((pos_i, ref_i, s.alt[i]), i)
+        pos_seen.setdefault(pos_i, i)
 
     # The cohort's coordinate range. Representability must be reported RELATIVE
     # to the region actually modelled: on a 2 Mb development slice, 95% of a
@@ -103,12 +121,65 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
     # one is the meaningful one.
     lo, hi = int(s.pos.min()), int(s.pos.max())
 
+    # ⚠ FULL-COVERAGE REQUIREMENT, and why the obvious version of this is unsafe.
+    #
+    # The reconstruction infers "this haplotype is REFERENCE" from the absence of a
+    # 1 at every panel record for our alts. That inference is only valid if the
+    # panel actually HAS a record for every one of our alts. If it covers 2 of our
+    # 4, a haplotype carrying alt 3 shows 0 at both covered records and would be
+    # written as reference -- a FABRICATED homozygous-reference call. The first
+    # version of this code did exactly that for 6,309 rows per target.
+    #
+    # So the recoverable set is restricted to rows the panel FULLY covers, and --
+    # critically -- it is computed from the PANEL'S SITE LIST ALONE, before any
+    # target is read. That keeps the set identical for every target, which is the
+    # precondition for normalising beta_v over it; deciding it per-person instead
+    # would make beta_v target-dependent and void Theorem 1.
+    fully_covered: set[int] = set()
+    if split_alt_join:
+        want: dict[tuple[int, str], set[str]] = {}
+        for i in range(s.n_sites):
+            if s.n_alt[i] > 1:
+                want.setdefault((int(s.pos[i]), s.ref[i]), set()).update(s.alt[i].split(","))
+        have: dict[tuple[int, str], set[str]] = {}
+        with _open(target_vcf) as fh:
+            for line in fh:
+                if line.startswith("#"):
+                    continue
+                f = line.split("\t", 6)
+                k = (int(f[1]), f[3])
+                if k in want:
+                    have.setdefault(k, set()).add(f[4])
+        for i in range(s.n_sites):
+            if s.n_alt[i] > 1:
+                k = (int(s.pos[i]), s.ref[i])
+                alts = set(s.alt[i].split(","))
+                if alts <= have.get(k, set()):
+                    fully_covered.add(i)
+                    for j, a in enumerate(s.alt[i].split(","), start=1):
+                        split_ix.setdefault((k[0], k[1], a), (i, j))
+
+    # the panel's site keys, for the target-independent `readable` set below
+    panel_site_keys: set = set()
+    with _open(target_vcf) as fh:
+        for line in fh:
+            if line.startswith("#"):
+                continue
+            f = line.split("\t", 6)
+            panel_site_keys.add((int(f[1]), f[3], f[4]))
+    inputs_panel = {"target_vcf_sitelist": "see path.npy inputs"}
+
     fill = -1 if absent_policy == "missing" else 0
     path = np.full((s.n_sites, 2), fill, dtype=np.int16)
     matched = np.zeros(s.n_sites, dtype=bool)
     # every site starts as "no record"; the join downgrades to no-call or promotes
     # to called as it learns better
     treason = np.full(s.n_sites, T_NO_RECORD, dtype=np.int8)
+    # row -> {our_allele_j: (gt0, gt1)} accumulated from the panel's split records
+    split_hits: dict[int, dict[int, tuple[int, int]]] = {}
+    # non-ref target calls whose classification must wait for the split resolution:
+    # row -> [(info, in_region), ...]
+    split_pending: dict[int, list] = {}
 
     n_target_records = 0
     n_nonref = n_nonref_in = 0
@@ -138,6 +209,11 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
                 path[row, 0], path[row, 1] = a, b
                 matched[row] = True
                 treason[row] = T_NO_CALL if (a == -1 and b == -1) else T_CALLED
+            elif split_ix:
+                hit = split_ix.get((pos, ref, alt))
+                if hit is not None:
+                    r2, j = hit
+                    split_hits.setdefault(r2, {})[j] = (a, b)
 
             if (a > 0) or (b > 0):          # a non-reference call by the target
                 n_nonref += 1
@@ -157,12 +233,63 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
                 if row is not None:
                     exact_hit += 1;  info_exact += info
                     if in_region: ex_in += 1; info_ex_in += info
+                elif (pos, ref, alt) in split_ix:
+                    # defer: representable IF the reconstruction succeeds
+                    split_pending.setdefault(split_ix[(pos, ref, alt)][0], []).append(
+                        (info, in_region))
                 elif pos in pos_seen:
                     pos_only_hit += 1; info_pos_only += info
                     if in_region: po_in += 1; info_po_in += info
                 else:
                     invisible += 1;  info_invisible += info
                     if in_region: inv_in += 1; info_inv_in += info
+
+    # resolve the split-ALT reconstruction. For each haplotype, the panel record
+    # whose single ALT the haplotype carries names OUR allele index; if no panel
+    # record for this site says 1, the haplotype is reference.
+    n_recovered = 0
+    n_contradictions = 0
+    recovered_calls = [0, 0]      # [all, in-region] non-ref calls credited via split
+    for r2, byj in split_hits.items():
+        # only reachable for fully covered rows, so "no alt carries a 1" really does
+        # mean reference rather than "we could not see the alt this haplotype has"
+        out = [fill, fill]
+        ok = True
+        for h in (0, 1):
+            carried = [j for j, gt in byj.items() if gt[h] == 1]
+            if len(carried) > 1:
+                ok = False
+                break
+            if carried:
+                out[h] = carried[0]
+            elif any(gt[h] == -1 for gt in byj.values()):
+                out[h] = -1
+            else:
+                out[h] = 0          # conclusive: every alt is covered and none is carried
+        if not ok:
+            n_contradictions += 1
+            # not representable after all -- a record exists at that POS but we
+            # cannot resolve which of our alleles the haplotype carries
+            for info, in_region in split_pending.pop(r2, []):
+                pos_only_hit += 1; info_pos_only += info
+                if in_region: po_in += 1; info_po_in += info
+            continue
+        path[r2, 0], path[r2, 1] = out
+        matched[r2] = True
+        treason[r2] = T_NO_CALL if (out[0] == -1 and out[1] == -1) else T_CALLED
+        n_recovered += 1
+        # the release CAN express these calls, so they belong with the exact matches
+        for info, in_region in split_pending.pop(r2, []):
+            exact_hit += 1; info_exact += info
+            recovered_calls[0] += 1
+            if in_region:
+                ex_in += 1; info_ex_in += info
+                recovered_calls[1] += 1
+
+    for leftover in split_pending.values():
+        for info, in_region in leftover:
+            pos_only_hit += 1; info_pos_only += info
+            if in_region: po_in += 1; info_po_in += info
 
     total_info = info_exact + info_pos_only + info_invisible
     total_in = info_ex_in + info_po_in + info_inv_in
@@ -200,6 +327,26 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
                                  "invisible_frac": (info_inv_in / total_in) if total_in else None},
         },
         "target_reason_counts": {T_CODE_NAMES[k]: int((treason == k).sum()) for k in T_CODE_NAMES},
+        "split_alt_join": {
+            "enabled": split_alt_join,
+            "our_multiallelic_records": int((s.n_alt > 1).sum()),
+            "fully_covered_by_panel": len(fully_covered),
+            "rows_recovered": n_recovered,
+            "contradictions": n_contradictions,
+            "nonref_calls_credited": recovered_calls[0],
+            "nonref_calls_credited_in_region": recovered_calls[1],
+            "contradiction_cause": ("observed at poly-A repeat sites where the panel's "
+                                    "biallelic records are NOT a mutually exclusive "
+                                    "decomposition -- one haplotype reads as carrying two "
+                                    "different alts. The row is left unresolved rather than "
+                                    "guessed, and its calls fall back to pos_only."),
+            "note": ("The panel is decomposed into biallelic records while 7.9% of our "
+                     "records are multi-allelic, so a strict full-ALT match cannot succeed "
+                     "on those. These rows were recovered by matching each of our alts "
+                     "against its own panel record. 'contradictions' counts rows where a "
+                     "haplotype appeared to carry two different alts, which should not "
+                     "happen at a properly decomposed site."),
+        },
         "in_chain_usable": None,     # filled below
         "ceiling_note": (
             "invisible calls can never be retained at any tau -- they have no chain "
@@ -208,12 +355,36 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
         ),
     }
 
+    # THE TARGET-INDEPENDENT SET. A row is "readable" if the target's panel has a
+    # record our join can use: either a strict (POS,REF,ALT) hit or a fully covered
+    # multi-allelic row. Both tests read only the panel's SITE LIST, which is the
+    # same file for every target, so this array is identical for all of them --
+    # verified by the audit check. That invariance is what makes it legal to
+    # normalise beta_v over this set: doing it over "positions where THIS target has
+    # a call" would be target-dependent and void Theorem 1, and it is NOT the same
+    # set, because a contradiction at a poly-A repeat drops a row for one target and
+    # not another.
+    readable = np.zeros(s.n_sites, dtype=bool)
+    for i in range(s.n_sites):
+        if (int(s.pos[i]), s.ref[i], s.alt[i]) in panel_site_keys or i in fully_covered:
+            readable[i] = True
+    store.save(outdir / "readable.npy", readable, inputs=inputs_panel,
+               params={"definition": "panel has a usable record for this row",
+                       "target_independent": True},
+               axis_digest=s.digest,
+               note="TARGET-INDEPENDENT. Normalise beta_v over `in_chain & readable`, "
+                    "never over positions where a particular target happens to have a "
+                    "call -- that set varies between targets and would make beta_v "
+                    "target-dependent.")
+
     # how much of the tilt budget this target can actually move
     usable = s.in_chain & (treason == T_CALLED)
     rep["in_chain_usable"] = {
         "chain_positions": int(s.in_chain.sum()),
         "with_a_target_call": int(usable.sum()),
+        "readable_target_independent": int((s.in_chain & readable).sum()),
         "frac": float(usable.sum() / s.in_chain.sum()) if s.in_chain.any() else None,
+        "readable_frac": float((s.in_chain & readable).sum() / s.in_chain.sum()) if s.in_chain.any() else None,
         "note": ("positions where phi_v is defined. The rest consume beta_v weight and "
                  "can never contribute to u, so max achievable u is this fraction unless "
                  "beta is normalised over this set instead -- see docs/plan.md."),
@@ -221,7 +392,9 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
 
     inputs = {"target_vcf": store.sha256_file(target_vcf),
               "cohort_sites": store.sha256_file(cohort_dir / "sites.tsv")}
-    params = {"sample": sample, "absent_policy": absent_policy, "join": "strict (POS,REF,ALT)"}
+    params = {"sample": sample, "absent_policy": absent_policy,
+              "join": "strict (POS,REF,ALT)" + (" + split-ALT recovery" if split_alt_join else ""),
+              "split_alt_join": split_alt_join}
     store.save(outdir / "path.npy", path, inputs=inputs, params=params,
                axis_digest=s.digest, note="the PRIVATE INPUT: target allele per site, per strand")
     store.save(outdir / "target_reason.npy", treason, inputs=inputs,

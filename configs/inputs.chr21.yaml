@@ -95,8 +95,8 @@ inputs:
 chain_span:
   start: 12968320      # exclusive
   end:   46680243      # inclusive -- the genetic map's last marker
-  keeps: 305887        # of 340,824 chr21 variant records = 89.75%
-  dropped_below: 34345
+  keeps: 305886        # of OUR 340,849 chr21 records = 89.74%
+  dropped_below: 34371
   dropped_above: 592
   provisional: true    # Dylan to settle with his PI; this is the cut that lets v1 run
   why: >

@@ -43,17 +43,32 @@ def _repo_root(start: Path) -> Path | None:
 
 
 def git_rev(repo: str | Path | None = None) -> str:
-    """The commit the code was at. 'unknown' rather than an exception --
-    provenance should never be the thing that fails a run."""
+    """The state of the code that ran -- NOT just HEAD.
+
+    ⚠ The first version returned `git rev-parse HEAD` with no dirty check, so an
+    artifact built from a modified tree was attributed to the preceding commit.
+    That is worse than recording nothing: 64 of 84 artifacts named a commit whose
+    code provably could not have produced them (they carried parameters the
+    committed code cannot emit). Provenance that confidently names the wrong cause
+    is a trap.
+
+    Returns `<sha>` for a clean tree and `<sha>-dirty+<12 hex of the diff>` for a
+    modified one, so an artifact built mid-edit is self-evidently so and two such
+    artifacts are distinguishable.
+    """
     root = Path(repo) if repo else _repo_root(Path(__file__).resolve())
     if root is None:
         return "unknown"
     try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=str(root),
-            capture_output=True, text=True, check=True,
-        )
-        return out.stdout.strip()
+        sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(root),
+                             capture_output=True, text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain"], cwd=str(root),
+                               capture_output=True, text=True, check=True).stdout.strip()
+        if not dirty:
+            return sha
+        diff = subprocess.run(["git", "diff", "HEAD"], cwd=str(root),
+                              capture_output=True, text=True, check=True).stdout
+        return f"{sha}-dirty+{hashlib.sha256(diff.encode()).hexdigest()[:12]}"
     except Exception:
         return "unknown"
 
@@ -151,6 +166,24 @@ def load_prov(path: str | Path) -> dict:
             f"so nothing records what produced it -- treat it as not quotable."
         )
     return json.loads(p.read_text())
+
+
+def verify(path: str | Path) -> None:
+    """Refuse an artifact whose bytes no longer match its recorded digest.
+
+    ⚠ The sidecar's sha256 was write-only until 2026-09-29: nothing compared it
+    against the file, so a silently mutated artifact passed every guard. A digest
+    nobody checks is decoration.
+    """
+    prov = load_prov(path)
+    actual = sha256_file(path)
+    if actual != prov["sha256"]:
+        raise ValueError(
+            f"{path} does not match its provenance record:\n"
+            f"  recorded sha256 {prov['sha256']}\n"
+            f"  actual sha256   {actual}\n"
+            f"The file changed after it was written. Rebuild it; do not override."
+        )
 
 
 def check_axis(path: str | Path, expected_digest: str) -> None:

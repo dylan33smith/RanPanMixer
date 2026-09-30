@@ -23,7 +23,7 @@ import numpy as np
 import store
 
 
-def build(cohort_dir: Path, *, strict: bool = False) -> dict:
+def build(cohort_dir: Path, *, strict: bool = True) -> dict:
     cohort_dir = Path(cohort_dir)
     hap = np.load(cohort_dir / "haplotypes.npy")
     an = np.load(cohort_dir / "an_info.npy")
@@ -40,7 +40,10 @@ def build(cohort_dir: Path, *, strict: bool = False) -> dict:
     meta = store.load_prov(cohort_dir / "haplotypes.npy")
     store.save(cohort_dir / "support.npy", support,
                inputs={"haplotypes": meta["sha256"]},
-               params={"definition": "count of non-missing haplotype entries per site"},
+               params={"definition": "count of non-missing haplotype entries per site",
+                       "an_mismatches": int(len(mismatch)),
+                       "sites_with_AN": int(have_an.sum()),
+                       "strict": strict},
                axis_digest=meta.get("axis_digest"),
                note="w_v = 1/support(v); cross-checked against INFO/AN")
 

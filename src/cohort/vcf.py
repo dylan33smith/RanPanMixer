@@ -28,8 +28,48 @@ def _run(cmd: list[str], stdout_path: Path | None = None) -> None:
         subprocess.run(cmd, check=True)
 
 
+def resolve_vg(cfg: dict | None = None, vg: Path | None = None) -> Path:
+    """Which vg binary will actually run. Precedence: explicit arg, $RANPANMIXER_VG,
+    the manifest's tools.vg.path, then the default.
+
+    ⚠ The manifest declared a vg path and sha256 that NO code read -- the pin was
+    decoration, and an impostor on $RANPANMIXER_VG ran while the digest test passed.
+    vg's version determines ALT allele ordering and therefore every allele index
+    downstream, so this is the one pin that must not be theatre.
+    """
+    if vg is not None:
+        return Path(vg)
+    env = os.environ.get("RANPANMIXER_VG")
+    if env:
+        return Path(env)
+    if cfg:
+        pth = (cfg.get("tools", {}).get("vg", {}) or {}).get("path")
+        if pth:
+            return Path(pth)
+    return VG
+
+
+def verify_vg(resolved: Path, cfg: dict | None) -> dict:
+    """Check the binary that will run against the manifest's declared digest."""
+    info = {"path": str(resolved), "sha256": store.sha256_file(resolved)}
+    try:
+        info["version"] = subprocess.run([str(resolved), "version"], capture_output=True,
+                                         text=True, check=True).stdout.splitlines()[0]
+    except Exception:
+        info["version"] = "unknown"
+    declared = ((cfg or {}).get("tools", {}).get("vg", {}) or {}).get("sha256")
+    if declared and declared != info["sha256"]:
+        raise ValueError(
+            f"vg digest mismatch. The manifest declares {declared} but the binary that "
+            f"would run, {resolved}, hashes to {info['sha256']}. vg's version decides "
+            f"ALT allele ordering and therefore every allele index downstream -- refuse."
+        )
+    info["digest_checked_against_manifest"] = bool(declared)
+    return info
+
+
 def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
-                threads: int = 32, vg: Path = VG) -> dict:
+                threads: int = 32, vg: Path | None = None, cfg: dict | None = None) -> dict:
     """`vg deconstruct` the GFA against the reference backbone path.
 
     Sample grouping was the risk here and it is settled: paths are PanSN
@@ -40,6 +80,8 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
     sample columns, so grouping is auto-detected and correct.
     """
     gfa = Path(gfa)
+    resolved = resolve_vg(cfg, vg)
+    vginfo = verify_vg(resolved, cfg)
     out_vcf = Path(out_vcf); out_vcf.parent.mkdir(parents=True, exist_ok=True)
 
     # vg cannot read a gzipped GFA -- it fails with "invalid Graph message", which
@@ -54,10 +96,17 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
                 shutil.copyfileobj(fi, fo, length=1 << 24)
         gfa = plain
 
-    _run([str(vg), "deconstruct", "-P", ref_prefix, "-a", "-t", str(threads), str(gfa)],
+    _run([str(resolved), "deconstruct", "-P", ref_prefix, "-a", "-t", str(threads), str(gfa)],
          stdout_path=out_vcf)
-    return {"vcf": str(out_vcf), "gfa_used": str(gfa),
-            "sha256": store.sha256_file(out_vcf)}
+    out = {"vcf": str(out_vcf), "gfa_used": str(gfa),
+           "sha256": store.sha256_file(out_vcf), "vg": vginfo}
+    # close the lineage: GFA + vg -> deconstruct.vcf had no sidecar at all
+    store.attach_prov(out_vcf, inputs={"gfa": store.sha256_file(gfa), "vg": vginfo["sha256"]},
+                      params={"ref_prefix": ref_prefix, "threads": threads,
+                              "vg_path": vginfo["path"], "vg_version": vginfo["version"]},
+                      note="vg deconstruct output. The vg VERSION is load-bearing: it "
+                           "determines ALT allele ordering and so every allele index.")
+    return out
 
 
 def drop_chm13(in_vcf: Path, out_vcf: Path, *, drop: str = "chm13") -> dict:
@@ -74,6 +123,9 @@ def drop_chm13(in_vcf: Path, out_vcf: Path, *, drop: str = "chm13") -> dict:
     _run(["bcftools", "index", "-f", str(out_vcf)])
     n = subprocess.run(["bcftools", "query", "-l", str(out_vcf)],
                        capture_output=True, text=True, check=True).stdout.split()
+    store.attach_prov(out_vcf, inputs={"deconstruct_vcf": store.sha256_file(in_vcf)},
+                      params={"dropped_sample": drop, "n_samples": len(n)},
+                      note="the 44-sample cohort VCF; chm13 removed")
     return {"vcf": str(out_vcf), "n_samples": len(n),
             "sha256": store.sha256_file(out_vcf), "dropped": drop}
 

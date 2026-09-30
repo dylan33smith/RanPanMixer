@@ -104,6 +104,94 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-29 (later) — A-IMP-preprocess: independence from PanMixer, and a real join bug
+
+**Goal.** Dylan's direction: the tool must be COMPLETELY INDEPENDENT of PanMixer, which is
+here only as a published example of a problem in the same space. Plus re-run chr21 through
+the committed code path rather than by hand, and recheck everything.
+
+### Independence — done and verified
+
+- **Our own conda env** `ranpanmixer` (`environment.yml`, plus `requirements.txt` for a
+  venv). Nothing from their `environment.yaml`. `src/` imports only stdlib, numpy and
+  pyyaml; scipy is present for the sampler. **pytest is in our env**, so both suites run
+  normally (it is absent from `panmixer`, which is why `test_preprocess.py` is self-running).
+- **The dev fixture is rebuilt from OUR VCF.** It had been sliced from PanMixer's.
+- **`vg` relocated** to `data/tools/vg`, pinned by sha256 in the manifest, overridable via
+  `$RANPANMIXER_VG`. Verified by re-running chrY deconstruct through it: 34,014 records.
+- **The 1000G panel staged** to `data/raw/`, recorded as evaluation-only.
+- `grep` finds **no** reference to `external/PanMixer` in `src/`, `configs/` or `tests/`, and
+  tracing every provenance sidecar shows PanMixer's chr21 VCF sha256 `5b880a3a…` appears in
+  **no** artifact's inputs.
+
+### chr21 re-run through the committed path
+
+8:33 / 9.475 GB, **340,849 records, 45 samples** — reproducing the by-hand run exactly
+(8:22 / 9.477 GB / same counts). The CLI performed its own decompression, confirming the gz
+fix. So the artifacts are now provably the output of committed code.
+
+### ⚠ A REAL BUG: the strict join could never match a multi-allelic record
+
+**The 1000G panel is entirely decomposed into biallelic records** — every one of its
+1,002,752 chr21 records declares exactly one ALT — while **7.9% of ours (27,021) are
+multi-allelic**. A strict (POS, REF, full-ALT-string) join therefore **cannot succeed on any
+of them**, for a purely notational reason, and the first implementation silently discarded
+target information we actually held.
+
+Recoverable by matching each of OUR alts against its own panel record and mapping back to
+OUR allele numbering:
+
+| | records |
+|---|---|
+| strict match | 258,610 |
+| **recoverable via split alts** | **8,377** (all multi-allelic; 8,283 inside `chain_span`) |
+| genuinely absent from the panel | 73,862 |
+
+Implemented as `split_alt_join`, on by default. Effects, measured across all ten targets:
+sites matched **258,610 -> 266,987**; chain positions with a target call **82.4% -> 85.1%**;
+and once the accounting was made consistent, representable non-ref calls **80.0% -> 83.5%**
+(a mean of 2,269 calls per target were being miscounted as unrepresentable).
+
+⚠ **The decomposition assumption is not universally safe, and the counter proves it.**
+**3 contradictions** across the ten targets (0.04% of recoveries) — a haplotype reading as
+carrying two different alts. Examined: chr21 **28,186,675**, REF `C`, our alts
+`CA,CAAA,CAA,CAAAA` — a **poly-A repeat** where the panel's biallelic records are NOT
+mutually exclusive, and haplotype 0 is `1` at both `C->CA` and `C->CAA`. The code counts it
+and **leaves the row unresolved rather than guessing**, and those calls fall back to
+`pos_only`. That is the correct behaviour and the contradiction counter is what makes it
+visible.
+
+**Second-order bug this exposed:** the recovery initially improved `path.npy` while
+`representability.json` still classified those calls as unrepresentable — the two artifacts
+disagreed about the same fact. Fixed by deferring the classification until the reconstruction
+resolves.
+
+### Three other items closed
+
+- **`support(v) == 0` is excluded from the chain**, not patched. `w_v = 1/(support+1)` was
+  the tempting fix and is wrong: at support 0 no donor has an allele, so the sampler has
+  nothing to emit and RENORMALISE has an empty pool — the position is unusable, and a finite
+  weight it can never earn would just hide that. Removes 0 positions today (the one such
+  site is already outside the span), so the guard no longer rests on that luck.
+- **`target_reason.npy`** distinguishes `no_record_in_target_callset` from
+  `record_present_but_no_call`. Measured: the inert 19% is **53,861 code 1 and ZERO code 2**
+  — a phased panel has no missing genotypes inside its own site list. So the unmatched set
+  is identical for all ten targets and provably carries no per-person variation, which is
+  the property needed to normalise `beta_v` over the panel-matched positions legitimately.
+- **A fabricated checksum, caught by the check written to catch it.** A `vg` sha256 was
+  written into the manifest with its tail invented from a truncated terminal display. It
+  looked plausible. Corrected, and a test now compares every declared tool digest against
+  the binary on disk — verified to fail against a corrupted one. A checksum that was never
+  computed is the worst violation of the traceability rule, since being checked is its only
+  purpose.
+
+**Provenance.** 40 tests pass in the `ranpanmixer` env. Audit workflow `wf_814ac6b2-5f2`
+launched four auditors; all four were cut off before returning, but one flagged the
+multi-allelic lead that this entry's main finding came from — chased and confirmed by hand.
+
+---
+
+
 ## 2026-09-29 — A-IMP-preprocess: the preprocessing pipeline, built and run end to end
 
 **Goal.** Implement preprocessing for the cohort and one target, verify every step, and

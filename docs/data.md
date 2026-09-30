@@ -59,6 +59,11 @@ in git as history.
 | `tests/tiny/` | a 24-record hand-written fixture, the only one committable | `OK` |
 | `data/` | symlink -> `/data/ds85/RanPanMixer/data`, gitignored | `OK` |
 
+**Artifacts not previously registered** (added 2026-09-29): `an_info.npy` (INFO/AN as the
+caller wrote it, cross-checked against `support`), `allele_lengths_offsets.npy` (the ragged
+index into `allele_lengths`), `target_reason.npy` and `readable.npy` (see `docs/plan.md`).
+⚠ `temp/chr21/deconstruct.vcf` is UNCOMPRESSED, not `.vcf.gz`.
+
 **Data tree.** `temp/` holds intermediates and is deletable; `cohort/` holds the
 durable artifacts and no target ever touches it; `dev/` is a complete parallel root
 reached with `--root data/dev`, so the 2 Mb slice runs the identical code path.
@@ -77,7 +82,8 @@ data/
   cohort/chr21/   haplotypes reason missing_runs positions genetic_pos in_chain
                   support allele_lengths sites.tsv haplotype_ids manifest.json
   dev/            the same tree, built from the 14-16 Mb slice
-  targets/<id>/chr21/   target.chr21.vcf.gz, path.npy, representability.json
+  targets/<id>/chr21/   target.chr21.vcf.gz, path.npy, target_reason.npy,
+                        readable.npy, representability.json
   attack/         1000g_30x_chr21_attackdb.vcf.gz  (evaluation only)
 ```
 

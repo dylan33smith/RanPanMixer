@@ -15,26 +15,26 @@ It carries **no findings, no results, no numbers** — those live in `docs/`.
 - **Mission:** implement and validate the cohort-tilted `tau`-private path release
   of `paper/Private_Genome_Path_Release.pdf`. Success = a sampler whose released
   paths retain measurable utility while the proven `tv_bound` holds and no
-  implemented attacker beats `p_succ_bound`. PanMixer supplies the cohort DATA and
-  an optional comparison arm — **not** the mechanism: its shipped sampler never
-  recombines, so reusing its HMM as `baseline_model` is not available.
-- **What this is NOT:** PanMixer protects cohort members by rewriting one member's
-  genotype column in the cohort VCF; it does not modify the graph either. The
-  difference is the object released and who is protected. We release an *external
-  target's mapped path* — a standalone object, never a column in the cohort file.
+  implemented attacker beats `p_succ_bound`.
+- **INDEPENDENT OF PANMIXER.** PanMixer is a published example of a problem in the
+  same space — it protects cohort members by rewriting one member's genotype column,
+  a different threat model, release object and attack vector. It is **not** a
+  dependency and **not** a data source: we run our own `vg deconstruct` on the HPRC
+  GFA we downloaded, and nothing in `src/`, `configs/` or `tests/` may read a path
+  inside its tree. We release an *external target's mapped path* — a standalone
+  object, never a column in the cohort file.
 - **THE TARGET IS EXTERNAL** — not in `G`, `D`, any panel, or the attack database.
   Nothing in the mechanism is a function of the target except the tilt, and a
   PanMixer property stated about a cohort-member target does not transfer. ⚠ Sole
   exception: the optional **head-to-head arm**, where a cohort member stands in as
   target; every `K = 86`, leave-one-out and cohort-distortion quantity — including
   `af_loss`/`ld_loss` entirely — belongs to that arm alone.
-- **Environment:** single Linux workstation. PanMixer's inputs and the GRCh38
-  genetic map are acquired; our mechanism artifacts are `PLANNED`. Every
-  `docs/data.md` path carries its own state — read the row, do not assume.
-- **Stack:** Python, NumPy/SciPy. PanMixer is pinned at `c182c38` under
-  `external/PanMixer` (symlink to `/data`; it writes inside its own tree and assumes
-  SLURM, absent here). Its conda env is `panmixer`; `pytest` is NOT in it — use
-  `python3`. Check before assuming any library is installed.
+- **Environment:** single Linux workstation. Every `docs/data.md` path carries its
+  own state — read the row, do not assume.
+- **Stack:** Python, NumPy/SciPy. **Our env is `ranpanmixer`** (`environment.yml`;
+  `pytest` IS in it). PanMixer is pinned at `c182c38` under `external/PanMixer`
+  (symlink to `/data`), read-only, for reference and the comparison arm only — its
+  `panmixer` env is not ours. Check before assuming any library is installed.
 
 ## Documentation Architecture
 

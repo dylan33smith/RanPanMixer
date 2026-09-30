@@ -345,8 +345,8 @@ artifact is an input to anything we build.** Their allele indices differ from ou
 (see `docs/memory.md` 2026-09-29, the ALT-reordering finding), so a cross-build join would
 be wrong as well as unwanted.
 
-**1. `absent_policy` — 19.0% of the tilt budget is currently inert, and there is a better
-third option.** The mechanics, stated precisely because the phrasing matters:
+**1. `absent_policy` — 16.4% of the tilt budget is inert (was 19.0% before the split-ALT
+fix of item 1d), and there is a better third option.** The mechanics, stated precisely because the phrasing matters:
 
 - Our site axis is the **pangenome's** 340,849 records. The target is read from the 1000G
   30x panel, which has its own site list. **24.1% of our records have no 1000G record at
@@ -357,23 +357,35 @@ third option.** The mechanics, stated precisely because the phrasing matters:
   prior draw there. **The release carries a cohort allele at those positions with no
   reference to the target whatsoever.**
 - Because `beta_v` is normalised over **all** chain positions, those inert positions sit in
-  the denominator. So `u` can never exceed **0.81**, and the tilt tops out at
-  `exp(0.81 · eta_tau)` instead of `exp(eta_tau)` — we pay the full `tau` for 81% of the
-  leverage. Measured: 252,025 of 305,886 chain positions have a target call, identical for
+  the denominator. So `u` can never exceed **0.836**, and the tilt tops out at
+  `exp(0.836 · eta_tau)` instead of `exp(eta_tau)` — we pay the full `tau` for 83.6% of the
+  leverage. Measured: 260,308 of 305,886 chain positions have a target call, identical for
   all ten targets because it is a property of the two site sets, not of any individual.
-  Note the inert positions are **disproportionately weighted** — 19.0% of the weight against
-  17.6% of the positions — because graph-only variants sit in harder regions with lower
+  Note the inert positions are **disproportionately weighted** — 16.4% of the weight against
+  14.9% of the positions — because graph-only variants sit in harder regions with lower
   support and therefore higher `w_v = 1/support(v)`.
 
 | option | effect |
 |---|---|
-| "missing" (current) | honest, but max `u` = 0.81; 19% of the budget cannot move |
+| "missing" (current) | honest, but max `u` = 0.836; 16.4% of the budget cannot move |
 | "reference" | fills allele 0. Recovers the budget but **invents a call** — absence from a callset means the caller reported no variant there, NOT that this person is reference. Worse than inert: `phi_v` would then reward donors matching a fabricated value |
 | **normalise `beta_v` over the panel-matched positions** | max `u` = 1, nothing invented. **Legitimate, because the matched set is a property of the PANEL and is fixed before any target arrives** — identical for all ten, so it is target-independent and can be declared as part of the utility definition |
 
+⚠ **CORRECTION 2026-09-29 (independence audit).** The justification below was attached to
+the WRONG set. `in_chain & (target_reason == 0)` — positions where a particular target has a
+call — is **NOT** invariant: measured, **4 distinct sets across the ten targets**, because a
+contradiction at a poly-A repeat drops a row for one target and not another. Normalising
+`beta_v` over it would be exactly the constraint-1 violation this section warns about.
+The set that IS invariant is now emitted as **`readable.npy`** — a row is readable if the
+panel has a usable record for it, by strict match or full multi-allelic coverage, and both
+tests read only the panel's **site list**, which is the same file for every target.
+**Verified: 1 distinct set across all ten**, and locked by a test. **Normalise `beta_v` over
+`in_chain & readable`**, which gives max `u` = 1.000 over **253,846 of 305,886** chain
+positions (83.0%). Normalising over all chain positions caps `u` at **0.815**.
+
 **Measured 2026-09-29, and it settles the target-dependence worry.** With `target_reason.npy`
-in place the 19% splits as: **53,861 positions code 1** (no record in the target callset,
-19.0% of the weight) and **0 positions code 2** (record present, no call). A phased reference
+in place the 19% splits as: **45,578 positions code 1** (no record in the target callset,
+16.4% of the weight) and **0 positions code 2** (record present, no call). A phased reference
 panel has no missing genotypes within its own site list, so every target is fully called
 there — identical for all ten. **The restricting set therefore provably contains no
 per-person variation**, which is exactly the property the third option needs.
@@ -391,10 +403,20 @@ would have a different unmatched fraction.
 |---|---|---|
 | target variant with **no graph record** — unrepresentable at any `tau` | target → graph | **10.2%** of non-ref calls, **21.5%** of information |
 | target variant where the graph has the POS but a different REF/ALT spelling | target → graph | ~9.9%, joinable only under a relaxed key we deliberately do not use |
-| **graph record with no target record** — we cannot read the target there | graph → panel | **24.1%** of sites, **19.0%** of `beta_v` weight |
+| **graph record with no target record** — we cannot read the target there | graph → panel | **14.9%** of chain positions, **16.4%** of `beta_v` weight (was 17.6% / 19.0% before the split-ALT fix) |
 
 The first two are ceilings on fidelity. The third is a ceiling on the *budget*. Reporting
 one when you mean another inverts the conclusion.
+
+**1d. ⚠ PART OF THE INERT BUDGET WAS A BUG, NOW FIXED.** The 1000G panel is decomposed into
+biallelic records while 7.9% of our records are multi-allelic, so a strict full-ALT join
+could never match those — 8,377 records, 8,283 of them in the chain, whose target alleles we
+actually held. `split_alt_join` recovers them by matching each of our alts against its own
+panel record. Chain positions with a target call went **82.4% -> 85.1%**, and representable
+non-ref calls **80.0% -> 83.5%**. So the remaining inert fraction is **16.4%** of the weight
+(over **14.9%** of chain positions), not 19.0% over 17.6%. ⚠ 3 recoveries in 10 targets hit a **poly-A repeat** where the panel's records are
+not mutually exclusive; those rows are left unresolved rather than guessed, and the
+contradiction counter is what makes that visible.
 
 **1c. `support(v) = 0` is now excluded from the chain (2026-09-29), not patched.** Measured: of the
 **305,886** chain positions, only **252,025** have a target allele at all, because 24.1% of

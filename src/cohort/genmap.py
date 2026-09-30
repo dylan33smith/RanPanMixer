@@ -99,6 +99,8 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
 
     meta = store.load_prov(positions_npy)
     digest = meta.get("axis_digest")
+    if support is not None and digest:
+        store.check_axis(sup_path, digest)   # the guard must actually be invoked
     inputs = {"positions": meta["sha256"], "gmap": store.sha256_file(gmap_path)}
     params = {"chain_span_start_exclusive": start, "chain_span_end_inclusive": end,
               "interp": "numpy.interp, left=nan right=nan", "provisional": True,

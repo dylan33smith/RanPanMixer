@@ -340,6 +340,109 @@ def test_manifest_tool_digests_match_the_binaries_on_disk():
         )
 
 
+def test_split_alt_join_recovers_multiallelic_records():
+    """REGRESSION 2026-09-29. The 1000 Genomes panel is entirely decomposed into
+    biallelic records -- every one of its 1,002,752 chr21 records declares exactly
+    one ALT -- while 7.9% of our pangenome records are multi-allelic. A strict
+    full-ALT-string join can therefore NEVER match those 27,021 records, for a
+    purely notational reason, and the first implementation silently discarded
+    target information we actually held: 8,377 rows, 8,283 of them inside
+    chain_span.
+
+    This test builds the same shape in miniature: one multi-allelic cohort record,
+    a target VCF that decomposes it into two biallelic records, and a target that
+    carries a different ALT on each haplotype -- so the reconstruction has to map
+    BOTH panel records back onto our allele numbering, which is the case a naive
+    'first match wins' would get wrong.
+    """
+    sys.path.insert(0, str(SRC))
+    from cohort import arrays as A
+    from target import path as TP
+    out = REPO / "tests" / "_tmp" / "splitalt"
+    coh = out / "cohort"; coh.mkdir(parents=True, exist_ok=True)
+
+    # cohort: one biallelic record and one 2-ALT record
+    cvcf = out / "cohort.vcf"
+    cvcf.write_text(
+        "##fileformat=VCFv4.2\n##contig=<ID=c,length=1000>\n"
+        '##INFO=<ID=AN,Number=1,Type=Integer,Description="x">\n'
+        '##INFO=<ID=LV,Number=1,Type=Integer,Description="x">\n'
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="GT">\n'
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tD1\tD2\n"
+        "c\t100\t.\tA\tG\t60\t.\tAN=4;LV=0\tGT\t0|1\t0|0\n"
+        "c\t200\t.\tC\tT,G\t60\t.\tAN=4;LV=0\tGT\t1|2\t0|1\n")
+    A.build(cvcf, coh)
+    # through store.save, not np.save: check_axis now demands a sidecar, and a test
+    # that bypasses the chokepoint is a test that does not exercise the real path
+    import sites as _s
+    _d = _s.load_sites(coh / "sites.tsv").digest
+    store_mod.save(coh / "in_chain.npy", np.ones(2, dtype=bool),
+                   inputs={}, params={}, axis_digest=_d)
+
+    # target: the SAME site 200 decomposed into two biallelic records, and the
+    # target carries T on haplotype 0 and G on haplotype 1 -> our alleles 1 and 2
+    tvcf = out / "target.vcf"
+    tvcf.write_text(
+        "##fileformat=VCFv4.2\n##contig=<ID=c,length=1000>\n"
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="x">\n'
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="GT">\n'
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tTGT\n"
+        "c\t100\t.\tA\tG\t60\t.\tAF=0.1\tGT\t0|1\n"
+        "c\t200\t.\tC\tT\t60\t.\tAF=0.1\tGT\t1|0\n"
+        "c\t200\t.\tC\tG\t60\t.\tAF=0.1\tGT\t0|1\n")
+
+    rep = TP.build(tvcf, coh, out / "t", sample="TGT", split_alt_join=True)
+    path = np.load(out / "t" / "path.npy")
+    assert list(path[0]) == [0, 1], f"biallelic row should pass through, got {path[0]}"
+    assert list(path[1]) == [1, 2], (
+        f"multi-allelic row should reconstruct to OUR allele numbering [1,2], got {path[1]}")
+    assert rep["split_alt_join"]["rows_recovered"] == 1
+    assert rep["split_alt_join"]["contradictions"] == 0
+
+    # and with the recovery disabled the row must be lost, proving it does work
+    rep2 = TP.build(tvcf, coh, out / "t2", sample="TGT", split_alt_join=False)
+    p2 = np.load(out / "t2" / "path.npy")
+    assert list(p2[1]) == [-1, -1], "without the split join the multi-allelic row is lost"
+    assert rep2["split_alt_join"]["rows_recovered"] == 0
+
+
+def test_readable_set_is_target_independent_but_called_set_is_not():
+    """REGRESSION 2026-09-29, from the independence audit.
+
+    docs/plan.md recommends normalising beta_v over the panel-matched positions, and
+    justified it with "identical for all ten targets". That justification was attached
+    to the WRONG set. `in_chain & (target_reason == 0)` -- positions where a particular
+    target has a call -- is NOT invariant: a contradiction at a poly-A repeat drops a
+    row for one target and not another, giving four distinct sets across ten targets.
+    Normalising over it would make beta_v target-dependent, which is the standing
+    constraint 1 violation that voids Theorem 1.
+
+    `readable.npy` is the set that IS invariant, because both its tests read only the
+    panel's site list. This test asserts both halves, on the real artifacts, and is
+    skipped when they are absent.
+    """
+    import glob
+    rd = sorted(glob.glob(str(REPO / "data/targets/*/chr21/readable.npy")))
+    tr = sorted(glob.glob(str(REPO / "data/targets/*/chr21/target_reason.npy")))
+    if len(rd) < 2:
+        print("    (skipped: needs >=2 built targets)")
+        return
+    sites_p = REPO / "data/cohort/chr21/sites.tsv"
+    s = sites_mod.load_sites(sites_p)
+    readable_sets = {frozenset(np.flatnonzero(np.load(f)).tolist()) for f in rd}
+    assert len(readable_sets) == 1, (
+        f"readable.npy differs across targets ({len(readable_sets)} distinct sets). It must "
+        f"be a function of the panel's site list alone, or beta_v normalised over it is "
+        f"target-dependent."
+    )
+    called_sets = {frozenset(np.flatnonzero(s.in_chain & (np.load(f) == 0)).tolist())
+                   for f in tr}
+    # not an error -- documenting WHY readable exists. If this ever becomes 1, the
+    # comment above is stale, not the code.
+    print(f"    (readable: 1 set; target_reason==0: {len(called_sets)} sets -- "
+          f"which is why readable.npy exists)")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]

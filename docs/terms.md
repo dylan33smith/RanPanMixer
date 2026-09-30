@@ -195,7 +195,7 @@ Is:                   Non-negative per-position weights with sum_v beta_v = 1. T
                       Under model C: beta_v = w_v / sum_u w_u with w_v = 1/support(v).
 Computed by:          PLANNED. ⚠ support(v) needs NO computation — measured 2026-09-28,
                       the pangenome VCF's own INFO/AN field is bit-identical to
-                      np.sum(pangenome != -1, axis=(0,2)) across all 340,824 chr21
+                      np.sum(pangenome != -1, axis=(0,2)) across all 340,849 chr21
                       records.
 CHANGES MEANING WITH: whether they are uniform (1/T) or support-weighted, and whether
                       length-weighting is ever adopted. The normalization is what keeps
@@ -211,7 +211,7 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
                       thinner: each position moves less and there are proportionally
                       more of them. Measured at tau = 0.5 (eta = 0.5493): per-position
                       tilt 1.0000055 at T = 100,757 (blocks) against 1.0000016 at
-                      T = 340,824 (variants), total exp(eta) = 1.7321 either way.
+                      T = 340,849 (variants), total exp(eta) = 1.7321 either way.
                       Model C is in fact BETTER on utility at matched tau, because a
                       block design must take a whole block from one donor while C can
                       collect partial credit position by position.
@@ -306,9 +306,9 @@ Is:                   T, the number of ordered positions in the hidden Markov ch
                       the steps the sampler takes along the chromosome, at each of
                       which it picks a donor haplotype and emits that donor's allele.
 Computed by:          PLANNED — one position per VCF record inside `chain_span`.
-                      chr21: 305,887 positions (340,824 records less the 34,345 below
+                      chr21: 305,886 positions (340,849 records less the 34,371 below
                       the coordinate cut).
-CHANGES MEANING WITH: the model. C = 340,824 raw / 305,887 after the cut; B = 100,757
+CHANGES MEANING WITH: the model. C = 340,849 raw / 305,886 after the cut; B = 100,757
                       LD-block entries. Runtime and numerical headroom both scale with
                       it — see beta_t for why finer T costs float32 headroom but NOT
                       privacy budget.
@@ -323,13 +323,13 @@ Aliases:              "T", "sites". ⚠ The name `T_blocks` is now a misnomer un
 ```
 Is:                   The length of the SITE AXIS — the number of VCF records for a
                       chromosome, and therefore the first dimension every preprocessing
-                      artifact is indexed by. chr21: **340,824**.
+                      artifact is indexed by. chr21: **340,849** (OUR build; PanMixer's is 340,824).
 Computed by:          PLANNED — the record count of the deconstructed per-chromosome VCF.
 CHANGES MEANING WITH: the VCF. A re-sort, a re-filter or a different `vg` version changes
                       which row is which SILENTLY, because every join in the pipeline is
                       positional. ⚠ Distinct from T: `n_sites` is the axis, T is the
                       number of CHAIN positions, which is `n_sites` restricted to
-                      `chain_span` (chr21: 305,887 of 340,824).
+                      `chain_span` (chr21: 305,886 of 340,849).
 Valid vs:             the same VCF, verified by the `sites.tsv` digest.
 Status:               SECONDARY
 Aliases:              "the site axis", "rows". Never "T".
@@ -338,8 +338,8 @@ Aliases:              "the site axis", "rows". Never "T".
 ### allele_lengths  [implementation] [dataset]
 ```
 Is:                   The length in base pairs of every declared allele at every record —
-                      ragged, `num_alleles[i]` entries for row i. chr21: 767,324 declared
-                      alleles over 340,824 records, max 90 at one site.
+                      ragged, `num_alleles[i]` entries for row i. chr21: 767,376 declared
+                      alleles over 340,849 records, max 90 at one site.
 Computed by:          PLANNED — emitted by our VCF-to-matrix step, which is the only
                       moment REF/ALT are in hand.
 CHANGES MEANING WITH: nothing, but its ABSENCE changes several things. Carried because
@@ -363,8 +363,8 @@ Aliases:              none
 Is:                   The coordinate interval of a chromosome the chain actually runs
                       over. ✅ chr21 (decided 2026-09-28, closed at both ends 2026-09-29):
                       **12,968,320 < POS <= 46,680,243** — the interval over which the
-                      genetic map carries real markers — keeping **305,887** of 340,824
-                      variants (89.75%). Everything outside is excluded from the chain
+                      genetic map carries real markers — keeping **305,886** of 340,849
+                      variants (89.74%). Everything outside is excluded from the chain
                       and from the release.
                       ⚠ **PROVISIONAL — Dylan to settle with his PI.** This is the cut
                       that lets v1 run, not a defended answer. Revisit it before any
@@ -394,7 +394,7 @@ place them uniquely and why GRCh38 fills them with N. chr21's p arm is the 0–~
 **The live defect the cut fixes.** `np.interp` clamps by default, so all 26,018 variants
 below the map's start (10,326,676) receive the map's first value; and the map's own first
 interval (10,326,676 → 12,968,320, spanning the centromere) carries **dcM = 0.000000**.
-Together that is **34,345 consecutive positions with identical cM**, so `Delta_x = 0`,
+Together that is **34,371 positions excluded by the cut** (26,044 NaN below the map plus 8,327 on the map's zero-cM centromeric plateau, all at cM 0.584144 exactly), so `Delta_x = 0`,
 `P(switch) = 0`, and the sampler emits **one donor's real haplotype verbatim across
 7.25 Mb** — departure (b) at roughly 200x the scale of the worst single block. This is a
 privacy failure, not a utility one, and it is silent.
@@ -449,7 +449,7 @@ chain SEGMENTS are unnecessary: a long variant-free stretch inside the span prod
 behaviour. The chain does not need to be broken by hand anywhere inside `chain_span`.
 
 ⚠ **INTERPOLATE WITH `left=nan, right=nan`**, then assert no NaN survives the cut. That one
-change converts a silent 34,345-position failure into a crash.
+change converts a silent 34,371-position failure into a crash.
 
 ### K_states  [implementation] [dataset]
 ```
@@ -566,8 +566,8 @@ CHANGES MEANING WITH: which positions are in the chain. It barely matters for th
                       so expect systematic donor switching in badly-assembled regions.
                       Measure this once the sampler runs; it is not a reason to change
                       the policy now.
-                      ⚠ GUARD REQUIRED: measured 2026-09-28 on chr21, 1 site of 340,824
-                      has all 88 donors missing and 89 sites leave <= 1 donor. The
+                      ⚠ GUARD REQUIRED: measured on OUR chr21 build, 1 site of 340,849
+                      has all 88 donors missing and 41 sites leave <= 1 donor. The
                       renormalised denominator can be zero. Declare the fallback
                       (uniform over all donors), count how often it fires, and report it.
 Valid vs:             another run under the SAME policy. Never compare across policies.
