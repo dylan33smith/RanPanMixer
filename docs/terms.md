@@ -156,7 +156,7 @@ Aliases:              "u". Never "similarity" — phi_t is the similarity; u is 
                       weighted aggregate.
 ```
 
-### phi_t  [utility]
+### phi_v  [utility]
 ```
 Is:                   The local per-position similarity in [0,1] between the target's
                       allele and a candidate donor's allele at chain position v.
@@ -170,9 +170,10 @@ CHANGES MEANING WITH: the missing_policy (an excluded donor has no phi_v at all)
                       the position contributes no tilt and every donor gets factor 1.
 Valid vs:             the same phi_v on the same site axis.
 Status:               PRIMARY
-Aliases:              "local agreement". ⚠ Historically "phi_t" / "block similarity",
-                      from the per-block design; under C the index is a variant, not
-                      a block. Write phi_v.
+Aliases:              "local agreement". ⚠ RENAMED from `phi_t` 2026-09-29. The old
+                      name came from the per-block design; under model C the index
+                      is a variant, not a block. `phi_t` in older entries and in
+                      docs/memory.md means this quantity.
 ⚠ THE k-MER JACCARD IS NOT THIS. The proposal's worked example — a population-weighted
                       k-mer Jaccard, sum_x w(x) min(1[x in K(a)], 1[x in K(b)]) over
                       sum_x w(x) max(...) — is RULED OUT as the in-sampler potential
@@ -187,7 +188,7 @@ Aliases:              "local agreement". ⚠ Historically "phi_t" / "block simil
                       out of the mechanism.
 ```
 
-### beta_t  [utility]
+### beta_v  [utility]
 ```
 Is:                   Non-negative per-position weights with sum_v beta_v = 1. They
                       decide which parts of the path the mechanism tries to preserve.
@@ -202,7 +203,7 @@ CHANGES MEANING WITH: whether they are uniform (1/T) or support-weighted, and wh
                       calibration, not just the emphasis.
 Valid vs:             the same weighting scheme.
 Status:               SECONDARY
-Aliases:              none
+Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_v`.
 ⚠ THE BUDGET IS INVARIANT IN T. Since u = sum_v beta_v phi_v with sum beta = 1, u lands
                       in [0,1] however the path is partitioned, and the total tilt
                       between a perfectly-matching and a non-matching path is exp(eta_tau)

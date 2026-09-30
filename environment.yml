@@ -1,0 +1,29 @@
+# RanPanMixer's own environment. Deliberately NOT PanMixer's.
+#
+# PanMixer is in this repository as a published example of a problem in the same
+# space -- a different threat model, a different release object, a different
+# attack vector. It is not a dependency of our tool and nothing here comes from
+# its environment.yaml. Our pipeline reads a pangenome graph and a genetic map
+# and produces its own arrays; it needs no part of their stack.
+#
+#   conda env create -f environment.yml
+#   conda activate ranpanmixer
+#
+name: ranpanmixer
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  # the mechanism and the preprocessing arrays
+  - numpy>=1.26
+  - scipy>=1.11          # for the sampler; not used by preprocessing yet
+  - pyyaml>=6            # src/cli.py reads configs/inputs.chr21.yaml
+  # VCF handling. bcftools is the only external tool preprocessing shells out to
+  # besides vg, whose binary is pinned separately (see docs/data.md).
+  - bcftools>=1.19
+  - htslib>=1.19
+  # tests. The docs contract and tests/test_preprocess.py both also run under a
+  # bare interpreter -- test_preprocess.py is self-running by design -- but pytest
+  # is the normal way to run them.
+  - pytest>=8

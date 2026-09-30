@@ -1,0 +1,8 @@
+# Python-only dependencies, for a venv rather than conda.
+# bcftools and vg are external binaries -- see environment.yml and docs/data.md.
+#
+#   python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+numpy>=1.26
+scipy>=1.11
+pyyaml>=6
+pytest>=8

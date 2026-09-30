@@ -56,15 +56,26 @@ def interpolate(positions: np.ndarray, gmap_path: Path) -> np.ndarray:
                      left=np.nan, right=np.nan)
 
 
-def chain_mask(positions: np.ndarray, cm: np.ndarray, start: int, end: int) -> np.ndarray:
+def chain_mask(positions: np.ndarray, cm: np.ndarray, start: int, end: int,
+               support: np.ndarray | None = None) -> np.ndarray:
     """The chain_span mask, asserting no NaN survives inside it.
 
     `start` is exclusive and `end` inclusive, matching configs/inputs.chr21.yaml.
     The assertion is the payoff for interpolating with NaN: it makes "every chain
     position carries a genuine interpolated cM" a checked invariant rather than a
     claim in a document.
+
+    ⚠ Positions with `support == 0` are also excluded. There, NO donor haplotype
+    has a called allele, so the sampler has nothing to emit and RENORMALISE has an
+    empty pool -- the position is unusable, not merely awkward. Excluding it also
+    removes the `w_v = 1/support(v)` division by zero at its source, which is
+    better than patching the weight: `1/(support+1)` would keep the position in
+    the chain and give it a finite weight it cannot ever earn. The exclusion is a
+    function of the cohort alone, so it is target-independent.
     """
     mask = (positions > start) & (positions <= end)
+    if support is not None:
+        mask &= support > 0
     bad = mask & ~np.isfinite(cm)
     if bad.any():
         i = np.flatnonzero(bad)
@@ -82,13 +93,16 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
     outdir = Path(outdir)
     positions = np.load(positions_npy)
     cm = interpolate(positions, gmap_path)
-    mask = chain_mask(positions, cm, start, end)
+    sup_path = Path(outdir) / "support.npy"
+    support = np.load(sup_path) if sup_path.exists() else None
+    mask = chain_mask(positions, cm, start, end, support)
 
     meta = store.load_prov(positions_npy)
     digest = meta.get("axis_digest")
     inputs = {"positions": meta["sha256"], "gmap": store.sha256_file(gmap_path)}
     params = {"chain_span_start_exclusive": start, "chain_span_end_inclusive": end,
-              "interp": "numpy.interp, left=nan right=nan", "provisional": True}
+              "interp": "numpy.interp, left=nan right=nan", "provisional": True,
+              "excludes_zero_support": support is not None}
 
     store.save(outdir / "genetic_pos.npy", cm, inputs=inputs, params=params,
                axis_digest=digest,
@@ -103,6 +117,8 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
     return {
         "n_sites": int(len(positions)),
         "T": int(mask.sum()),
+        "excluded_zero_support": int(((positions > start) & (positions <= end)
+                                     & (support == 0)).sum()) if support is not None else None,
         "dropped_below": int((positions <= start).sum()),
         "dropped_above": int((positions > end).sum()),
         "cm_span": [float(inside.min()), float(inside.max())] if mask.any() else None,

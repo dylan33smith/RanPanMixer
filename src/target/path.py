@@ -31,6 +31,29 @@ import store
 #                   Cheaper on budget, but it INVENTS a call.
 ABSENT_POLICIES = ("missing", "reference")
 
+# Why the TARGET needs its own reason codes, separate from the cohort's.
+#
+# A -1 in path.npy has two completely different meanings and phi_v cannot tell
+# them apart, because both simply produce "no tilt here":
+#
+#   NO_RECORD  the target's callset has no record at this graph position at all.
+#              A limitation of OUR JOIN, identical for every target drawn from the
+#              same panel. It says nothing about the person.
+#   NO_CALL    the callset HAS a record here but reported no genotype for this
+#              individual. A real failure to call THIS person.
+#
+# They behave identically in the mechanism and differently in the reporting: a
+# position the panel never covered arguably should not count against
+# target_fidelity, while one it covered and could not call for this person
+# arguably should. Without these codes that denominator is ambiguous, and the
+# cohort's reason codes cannot express either case -- theirs are about graph
+# nesting (LV/PS/CONFLICT), which has nothing to do with callset coverage.
+T_CALLED    = 0
+T_NO_RECORD = 1
+T_NO_CALL   = 2
+T_CODE_NAMES = {T_CALLED: "called", T_NO_RECORD: "no_record_in_target_callset",
+                T_NO_CALL: "record_present_but_no_call"}
+
 
 def _open(path: Path):
     return gzip.open(path, "rt") if str(path).endswith(".gz") else open(path, "rt")
@@ -83,6 +106,9 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
     fill = -1 if absent_policy == "missing" else 0
     path = np.full((s.n_sites, 2), fill, dtype=np.int16)
     matched = np.zeros(s.n_sites, dtype=bool)
+    # every site starts as "no record"; the join downgrades to no-call or promotes
+    # to called as it learns better
+    treason = np.full(s.n_sites, T_NO_RECORD, dtype=np.int8)
 
     n_target_records = 0
     n_nonref = n_nonref_in = 0
@@ -111,6 +137,7 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
             if row is not None:
                 path[row, 0], path[row, 1] = a, b
                 matched[row] = True
+                treason[row] = T_NO_CALL if (a == -1 and b == -1) else T_CALLED
 
             if (a > 0) or (b > 0):          # a non-reference call by the target
                 n_nonref += 1
@@ -172,6 +199,8 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
                                  "invisible": info_inv_in,
                                  "invisible_frac": (info_inv_in / total_in) if total_in else None},
         },
+        "target_reason_counts": {T_CODE_NAMES[k]: int((treason == k).sum()) for k in T_CODE_NAMES},
+        "in_chain_usable": None,     # filled below
         "ceiling_note": (
             "invisible calls can never be retained at any tau -- they have no chain "
             "position. Report target_fidelity against this ceiling. A held-out panel "
@@ -179,11 +208,28 @@ def build(target_vcf: Path, cohort_dir: Path, outdir: Path, *,
         ),
     }
 
+    # how much of the tilt budget this target can actually move
+    usable = s.in_chain & (treason == T_CALLED)
+    rep["in_chain_usable"] = {
+        "chain_positions": int(s.in_chain.sum()),
+        "with_a_target_call": int(usable.sum()),
+        "frac": float(usable.sum() / s.in_chain.sum()) if s.in_chain.any() else None,
+        "note": ("positions where phi_v is defined. The rest consume beta_v weight and "
+                 "can never contribute to u, so max achievable u is this fraction unless "
+                 "beta is normalised over this set instead -- see docs/plan.md."),
+    }
+
     inputs = {"target_vcf": store.sha256_file(target_vcf),
               "cohort_sites": store.sha256_file(cohort_dir / "sites.tsv")}
     params = {"sample": sample, "absent_policy": absent_policy, "join": "strict (POS,REF,ALT)"}
     store.save(outdir / "path.npy", path, inputs=inputs, params=params,
                axis_digest=s.digest, note="the PRIVATE INPUT: target allele per site, per strand")
+    store.save(outdir / "target_reason.npy", treason, inputs=inputs,
+               params={**params, "codes": {str(k): v for k, v in T_CODE_NAMES.items()}},
+               axis_digest=s.digest,
+               note="why a path entry is -1: our join had no record (1) vs the callset "
+                    "could not call this person (2). phi_v cannot distinguish them; "
+                    "target_fidelity's denominator depends on which.")
     store.save(outdir / "representability.json", rep, inputs=inputs, params=params,
                axis_digest=s.digest, note="AUDIT ONLY -- never used to extend output_support")
     return rep

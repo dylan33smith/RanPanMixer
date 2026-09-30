@@ -334,7 +334,69 @@ away, but it is off the main path.
 
 #### ⚠ TWO THINGS THE FIRST RUN SURFACED THAT NEED A DECISION (2026-09-29)
 
-**1. `absent_policy` — 19.0% of the tilt budget is currently inert.** Measured: of the
+**0. THE TOOL IS INDEPENDENT OF PANMIXER (Dylan, 2026-09-29).** PanMixer is in this
+repository as a published example of a problem in the same space — a different threat model,
+a different release object, a different attack vector — and must not be overweighted in what
+we build. Concretely, as of 2026-09-29: our own conda env (`environment.yml`, name
+`ranpanmixer`) with nothing taken from their `environment.yaml`; `src/` importing only
+stdlib, numpy and pyyaml; our own `vg deconstruct` producing our own VCF; and the
+development fixture sliced from **our** VCF rather than theirs. **No PanMixer-derived
+artifact is an input to anything we build.** Their allele indices differ from ours anyway
+(see `docs/memory.md` 2026-09-29, the ALT-reordering finding), so a cross-build join would
+be wrong as well as unwanted.
+
+**1. `absent_policy` — 19.0% of the tilt budget is currently inert, and there is a better
+third option.** The mechanics, stated precisely because the phrasing matters:
+
+- Our site axis is the **pangenome's** 340,849 records. The target is read from the 1000G
+  30x panel, which has its own site list. **24.1% of our records have no 1000G record at
+  all** — graph-derived structural and nested variants that a short-read SNV/INDEL/SV
+  callset never called. The direction is graph → panel, not panel → graph.
+- At those positions we do not know the target's allele, so `path.npy` holds `-1`. `phi_v`
+  is then undefined, the position contributes nothing to `u`, and the sampler emits a pure
+  prior draw there. **The release carries a cohort allele at those positions with no
+  reference to the target whatsoever.**
+- Because `beta_v` is normalised over **all** chain positions, those inert positions sit in
+  the denominator. So `u` can never exceed **0.81**, and the tilt tops out at
+  `exp(0.81 · eta_tau)` instead of `exp(eta_tau)` — we pay the full `tau` for 81% of the
+  leverage. Measured: 252,025 of 305,886 chain positions have a target call, identical for
+  all ten targets because it is a property of the two site sets, not of any individual.
+  Note the inert positions are **disproportionately weighted** — 19.0% of the weight against
+  17.6% of the positions — because graph-only variants sit in harder regions with lower
+  support and therefore higher `w_v = 1/support(v)`.
+
+| option | effect |
+|---|---|
+| "missing" (current) | honest, but max `u` = 0.81; 19% of the budget cannot move |
+| "reference" | fills allele 0. Recovers the budget but **invents a call** — absence from a callset means the caller reported no variant there, NOT that this person is reference. Worse than inert: `phi_v` would then reward donors matching a fabricated value |
+| **normalise `beta_v` over the panel-matched positions** | max `u` = 1, nothing invented. **Legitimate, because the matched set is a property of the PANEL and is fixed before any target arrives** — identical for all ten, so it is target-independent and can be declared as part of the utility definition |
+
+**Measured 2026-09-29, and it settles the target-dependence worry.** With `target_reason.npy`
+in place the 19% splits as: **53,861 positions code 1** (no record in the target callset,
+19.0% of the weight) and **0 positions code 2** (record present, no call). A phased reference
+panel has no missing genotypes within its own site list, so every target is fully called
+there — identical for all ten. **The restricting set therefore provably contains no
+per-person variation**, which is exactly the property the third option needs.
+
+⚠ The third option is **not** the same as "normalise over positions where this target has a
+call" — that would make `beta` target-dependent, which is exactly the constraint-1 violation
+that voids Theorem 1. The distinction is whether the restricting set is the panel's or the
+person's. **Recommended, not yet decided.** Also note this is partly an artifact of using a
+panel as the target source; a real external genome called against GRCh38 with full coverage
+would have a different unmatched fraction.
+
+**1b. Three distinct losses, not one.** They are easy to conflate and the numbers differ:
+
+| | direction | measured |
+|---|---|---|
+| target variant with **no graph record** — unrepresentable at any `tau` | target → graph | **10.2%** of non-ref calls, **21.5%** of information |
+| target variant where the graph has the POS but a different REF/ALT spelling | target → graph | ~9.9%, joinable only under a relaxed key we deliberately do not use |
+| **graph record with no target record** — we cannot read the target there | graph → panel | **24.1%** of sites, **19.0%** of `beta_v` weight |
+
+The first two are ceilings on fidelity. The third is a ceiling on the *budget*. Reporting
+one when you mean another inverts the conclusion.
+
+**1c. `support(v) = 0` is now excluded from the chain (2026-09-29), not patched.** Measured: of the
 **305,886** chain positions, only **252,025** have a target allele at all, because 24.1% of
 pangenome records have no matching record in the 1000G panel the target comes from. Under
 the default `absent_policy = "missing"` those positions have no `phi_v`, so they can never
@@ -347,11 +409,27 @@ callset, not that the sample is reference there. Both are implemented and record
 target's provenance. **Not decided.** The honest framing is that "missing" understates
 achievable utility and "reference" overstates confidence in the target's path.
 
-**2. A site with `support(v) = 0` would make `w_v = 1/support(v)` infinite.** There is
-exactly one on chr21, at **pos 8,460,681**, and it is currently **outside `chain_span`** —
-so nothing divides by zero today. That is luck, not design: the cut is PROVISIONAL, and
-moving it toward the p arm brings the site into the chain. **Guard `support == 0` explicitly
-when the utility is written**, rather than relying on the coordinate cut to keep it away.
+There is exactly one such site on chr21, at **pos 8,460,681**. It was outside `chain_span`
+by luck rather than design, and the cut is provisional. `chain_mask` now excludes
+`support == 0` outright.
+⚠ **Why exclusion rather than `w_v = 1/(support(v) + 1)`**, which was the obvious patch:
+`support(v) = 0` means **no donor haplotype has a called allele there**, so the sampler has
+nothing to emit and RENORMALISE has an empty pool. The position is unusable, not merely
+awkward. `1/(support+1)` would keep it in the chain and hand it a finite `beta_v` share it
+can never earn — re-creating the inert-budget problem of item 1 one position at a time, and
+hiding a position that cannot produce output. The exclusion is a function of the cohort
+alone, so it is target-independent.
+
+**3. The target now has its own reason array (2026-09-29).** A `-1` in `path.npy` had two
+meanings that `phi_v` cannot distinguish, because both simply mean "no tilt here":
+`no_record_in_target_callset` (our join found nothing — a limitation of the join, identical
+for every target from the same panel, and no statement about the person) and
+`record_present_but_no_call` (the callset covered the site and reported no genotype for this
+individual — a real failure to call them). They behave identically in the mechanism and
+differently in the reporting: a position the panel never covered arguably should not count
+against `target_fidelity`, while one it covered and could not call arguably should. The
+cohort's codes cannot express either, since those are about graph nesting. Emitted as
+`target_reason.npy` beside `path.npy`.
 
 #### Exit gates
 
