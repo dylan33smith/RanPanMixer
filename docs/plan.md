@@ -29,19 +29,22 @@ Read at session start. This file exists so a new session never has to grep
   `[0, eta_tau]`, and `tau` = 0 reproduces `baseline_model` to 1e-15. 46 new tests, **87
   in the suite, all passing.** The O(TK) rank-one forward pass agrees with an O(TK^2)
   dense reference to **1.11e-16**.
-- ⚠⚠ **THE FIRST RanPanMixer NUMBER EXISTS, AND IT IS THAT THE TILT CHANGES NOTHING.**
-  HG00096, chr21, `beta` scope `chain`: the released path is **bit-identical at
-  `tau` = 0, 0.1, 0.5 and 0.9** for a fixed seed — 0 of 611,772 positions differ — and
-  `utility_retained` is 0.6940 against a `u_ceiling` of 0.8155 at every `tau`. This is
-  NOT a bug: `log_z_p` tracks `eta_tau` at a constant 69.5%, and the sampler is proven
-  exact on the toy. Measured sampling-free from the derivatives of `log Z_p`:
-  `Var_Q(u)` = 4.046e-06, so the gain the tilt can buy is `eta_tau * Var` = **2.222e-06**
-  against a draw-to-draw `sd(u)` of **2.011e-03** — about **1:900**, needing ~8.3e+05
-  draws to resolve. The cause is exact: `sum_v eta_tau * beta_v = eta_tau`, so the
-  expected number of positions the tilt moves is of order `eta_tau` and cannot grow with
-  T. **The lever is `sum beta^2`, not `tau`** — which promotes deferred decision R3 from
-  cosmetic to the highest-value open question. See `R5` below and `docs/memory.md`
-  2026-09-30.
+- ⚠⚠ **THE FIRST RanPanMixer NUMBER EXISTS: THE TILT RESHUFFLES THE PATH AND BUYS NO
+  UTILITY.** HG00096, chr21, `beta` scope `chain`. Between `tau` = 0 and `tau` = 0.9 the
+  released path MOVES — 8 of 10 disjoint-stream draws differ, by a mean of **417 state
+  positions** and **54 allele positions** per haplotype — while expected utility moves
+  **2.94e-06** across the whole `tau` grid. `utility_retained` is 0.6940 against a
+  `u_ceiling` of 0.8155 at every `tau`. Not a bug: `log_z_p` tracks `eta_tau` at a
+  constant 69.5% and the sampler is proven exact on the toy. Measured sampling-free from
+  the derivatives of `log Z_p`: `Var_Q(u)` = **4.046e-06**, `sd(u)` = **2.011e-03**, so
+  the gain is about **1:900** against a single draw's noise.
+  ⚠ **AND REWEIGHTING `beta_v` CANNOT FIX IT — measured 2026-09-30.** Concentrating the
+  budget 3,000-fold raises `sum beta^2` 2,200x but `Var_Q(u)` only **16.5x**, still 55x
+  below the noise, while collapsing `E_Q[u]` from 0.695 to 0.049. **94.8%** of `Var_R(u)`
+  is the mosaic's between-position covariance, which no `beta_v` touches. So R3 is not the
+  answer to R5. See `R5` and the corrections in `docs/memory.md` 2026-09-30 — the first
+  version of this bullet claimed the path was bit-identical, which was true only of the
+  one seed it checked.
 - ⚠ **WE NOW HAVE OUR OWN chr21 VCF, AND IT IS NOT PANMIXER'S.** `vg deconstruct`
   at vg 1.68 gives **340,849 records** against the published 340,824, and **1,189,258**
   missing matrix cells against 1,278,653 — vg 1.68 calls 89,395 more genotypes and
@@ -121,26 +124,35 @@ unsettled.
 
 | metric | `tau`=0 (floor) | 0.05 | 0.10 | 0.25 | 0.50 | 0.90 |
 |---|---|---|---|---|---|---|
-| `utility_retained` * | 0.6940 | 0.6940 | 0.6940 | 0.6940 | 0.6940 | 0.6940 |
+| `utility_retained` * | 0.6931 | 0.6931 | 0.6931 | 0.6931 | 0.6931 | **0.6932** |
 | `u_ceiling` * | 0.8155 | 0.8155 | 0.8155 | 0.8155 | 0.8155 | 0.8155 |
-| `utility_retained` / `u_ceiling`, at each `tau` | 85.1% | 85.1% | 85.1% | 85.1% | 85.1% | 85.1% |
+| `utility_retained` / `u_ceiling`, at each `tau` | 85.0% | 85.0% | 85.0% | 85.0% | 85.0% | 85.0% |
 | `attacker_accuracy` * | n/a — no attacker implemented; pre-registration must fix the attacker set first, and a weak attacker would prove nothing (constraint 6) | — | — | — | — | — |
 | `p_succ_bound` * | 0.5000 | 0.5250 | 0.5500 | 0.6250 | 0.7500 | 0.9500 |
 | `log_z_p` * | 0.0000 | 0.0348 | 0.0697 | 0.1774 | 0.3815 | 1.0226 |
 | `log_z_p` as a share of `eta_tau` | 0 | 69.5% | 69.5% | 69.5% | 69.5% | 69.5% |
 | `two_target_indistinguishability` * | n/a at this scale — plug-in TV over a support this size is biased UPWARD and cannot falsify anything. Exact on the toy; worst pair 43.1% of `tau` at `tau` = 0.9 | — | — | — | — | — |
 | `target_fidelity` * | n/a — needs its own ceiling on this graph (~9.9% of a target's non-reference calls have no record in `G`, carrying 20.5% of its `-log f`). `u_path` is fidelity-on-what-the-graph-can-see and is NOT a substitute | — | — | — | — | — |
-| released positions differing from `tau`=0, seed 1000 | 0 | 0 | 0 | 0 | 0 | **0** of 611,772 |
-| `donor_switches`, both haplotypes | 14169 | 14169 | 14169 | 14169 | 14169 | 14169 |
+| released state positions differing from `tau`=0, per haplotype, mean of 10 seeds | 0 | — | — | — | — | **417.2** (8 of 10 draws move; range 0–1,641) |
+| `donor_switches`, both haplotypes, mean of 3 draws | 13908 | 13908 | 13908 | 13908 | 13908 | **13909** |
 | `eta_tau` | 0.000000 | 0.050042 | 0.100335 | 0.255413 | 0.549306 | 1.472219 |
 | `epsilon_tau` | 0.000000 | 0.100083 | 0.200671 | 0.510826 | 1.098612 | 2.944439 |
 | `af_loss` / `ld_loss` | n/a BY DEFINITION — cohort-distortion metrics, undefined for an external-target release that never edits the cohort | — | — | — | — | — |
-| seconds per release, diploid | 9.4 | 9.5 | 9.4 | 9.8 | 9.4 | 9.4 |
+| seconds per release, diploid | 9.4 | 9.4 | 9.4 | 9.5 | 9.4 | 9.4 |
 
-**Provenance.** `chr21/hprc-v1.0-pggb/K88/T305886` · 44 individuals / 88 haplotypes ·
-`indicator/w=inv_support/beta=chain`, `beta` over 305,886/305,886 chain positions ·
-3 draws per `tau`, seeds 1000-1002 · `baseline_log_norm` -584.8135 · `chain_span`
-PROVISIONAL (12,968,320 < POS <= 46,680,243) · R1-R5 UNSETTLED.
+**Provenance.** `logs/A_HG00096_chr21_v2.md` · `chr21/hprc-v1.0-pggb/K88/T305886` ·
+44 individuals / 88 haplotypes · `indicator/w=inv_support/beta=chain`, `beta` over
+305,886/305,886 chain positions · 3 draws per `tau`, seeds 1000-1002 with
+`SeedSequence.spawn` streams · `baseline_log_norm` -584.8135 · `chain_span` PROVISIONAL
+(12,968,320 < POS <= 46,680,243) · R1-R5 UNSETTLED.
+⚠ **SUPERSEDES `logs/A_HG00096_chr21_v1.md`**, whose three "independent" draws per `tau`
+were four CORRELATED haplotype draws — the diploid seeds were `seed` and `seed + 1`, so one
+release's haplotype 1 was bit-identical to the next release's haplotype 0. Re-run
+2026-09-30 after the fix: `utility_retained` 0.6940 -> 0.6931, `donor_switches`
+14,169 -> 13,908, and `sd(u)` at `tau` = 0.5 falls from 2.389e-03 to **1.173e-03** against
+a diploid prediction of `sd(u_hap)/sqrt(2)` = 1.422e-03 — so the spread now corroborates the
+exact value instead of coincidentally matching the haploid one. `log_z_p` and `u_ceiling` are
+unchanged, as they do not depend on the draw.
 
 **COLUMNS** · *`tau`=0* is the floor: an untilted draw from `baseline_model`, a real
 cohort haplotype mosaic carrying zero target information — which is why
@@ -148,7 +160,8 @@ cohort haplotype mosaic carrying zero target information — which is why
 `tau` = 0.10 already bounds equal-prior identification at 0.55. · *0.90* is past any
 claim we would make and is included because a bound must be checked where it is loose.
 
-**ROWS** · *`utility_retained`* does not move — not "moves little", does not move. ·
+**ROWS** · *`utility_retained`* moves in the 4th decimal only, and only at `tau` = 0.9
+(0.6931 -> 0.6932); the exact expected-utility movement across the whole grid is 2.94e-06. ·
 *`u_ceiling`* is 0.8155, not 1: deferred decision R1 measured rather than predicted. ·
 *`log_z_p`* DOES move, exactly proportionally to `eta_tau` at a constant 69.5%, which is
 the first-order identity `log Z_p ~ eta_tau * E_R[u]` with `E_R[u]` = 0.694 — so the tilt
@@ -156,17 +169,22 @@ is applied at the right magnitude. · *released positions differing* is the whol
 in one row. · *seconds per release* 9.4 s for a diploid release over T = 305,886 at
 K = 88, so compute is not the constraint and never was.
 
-**SYNTHESIS.** The mechanism is correct and the guarantee holds, and it holds because
-almost nothing is happening. The tilt reweights 305,886 positions by about one part in a
+**SYNTHESIS.** The mechanism is correct, the guarantee holds, and the tilt is doing
+visible work that buys nothing. It reweights 305,886 positions by about one part in a
 million each (1.80e-06 at mean `beta`, `tau` = 0.5), and its entire budget summed over
-those positions is `sum_v eta_tau * beta_v = eta_tau` = 0.549 — so it is expected to move
-the drawn path at a fraction of one position, and measurably does not move it at all. The
-achievable utility gain is `eta_tau * Var_Q(u)` = 2.222e-06 against a draw-to-draw
-`sd(u)` of 2.011e-03. **`tau` is not the lever.** `sum_v beta_v` is pinned at 1, but
-`sum_v beta_v^2` is not — it is 3.27e-06 under the near-uniform `w_v = 1/support(v)` —
-and that is what sets `Var_R(u)` and hence the gain. Whether the mechanism can be made to
-do anything measurable is now a question about `beta_v`, which is deferred decision R3
-and a pre-registration item. See R5.
+those positions is `sum_v eta_tau * beta_v = eta_tau` = 0.549. That bounds the number of
+INDEPENDENT flips at order `eta_tau` — but one flip re-seeds the whole downstream path
+through the backward recursion, so the released path moves by a mean of 417 state
+positions while expected utility moves 2.94e-06. The achievable gain is
+`eta_tau * Var_Q(u)` = 2.222e-06 against a per-draw `sd(u)` of 2.011e-03.
+⚠ **`beta_v` is not the lever either**, which is the correction of 2026-09-30:
+concentrating it 3,000-fold buys 16.5x the variance and still falls 55x short, because
+94.8% of `Var_R(u)` is mosaic covariance set by the chromosome's genetic length. What
+remains is structural: `phi_v` must decompose per position for `ffbs` to be EXACT, and
+that is what forces `u` to be a near-uniform average over T positions, which is what makes
+`Var_R(u)` tiny. A utility with real variance would not factor, and an approximate draw
+carries no bound — the reason the k-mer Jaccard was ruled out. **That tension is the thing
+to take to the PI.** See R5.
 
 ### The ingest measurement that gates use of PanMixer's data
 
@@ -335,9 +353,16 @@ bit-identical at `tau` = 0, 0.1, 0.5 and 0.9** for a fixed seed — 0 of 611,772
 differ — and `utility_retained` is 0.6940 at every `tau`.
 
 **Carrying:** nothing, yet. This is not a decision that has been deferred; it is a finding
-that has to be understood before `A-LCK-preregister` can mean anything, because
-pre-registering a `tau` grid over which the mechanism provably does not vary would freeze
-in a result of zero.
+that has to be understood before `A-LCK-preregister` can mean anything.
+
+⚠ **CORRECTED 2026-09-30, SAME DAY.** The paragraph above originally opened by claiming the
+released path is "bit-identical at `tau` = 0, 0.1, 0.5 and 0.9 — 0 of 611,772 positions
+differ". **That was false**, and true only of the single seed it checked: at ten
+disjoint-stream draws, **8 of 10 move**, by a mean of 417 state positions and 54 allele
+positions per haplotype. It was also measured under COMMON RANDOM NUMBERS, so agreement was
+the expected outcome rather than a finding. **The finding's substance is unchanged and now
+rests only on the exact derivative measurement below.** The honest statement is that the
+tilt VISIBLY RESHUFFLES the released path and the reshuffling is UTILITY-NEUTRAL.
 
 **It is not a bug, and four independent things say so.** `log_z_p` tracks `eta_tau` at a
 constant **69.5%**, which is the first-order identity `log Z_p ~ eta_tau * E_R[u]` with
@@ -355,19 +380,46 @@ T**. Sampling-free from the derivatives of `log Z_p` at `tau` = 0.5:
 `eta_tau * Var` = **2.222e-06**. Signal to noise about **1:900**; resolving it needs
 ~**8.3e+05** draws at 9.4 s each, about 90 days for one target at one `tau`.
 
-**THE LEVER IS `sum beta^2`, NOT `tau`.** `sum_v beta_v` is pinned at 1 by the
-calibration, but `sum_v beta_v^2` is free — it is **3.27e-06** under the near-uniform
-`w_v = 1/support(v)`, whose median support is 88 — and that is what sets `Var_R(u)` and
-therefore the gain. **So R3 stops being cosmetic and becomes the highest-value open
-question in the project.** R3 asks whether `beta_v` should emphasise rarity (`-log f`)
-rather than call rate; the answer now also decides whether the mechanism does anything
-measurable at all.
+⚠⚠ **`beta_v` IS NOT THE LEVER EITHER — MEASURED, AND THIS KILLS THE OBVIOUS FIX.** The
+first version of this block asserted "THE LEVER IS `sum beta^2`, NOT `tau`" and quoted
+`sum_v beta_v^2` = 3.27e-06. Both were wrong. The real `sum_v beta_v^2` is **4.556723e-06**;
+3.269192e-06 is `1/T` = `mean(beta_v)`, the value `sum beta^2` takes only for UNIFORM
+weights — two statistics that coincide in the uniform case were conflated. And
+`Var_Q(u)` measured from `d2 log Z_p / d eta2` under `beta` held uniform over the top-n
+positions by inverse support:
 
-**The option set, none of it assessed yet:**
-- **Concentrate `beta_v`** on the positions that carry real information (R3's rarity
-  weighting is the obvious candidate). Raises `sum beta^2` directly. ⚠ Note what it does
-  NOT do: the expected number of moved positions stays of order `eta_tau`. It changes how
-  much utility each move is WORTH.
+| `beta_v` scheme | sum of squared weights | `Var_Q(u)` | gain at `tau`=0.5 | `E_Q[u]` |
+|---|---|---|---|---|
+| inv_support (current) | 4.557e-06 | 4.046e-06 | 2.22e-06 | 0.6951 |
+| uniform over all T | 3.269e-06 | 4.203e-06 | 2.31e-06 | 0.7075 |
+| top 100,000 by inverse support | 1.000e-05 | 1.140e-05 | 6.26e-06 | 0.6610 |
+| top 10,000 | 1.000e-04 | 1.114e-05 | 6.12e-06 | 0.2926 |
+| top 1,000 | 1.000e-03 | 1.113e-05 | 6.12e-06 | 0.0873 |
+| top 100 | 1.000e-02 | 6.676e-05 | 3.67e-05 | 0.0494 |
+
+Concentrating the budget **3,000-fold** raises `sum beta^2` **2,200x** and `Var_Q(u)` only
+**16.5x** — the gain stays **55x below** the per-draw `sd(u)` of 2.011e-03 — while `E_Q[u]`
+collapses from 0.695 to 0.049, because a utility defined on 100 positions is a different and
+far weaker quantity. The reason is that **94.8%** of `Var_R(u)` is between-position
+COVARIANCE from the mosaic's segment structure (`sum_v beta_v^2 p_v(1-p_v)` = 2.115e-07
+against `Var_Q(u)` = 4.046e-06), and the segment count is set by the chromosome's genetic
+length and `Ne*r`, which no `beta_v` touches.
+
+**So R3 is NOT the answer to R5.** R3 is still worth settling on its own merits — call rate
+is not informativeness — but it will not make the mechanism measurable.
+
+⚠⚠ **WHAT IS ACTUALLY LEFT IS STRUCTURAL, AND IT IS THE THING FOR THE PI.** `phi_v` must
+decompose along chain positions for `ffbs` to draw from `Q^tau_p` EXACTLY. That requirement
+is what forces `u` to be a near-uniform average over T positions; that is what makes
+`Var_R(u)` tiny; that is what makes the tilt powerless. A utility with real variance would
+not factor — and an approximate draw carries no bound at all, which is exactly why the k-mer
+Jaccard was ruled out as the in-sampler potential. **Exact sampling and a high-variance
+utility are in tension, and the mechanism currently sits at the exact-sampling end.**
+
+**The option set, with the first entry now MEASURED AND CLOSED:**
+- ~~**Concentrate `beta_v`**~~ — **MEASURED 2026-09-30 AND IT DOES NOT WORK.** See the table
+  above: 16.5x the variance at 3,000x the concentration, still 55x short, at the cost of the
+  utility's own meaning.
 - **Shrink the scope `tau` covers.** A `tau` per megabase rather than per chromosome
   raises every `beta_v` by the ratio of scopes — but that is k independent releases of
   one genome and they COMPOSE, which standing constraint 4 forbids. It is the same scope
@@ -390,11 +442,12 @@ segment count is set by the chromosome's genetic length, not by T.
 
 | ID | Intervention | Endpoint | n | Result | Verdict | memory |
 |---|---|---|---|---|---|---|
+| A-FIX-mechanism-audit | Independent audit of the same day's mechanism build; docstrings declared non-evidence | every gap between docs and code, adversarially verified | 127 agents, 6 dimensions, 3 refuters per gap | **6 real defects the 88-test suite passed over**, 4 confirmed by mutation and all fixed; 30 gaps survived of 40 filed. Overturned the day's headline row and closed R5's leading option | done | 2026-09-30 |
 | A-THY-toy-enumeration | Brute-force correctness gate on a hand-written graph, built BEFORE the sampler | sampler matches exact enumeration; exact TV <= `tau`; `log_z_p` bracketed; `tau`=0 reproduces `R_D` | K=4, T=7; 96 output paths; 3,571,128 input pairs per `tau` | all clauses PASS. ⚠ AND A SIXTH WAS NEEDED: exact TV reaches only 27.4-43.1% of `tau`, so a doubled tilt exponent passes it at every `tau`; `ratio_spread` is sharp and is the only gate that fires | done | 2026-09-30 |
 | A-IMP-cohort-hmm | `baseline_model` from the cohort alone, constants re-derived from the Methods | the initial distribution and the `stay_switch` transitions built from `G` and `D` only, with no target reachable | chr21, K=88, T=305,886 | built; no target parameter, asserted from the AST; E[switches] **7,021.0** vs the **7,155** model C predicted; O(TK) agrees with dense O(TK^2) to **1.11e-16** | done | 2026-09-30 |
 | A-IMP-utility | Bounded utility: `phi_v` an indicator, `beta_v` normalised inverse-support weights | `u_path` in [0,1] and `beta_v` summing to 1, both ASSERTED at runtime | chr21 | built; `u_ceiling` = **0.815455** over 253,846/305,886 positions, independently reproducing R1's predicted 0.815 | done | 2026-09-30 |
 | A-IMP-ffbs-sampler | Algorithm 1: stored alphas, exact backward sample, no argmax | draws from `Q^tau_p`; `log_z_p` range-asserted; `A` never materialised | 40,000 draws/`tau` on the toy; 18 releases on chr21 | built; output distribution AND state-path joint both within Monte-Carlo error; 9.4 s per diploid chr21 release. ⚠ `log_z_p` needs the `baseline_log_norm` subtraction — see `docs/bugs.md` | done | 2026-09-30 |
-| A-EVL-thin-tilt | Does the tilt actually change the released path at chr21 scale? | a measured utility difference between `tau` = 0 and `tau` = 0.9 | 1 target, 6 `tau`, 3 seeds + exact derivatives | **NO — 0 of 611,772 positions differ.** Gain `eta_tau * Var_Q(u)` = 2.222e-06 against `sd(u)` = 2.011e-03, about 1:900. Not a bug; the lever is `sum beta^2`, not `tau`. See R5 | done | 2026-09-30 |
+| A-EVL-thin-tilt | Does the tilt actually change the released path at chr21 scale? | a measured utility difference between `tau` = 0 and `tau` = 0.9 | 1 target, 6 `tau`, 10 disjoint-stream seeds + exact derivatives | **The path MOVES (8/10 draws, mean 417 state positions per haplotype) and the movement is UTILITY-NEUTRAL**: gain `eta_tau * Var_Q(u)` = 2.222e-06 against `sd(u)` = 2.011e-03, about 1:900. Not a bug. ⚠ Reweighting `beta_v` cannot fix it — 3,000x concentration buys 16.5x the variance, 94.8% of which is mosaic covariance. ⚠ The first verdict here read "NO — 0 of 611,772 positions differ" at n=3 under common random numbers; corrected same day | done | 2026-09-30 |
 | A-FIX-panmixer-framing | Audit the docs for PanMixer framing forced onto our different problem | every instance found and scoped | 6 files, 12 agents | 91 filed, 76 upheld, 51 more found by verifiers; CLAUDE.md constraint 1 was re-seeding it every session | done | 2026-09-28 |
 | A-DAT-genetic-map-parm | Can any map give chr21 genetic distance below 10.3 Mb? | a defensible rule for every variant | chr21, 10 agents | no usable map; `np.interp` clamping + the map's own centromeric plateau give 34,345 zero-distance positions = 7.25 Mb emitted verbatim; cut at 12,968,320 | done | 2026-09-28 |
 | A-DAT-input-set | What does the mechanism actually need as input? | a minimal, verified input set | full checkout | model C needs only graph + genetic map + target; PanGenie and the external panel drop out; `INFO/AN` == `support(v)` bit-identical | done | 2026-09-28 |
@@ -1041,6 +1094,61 @@ Ordered. Each item names what must pass before it starts and what closes it.
   [0, `eta_tau`]. One private input, one `tau`, one bracket.
 - `new_haplotypes` for the comparison arm is NOT emitted yet; it was never part of this
   gate and belongs to `[A-EVL-headtohead]`.
+
+### [A-THY-diploid-gate] A diploid falsification gate — THE TOP PRIORITY
+- **Why:** ⚠ **every falsification gate in this project is HAPLOID, and the diploid path is
+  the only one that has ever been run.** All 18 releases of the first chr21 run carry
+  `ploidy: 2`. Exact TV, `ratio_spread`, the sharp pair, the state-path joint, clause (f)
+  and the KILL CRITERION all run on a single chain. Named by the audit's completeness critic
+  as the single most important thing still missing, and it is right.
+- **Why it is not just a missing test:** `src/mechanism/exact.py` has NO diploid primitive
+  — no product-support enumeration, no diploid `utility_vector`, no diploid
+  `release_distribution`. The gate cannot be applied to the diploid path because there is
+  nothing to apply it with. This is missing REFERENCE CODE, not a missing assertion.
+- **What is already patched:** the diploid `log_z_p` bracket, which was absent — a doubled
+  diploid exponent was ACCEPTED at every `tau`, returning a record whose published
+  `log_z_p` violated its own stated invariant. Fixed and regression-tested by mutation.
+  ⚠ **A patched assertion is not a gate.** The bracket catches one error class; the toy
+  gate catches the ones nobody predicted.
+- **Prerequisite:** none. The toy already exists; the work is a diploid `enumerate_baseline`
+  and `release_distribution` over the product support, which is K^(2T) and so needs the toy
+  shrunk (K = 3, T = 4 gives 531,441 pairs, enumerable) or the two chains enumerated
+  separately and combined, which is only valid BECAUSE the mean factorises — so enumerating
+  them jointly is the check that the factorisation is real.
+- **Exit gate:** exact TV <= `tau` and `ratio_spread <= exp(epsilon_tau)` over pairs of
+  DIPLOID inputs; `log_z_p` in [0, `eta_tau`] for the pair; `tau` = 0 reproduces the product
+  baseline; and the mutation (full `eta_tau` per haplotype rather than half) fails at least
+  one clause at EVERY `tau` on the grid, not only above 0.25.
+
+### [A-FIX-audit-gaps] What the 2026-09-30 audit left open — needs Dylan's decisions
+- **Why:** each is a real gap the audit confirmed, and each needs a choice rather than code.
+- **The four that change behaviour:**
+  1. ⚠ **`missing_policy`'s guard deviates from the recorded decision.** `docs/terms.md`
+     says "Declare the fallback (uniform over all donors), count how often it fires, and
+     report it." The code RAISES instead, on the reasoning that `support == 0` is excluded
+     upstream so it cannot fire and a loud failure beats a silent fallback. **That is the
+     implementer overriding a written decision and it needs Dylan's sign-off either way.**
+  2. **Duplicate-haplotype collapse is not implemented** — no collapse, no policy, no
+     assertion that duplicates are absent. So **every K = 88 in this project is a
+     PRE-COLLAPSE number**, including the runtime and alpha-storage figures, and none said
+     so. Whether duplicates OCCUR on this cohort is unmeasured. Measure first.
+  3. **Standing constraint 4 is unenforced.** No release cache, and `docs/data.md`'s
+     "(target_id, tau, utility_id, seed) ... collisions must raise, never overwrite" exists
+     in no code. `--seeds` is labelled an evaluation device but nothing structurally stops
+     it being used as a release procedure.
+  4. **`graph_id` defaults to the empty string** and is hand-assembled by the caller, so the
+     only cohort stamp on a release can be silently absent or wrong. It should be derived
+     from the cohort manifest's `axis_digest`, which already exists.
+- **The rest, all cheap:** `hmm.expected_switches` has no test and no caller, so the 7,021.0
+  figure quoted in five places is produced by no code in the repo; `ratio_spread` is pinned
+  as a gate to be marked `*` in tables and appears in no table; `src/cli.py` has no
+  mechanism subcommand, so the mechanism is reachable only through a script its own
+  docstring calls "operational, not mechanism"; `scripts/toy_chain_models.py` is an orphan
+  model-B relic referenced by nothing, and is where the wrong `sum beta^2` figure came from;
+  and the post-split-ALT figures in this file's item 1 / 1b / 1d were reported inconsistent
+  with the code's output and are UNVERIFIED by me.
+- **Scope limits to disclose in any writeup:** one target of ten prepared, one chromosome
+  of 22, and no attacker of any kind.
 
 ### [A-LCK-preregister] Freeze the evaluation before looking at it — NEXT, BUT BLOCKED
 - **Why:** the proposal requires the utility function be chosen before any attack

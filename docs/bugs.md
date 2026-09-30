@@ -450,6 +450,78 @@ substituted for `ffbs`. Every one of them produces a plausible path and no error
 Each now has a test. The entries below are what the first build actually hit,
 which was mostly a DIFFERENT set.
 
+### Six defects an 88-test suite passed over, found by an independent audit
+- **[2026-09-30] The implementer wrote the code, the docstrings AND the tests**
+  **[Symptom]** 88/88 tests pass, the toy gate is sharp and saturated, and the
+  headline finding is confidently wrong. Every check the implementer thought to
+  write, passed.
+  **[Cause]** Self-audit. Six independent auditors were given the docs as the
+  authority and told explicitly NOT to trust the docstrings, because the same
+  agent wrote the claims and the tests that check them. 30 gaps survived
+  three-lens adversarial verification. The ones that were real bugs:
+  1. **`epsilon_tau` returned `2*arctanh(tau)/delta_u`.** `delta_u` CANCELS in the
+     budget. At `delta_u` = 2 it returned exactly `arctanh(tau)` — the expression
+     `docs/terms.md` forbids in capitals. Unreachable and untested at any
+     non-unit range, so the one scenario the parameter exists for was the one that
+     corrupted the headline privacy number.
+  2. **The diploid `log_z_p` was never bracketed.** Each haplotype was checked
+     against half of `eta_tau`; their SUM was returned unchecked. Verified by mutation:
+     restoring the full `eta_tau` per haplotype was ACCEPTED at `tau` = 0.25, 0.5
+     and 0.9, returning a record whose published `log_z_p` (0.763 at `tau` = 0.5)
+     violated its own stated invariant of [0, 0.549].
+  3. **The diploid seeds were `seed` and `seed + 1`.** So `release(seed=s)`
+     haplotype 1 was bit-identical to `release(seed=s+1)` haplotype 0 — 0 of
+     305,886 positions differed. "3 independent draws" were 4 correlated haplotype
+     draws; `sd(u)` was inflated 2.2x and landed coincidentally on the HAPLOID
+     value when the diploid prediction is that over sqrt(2).
+  4. **`release()` took the allele matrix as a free argument.** `CohortHMM` carries
+     only the availability mask, so a caller could hand the sampler a
+     target-pruned matrix of the same shape — the standing-constraint-1 violation
+     the cohort/target directory split exists to prevent and the one shape it
+     cannot catch. The post-draw `-1` check caught only the occupied subset.
+  5. **`phi_v` was never called by the mechanism.** `tilt_potentials` and
+     `u_of_output` both re-inline the indicator for speed, so the function
+     carrying the documented semantics — and the only one with a test — was on no
+     live path. Two implementations of one definition with no edge between them.
+     The same was true of `exact.utility_vector` against `utility.u_of_output`,
+     which differ in their null guards and which the gate and the mechanism use
+     respectively.
+  6. **`sum_v beta_v^2` was reported as `mean(beta_v)`.** Two statistics that
+     coincide for uniform weights. The real value is 4.556723e-06, not 3.269192e-06
+     = 1/T. It is the number the "lever" claim rested on.
+  **[Proven fix]** All six fixed; 1-4 verified by mutation before the fix was
+  accepted. Seven regression tests added, including one that PARSES the
+  calibration table out of `docs/terms.md` — the previous three "checks" of it
+  were three independent transcriptions with no edge to the document.
+  **[Severity]** ⚠ The class is what matters, not the six. A suite written by the
+  same agent as the code tests the agent's model of the code, not the spec. The
+  cheapest counter is an auditor holding the spec who is told the docstrings are
+  the claim under audit.
+
+### A headline finding measured under common random numbers
+- **[2026-09-30] "0 of 611,772 positions differ" was true of one seed and predicted in advance**
+  **[Symptom]** The released path was reported bit-identical at `tau` = 0, 0.1, 0.5
+  and 0.9. It looked like a strong, clean result.
+  **[Cause]** Two compounding errors. `_draw_one` opens a fresh generator from the
+  same seed at every `tau`, so the paths were compared under COMMON RANDOM NUMBERS
+  — with a per-position tilt of 1.8e-06, agreement is the expected outcome, not a
+  finding. And n = 3 was too small: at ten disjoint-stream draws, **8 of 10 move**,
+  by a mean of 417 state positions per haplotype. The one seed checked was one of
+  the two that happen not to. ⚠ Worse, the docs PREDICTED the result they then
+  reported as a discovery — "the expected number of positions the tilt moves is of
+  order `eta_tau`" — so the measurement could not have surprised anyone.
+  **[Proven fix]** Report the exact quantity instead: `E_Q[u] = d log Z_p/d eta`
+  and `Var_Q(u) = d2 log Z_p/d eta2`, three forward passes and no sampling. The
+  finding's substance survives unchanged — expected utility moves 2.94e-06 across
+  the whole grid — and is now stated as "the tilt reshuffles the path and the
+  reshuffling is utility-neutral", which is both true and a stronger claim.
+  **[Severity]** ⚠ Silent, and in the most dangerous direction: a wrong headline
+  with a correct conclusion underneath it. Also a lesson about the project's own
+  reporting rule — a row whose columns are all identical deserves suspicion before
+  it deserves a synthesis paragraph. The rounded MEAN concealed movement that the
+  per-draw records showed: `donor_switches` 14,147/14,211/14,147 at `tau` = 0.9
+  against 14,148/14,212/14,148 below it, both printing as 14,169.
+
 ### `log_z_p` lands ~1000x outside `[0, eta_tau]` and the tempting fix is fatal
 - **[2026-09-30] The forward normaliser is not the tilt normaliser when a mask is applied**
   **[Symptom]** `log_z_p` from `sum_t log c_t` is **-584.81** on chr21 against a

@@ -274,20 +274,33 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
                       The achievable gain is about eta_tau * Var = 2.222e-06 at
                       tau = 0.5 — a signal-to-noise ratio against a single draw of about
                       1:900, needing ~8.3e+05 draws to resolve. MEASURED CONSEQUENCE: the
-                      released path is BIT-IDENTICAL at tau = 0, 0.1, 0.5 and 0.9 for a
-                      fixed seed — 0 of 611,772 positions differ.
-                      The reason is exact, not empirical: sum_v eta_tau * beta_v =
-                      eta_tau, since beta sums to 1, so the expected number of positions
-                      the tilt moves is of order eta_tau (0.549 at tau = 0.5, 1.47 at
-                      tau = 0.9) and CANNOT grow with T. sum_v beta_v is pinned at 1 but
-                      sum_v beta_v^2 is NOT — it is 3.27e-06 under the near-uniform
-                      w_v = 1/support(v) — and that is what sets Var_R(u) and hence the
-                      gain. ⚠ This makes deferred decision R3 (rarity weighting instead
-                      of call rate) the highest-value open question, and it is a
-                      PRE-REGISTRATION item under constraint 5. Whether Var_R(u) itself
-                      shrinks with T is NOT established and must not be claimed: the
-                      mosaic's segment count is set by the chromosome's genetic length,
-                      not by T. See `docs/memory.md` 2026-09-30.
+                      released path MOVES between tau = 0 and tau = 0.9 — 8 of 10
+                      disjoint-stream draws differ, by a mean of 417 state positions and
+                      54 allele positions per haplotype — and the movement is
+                      UTILITY-NEUTRAL. ⚠ An earlier version of this entry said the path
+                      was "BIT-IDENTICAL ... 0 of 611,772 positions differ"; that was
+                      measured on one seed under common random numbers and is FALSE. See
+                      the correction in `docs/memory.md` 2026-09-30.
+                      Part of the reason is exact: sum_v eta_tau * beta_v = eta_tau, since
+                      beta sums to 1, so the expected number of INDEPENDENT flips is of
+                      order eta_tau (0.549 at tau = 0.5, 1.47 at tau = 0.9) and CANNOT
+                      grow with T — but one flip re-seeds the whole downstream path
+                      through the backward recursion, so that bounds the flips, not the
+                      number of differing positions.
+⚠ AND REWEIGHTING beta_v CANNOT FIX IT (measured 2026-09-30, corrects this entry's own
+                      earlier claim that "THE LEVER IS sum beta^2"). The real
+                      sum_v beta_v^2 is 4.556723e-06; the 3.27e-06 once quoted here is
+                      1/T = mean(beta_v), which equals sum beta^2 only for uniform
+                      weights. Concentrating beta 3,000-fold raises sum beta^2 2,200x and
+                      Var_Q(u) only 16.5x — the gain stays 55x below the per-draw sd(u) —
+                      while E_Q[u] collapses from 0.695 to 0.049. 94.8% of Var_R(u) is
+                      between-position COVARIANCE from the mosaic's segment structure,
+                      which no beta_v touches. So R3 (rarity weighting instead of call
+                      rate) is worth settling on its own merits and is a PRE-REGISTRATION
+                      item under constraint 5, but it is NOT the answer to R5. What
+                      remains is the tension between exact sampling — phi_v must decompose
+                      per position for ffbs — and a utility with real variance. See
+                      `docs/plan.md` R5 and `docs/memory.md` 2026-09-30.
 ```
 
 ### psi_t  [implementation] [mechanism]
@@ -434,7 +447,9 @@ Aliases:              "the PanMixer transitions"
 Is:                   T, the number of ordered positions in the hidden Markov chain —
                       the steps the sampler takes along the chromosome, at each of
                       which it picks a donor haplotype and emits that donor's allele.
-Computed by:          PLANNED — one position per VCF record inside `chain_span`.
+Computed by:          src/cohort/genmap.py:chain_mask (built 2026-09-29) plus
+                      src/mechanism/hmm.py:from_arrays, which applies the mask.
+                      One position per VCF record inside `chain_span`.
                       chr21: 305,886 positions (340,849 records less the 34,371 below
                       the coordinate cut).
 CHANGES MEANING WITH: the model. C = 340,849 raw / 305,886 after the cut; B = 100,757
@@ -453,7 +468,8 @@ Aliases:              "T", "sites". ⚠ The name `T_blocks` is now a misnomer un
 Is:                   The length of the SITE AXIS — the number of VCF records for a
                       chromosome, and therefore the first dimension every preprocessing
                       artifact is indexed by. chr21: **340,849** (OUR build; PanMixer's is 340,824).
-Computed by:          PLANNED — the record count of the deconstructed per-chromosome VCF.
+Computed by:          src/cohort/arrays.py (built 2026-09-29) — the record count of the
+                      deconstructed per-chromosome VCF.
 CHANGES MEANING WITH: the VCF. A re-sort, a re-filter or a different `vg` version changes
                       which row is which SILENTLY, because every join in the pipeline is
                       positional. ⚠ Distinct from T: `n_sites` is the axis, T is the
@@ -469,8 +485,8 @@ Aliases:              "the site axis", "rows". Never "T".
 Is:                   The length in base pairs of every declared allele at every record —
                       ragged, `num_alleles[i]` entries for row i. chr21: 767,376 declared
                       alleles over 340,849 records, max 90 at one site.
-Computed by:          PLANNED — emitted by our VCF-to-matrix step, which is the only
-                      moment REF/ALT are in hand.
+Computed by:          src/cohort/arrays.py (built 2026-09-29) — our VCF-to-matrix step,
+                      the only moment REF/ALT are in hand.
 CHANGES MEANING WITH: nothing, but its ABSENCE changes several things. Carried because
                       the integer allele matrix knows an allele's INDEX and not one base
                       of its SEQUENCE, hence not its length — so without this array no
@@ -498,7 +514,9 @@ Is:                   The coordinate interval of a chromosome the chain actually
                       ⚠ **PROVISIONAL — Dylan to settle with his PI.** This is the cut
                       that lets v1 run, not a defended answer. Revisit it before any
                       result is published; the full option set is in the REVISIT block.
-Computed by:          PLANNED — a fixed coordinate rule in the preprocessing config.
+Computed by:          configs/inputs.chr21.yaml `chain_span`, applied by
+                      src/cohort/genmap.py:chain_mask (built 2026-09-29). Stored as a
+                      MASK over the full axis, never as a row filter.
 CHANGES MEANING WITH: the chromosome and the genetic map. It is a property of the
                       ASSEMBLY and the MAP, never of the target — which is what makes it
                       safe: it is fixed before the target is opened, so R_D stays a
@@ -602,7 +620,10 @@ Valid vs:             expected_switches under the same cohort and chain_span, an
                       chr21 build at K = 88: prior expectation **7,021.0** per
                       haplotype, against the **7,155** the model-C decision predicted
                       independently; realised **14,169** for a diploid release
-                      (7,084 per haplotype), IDENTICAL at every tau from 0 to 0.9.
+                      (7,084 per haplotype). ⚠ An earlier version said "IDENTICAL at
+                      every tau from 0 to 0.9"; the per-draw values DO move —
+                      14,147/14,211/14,147 at tau = 0.9 against 14,148/14,212/14,148 below
+                      it — and only the rounded MEAN (14,169 either way) was identical.
 Status:               SECONDARY — structure, not a gate. But a value near 0 or near T
                       means the transition model is broken, which is exactly how
                       PanMixer's defect would have shown up had anyone looked.
@@ -615,10 +636,21 @@ Aliases:              "switches", "recombinations". ⚠ Never "crossovers" — t
 Is:                   K, the number of cohort haplotype states. At most ~2n for a
                       diploid cohort of n individuals, before duplicate haplotypes
                       are collapsed.
-Computed by:          PLANNED
+Computed by:          src/mechanism/hmm.py:CohortHMM.K = haplotypes.shape[0]
+                      (built 2026-09-30).
 CHANGES MEANING WITH: whether duplicates have been collapsed. A K quoted before
                       collapse and a K quoted after are different numbers; runtime
                       claims must say which.
+                      ⚠ **COLLAPSE IS NOT IMPLEMENTED (gap found by audit, 2026-09-30).**
+                      No collapse, no policy, no declaration, and no assertion that
+                      duplicates are absent. **EVERY K = 88 this project quotes is
+                      therefore PRE-COLLAPSE**, including the runtime and alpha-storage
+                      figures, and none of them said so until now. Two donors identical
+                      across all 305,886 chain positions would be two states the
+                      mechanism treats as distinct — which changes the uniform initial
+                      distribution and every per-state switch probability s_t/K, since
+                      both are functions of K. Whether it OCCURS on this cohort is
+                      unmeasured. Measure it before quoting K again.
 Valid vs:             the same cohort at the same collapse policy.
 Status:               SECONDARY
 Aliases:              "K", "donor states"
@@ -840,8 +872,8 @@ handles it, restricted to records the target's VCF fully covers, because only th
 Is:                   An auxiliary array row- and slot-aligned to the allele matrix,
                       holding a small integer code per entry saying WHY that entry is
                       `-1`. Shape `(88, n_sites)` int8, code 0 = called.
-Computed by:          PLANNED — our VCF-to-matrix step, which is the only moment the
-                      INFO column is in hand.
+Computed by:          src/cohort/arrays.py (built 2026-09-29) — our VCF-to-matrix step,
+                      the only moment the INFO column is in hand.
 CHANGES MEANING WITH: the code set and the precedence rule (below). Two reason arrays
                       built under different precedence are NOT comparable.
 Valid vs:             the same code set, same precedence, same site axis.
@@ -1120,14 +1152,22 @@ these are not, and every one of them needs an `n` and a `tau`.
 ```
 Is:                   u_path(p_g, released_path) achieved by an actual release, for
                       the true target path p_g. Averaged over independent draws.
-Computed by:          PLANNED — src/ranpanmixer/eval.py
+Computed by:          src/mechanism/ffbs.py:Release.u_achieved per draw; averaged and
+                      tabulated by scripts/run_mechanism_chr21.py (built 2026-09-30).
+                      ⚠ Never quotable without u_ceiling beside it.
 CHANGES MEANING WITH: tau (monotonically), the utility function, AND the denominator
                       (see the two measurement paths below). Report with n draws.
 Valid vs:             the same utility function at another tau, against the floor
-                      (tau = 0, an untilted draw from R_D) and the ceiling
-                      (the target's own path, u = 1 by construction).
+                      (tau = 0, an untilted draw from R_D) and the ceiling.
+                      ⚠ CORRECTED 2026-09-30: the ceiling is NOT "the target's own path,
+                      u = 1 by construction" — that holds only for a target with a call at
+                      every weighted position. For a real external target it is u_ceiling,
+                      measured 0.815455 on HG00096 chr21 at beta scope "chain". The old
+                      wording is what produced the 0.6940-against-1 misreading recorded in
+                      docs/bugs.md; see u_ceiling.
 Status:               PRIMARY
-Aliases:              "utility". Never quoted bare without its tau.
+Aliases:              "utility". Never quoted bare without its tau, its denominator, or
+                      its u_ceiling.
 ```
 
 ### attacker_accuracy  [attack] [evaluation] [gate]
@@ -1149,8 +1189,9 @@ Aliases:              "attack accuracy", "identification rate"
 ### tv_empirical  [privacy] [evaluation] [diagnostic]
 ```
 Is:                   An ESTIMATE of TV(Q^tau_p, Q^tau_q) from finite samples.
-Computed by:          PLANNED — on toy graphs by exact enumeration; at scale it is
-                      not directly estimable and must be reported as such.
+Computed by:          src/mechanism/exact.py:tv on the toy support, by EXACT enumeration
+                      (so on the toy it is not an estimate at all); at scale it is not
+                      directly estimable and must be reported as such. Built 2026-09-30.
 CHANGES MEANING WITH: the estimator. Plug-in TV over a large support is severely
                       BIASED UPWARD at finite n — an estimate above tau on a big
                       support is the expected behaviour of the estimator, not a
@@ -1172,7 +1213,12 @@ Is:                   The test our guarantee ACTUALLY makes, and the reason the
                       such pair; PanMixer's design cannot bound it at all, because it
                       releases unselected blocks verbatim, so two inputs differing in
                       an unselected block have DISJOINT supports and TV = 1.
-Computed by:          PLANNED — ours to write. ⚠ **NOTHING in PanMixer's evaluation
+Computed by:          tests/test_toy_enumeration.py, EXACTLY, on the toy support
+                      (built 2026-09-30): all 3,571,128 pairs of admissible inputs per
+                      tau, worst pair reported. ⚠ STILL PLANNED at chr21 scale, and see
+                      docs/plan.md R5 before building it — the release barely varies with
+                      tau under the current utility, so the measurement would be of a
+                      mechanism that does not move. ⚠ **NOTHING in PanMixer's evaluation
                       suite tests this** (established 2026-09-28 by reading every
                       evaluator). Their metrics test their claim.
 CHANGES MEANING WITH: the estimator and the support size — see tv_empirical: plug-in TV

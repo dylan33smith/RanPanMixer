@@ -139,6 +139,22 @@ def toy_cohort() -> Toy:
         raise ValueError("support is uniform; non-uniform beta_v is untested")
     if t.n_alleles.max() < 3:
         raise ValueError("no multi-allelic position; allele bounds are untested")
+    # ⚠ ADDED 2026-09-30. The table above claims seven features and this function
+    # asserted only five, so two could be degraded silently -- which is exactly the
+    # failure the assertions exist to prevent, one level up.
+    twin = [j for j in range(1, t.K)
+            if ((t.haplotypes[j] == t.haplotypes[0]) | (t.haplotypes[j] == -1)).all()
+            and (t.haplotypes[j] == -1).any()]
+    if not twin:
+        raise ValueError(
+            "no donor is another donor minus a cell, so no two state paths collapse "
+            "to one output path -- the output-collision case is untested and TV "
+            "would effectively be measured over state paths")
+    d = np.diff(t.genetic_pos)
+    if not (d * 10_000.0 * 1.26 / t.K > 10.0).any():
+        raise ValueError(
+            "no step is far enough to drive switching to uniform; the wide end of "
+            "the transition model is untested")
     return t
 
 
@@ -163,10 +179,11 @@ def sharp_pair(toy: Toy) -> tuple[np.ndarray, np.ndarray]:
     ⚠ THIS IS WHY THE PAIR IS CONSTRUCTED AND NOT SAMPLED. A saturating pair makes
     the gate sharp: any inflation of the tilt exponent fails it immediately. The
     `tv_empirical <= tau` gate does NOT have that property -- measured on this
-    toy, the worst exact TV reaches only about half of `tau`, so TV alone cannot
-    detect a doubled `eta_tau`, which is the single most likely calibration error
-    in the project (`epsilon_tau = 2 * eta_tau`, and reaching for the wrong one is
-    a one-character mistake). Keep both gates; only this one is sharp.
+    toy, the worst exact TV reaches only **27.4% of `tau` at `tau` = 0.01, rising
+    to 43.1% at `tau` = 0.9**, so TV alone cannot detect a doubled `eta_tau`, which
+    is the single most likely calibration error in the project
+    (`epsilon_tau = 2 * eta_tau`, and reaching for the wrong one is a one-character
+    mistake). Keep both gates; only this one is sharp.
     """
     return toy.haplotypes[0].copy(), toy.haplotypes[1].copy()
 

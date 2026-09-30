@@ -206,10 +206,11 @@ def ratio_spread(q1: np.ndarray, q2: np.ndarray, *, floor: float = 0.0) -> float
     cancels approximately.
 
     It is strictly more powerful than `TV <= tau` on this toy, which is worth
-    stating plainly: the worst exact TV here reaches only about half of `tau`, so
-    a tilt applied with `epsilon_tau` in place of `eta_tau` -- twice the intended
-    exponent, and a one-token error -- passes the TV gate at every `tau` we test
-    and fails this one by a factor of `exp(epsilon_tau)`.
+    stating plainly: the worst exact TV here reaches only **27.4% of `tau` at
+    `tau` = 0.01, rising to 43.1% at `tau` = 0.9** (measured), so a tilt applied
+    with `epsilon_tau` in place of `eta_tau` -- twice the intended exponent, and a
+    one-token error -- passes the TV gate at every `tau` we test and fails this one
+    by a factor of `exp(epsilon_tau)`.
 
     Support entries below `floor` are dropped; both distributions share the
     enumerated support of `R_D`, so with `floor = 0` nothing is dropped and the

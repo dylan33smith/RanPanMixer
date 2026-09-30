@@ -43,6 +43,7 @@ FOUR THINGS THIS FILE IS CAREFUL ABOUT, each a real failure it would otherwise h
 
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass, field
 from datetime import date
@@ -206,6 +207,11 @@ def _categorical(p: np.ndarray, rng: np.random.Generator) -> int:
                    len(p) - 1))
 
 
+def _digest(a: np.ndarray) -> str:
+    """Content digest of an array, so a record identifies the object it describes."""
+    return hashlib.sha256(np.ascontiguousarray(a).tobytes()).hexdigest()
+
+
 @dataclass(frozen=True)
 class Release:
     """One released path, self-describing. Field names are `docs/data.md` section 4.
@@ -238,7 +244,16 @@ class Release:
                 f"_seed{self.seed}".replace("/", "-").replace("=", ""))
 
     def record(self) -> dict:
-        """The quotable record. The released PATH is included; the target is not."""
+        """The quotable record. The released PATH is identified; the target is not.
+
+        ⚠ The arrays are carried by DIGEST, not inlined. `docs/data.md` section 4
+        lists `state_path` and `released_path` as fields, and the first version of
+        this method omitted BOTH -- so the "quotable object" appeared in no record
+        at all. Inlining 305,886 integers per haplotype into every summary row is
+        not what that schema wants either: the digest lets a record answer "is this
+        the same release?", while the arrays go to disk through `store.save()`,
+        which attaches their own provenance. `docs/data.md` records the deviation.
+        """
         return {
             "release_id": self.release_id, "target_id": self.target_id,
             "tau": self.tau, "eta_tau": self.eta_tau,
@@ -247,15 +262,21 @@ class Release:
             "log_z_p": self.log_z_p, "u_achieved": self.u_achieved,
             "u_ceiling": self.u_ceiling, "ploidy": self.ploidy,
             "released_at": self.released_at,
+            "state_path_sha256": _digest(self.state_path),
+            "released_path_sha256": _digest(self.released_path),
             "T": int(self.state_path.shape[0]),
             "donor_switches": int((np.diff(self.state_path, axis=0) != 0).sum()),
         }
 
 
 def _draw_one(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_1d: np.ndarray,
-              beta: np.ndarray, eta: float, seed: int, baseline_norm: float
+              beta: np.ndarray, eta: float, seed, baseline_norm: float
               ) -> tuple[np.ndarray, np.ndarray, float, float]:
     """One tilted chain: `(state_path, released_alleles, log_z, u_achieved)`.
+
+    `seed` is a `numpy.random.SeedSequence`, not an integer, so the caller owns
+    stream separation -- see the note in `release()` about the overlap the
+    integer form caused.
 
     Takes `eta` rather than `tau` because the diploid release runs this at
     `eta_tau / 2` per haplotype while the RECORD must still carry the real `tau`.
@@ -303,9 +324,30 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
     base = baseline_log_norm(hmm) if baseline_norm is None else baseline_norm
     target_chain = np.asarray(target_chain)
 
+    # ⚠ BIND THE ALLELES TO THE MODEL. `CohortHMM` carries only the availability
+    # mask, never the alleles, so this argument is the one place a caller could
+    # hand the sampler a DIFFERENT cohort of the same shape -- a target-pruned
+    # matrix, say, which is the standing-constraint-1 violation the directory split
+    # was built to prevent and the one shape it cannot catch. The `-1` check after
+    # the draw only catches the subset that happens to be occupied, so the binding
+    # is asserted here instead.
+    if haplotypes_chain.shape != (hmm.K, hmm.T):
+        raise ValueError(
+            f"haplotypes_chain is {haplotypes_chain.shape}, but the model is "
+            f"(K, T) = {(hmm.K, hmm.T)}. These are different cohorts or a "
+            f"different chain_span.")
+    if not np.array_equal(haplotypes_chain != -1, hmm.allowed):
+        bad = int((( haplotypes_chain != -1) != hmm.allowed).sum())
+        raise ValueError(
+            f"haplotypes_chain disagrees with the model's availability mask at "
+            f"{bad} cells. The mask and the alleles describe different cohorts, so "
+            f"R_D is not the distribution these alleles came from -- which is how a "
+            f"target-pruned state space would enter (standing constraint 1).")
+
     if target_chain.ndim == 1:
         z, released, lz, u = _draw_one(hmm, haplotypes_chain, target_chain,
-                                       util.beta, eta, seed, base)
+                                       util.beta, eta,
+                                       np.random.SeedSequence(seed).spawn(1)[0], base)
         ceiling = utility.u_ceiling(target_chain, util.beta)
         ploidy = 1
     elif target_chain.ndim == 2 and target_chain.shape[1] == 2:
@@ -317,11 +359,32 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
         # ⚠ Running each haplotype at the full `eta` is the SUM aggregator in
         # disguise: it doubles the effective tilt, puts the utility range at 2,
         # and `tau` stops covering the release.
+        # ⚠ SeedSequence.spawn, NOT `seed + h`. The first version derived the two
+        # haplotype streams as `seed` and `seed + 1`, so release(seed=s) and
+        # release(seed=s+1) SHARED a draw -- measured, haplotype 1 of one release
+        # was bit-identical to haplotype 0 of the next across all 305,886
+        # positions. The three "independent" draws in the first chr21 run were
+        # therefore four correlated haplotype draws, which inflated the observed
+        # seed-to-seed spread 2.2x. spawn() gives provably disjoint streams from
+        # one recorded integer, so a release stays reproducible from its `seed`.
+        streams = np.random.SeedSequence(seed).spawn(2)
         draws = [_draw_one(hmm, haplotypes_chain, target_chain[:, h], util.beta,
-                           eta / 2.0, seed + h, base) for h in (0, 1)]
+                           eta / 2.0, streams[h], base) for h in (0, 1)]
         z = np.stack([d[0] for d in draws], axis=1)
         released = np.stack([d[1] for d in draws], axis=1)
         lz = draws[0][2] + draws[1][2]
+        # ⚠ BRACKET THE SUM. Each haplotype's log_z was checked against eta/2, but
+        # nothing checked their sum until 2026-09-30 -- so restoring the full `eta`
+        # per haplotype (the SUM aggregator in disguise) was ACCEPTED at every tau
+        # and returned a record whose published log_z_p violated its own stated
+        # invariant. Measured at tau = 0.5: 0.763 against a bracket of [0, 0.549].
+        if not (-1e-6 <= lz <= eta + 1e-6):
+            raise AssertionError(
+                f"diploid log_z_p = {lz!r} is outside [0, eta_tau] = [0, {eta!r}] "
+                f"(haplotype values {draws[0][2]!r} and {draws[1][3]!r}). The two "
+                f"chains must each run at eta_tau/2 so their sum lands in the "
+                f"bracket; running each at the full eta_tau doubles the effective "
+                f"tilt and tau no longer covers the release.")
         u = utility.diploid_utility(draws[0][3], draws[1][3])
         ceiling = utility.diploid_utility(
             utility.u_ceiling(target_chain[:, 0], util.beta),

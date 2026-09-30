@@ -645,6 +645,193 @@ def test_the_fast_and_dense_forward_agree_away_from_the_toy():
     assert abs(fast.log_norm - dense_logc) < 1e-10
 
 
+# ---------------------------------------------------------------------------
+# Regressions from the 2026-09-30 independent audit. Each of these was a real
+# defect that the 88-test suite passed over, so each gets a test that fails if it
+# returns. Three were verified by mutation before the fix was accepted.
+# ---------------------------------------------------------------------------
+
+def test_calibration_is_checked_against_the_table_parsed_from_the_glossary():
+    """Parse `docs/terms.md`'s table, then check the code against it.
+
+    ⚠ THIS TEST EXISTS BECAUSE ITS ABSENCE HID A BUG. `calibration.py` claimed the
+    docs contract already checked it against the glossary; it does not -- that test
+    recomputes from `math.atanh` and never imports the module, and the test above
+    compares against a hardcoded third copy. Three independent transcriptions of
+    one table, no edge between the code and the document. Parsing the document is
+    the only version of this check that can actually fail.
+    """
+    rows = []
+    for line in (REPO / "docs" / "terms.md").read_text().splitlines():
+        cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
+        if len(cells) != 4:
+            continue
+        try:
+            rows.append(tuple(float(c) for c in cells))
+        except ValueError:
+            continue
+    assert len(rows) >= 7, f"parsed {len(rows)} calibration rows from terms.md, expected >= 7"
+    for tau, eta, eps, ps in rows:
+        assert abs(C.eta_tau(tau) - eta) < 5e-7, f"eta_tau({tau})"
+        assert abs(C.epsilon_tau(tau) - eps) < 5e-7, f"epsilon_tau({tau})"
+        assert abs(C.p_succ_bound(tau) - ps) < 5e-7, f"p_succ_bound({tau})"
+
+
+def test_epsilon_tau_does_not_divide_by_the_utility_range():
+    """REGRESSION 2026-09-30. `epsilon_tau` returned `2*arctanh(tau)/delta_u`.
+
+    `delta_u` CANCELS in the budget: a utility spanning `delta_u` is tilted by an
+    exponent whose range is `eta_tau * delta_u = arctanh(tau)`, so the pointwise
+    ratio spans `exp(2*arctanh(tau))` whatever the range. The old code returned
+    exactly `arctanh(tau)` at `delta_u` = 2 -- the expression `docs/terms.md`
+    forbids in capitals as a silent understatement of the leakage. It was
+    unreachable and untested at any non-unit range, so the only scenario the
+    parameter exists for was the one that corrupted the headline privacy number.
+    """
+    for tau in (0.01, 0.1, 0.25, 0.5, 0.9):
+        want = 2 * math.atanh(tau)
+        for du in (0.5, 1.0, 2.0, 7.0):
+            assert abs(C.epsilon_tau(tau, delta_u=du) - want) < 1e-15, (tau, du)
+        assert abs(C.epsilon_tau(tau) - 2 * C.eta_tau(tau)) < 1e-15, (
+            "the 2x relation must still hold at the unit range")
+
+
+def test_a_diploid_release_brackets_the_SUM_of_its_two_log_z_values():
+    """REGRESSION 2026-09-30, VERIFIED BY MUTATION. Nothing checked the sum.
+
+    Each haplotype's `log_z` was asserted against `eta_tau/2`, and `release()`
+    then returned their sum unchecked. Measured on chr21 before the fix: restoring
+    the full `eta_tau` per haplotype -- the SUM aggregator in disguise -- was
+    ACCEPTED at tau = 0.25, 0.5 and 0.9, returning a record whose published
+    `log_z_p` (0.763 at tau = 0.5) violated its own stated invariant of
+    [0, 0.549]. After the fix all three raise.
+
+    Here the same hole is provoked without touching the source: two haplotype
+    chains each legitimately bracketed at the FULL eta can sum past it.
+    """
+    t, util, m = _toy_bundle()
+    tau = 0.5
+    eta = C.eta_tau(tau)
+    dip = np.stack([t.haplotypes[0], t.haplotypes[1]], axis=1)
+    halves = []
+    for h in (0, 1):
+        psi = U.tilt_potentials(m.allowed, t.haplotypes, dip[:, h], util.beta, eta)
+        halves.append(F.log_z_p(F.forward(m, psi), F.baseline_log_norm(m), eta))
+    assert sum(halves) > eta, (
+        f"the two full-exponent log_z values sum to {sum(halves)}, inside "
+        f"[0, {eta}] -- this toy can no longer provoke the hole, so the test is "
+        f"no longer testing anything")
+    r = F.release(m, t.haplotypes, dip, util, tau, seed=3, target_id="dip")
+    assert 0.0 <= r.log_z_p <= eta + 1e-9, "the correct diploid release must bracket"
+
+
+def test_diploid_haplotype_streams_do_not_overlap_the_next_release():
+    """REGRESSION 2026-09-30, MEASURED ON chr21. `seed + h` coupled the draws.
+
+    Deriving the two haplotype streams as `seed` and `seed + 1` made
+    `release(seed=s)`'s haplotype 1 BIT-IDENTICAL to `release(seed=s+1)`'s
+    haplotype 0 -- 0 of 305,886 positions differed. So the first chr21 run's
+    "3 independent draws per tau" were 4 correlated haplotype draws, which
+    inflated the observed seed-to-seed spread 2.2x and made it coincidentally
+    match the haploid `sd(u)`. `SeedSequence.spawn` gives provably disjoint
+    streams from the one integer the record carries.
+    """
+    t, util, m = _toy_bundle()
+    dip = np.stack([t.haplotypes[0], t.haplotypes[1]], axis=1)
+    # A longer toy chain, so two independent draws agreeing everywhere by chance
+    # is not the expected outcome.
+    rng = np.random.default_rng(4)
+    K, T = 12, 400
+    hap = rng.integers(0, 2, size=(K, T)).astype(np.int16)
+    cm = np.sort(rng.random(T)) * 0.5
+    mm = H.from_arrays(hap, cm, np.arange(1, T + 1) * 500)
+    uu = U.beta_v((hap != -1).sum(axis=0).astype(np.int32))
+    tt = np.stack([hap[0], hap[1]], axis=1)
+    a = F.release(mm, hap, tt, uu, 0.5, seed=500, target_id="a")
+    b = F.release(mm, hap, tt, uu, 0.5, seed=501, target_id="b")
+    for i in (0, 1):
+        for j in (0, 1):
+            assert not np.array_equal(a.state_path[:, i], b.state_path[:, j]), (
+                f"release(500) haplotype {i} is identical to release(501) "
+                f"haplotype {j}; the streams overlap again")
+
+
+def test_the_allele_matrix_is_bound_to_the_model_it_was_built_from():
+    """REGRESSION 2026-09-30. `release()` took the alleles as a free argument.
+
+    `CohortHMM` carries only the availability mask, never the alleles, so this
+    argument was the one place a caller could hand the sampler a DIFFERENT cohort
+    of the same shape -- a target-pruned matrix above all, which is the standing
+    constraint 1 violation the cohort/target directory split exists to prevent and
+    the one shape that split cannot catch. The post-draw `-1` check only caught the
+    subset that happened to be occupied.
+    """
+    t, util, m = _toy_bundle()
+    pruned = t.haplotypes.copy()
+    pruned[2, 0] = -1                      # prune one donor at one position
+    try:
+        F.release(m, pruned, t.haplotypes[0], util, 0.25, seed=1, target_id="x")
+    except ValueError as e:
+        assert "different cohorts" in str(e)
+    else:
+        raise AssertionError("a pruned allele matrix was accepted")
+    try:
+        F.release(m, t.haplotypes[:, :-1], t.haplotypes[0], util, 0.25,
+                  seed=1, target_id="x")
+    except ValueError as e:
+        assert "different cohorts" in str(e) or "chain_span" in str(e)
+    else:
+        raise AssertionError("a mis-shaped allele matrix was accepted")
+
+
+def test_phi_v_is_the_authority_for_the_indicator_the_fast_paths_inline():
+    """REGRESSION 2026-09-30. `phi_v` is tested but never CALLED by the mechanism.
+
+    `tilt_potentials` and `u_of_output` both re-inline the model-C indicator as a
+    vectorised expression for speed, so the function carrying the documented
+    semantics -- and the only one with a test -- was on no live code path. That is
+    two implementations of one definition with no edge between them. This test is
+    that edge: it checks the inlined comparisons agree with `phi_v` cell by cell,
+    including the missing-target and missing-donor cases that are the whole reason
+    `phi_v` has a docstring.
+    """
+    t, util, m = _toy_bundle()
+    eta = C.eta_tau(0.5)
+    for target in list(TOY.toy_inputs(t, kind="all")[::37]) + [t.haplotypes[2]]:
+        psi = U.tilt_potentials(m.allowed, t.haplotypes, target, util.beta, eta)
+        for v in range(t.T):
+            want = U.phi_v(t.haplotypes[:, v], int(target[v]))
+            got = np.where(m.allowed[:, v],
+                           np.round(np.log(np.maximum(psi[v], 1e-300))
+                                    / (eta * util.beta[v]), 6), want)
+            assert np.allclose(got[m.allowed[:, v]], want[m.allowed[:, v]], atol=1e-5), (
+                f"tilt_potentials disagrees with phi_v at position {v}")
+        u_inline = float(U.u_of_output(
+            t.haplotypes[0], target, util.beta)[0])
+        u_phi = float(sum(util.beta[v] * U.phi_v(t.haplotypes[0:1, v], int(target[v]))[0]
+                          for v in range(t.T)))
+        assert abs(u_inline - u_phi) < 1e-12, "u_of_output disagrees with phi_v"
+
+
+def test_the_two_independent_utility_implementations_agree():
+    """`exact.utility_vector` and `utility.u_of_output` must compute one quantity.
+
+    REGRESSION 2026-09-30. The gate's entire 3.5M-pair sweep scores with
+    `exact.py`'s utility while every release scores with `utility.py`'s, and their
+    null guards differ (`target != -1` against `target >= 0 & output >= 0`). If
+    they diverged the gate would silently be measuring a different quantity than
+    the mechanism optimises -- and nothing compared them.
+    """
+    t, util, m = _toy_bundle()
+    base = E.enumerate_baseline(t.haplotypes, t.genetic_pos)
+    worst = 0.0
+    for target in TOY.toy_inputs(t, kind="all")[::11]:
+        a = E.utility_vector(base, target, util.beta)
+        b = U.u_of_output(base.paths, target, util.beta)
+        worst = max(worst, float(np.abs(a - b).max()))
+    assert worst < 1e-15, f"the two utility implementations differ by {worst}"
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]
