@@ -104,6 +104,79 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-30 (later still) — R5 REOPENED: contiguity is the lever, and there is an exact ceiling
+
+**Why this entry exists.** Two hours earlier the same day, R5's option list was narrowed to
+"nothing works" on the strength of a table that concentrated `beta_v` on the top-n positions
+by `w_v`. **Those positions are SCATTERED across the chromosome**, and that confound was
+never separated. It is the whole answer.
+
+**Measured, sampling-free, `Var_Q(u)` from `d2 log Z_p / d eta2` at `tau` = 0.5, HG00096
+haplotype 0, chr21. Same n, same `sum beta_v` = 1, only the LAYOUT differs.**
+
+| n positions | `Var_Q(u)` scattered | `Var_Q(u)` contiguous | ratio |
+|---|---|---|---|
+| 100,000 | 1.1404e-05 | 1.5149e-05 | 1.3x |
+| 10,000 | 1.1140e-05 | 1.6422e-04 | **14.7x** |
+| 1,000 | 1.1132e-05 | 1.0565e-03 | **94.9x** |
+| 100 | 6.6763e-05 | 8.3509e-03 | **125.1x** |
+
+**Provenance.** `src/mechanism/ffbs.py` forward passes only, no sampling; three passes per
+row. Contiguous windows are centred on the chain; scattered sets are the top n by
+`w_v = 1/support(v)`.
+
+**COLUMNS** · *scattered* is what the earlier table measured. · *contiguous* is a single
+window of the same size. · *ratio* is the finding.
+
+**ROWS** · *100,000* — a third of the chromosome, so both layouts span most of the segments
+and barely differ. · *10,000 down to 100* — scattered `Var` is PINNED near 1.1e-05 however
+few positions it covers, while contiguous `Var` rises roughly as 1/n.
+
+**SYNTHESIS, and it corrects this project twice over.** `Var_R(u)` is governed by **how many
+independent mosaic SEGMENTS the utility spans**, not by `sum beta_v^2`. Scattered positions
+each sit in their own segment, so concentrating onto them leaves the segment count — and
+hence the variance — untouched; that is why the earlier table read as a flat line and was
+mistaken for a dead end. A contiguous window spans few segments, so `u` approaches "does the
+drawn donor match the target through this window", whose variance approaches `p(1-p)`.
+
+**AND THERE IS AN EXACT CEILING, which settles what is possible rather than what we tried.**
+The tilt's gain is `eta_tau * Var_Q(u)` and a single draw's noise is `sd(u) = sqrt(Var)`, so
+
+    gain / noise per draw  =  eta_tau * sqrt(Var)  <=  eta_tau / 2
+
+because `u` in [0,1] bounds `Var` at 1/4. That is a bound on EVERY utility of this form, at
+every `beta`, forever:
+
+| `tau` | 0.10 | 0.25 | 0.50 | 0.90 | 0.99 |
+|---|---|---|---|---|---|
+| `eta_tau` | 0.1003 | 0.2554 | 0.5493 | 1.4722 | 2.6467 |
+| ceiling on gain/noise per draw | 0.0502 | 0.1277 | 0.2747 | 0.7361 | 1.3233 |
+| draws for 2 sigma at the ceiling | 1,589 | 245 | **53** | 7 | 2 |
+
+**So the mechanism's effect is ALWAYS sub-noise in a single release** — that is what a TV
+bound of `tau` means, and it is not a defect. What varies is how many draws it takes to SEE
+it. At our current configuration `sd(u)` = 2.0115e-03 gives 1.1049e-03 sigma per draw and
+**3,276,480 draws** for 2 sigma. A contiguous window of 100 gives 5.0197e-02 sigma per draw
+and about **1,600 draws** — 4 hours at 9.4 s per diploid release. The theoretical best at
+`tau` = 0.5 is **53 draws**. We are sitting **250x below the achievable ceiling**, not at it.
+
+⚠ **AND R5's OPTION 2 WAS ALSO WRONG.** It dismissed "shrink the scope `tau` covers" as
+"k independent releases of one genome, and they COMPOSE, which standing constraint 4
+forbids". That conflates two different things. Releasing k windows each with its own `tau`
+does compose and is forbidden. Defining ONE release whose utility sums to 1 over ONE window
+does NOT compose — the chain still runs genome-wide, one path is released, and the positions
+outside the window are simply a pure prior draw. It is a narrower UTILITY, not a second
+release. That distinction is the door the earlier analysis closed by mistake.
+
+**What this does NOT settle, and it is the real question for the PI.** A utility over a
+contiguous window means the release preserves target information THERE and is a pure prior
+draw everywhere else. That is a different product from whole-chromosome fidelity, and
+choosing between them is a question about what the release is FOR, not about `beta_v`. The
+measured trade is now on the table instead of being hidden behind a flat line:
+whole-chromosome fidelity is unmeasurable at any feasible n; regional fidelity is measurable
+at roughly 1,600 draws. ⚠ Both are PRE-REGISTRATION items under standing constraint 5.
+
+
 ## 2026-09-30 (later) — A-FIX-mechanism-audit: an independent audit of the same day's build
 
 **Hypothesis.** A test suite written by the agent that wrote the code tests that agent's

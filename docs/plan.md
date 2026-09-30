@@ -29,7 +29,25 @@ Read at session start. This file exists so a new session never has to grep
   `[0, eta_tau]`, and `tau` = 0 reproduces `baseline_model` to 1e-15. 46 new tests, **87
   in the suite, all passing.** The O(TK) rank-one forward pass agrees with an O(TK^2)
   dense reference to **1.11e-16**.
-- ⚠⚠ **THE FIRST RanPanMixer NUMBER EXISTS: THE TILT RESHUFFLES THE PATH AND BUYS NO
+- ⚠⚠ **NEXT: THE UTILITY'S SCOPE. R5 is a live, quantified design choice, not a dead end**
+  (reopened 2026-09-30). `Var_R(u)` is set by how many mosaic SEGMENTS the utility spans, so
+  a CONTIGUOUS window of 1,000 positions gives **94.9x** the variance of 1,000 scattered
+  ones at identical `sum beta`. And the ceiling is exact:
+  `gain/noise per draw = eta_tau * sqrt(Var) <= eta_tau/2`. Our configuration needs
+  **3,276,480** draws to show the tilt at 2 sigma; a contiguous window of 100 needs about
+  **1,600**; the best possible at `tau` = 0.5 is **53**. **The question for Dylan and his PI
+  is what the release is FOR** — whole-chromosome fidelity, which is unmeasurable at any
+  feasible n, or regional fidelity, which is measurable this week. Pre-registration item
+  under constraint 5, so it must be settled BEFORE `A-LCK-preregister` and before any
+  evaluation. See R5.
+- ⚠ **DO NOT RUN THE EVALUATION FIRST.** At the current utility it would pass trivially and
+  prove nothing: the release carries almost no target information, so `attacker_accuracy`
+  would sit at chance and two-target TV near 0 — which standing constraint 6 says is not
+  evidence of anything. And `utility_retained` is **85.0% of `u_ceiling` at `tau` = 0 too**
+  (0.6931 against 0.6932 at `tau` = 0.9), so quoting it as the mechanism's utility would be
+  exactly the free lunch `target_fidelity` warns about — now measured on `u_path` ITSELF,
+  not merely on the cohort-level metrics that warning was written about.
+- ⚠⚠ **THE FIRST RanPanMixer NUMBER: THE TILT RESHUFFLES THE PATH AND BUYS NO
   UTILITY.** HG00096, chr21, `beta` scope `chain`. Between `tau` = 0 and `tau` = 0.9 the
   released path MOVES — 8 of 10 disjoint-stream draws differ, by a mean of **417 state
   positions** and **54 allele positions** per haplotype — while expected utility moves
@@ -417,9 +435,28 @@ Jaccard was ruled out as the in-sampler potential. **Exact sampling and a high-v
 utility are in tension, and the mechanism currently sits at the exact-sampling end.**
 
 **The option set, with the first entry now MEASURED AND CLOSED:**
-- ~~**Concentrate `beta_v`**~~ — **MEASURED 2026-09-30 AND IT DOES NOT WORK.** See the table
-  above: 16.5x the variance at 3,000x the concentration, still 55x short, at the cost of the
-  utility's own meaning.
+- ~~**Concentrate `beta_v`** on SCATTERED positions~~ — **MEASURED AND IT DOES NOT WORK.**
+  16.5x the variance at 3,000x the concentration. ⚠ But see the next entry: the table above
+  tested only scattered sets, and that confound was the whole answer.
+- ✅ **CONCENTRATE `beta_v` ON A CONTIGUOUS REGION — MEASURED 2026-09-30 AND IT DOES WORK.**
+  Same n, same `sum beta` = 1, only the layout differs: at n = 1,000 a contiguous window
+  gives `Var_Q(u)` = 1.0565e-03 against 1.1132e-05 scattered, **94.9x**; at n = 100 it is
+  **125.1x**. `Var_R(u)` is governed by how many independent mosaic SEGMENTS the utility
+  spans, not by `sum beta_v^2` — scattered positions each sit in their own segment, so
+  concentrating onto them changes nothing. **And there is an exact ceiling:**
+  `gain/noise per draw = eta_tau * sqrt(Var) <= eta_tau/2`, since `u` in [0,1] bounds `Var`
+  at 1/4. So the effect is ALWAYS sub-noise in one release — that is what a `tau` bound
+  MEANS — and the only question is how many draws it takes to see. Our configuration needs
+  **3,276,480**; a contiguous window of 100 needs about **1,600** (4 hours); the theoretical
+  best at `tau` = 0.5 is **53**. We sit 250x below the ceiling, not at it.
+  ⚠ **The cost is what the release is FOR:** a windowed utility preserves target information
+  in the window and is a pure prior draw everywhere else. That is a different product from
+  whole-chromosome fidelity, and it is the PI's question, not `beta_v`'s.
+- ⚠ **OPTION 2 BELOW WAS ALSO WRONG** and is corrected here. Releasing k windows each with
+  its own `tau` composes and is forbidden. Defining ONE release whose utility sums to 1 over
+  ONE window does NOT compose: the chain still runs genome-wide, one path is released, and
+  the positions outside the window are a prior draw. A narrower UTILITY is not a second
+  release. See `docs/memory.md` 2026-09-30.
 - **Shrink the scope `tau` covers.** A `tau` per megabase rather than per chromosome
   raises every `beta_v` by the ratio of scopes — but that is k independent releases of
   one genome and they COMPOSE, which standing constraint 4 forbids. It is the same scope
