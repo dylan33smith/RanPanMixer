@@ -62,7 +62,7 @@ in git as history.
 **Artifacts not previously registered** (added 2026-09-29): `an_info.npy` (INFO/AN as the
 caller wrote it, cross-checked against `support`), `allele_lengths_offsets.npy` (the ragged
 index into `allele_lengths`), `target_reason.npy` and `readable.npy` (see `docs/plan.md`).
-⚠ `temp/chr21/deconstruct.vcf` is UNCOMPRESSED, not `.vcf.gz`.
+⚠ `data/temp/chr21/deconstruct.vcf` is UNCOMPRESSED, not `.vcf.gz`.
 
 **Data tree.** `temp/` holds intermediates and is deletable; `cohort/` holds the
 durable artifacts and no target ever touches it; `dev/` is a complete parallel root
