@@ -104,6 +104,86 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-09-29 (audit) — A-FIX-independence-audit: four auditors, and two criticals of my own
+
+**Method.** Adversarial workflow `wf_814ac6b2-5f2`, four auditors on independence, cohort
+correctness, target correctness and provenance, each required to verify by execution. One
+auditor's transcript was briefly read as "died" and its lead chased by hand; all four in fact
+returned.
+
+**What held.** The cohort arrays are correct: every quantity re-derived independently with
+bcftools/awk matched, and all 12 artifacts rebuild **byte-identically**. Sidecar coverage
+84/84 with 0 stale digests, axis-digest sensitivity correct on all three axes, six of six
+guards firing, and the dev fixture confirmed a clean subset of OUR axis (its digest
+reproduces from our VCF; PanMixer's gives a different one).
+
+### Two criticals in code I had written hours earlier
+
+**1. The split-ALT join fabricated homozygous-reference calls.** It inferred "this haplotype
+is reference" from the absence of a `1` at every panel record for our alts — valid only if
+the panel covers ALL of them. Where it covered 2 of 4, a haplotype carrying alt 3 was written
+as reference: **6,309 fabricated calls per target**, booked as reason 0 `called` under a
+policy documented to mean "honest, unknown". Restricted to **fully covered** rows: **1,856**,
+not 8,377 — matching the auditor's independent count exactly — where a `(0,0)` is conclusive.
+Measured after the fix: 957 of the 1,856 are genuinely homozygous reference, 899 carry a
+non-reference allele.
+
+**2. The recommended `beta_v` normalisation rested on a false premise, and it was not the
+recovery's fault.** `docs/plan.md` justified normalising over the panel-matched set with
+"identical for all ten targets" — but that was attached to `in_chain & (target_reason == 0)`,
+which is **NOT** invariant: **4 distinct sets across ten targets**, because a contradiction at
+a poly-A repeat drops a row for one target and not another. Normalising over it is precisely
+the constraint-1 violation the same section warns voids Theorem 1.
+Fixed by emitting **`readable.npy`**: a row is readable if the panel has a usable record for
+it, and both tests read only the panel's **site list**, the same file for every target.
+**Verified 1 distinct set across all ten, locked by a test.** Normalising over
+`in_chain & readable` gives max `u` = **1.000** over **253,846 of 305,886** chain positions
+(83.0%), against **0.815** over all of them.
+
+### Two more criticals, found independently by two auditors
+
+- **`git_rev` stamped HEAD with no dirty check**, so **64 of 84** artifacts named a commit
+  whose code provably could not emit the parameters they carried. Now `<sha>` when clean and
+  `<sha>-dirty+<diff digest>` otherwise. Provenance that confidently names the wrong cause is
+  worse than none.
+- **`store.check_axis` was dead code** — defined, unit-tested, never called from `src/` — so a
+  cohort directory mixing two site axes was consumed without error. Now invoked in both
+  stages, and it immediately caught a shortcut in one of my own tests that wrote
+  `in_chain.npy` with a bare `np.save`.
+
+### Major
+
+- **The `vg` digest pin was theatre.** No code read `tools.vg.path`, and the test hashed the
+  *config's* path rather than the resolved binary — an impostor on `$RANPANMIXER_VG` ran while
+  the test passed. `deconstruct` now resolves vg through the manifest, verifies the digest of
+  the binary that will run, and records its path, version and digest. vg's version decides ALT
+  ordering and therefore every allele index, so this is the one pin that matters.
+- **`CLAUDE.md` still said PanMixer supplies the cohort data and to use their env.** That is
+  the mechanism that re-seeds the coupling — this file records it happening before with
+  constraint 1. Rewritten, and held at exactly 150 lines.
+- **All ten target VCFs and the attack DB were cut from PanMixer's `starting_data`**, with
+  that path in every header. Re-cut from `data/raw/`; verified no header names their tree.
+- **The sidecar `sha256` was write-only.** Added `store.verify`; all artifacts pass.
+- **The support/`INFO/AN` canary never enforced** (`strict=False` at its only call site), so
+  real row drift would write `support.npy` and exit 0. Now strict, result recorded.
+- **`deconstruct` and `drop_chm13` wrote no sidecars**, breaking the lineage from GFA to
+  arrays. Both attach provenance now, including the vg version.
+- **Stale PanMixer-derived counts corrected** in `terms.md`, `plan.md` and the manifest:
+  n_sites **340,849** (not 340,824), T **305,886** (not 305,887), dropped_below **34,371**
+  (not 34,345), **767,376** declared alleles, **41** sites at support<=1 (not 89).
+
+### Process failures of mine worth recording
+
+- I wrote a `vg` sha256 into the manifest with its **tail fabricated** from a truncated
+  terminal display. Corrected, and a test now compares declared tool digests against the
+  binaries on disk.
+- I **committed while the docs contract was failing**, because a `&&` chain meant to gate the
+  commit did not: piping pytest through `tail` masked its exit code. Fixed in the following
+  commit; check `PIPESTATUS` or capture the exit code explicitly.
+
+---
+
+
 ## 2026-09-29 (later) — A-IMP-preprocess: independence from PanMixer, and a real join bug
 
 **Goal.** Dylan's direction: the tool must be COMPLETELY INDEPENDENT of PanMixer, which is
