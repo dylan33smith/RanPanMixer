@@ -63,9 +63,16 @@ in git as history.
 durable artifacts and no target ever touches it; `dev/` is a complete parallel root
 reached with `--root data/dev`, so the 2 Mb slice runs the identical code path.
 
+⚠ **INDEPENDENCE (2026-09-29).** Nothing in `src/`, `configs/` or `tests/` reads a path
+inside PanMixer's checkout — verified by grep and by tracing every provenance sidecar. The
+`vg` binary was relocated to `data/tools/vg` (it is third-party, v1.68.0, pinned by sha256 in
+the manifest) and the 1000G panel to `data/raw/` (third-party, evaluation-only). PanMixer's
+own chr21 VCF sha256 `5b880a3a…` appears in **no** artifact's inputs.
+
 ```
 data/
-  raw/            the two staged inputs
+  tools/vg        v1.68.0, pinned in configs/inputs.chr21.yaml
+  raw/            the staged inputs
   temp/chr21/     deconstruct.vcf.gz, cohort44.vcf.gz   (deletable)
   cohort/chr21/   haplotypes reason missing_runs positions genetic_pos in_chain
                   support allele_lengths sites.tsv haplotype_ids manifest.json

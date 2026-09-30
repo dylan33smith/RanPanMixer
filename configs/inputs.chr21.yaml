@@ -9,6 +9,21 @@
 
 chrom: chr21
 
+# External binaries this pipeline shells out to. Pinned here so a version change is
+# visible rather than silent -- vg 1.68 and vg 1.36 order ALT alleles differently at
+# multi-allelic sites, so the version determines the allele indices.
+tools:
+  vg:
+    path: data/tools/vg           # override with $RANPANMIXER_VG
+    version: v1.68.0
+    sha256: 008a4bf376674e2720a21cf9c6ab94a65d98a91a2106925ecdda5fbed9a36610
+    note: >
+      A third-party binary, kept under OUR data tree rather than inside PanMixer's
+      checkout so the pipeline has no path dependency on their tool.
+  bcftools:
+    version: "1.24"
+    from: the ranpanmixer conda env (environment.yml)
+
 inputs:
 
   graph:
@@ -54,6 +69,24 @@ inputs:
     # Supplied per run by preprocess-target, not by this manifest.
     # See target_selection below.
     path: null
+
+  # NOT a mechanism input. The 1000 Genomes 30x GRCh38 panel serves two
+  # EVALUATION-ONLY roles: it is where the stand-in test targets are drawn from,
+  # and it is the attack database. Staged under our own data/raw/ rather than read
+  # from inside PanMixer's checkout -- it is third-party data, not their artifact,
+  # but the recipe should not point into their tree.
+  external_panel_evaluation_only:
+    path: data/raw/1000g_30x_phased.vcf.gz
+    bytes: 427136458
+    sha256: a925c112a1085faf01332bef0707b7f0304079fbd974a82de402d248037ea48b
+    samples: 3202
+    build: GRCh38
+    url: https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr21.filtered.SNV_INDEL_SV_phased_panel.vcf.gz
+    note: >
+      Phased and GRCh38-called, which is why a sample column IS a path once joined
+      to our site list. 39 of the 44 HPRC donors are in it -- irrelevant to the
+      mechanism, which never reads it, but it is why the attack database needs the
+      cohort overlap removed before any privacy number is quoted.
 
 # ---------------------------------------------------------------------------
 # chain_span — the coordinate interval the chain actually runs over.

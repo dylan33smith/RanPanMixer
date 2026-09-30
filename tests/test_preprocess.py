@@ -311,6 +311,35 @@ def test_an_cross_check_is_not_vacuous():
     assert pos[mism[0]] == 1300
 
 
+def test_manifest_tool_digests_match_the_binaries_on_disk():
+    """REGRESSION 2026-09-29. A vg sha256 was written into the manifest with its tail
+    FABRICATED from a truncated terminal display. It looked entirely plausible. The
+    project rule is that every number is traceable; a checksum that was never computed
+    is the worst possible violation of it, because its whole purpose is to be checked.
+
+    vg's version is load-bearing, not cosmetic: 1.68 and 1.36 order ALT alleles
+    differently at multi-allelic sites, so the version determines the allele indices
+    every downstream array is written in terms of.
+    """
+    import yaml
+    cfg = yaml.safe_load((REPO / "configs" / "inputs.chr21.yaml").read_text())
+    tools = cfg.get("tools", {})
+    assert tools, "configs/inputs.chr21.yaml declares no tools block"
+    for name, spec in tools.items():
+        declared = spec.get("sha256")
+        path = spec.get("path")
+        if not declared or not path:
+            continue
+        f = REPO / path
+        if not f.exists():
+            continue                      # staged elsewhere; nothing to check
+        actual = store_mod.sha256_file(f)
+        assert actual == declared, (
+            f"{name}: manifest declares sha256 {declared} but {path} hashes to {actual}. "
+            f"Either the binary changed or the digest was never computed."
+        )
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]

@@ -7,13 +7,17 @@ converter that gets rewritten repeatedly.
 from __future__ import annotations
 
 import gzip
+import os
 import shutil
 import subprocess
 from pathlib import Path
 
 import store
 
-VG = Path("/data/ds85/RanPanMixer/external/PanMixer/downloaded_tools/vg")
+# vg is a third-party binary (v1.68.0). It lives under OUR data tree, not inside
+# PanMixer's checkout, so nothing in this pipeline reads a path belonging to their
+# tool -- see docs/plan.md on independence. Overridable by env var for portability.
+VG = Path(os.environ.get("RANPANMIXER_VG", "data/tools/vg"))
 
 
 def _run(cmd: list[str], stdout_path: Path | None = None) -> None:
