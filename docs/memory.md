@@ -104,6 +104,81 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-01 — R5 knob inventory: every degree of freedom in the tilt, measured
+
+**Question (Dylan).** Can `beta_v` be made larger by changing something else, keeping the
+maths valid?
+
+**Frame.** Detectability of the tilt in one draw is `gain/noise = eta_tau * sd(u)`, and
+`Var(u) ~ Var(local match rate) / (independent segments the utility spans)`. So there are
+exactly three factors: `eta_tau`, the local match variance, and the segment count. Every
+knob below is one of those three.
+
+| knob | effect on gain/noise | legitimate? | cost |
+|---|---|---|---|
+| `phi_v` functional form | **1.00x — no room at all** | yes | a 0/1 variable already MAXIMISES variance for any [0,1] variable of given mean |
+| reward matches AND penalise mismatches | **1.00x — literally the same mechanism** | yes | none, and no benefit: measured max abs difference between the two release distributions is **2.776e-17** |
+| negative `beta_v` summing to 1 | **< 1x — it COSTS** | yes but perverse | the range is `sum |beta_v|`, not `sum beta_v`; one weight at -0.3 gives range **2.0534**, so `eta_tau` must SHRINK to 0.2675 |
+| release ONE haplotype instead of a pair | **sqrt(2) = 1.41x** | yes | half the release object |
+| cohort heterozygosity weights | **2.22x** | yes — function of D alone | `E_Q[u]` 0.695 -> 0.520; a DIFFERENT utility |
+| contiguous 1,000-position utility | **16.16x** | yes | target information only in the window |
+| contiguous 100 + heterozygosity | **86.3x** | yes | both of the above, compounded |
+| `tau` 0.5 -> 0.9 | **2.68x** | a weaker privacy claim | `eta_tau` enters linearly |
+| fewer donor segments via `Ne*r` | **1.36x, and NON-MONOTONIC** | not target-dependent, but see cost | the release becomes a long verbatim copy of ONE real donor — departure (b), and `tau` protects the TARGET, not the donors |
+
+**Provenance.** `Var_Q(u)` from `d2 log Z_p / d eta2`, three forward passes per row, no
+sampling · HG00096 haplotype 0 · chr21 · `tau` = 0.5 unless stated · the equivalence and
+negative-weight rows are exact on the toy.
+
+**COLUMNS** · *effect* is on `eta_tau * sd(u)`, which is dimensionless and comparable
+across utilities even though the utilities themselves are not (constraint 7). ·
+*legitimate* means it does not make `R_D`, `Y_D` or `beta_v` a function of the target.
+
+**ROWS** · the first three are the answer to the question as asked, and all three are
+**no**. · the middle five are the real levers. · the last one is the surprise.
+
+**SYNTHESIS, and three things worth keeping.**
+
+**1. The two formulations of the utility are the same mechanism.** Rewarding matches
+(`phi` valued 0 or 1, range 1, `eta_tau`) and rewarding matches while penalising mismatches
+(`phi'` = 2`phi` - 1 in -1 or +1, range 2, `eta_tau`/2) give the IDENTICAL release
+distribution, to 2.776e-17. Algebraically `(eta/2)(2u - 1) = eta*u - eta/2` and the
+constant is absorbed by `Z_p`. The tilt sees only DIFFERENCES in `u` between outputs, so
+`u`'s zero point and scale are both free and both cancel. Any reformulation that merely
+rescales or shifts `u` is not a new mechanism.
+
+**2. ⚠ CORRECTION TO A NUMBER QUOTED SINCE 2026-09-30.** The "3,276,480 draws" figure is
+the HAPLOID one. The diploid release — the only kind we have ever run — has
+`Var(u_dip) = V/2` and gain `(eta_tau/2) * V`, so `gain/noise = (eta_tau/sqrt2) * sqrt(V)`
+= **7.8129e-04** and **6,552,960 draws**, twice what was reported. Releasing a single
+haplotype therefore buys exactly **sqrt(2)**, not the 2x a first look at half `eta_tau`
+suggests. Stale copies hunted in `docs/plan.md` and `docs/terms.md`.
+
+**3. LENGTHENING THE SEGMENTS BARELY WORKS, AND SATURATES.** Dividing the recombination
+rate by 10, 100 and 1,000 takes expected switches from 7,021 to 854 to 87.8 to 8.8, and
+raises `Var` only 1.6x, 1.8x, 1.6x — it PEAKS around 100 switches and then falls. The
+reason is instructive: with one donor spanning the chromosome, `Var(u)` becomes the
+between-donor spread in GLOBAL match rate, and every donor matches a human target at about
+the same rate, so that spread is tiny. **So the contiguity lever does not work by
+lengthening segments.** It works because a utility over a small window measures a LOCAL
+match rate, and local haplotype sharing genuinely varies between donors while the global
+average does not. Shrinking the utility's footprint helps on both factors at once;
+stretching the segments helps on only one and runs into a floor.
+
+**The best legitimate stack** is a haploid release with a heterozygosity-weighted
+contiguous 100-position utility at `tau` = 0.9: gain/noise **0.2463** against 7.8129e-04
+as built, a factor of **315x**, which is **66 draws** instead of 6,552,960 — about
+99,000x fewer. The two working levers compose almost exactly multiplicatively (16.16 x 2.22
+= 35.85 predicted, 36.66 measured). ⚠ Every one of those configurations is a DIFFERENT
+utility function and a different release object; this table says what is reachable, not
+what we should pre-register.
+
+⚠ **ONE TRAP NAMED.** Weighting `beta_v` by `p_v(1 - p_v)`, the per-position match variance,
+would be the direct way to raise the diagonal — and `p_v` is a function of the TARGET, so it
+is a standing-constraint-1 violation that voids Theorem 1. Cohort heterozygosity is the
+legitimate proxy and is what was measured above; it is a function of D alone.
+
+
 ## 2026-09-30 (later still) — R5 REOPENED: contiguity is the lever, and there is an exact ceiling
 
 **Why this entry exists.** Two hours earlier the same day, R5's option list was narrowed to

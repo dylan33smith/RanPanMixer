@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-01
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -34,7 +34,7 @@ Read at session start. This file exists so a new session never has to grep
   a CONTIGUOUS window of 1,000 positions gives **94.9x** the variance of 1,000 scattered
   ones at identical `sum beta`. And the ceiling is exact:
   `gain/noise per draw = eta_tau * sqrt(Var) <= eta_tau/2`. Our configuration needs
-  **3,276,480** draws to show the tilt at 2 sigma; a contiguous window of 100 needs about
+  **6,552,960** (the DIPLOID figure; 3,276,480 is the haploid one — corrected 2026-10-01) draws to show the tilt at 2 sigma; a contiguous window of 100 needs about
   **1,600**; the best possible at `tau` = 0.5 is **53**. **The question for Dylan and his PI
   is what the release is FOR** — whole-chromosome fidelity, which is unmeasurable at any
   feasible n, or regional fidelity, which is measurable this week. Pre-registration item
@@ -447,7 +447,7 @@ utility are in tension, and the mechanism currently sits at the exact-sampling e
   `gain/noise per draw = eta_tau * sqrt(Var) <= eta_tau/2`, since `u` in [0,1] bounds `Var`
   at 1/4. So the effect is ALWAYS sub-noise in one release — that is what a `tau` bound
   MEANS — and the only question is how many draws it takes to see. Our configuration needs
-  **3,276,480**; a contiguous window of 100 needs about **1,600** (4 hours); the theoretical
+  **6,552,960** (the DIPLOID figure; 3,276,480 is the haploid one — corrected 2026-10-01); a contiguous window of 100 needs about **1,600** (4 hours); the theoretical
   best at `tau` = 0.5 is **53**. We sit 250x below the ceiling, not at it.
   ⚠ **The cost is what the release is FOR:** a windowed utility preserves target information
   in the window and is a pure prior draw everywhere else. That is a different product from
