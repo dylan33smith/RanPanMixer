@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-01
+**Last updated:** 2026-10-03
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.

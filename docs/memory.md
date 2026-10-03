@@ -104,6 +104,64 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-03 — How many alleles each tool actually changes on chr21
+
+**Question (Dylan).** How many variants does PanMixer actually change?
+
+**PanMixer's figures are already measured** (2026-09-18 run, HG00438, chr21, seed 123)
+and are restated here only so they sit beside ours. **Ours is new.**
+
+| descriptive count | PanMixer, capacity 0.1 | PanMixer, capacity 0.5 | ours, `tau` = 0.5 |
+|---|---|---|---|
+| selected moves | 47,070 | 177,865 | n/a — no selection step exists |
+| of those, moves changing NOTHING | 14,526 (30.9%) | not measured | n/a |
+| allele cells altered vs the target | **68,335** | **106,549** | **76,283** |
+| denominator | 650,541 | 649,242 | 507,692 target-known cells of 611,772 released |
+| share | **10.50%** | **16.41%** | **15.03%** |
+| cells released as the target's OWN data | 582,206 (89.50%) | 542,693 (83.59%) | **0** |
+| sequence rewritten | 3.13 Mb (6.7% of chr21) | not measured | n/a — no edit, the path is built from the cohort |
+
+**Provenance.** PanMixer: `logs/pm_obf.log`, sentinel 0, `external/PanMixer` @ `c182c38`,
+HG00438 (a COHORT MEMBER), capacities 0.1 and 0.5, seed 123. Ours: HG00096 (EXTERNAL),
+`tau` = 0.5, seed 1000, diploid, `indicator/w=inv_support/beta=chain`, `chain_span`
+provisional, T = 305,886.
+
+⚠⚠ **THESE COLUMNS ARE NOT A COMPARISON AND MUST NEVER BE QUOTED AS ONE.** Different
+targets, different denominators, and `capacity` and `tau` are formally incomparable
+(`docs/terms.md`). They are descriptive counts of two different operations, put side by
+side to answer one factual question. Nothing here says either tool is better.
+
+**COLUMNS** · *PanMixer 0.1 / 0.5* — its two reported operating points. · *ours* — one
+release at the mid-grid `tau`.
+
+**ROWS** · *selected moves* — PanMixer picks a SUBSET of blocks to rewrite; we have no
+such step. · *allele cells altered* — the counts land within a factor of 1.4 of each other,
+which is a coincidence of two unrelated mechanisms and nothing more. · *cells released as
+the target's own data* — **this is the only row that matters**, and it is the whole
+difference between the two threat models.
+
+**SYNTHESIS, and it is the row nobody would think to put in the table.** The altered-cell
+counts are superficially similar — 10.50% and 16.41% against our 15.03% — and that
+similarity is meaningless. PanMixer starts from the target's own genotype column and
+rewrites a selected subset, so **89.50% of its release at capacity 0.1 is the target's
+REAL DATA, verbatim.** We never release the target's data at all: every one of the 611,772
+cells is drawn from the cohort, and the 431,409 that coincide with the target do so
+because two humans share most of their alleles, not because anything was copied from them.
+
+**That single structural fact is why the two guarantees differ by construction, and it is
+worth having in one sentence for the writeup.** Because PanMixer releases unselected
+blocks verbatim, two inputs differing in an unselected block produce outputs with DISJOINT
+supports, so TV between their release distributions is exactly 1 and no bound of the kind
+Theorem 1 states is available at any capacity. Our support `Y_D` is a function of `G` and
+`D` alone, identical for every target, so every pair of inputs is bounded. The altered-cell
+count is a measure of how much a tool EDITS; it is not a measure of what it LEAKS.
+
+⚠ Also note what the 30.9% no-op figure means in this light: 14,526 of PanMixer's 47,070
+selected moves resampled the target's own alleles back, so they are counted as privacy
+work while leaving the genome untouched — and those blocks are then indistinguishable from
+unselected ones in the output.
+
+
 ## 2026-10-01 — R5 knob inventory: every degree of freedom in the tilt, measured
 
 **Question (Dylan).** Can `beta_v` be made larger by changing something else, keeping the
