@@ -104,6 +104,76 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-03 (later) — the differ-rate at honest n, and a finding I nearly published from n=10
+
+**Dylan caught it.** The differ-rate table reported 76,283 cells at `tau` = 0, 0.05, 0.1,
+0.25 and 0.5 — identical to the digit — and he asked whether that was the same random
+seed. **It was.** One seed, so one uniform stream; with a per-position tilt of 1.8e-06 the
+inverse-CDF draw lands on the same state at essentially every position, so identity is the
+EXPECTED outcome, not a finding. ⚠ **This is the SECOND time this error class has been
+committed** — `docs/bugs.md`, "A headline finding measured under common random numbers" —
+and the first time it was caught by an audit rather than by me.
+
+**A. THE LEVEL, 40 independent seeds (3000-3039), HG00096, diploid, of 507,692
+target-known cells:**
+
+| `tau` | 0.0 | 0.5 | 0.9 |
+|---|---|---|---|
+| mean cells differing | 75,139.9 | 75,151.7 | 75,149.8 |
+| sd between draws | 693.2 | 696.2 | 696.5 |
+| **differ-rate** | **14.800%** | **14.803%** | **14.802%** |
+
+**B. THE EFFECT, paired within seed — AND THE SIGN IS NOT STABLE.** Pairing (common random
+numbers within a seed) is the right design for a small treatment effect, because it cancels
+between-draw noise; the earlier error was reporting a paired result as an absolute LEVEL at
+n = 1, not the pairing itself.
+
+| paired `differ(tau) - differ(0)` | n = 10 (seeds 2000-2009) | n = 40 (seeds 3000-3039) |
+|---|---|---|
+| `tau` = 0.5 | **-7.0** (sd 21.1, t = -1.05) | **+11.8** (sd 51.4, t = +1.45) |
+| `tau` = 0.9 | **-21.2** (sd 39.2, t = -1.71) | **+9.8** (sd 60.6, t = +1.02) |
+| seeds whose draw moved, `tau` = 0.9 | 10/10 | 37/40 |
+| state cells moved, `tau` = 0.9 | 457.2 | 542.3 |
+
+⚠⚠ **AT n = 10 THE EFFECT LOOKED CORRECTLY SIGNED AND MONOTONIC IN `tau` (-0.1, -7.0,
+-21.2) AND I WAS ABOUT TO PUBLISH THAT AS A FINDING.** At n = 40 the sign FLIPS to +11.8
+and +9.8. Neither n reaches significance (|t| from 1.02 to 1.71). **It was noise with a
+pattern, and the pattern was the thing I found compelling.** Only running a larger n
+caught it — not the reasoning, which had already produced a tidy story about direction and
+monotonicity.
+
+**C. THE EXPECTED EFFECT, DERIVED RATHER THAN SAMPLED, and it settles the question.**
+`E_Q[u]` moves **2.94e-06** across the whole `tau` grid (exact, three forward passes). A
+flipped cell is worth about `mean(beta_v)` = 3.269e-06 of `u`, so:
+
+    cells the tilt should flip  =  2.94e-06 / 3.269e-06  =  0.90 per haplotype
+                                =  **1.80 cells of 507,692**  (3.5e-06 of them)
+
+Against a paired sd of 51-61 cells, that needs **3,300 to 4,500 paired draws** for 2 sigma
+(8-11 hours). So neither n = 10 nor n = 40 could ever have resolved it, and the sign
+flipping between them is exactly what a 1.8-cell effect under 56-cell noise looks like.
+
+**SYNTHESIS, and it corrects my own framing twice over.**
+
+1. **Pairing is genuinely worth a lot**: it cuts the sd from ~695 cells (between-draw) to
+   ~56 (paired), a **154x** reduction in draws required. That is real and it is the right
+   design for any future effect measurement here.
+2. **But it does not rescue the finding, because detectability was never the binding
+   problem.** The effect is **1.8 cells of 507,692**, and we have known its size exactly
+   since 2026-09-30 from the derivative of `log Z` — no sampling needed. My "6,552,960
+   draws" headline invited exactly the wrong follow-up question ("can we get n down?")
+   when the answer is that the magnitude, not the measurability, is what makes it
+   negligible. The very first write-up said "the effect is exactly known and negligible",
+   and every later framing drifted away from that.
+3. **The differ-RATE Dylan asked for is 14.80%**, and it is flat to three decimal places
+   from `tau` = 0 to 0.9. That is the number for the head-to-head axis, and the fact that
+   it does not move with `tau` is the honest content of R5.
+
+⚠ Cosmetic bug in the measurement script's output, recorded so the log is not misread: the
+"seeds moved" column prints `/10` hard-coded regardless of n, so the n = 40 rows read
+"27/10" and "37/10" where they mean 27/40 and 37/40. The counts themselves are right.
+
+
 ## 2026-10-03 — `target_fidelity` as the comparable axis: our differ-rate measured
 
 **Correction upstream.** The 2026-10-03 entry below this one first declared the

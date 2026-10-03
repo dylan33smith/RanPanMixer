@@ -498,6 +498,25 @@ which was mostly a DIFFERENT set.
   cheapest counter is an auditor holding the spec who is told the docstrings are
   the claim under audit.
 
+### A pattern in n=10 noise that reversed at n=40
+- **[2026-10-03] Right-signed and monotonic at n=10; opposite sign at n=40**
+  **[Symptom]** Paired `differ(tau) - differ(0)` came out -0.1, -7.0, -21.2 at
+  `tau` = 0.1/0.5/0.9: correctly signed (the tilt should IMPROVE fidelity), monotonic in
+  `tau`, and with 10 of 10 seeds moving. A tidy, publishable story. At n = 40 the same
+  measurement gives **+11.8 and +9.8** — the wrong sign. No n reaches significance.
+  **[Cause]** The true effect is **1.80 cells of 507,692**, derivable exactly from
+  `d log Z / d eta` without sampling, against a paired sd of 51-61 cells. Neither n could
+  resolve it. The monotone-looking sequence was three draws from noise, and the ordering
+  was read as structure because theory PREDICTED that ordering — so the prediction supplied
+  the pattern and the data merely failed to contradict it.
+  **[Proven fix]** Derive the expected effect size BEFORE interpreting the sample, from the
+  exact route where one exists. Here one did, and it says no feasible n matters. Also:
+  increase n before believing a sign, especially when the sign is the one you expected.
+  **[Severity]** ⚠ Would have been a published finding. It is the same failure as the
+  common-random-numbers entry below but one level up: not a bad measurement, a bad
+  inference from a defensible measurement. The tell was available — three points, a
+  predicted direction, and |t| < 2 throughout.
+
 ### A headline finding measured under common random numbers
 - **[2026-09-30] "0 of 611,772 positions differ" was true of one seed and predicted in advance**
   **[Symptom]** The released path was reported bit-identical at `tau` = 0, 0.1, 0.5
