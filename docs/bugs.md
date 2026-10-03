@@ -498,6 +498,49 @@ which was mostly a DIFFERENT set.
   cheapest counter is an auditor holding the spec who is told the docstrings are
   the claim under audit.
 
+### A measurement script that did not measure the mechanism
+- **[2026-10-03] fid2.py tilted EACH haplotype at the full `eta_tau`, not half**
+  **[Symptom]** A plausible differ-count table at every `tau`, with sensible
+  magnitudes. Nothing in the output said the mechanism being measured was not the
+  mechanism in `src/`.
+  **[Cause]** The script built potentials and called `F.forward` DIRECTLY instead of
+  going through `ffbs.release()`. `release()`'s diploid path runs each chain at
+  half of `eta_tau` so the two `log_z_p` values sum into the bracket; the script used
+  the full `eta_tau` on both. **That is the "SUM instead of MEAN" aggregator error
+  the project has a standing constraint about** — and calling `forward` directly
+  also bypassed the diploid `log_z_p` bracket added on 2026-09-30, which exists to
+  catch exactly this and would have fired.
+  **[Measured]** Every effect in that run is exactly 2x the mechanism's: slope
+  -2.4761 cells per unit `eta_tau` against the true -1.2381, confirmed by running
+  both conventions side by side in `scripts/exact_fidelity.py`.
+  **[Proven fix]** Measure through the public entry point. A diagnostic that
+  reconstructs the mechanism's internals by hand is a second implementation with no
+  test, and here it silently became a different mechanism. Where a diagnostic must
+  touch internals, assert the invariant the entry point would have checked.
+  **[Severity]** ⚠ Silent, and it defeated a guard built specifically for this error
+  two days earlier. Found by independent audit, not by the suite.
+
+### 50 draws spent on a quantity that is exactly computable
+- **[2026-10-03] E[differ] is a linear functional of the posterior marginals**
+  **[Symptom]** Two sampling runs (n = 10 then n = 40), a sign flip between them,
+  and an argument about what sample size would settle it.
+  **[Cause]** `differ` is a sum over positions of a function of the state at that
+  position, so `E[differ] = sum_t sum_k gamma_t(k) 1[hap[k,t] != target_t]` with
+  `gamma ∝ alpha * beta` — exact, zero Monte-Carlo error, O(TK). **The project had
+  already written this lesson down** for expected utility, in the
+  common-random-numbers entry below: "report the exact quantity instead ... three
+  forward passes and no sampling". It was not applied to the metric that replaced
+  it.
+  **[Proven fix]** `ffbs.state_marginals` and `ffbs.expected_mismatches`, validated
+  against the repo's own O(K^T) enumerator on the toy to **4.8e-15**. chr21 runs in
+  ~30 s per `tau`. The exact answer: the tilt reduces expected mismatches by
+  **1.2381 cells per unit `eta_tau`**, perfectly linearly — 0.680 cells at
+  `tau` = 0.5 and 1.823 at `tau` = 0.9, of 507,692.
+  **[Severity]** Wasted effort, and worse, it put a sample-size argument where a
+  closed form belonged. ⚠ The general rule now: before estimating anything about
+  this mechanism by sampling, ask whether it decomposes over positions. If it does,
+  it is exact.
+
 ### A pattern in n=10 noise that reversed at n=40
 - **[2026-10-03] Right-signed and monotonic at n=10; opposite sign at n=40**
   **[Symptom]** Paired `differ(tau) - differ(0)` came out -0.1, -7.0, -21.2 at

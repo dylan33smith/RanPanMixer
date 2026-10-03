@@ -153,6 +153,26 @@ Against a paired sd of 51-61 cells, that needs **3,300 to 4,500 paired draws** f
 (8-11 hours). So neither n = 10 nor n = 40 could ever have resolved it, and the sign
 flipping between them is exactly what a 1.8-cell effect under 56-cell noise looks like.
 
+⚠⚠ **[CORRECTION - 2026-10-03, within the hour, by independent audit]** Everything in
+sections A and B above was measured by a script that **did not sample this mechanism**: it
+tilted each haplotype at the FULL `eta_tau` instead of half of it, so every number in them
+belongs to a mechanism with twice the intended tilt. And the whole sampling exercise was
+unnecessary — `E[differ]` is a LINEAR FUNCTIONAL of the posterior state marginals and so is
+EXACT. Both defects are in `docs/bugs.md`. **The exact answer, `scripts/exact_fidelity.py`,
+validated against brute-force enumeration to 4.8e-15:**
+
+| `tau` | 0.0 | 0.05 | 0.10 | 0.25 | 0.50 | 0.75 | 0.90 | 0.99 |
+|---|---|---|---|---|---|---|---|---|
+| `E[differ]` | 75177.401 | 75177.339 | 75177.277 | 75177.085 | 75176.721 | 75176.196 | 75175.578 | 75174.124 |
+| shift vs `tau`=0 | 0 | **-0.062** | **-0.124** | **-0.316** | **-0.680** | **-1.205** | **-1.823** | **-3.277** |
+
+**The tilt is REAL, correctly SIGNED, and EXACTLY LINEAR in `eta_tau` at -1.2381 cells per
+unit** (range -1.2381 to -1.2381 across all seven points). Baseline **75,177.40 of 507,692
+= 14.8077%**. So the sign never was unstable — the SAMPLING could not see a 1.8-cell effect
+under 56-cell noise, and the n=10 / n=40 flip was noise around a true value of -0.680 and
+-1.823. ⚠ My claim that "the sign is not stable" is therefore also withdrawn: it is the
+estimator that was unstable, not the quantity.
+
 **SYNTHESIS, and it corrects my own framing twice over.**
 
 1. **Pairing is genuinely worth a lot**: it cuts the sd from ~695 cells (between-draw) to

@@ -192,6 +192,69 @@ def backward_sample(hmm: CohortHMM, fwd: Forward, rng: np.random.Generator
     return z
 
 
+def state_marginals(hmm: CohortHMM, fwd: Forward, potentials: np.ndarray) -> np.ndarray:
+    """(T, K) posterior state marginals `gamma_t(k) = P(Z_t = k | the tilt)`. O(TK).
+
+    ⚠ WHY THIS EXISTS, AND IT IS A LESSON THE PROJECT ALREADY WROTE DOWN ONCE.
+    `docs/bugs.md` records, for expected utility, that the fix for a sampling
+    experiment with no power is to "report the exact quantity instead:
+    `E_Q[u] = d log Z_p / d eta`, three forward passes and no sampling". That
+    lesson was then NOT applied to the metric that replaced it -- the count of
+    released cells differing from the target -- and 50 draws were spent estimating
+    something computable exactly. Found by an independent audit, 2026-10-03.
+
+    The general fact: ANY quantity that is a sum over positions of a function of
+    the state at that position is a linear functional of these marginals, so its
+    expectation under the release distribution is exact with zero Monte-Carlo
+    error. `expected_mismatches` below is one such quantity; so is expected
+    `u_path`, and so is any per-position fidelity or rewrite accounting.
+
+    The backward recursion uses the same rank-one decomposition as the forward
+    pass, so `A` is never materialised here either:
+
+        b_t(j) = (1 - s_t) * psi_{t+1}(j) * b_{t+1}(j)
+                 + (s_t / K) * sum_k psi_{t+1}(k) * b_{t+1}(k)
+
+    ⚠ `b_t` is rescaled to sum 1 at every position. Without it the product
+    underflows float64 long before T = 305,886 -- the same reason the forward pass
+    normalises. The scaling cancels when `gamma` is normalised, so it is free.
+    """
+    T, K = hmm.T, hmm.K
+    if potentials.shape != (T, K):
+        raise ValueError(f"potentials must be (T, K) = {(T, K)}, got {potentials.shape}")
+    b = np.zeros((T, K), dtype=np.float64)
+    b[T - 1] = 1.0 / K
+    s = hmm.switch_mass
+    for t in range(T - 2, -1, -1):
+        v = potentials[t + 1] * b[t + 1]
+        r = (1.0 - s[t]) * v + (s[t] / K) * v.sum()
+        tot = r.sum()
+        if tot <= 0:
+            raise AssertionError(
+                f"backward message vanishes at chain position {t}; no state there "
+                f"can reach the end of the chain")
+        b[t] = r / tot
+
+    g = fwd.alpha * b
+    z = g.sum(axis=1, keepdims=True)
+    if (z <= 0).any():
+        raise AssertionError("a position has zero posterior mass across all states")
+    return g / z
+
+
+def expected_mismatches(hmm: CohortHMM, haplotypes_chain: np.ndarray,
+                        target_1d: np.ndarray, gamma: np.ndarray) -> float:
+    """`E[# positions where the released allele differs from the target]`. EXACT.
+
+    Positions where the target has no call are excluded, matching the denominator
+    `target_fidelity` is quoted against. Zero Monte-Carlo error: this is a linear
+    functional of the marginals, not an estimate from draws.
+    """
+    known = target_1d >= 0
+    mism = (haplotypes_chain != target_1d[None, :]) & known[None, :]
+    return float((gamma.T * mism).sum())
+
+
 def _categorical(p: np.ndarray, rng: np.random.Generator) -> int:
     """One draw from a categorical, by inverse CDF.
 

@@ -832,6 +832,72 @@ def test_the_two_independent_utility_implementations_agree():
     assert worst < 1e-15, f"the two utility implementations differ by {worst}"
 
 
+def test_state_marginals_match_brute_force_enumeration():
+    """The exact posterior marginals, against the repo's own O(K^T) enumerator.
+
+    ADDED 2026-10-03 after an independent audit found that 50 sampling draws had
+    been spent estimating a quantity that is a LINEAR FUNCTIONAL of these
+    marginals and therefore exact. The enumerator collapses the full joint over
+    K^T state paths; `state_marginals` does it in O(TK) with the rank-one
+    recursion and never materialises `A`. They must agree.
+    """
+    t, util, m = _toy_bundle()
+    target, _ = TOY.sharp_pair(t)
+    for tau in (0.0, 0.25, 0.5, 0.9):
+        psi = U.tilt_potentials(m.allowed, t.haplotypes, target, util.beta, C.eta_tau(tau))
+        gamma = F.state_marginals(m, F.forward(m, psi), psi)
+        assert gamma.shape == (t.T, t.K) and gamma.dtype == np.float64
+        assert np.allclose(gamma.sum(axis=1), 1.0, rtol=0, atol=1e-12)
+
+        post = E.enumerate_state_posterior(t.haplotypes, t.genetic_pos, psi)
+        ref = np.zeros((t.T, t.K))
+        for i, pr in enumerate(post):
+            if pr == 0.0:
+                continue
+            z, r = [], i
+            for _ in range(t.T):
+                z.append(r % t.K)
+                r //= t.K
+            for tt, st in enumerate(reversed(z)):
+                ref[tt, st] += pr
+        assert np.abs(gamma - ref).max() < 1e-12, (
+            f"tau={tau}: marginals differ from enumeration by "
+            f"{np.abs(gamma - ref).max():.3e}")
+
+        # and the quantity they exist for, both ways
+        known = target >= 0
+        mism = (t.haplotypes != target[None, :]) & known[None, :]
+        assert abs(F.expected_mismatches(m, t.haplotypes, target, gamma)
+                   - float((ref.T * mism).sum())) < 1e-12
+
+
+def test_expected_mismatches_is_exact_where_sampling_was_hopeless():
+    """E[differ] is exact and LINEAR in `eta_tau`; no sample size was ever needed.
+
+    REGRESSION 2026-10-03. The sampling route produced a signed monotonic pattern
+    at n = 10 that reversed at n = 40, because the true effect on chr21 is about
+    1.8 cells of 507,692 against a paired sd near 56. The exact route settles it
+    in two forward and two backward passes. This test pins the linearity, which is
+    what makes the slope quotable as a single number.
+    """
+    t, util, m = _toy_bundle()
+    target, _ = TOY.sharp_pair(t)
+
+    def differ(eta):
+        psi = U.tilt_potentials(m.allowed, t.haplotypes, target, util.beta, eta)
+        return F.expected_mismatches(
+            m, t.haplotypes, target, F.state_marginals(m, F.forward(m, psi), psi))
+
+    d0 = differ(0.0)
+    for eta in (0.05, 0.1, 0.25):
+        assert differ(eta) < d0, "the tilt must REDUCE expected mismatches"
+    # a doubled exponent must double the effect -- the error the sampling script made
+    one, two = d0 - differ(0.2), d0 - differ(0.4)
+    assert abs(two / one - 2.0) < 0.05, (
+        f"doubling eta changed the effect by {two/one:.3f}x, not ~2x; the effect is "
+        f"no longer linear and the recorded slope is not quotable")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]
