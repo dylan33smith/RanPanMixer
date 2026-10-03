@@ -1212,6 +1212,17 @@ Ordered. Each item names what must pass before it starts and what closes it.
   the primary endpoint, the attacker set, and **which attack database** is used.
 
 ### [A-EVL-headtohead] The comparison on PanMixer's data
+- ✅ **FIRST STEP IDENTIFIED 2026-10-03, and it is cheap.** `target_fidelity` — the share
+  of the target's called alleles the release alters — is computable on either arm's output
+  and is the axis to align on. Measured: ours is **15.03%** and FLAT from `tau` = 0 to 0.9;
+  PanMixer's is **10.50%** at capacity 0.1 and **16.41%** at capacity 0.5. **Their capacity
+  dial spans our fixed point**, so a matched-fidelity comparison exists at a capacity near
+  0.45 — which is the alignment this item needs and did not previously have.
+  ⚠ Three obstacles, all quantified in `docs/memory.md` 2026-10-03: 10.25% of their records
+  sit outside our `chain_span`; the two VCFs agree on only 92.7% of sites by
+  (POS, REF, ALT), so the count must run on the biallelic-SNP intersection (249,750
+  records); and their obfuscated output was not kept, so their run must be repeated on OUR
+  VCF.
 - **Why:** the direct comparison this project is for.
 - **Prerequisite:** `A-DAT-grch38-repin`, `A-LCK-preregister`.
 - **Exit gate:** for each subject, a `loo_cohort` with donor panel, allele

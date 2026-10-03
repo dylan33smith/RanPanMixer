@@ -104,6 +104,70 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-03 — `target_fidelity` as the comparable axis: our differ-rate measured
+
+**Correction upstream.** The 2026-10-03 entry below this one first declared the
+altered-cell count non-comparable. Corrected in place: it is `target_fidelity`, the one
+axis that transfers between arms, and Dylan was right to push back.
+
+**A. Our differ-rate barely moves with `tau`** — HG00096, chr21, seed 1000, diploid:
+
+| `tau` | 0.0 | 0.05 | 0.10 | 0.25 | 0.50 | 0.90 |
+|---|---|---|---|---|---|---|
+| cells differing from the target | 76,283 | 76,283 | 76,283 | 76,283 | 76,283 | 76,269 |
+| of 507,692 target-known cells | 15.03% | 15.03% | 15.03% | 15.03% | 15.03% | **15.02%** |
+
+⚠ **15.03% AT `tau` = 0.** A pure prior draw, using zero target information, already
+coincides with the target at **84.97%** of its called positions — because two humans share
+most of their alleles. Our differ-rate is therefore a FLOOR set by cohort-to-target
+mismatch, not a dial the mechanism turns. This is the `target_fidelity` free-lunch warning
+measured at the cell level rather than argued.
+
+**B. Target choice moves it by less than 2 points** — `tau` = 0.5, seed 1000:
+
+| target | HG02389 (EAS) | HG00097 (EUR) | HG00096 (EUR) | HG04211 (SAS) | NA19350 (AFR) | NA20294 (AFR) |
+|---|---|---|---|---|---|---|
+| differ-rate | 14.83% | 14.90% | 15.03% | 15.09% | 16.43% | **16.63%** |
+
+Range **1.80 points**, and ordered as population genetics predicts — the two AFR targets are
+highest against a multi-continental cohort. **So comparing across different targets is NOT
+what invalidates a cross-arm count:** the target effect is small beside the 4.5-point gap to
+PanMixer.
+
+**C. The three real obstacles, with the biggest one quantified.**
+
+1. **Denominator mismatch — MEASURED.** **34,937 of PanMixer's 340,824 records (10.25%)**
+   fall outside our `chain_span` (34,345 below, 592 above). That region carries 36.76%
+   cohort missingness against 6.57% elsewhere, and missing genotypes are released VERBATIM,
+   so it is low-change territory diluting their rate downward. Bounding it: if they change
+   nothing there their matched-region rate is 10.50%/0.8975 = **11.70%**; if they change it
+   at their average rate it stays **10.50%**. So the matched comparison is ours **15.03%**
+   against theirs **10.50-11.70%** — we alter about **1.3-1.4x** as many cells.
+2. **Different VCFs.** Ours is vg 1.68, theirs vg 1.36: 99.55% of sites agree by POS but
+   only 92.7% by (POS, REF, ALT), and ALT ordering differs at multi-allelic sites, so
+   allele INDICES are not comparable cell-by-cell there. The defensible common subset is the
+   biallelic SNPs, where ordering is unambiguous: **274,458 of their records (80.5%)**, of
+   which **249,750** sit inside our `chain_span`. That intersection is the site set a
+   rigorous count should run on.
+3. **Their obfuscated output was not kept.** The 68,335 figure is from `logs/pm_obf.log`,
+   not from a saved artifact, so a matched-region recount needs their obfuscation re-run
+   (~68 s). Cheap, but it must run on the SAME VCF for the count to mean anything, which is
+   the condition `docs/plan.md` already states for the head-to-head.
+
+**SYNTHESIS, and it answers the question as asked.** Yes, the two tools alter a similar
+NUMBER of cells — ours 15.03%, theirs 10.50% raw and 10.50-11.70% on a matched region, so
+within about 1.4x. But the two numbers are the same statistic of different operations, and
+the difference shows up in how they respond to the knob. **PanMixer's capacity dial SPANS
+our fixed point**: at capacity 0.1 it alters fewer cells than we do (10.50%), at capacity
+0.5 it alters more (16.41%), while ours sits at 15.0% for every `tau` from 0 to 0.9. Theirs
+is a budget of deliberate edits to a genome it starts from; ours is the residual mismatch of
+a mosaic that never saw the target's data. **So the comparable axis is comparable, and what
+it shows is that a matched-fidelity comparison is achievable — PanMixer at a capacity near
+0.45 would sit at our differ-rate — which is exactly the alignment the head-to-head needs.**
+That is a concrete, cheap experiment and it is now the obvious first step for
+`[A-EVL-headtohead]`.
+
+
 ## 2026-10-03 — How many alleles each tool actually changes on chr21
 
 **Question (Dylan).** How many variants does PanMixer actually change?
@@ -126,10 +190,15 @@ HG00438 (a COHORT MEMBER), capacities 0.1 and 0.5, seed 123. Ours: HG00096 (EXTE
 `tau` = 0.5, seed 1000, diploid, `indicator/w=inv_support/beta=chain`, `chain_span`
 provisional, T = 305,886.
 
-⚠⚠ **THESE COLUMNS ARE NOT A COMPARISON AND MUST NEVER BE QUOTED AS ONE.** Different
-targets, different denominators, and `capacity` and `tau` are formally incomparable
-(`docs/terms.md`). They are descriptive counts of two different operations, put side by
-side to answer one factual question. Nothing here says either tool is better.
+[INCORRECT] - ⚠⚠ **THESE COLUMNS ARE NOT A COMPARISON AND MUST NEVER BE QUOTED AS ONE.** Different targets, different denominators, and `capacity` and `tau` are formally incomparable (`docs/terms.md`). They are descriptive counts of two different operations, put side by side to answer one factual question. Nothing here says either tool is better.
+[CORRECTION - 2026-10-03]: **OVER-STRONG, AND IT BLOCKED THE RIGHT COMPARISON** (Dylan).
+The altered-cell row IS comparable, and it is already a named term: `target_fidelity`,
+which `docs/terms.md` records as computable mechanism-agnostically on either arm's output.
+It is the axis `docs/plan.md` `[A-EVL-headtohead]` lists as a MUST. What is incomparable is
+the OPERATING POINT — reading a privacy claim off `capacity` 0.1 beside `tau` 0.5 — not the
+quantity. The correct use is as the x-axis of a frontier, with the arms aligned on measured
+attack success, exactly as the head-to-head already specifies. The three real obstacles are
+below, and they are about denominators and VCFs, not about the quantity being meaningless.
 
 **COLUMNS** · *PanMixer 0.1 / 0.5* — its two reported operating points. · *ours* — one
 release at the mid-grid `tau`.
