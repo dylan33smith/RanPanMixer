@@ -898,6 +898,128 @@ def test_expected_mismatches_is_exact_where_sampling_was_hopeless():
         f"no longer linear and the recorded slope is not quotable")
 
 
+# ---------------------------------------------------------------------------
+# Model B, the LD-block chain. The retained fallback in docs/plan.md.
+# ---------------------------------------------------------------------------
+
+def test_identity_blocks_reproduce_model_C_exactly():
+    """ONE CODE PATH: model C is the one-position-per-unit case of model B.
+
+    This is the test that makes the block machinery safe to add. If blocks of size
+    one do not reproduce model C bit for bit, then model B is a second mechanism
+    with its own bugs rather than a regrouping of the first.
+    """
+    t, util, m_c = _toy_bundle()
+    target, _ = TOY.sharp_pair(t)
+    m_b = H.from_arrays(t.haplotypes, t.genetic_pos, t.positions,
+                        blocks=np.arange(t.T))
+    assert m_c.model == "C" and m_b.model == "B"
+    assert np.array_equal(m_c.allowed, m_b.allowed)
+    assert np.allclose(m_c.switch_mass, m_b.switch_mass, rtol=0, atol=0)
+    assert m_b.n_positions == m_c.T
+
+    for tau in (0.0, 0.25, 0.5, 0.9):
+        eta = C.eta_tau(tau)
+        got = []
+        for m in (m_c, m_b):
+            psi = U.tilt_potentials(m.allowed, t.haplotypes, target, util.beta, eta,
+                                    unit_spans=m.unit_spans)
+            fwd = F.forward(m, psi)
+            g = F.state_marginals(m, fwd, psi)
+            r = F.release(m, t.haplotypes, target, util, tau, seed=11, target_id="x")
+            got.append((F.log_z_p(fwd, F.baseline_log_norm(m), eta),
+                        F.expected_mismatches(m, t.haplotypes, target, g),
+                        r.released_path.tolist(), r.u_achieved))
+        # a tight TOLERANCE, not bitwise: model B sums a unit's weights with a
+        # cumulative sum while model C sums them directly, so the two agree to
+        # floating-point rounding rather than to the last bit.
+        assert abs(got[0][0] - got[1][0]) < 1e-14, (
+            f"tau={tau}: log_z_p differs by {abs(got[0][0]-got[1][0]):.3e}")
+        assert abs(got[0][1] - got[1][1]) < 1e-12, f"tau={tau}: E[differ] differs"
+        assert got[0][2] == got[1][2], f"tau={tau}: a different path was released"
+        assert got[0][3] == got[1][3], f"tau={tau}: u_achieved differs"
+
+
+def test_model_B_regrouping_preserves_the_calibration():
+    """`sum beta_v` must stay 1 when the weights are regrouped into units.
+
+    Model B sums each unit's per-position weights into one exponent. That is a
+    regrouping, not a rescaling, so the utility's RANGE -- and therefore
+    `eta_tau = arctanh(tau)` -- is untouched. If this ever fails, model B is
+    running at the wrong privacy calibration.
+    """
+    t, util, _ = _toy_bundle()
+    for blk in (np.arange(t.T), np.array([0, 0, 1, 1, 1, 2, 2]), np.zeros(t.T, dtype=int)):
+        m = H.from_arrays(t.haplotypes, t.genetic_pos, t.positions, blocks=blk)
+        per_unit = np.add.reduceat(util.beta, m.unit_spans[:, 0])
+        assert abs(per_unit.sum() - 1.0) < 1e-12, f"blocks={blk}: sum is {per_unit.sum()}"
+        assert len(per_unit) == m.T
+
+
+def test_model_B_is_atomic_one_donor_covers_each_whole_unit():
+    """The defining property, and the one that creates departure (b).
+
+    A unit is emitted entirely by one donor, so the release carries that donor's
+    real haplotype VERBATIM across the span -- up to 1,212 chr21 variants with our
+    block set. `tau` bounds what the TARGET leaks and says nothing about donors, so
+    this is a cost of model B rather than a feature.
+    """
+    t, util, _ = _toy_bundle()
+    blk = np.array([0, 0, 1, 1, 1, 2, 2])
+    m = H.from_arrays(t.haplotypes, t.genetic_pos, t.positions, blocks=blk)
+    assert m.T == 3 and m.unit_sizes.tolist() == [2, 3, 2]
+    target, _ = TOY.sharp_pair(t)
+    for seed in range(25):
+        r = F.release(m, t.haplotypes, target, util, 0.5, seed=seed, target_id="x")
+        assert r.state_path.shape == (m.T,)
+        for u, (lo, hi) in enumerate(m.unit_spans):
+            want = t.haplotypes[r.state_path[u], lo:hi + 1]
+            assert np.array_equal(r.released_path[lo:hi + 1], want), (
+                f"seed {seed}: unit {u} was not emitted by a single donor")
+
+
+def test_model_B_drops_units_no_donor_can_cover():
+    """A unit no donor is called across has an empty RENORMALISE pool: excluded.
+
+    Same treatment as `support == 0` under model C -- the position is unusable, not
+    merely awkward, and the exclusion is a function of the cohort alone so it stays
+    target-independent. Measured on chr21: 6 units of 59,478, costing 1,222 of
+    305,886 chain positions.
+    """
+    # positions 1 and 2 share a block and NO donor is called across both of them
+    hap = np.array([[0, 0, -1, 1],
+                    [1, -1, 0, 0],
+                    [0, -1, -1, 1]], dtype=np.int16)
+    cm = np.array([0.0, 0.0001, 0.0002, 0.0003])
+    pos = np.array([10, 20, 30, 40])
+    m = H.from_arrays(hap, cm, pos, blocks=np.array([0, 1, 1, 2]))
+    assert m.T == 2, f"expected the dead unit dropped, got T={m.T}"
+    assert m.n_positions == 2, "the dropped unit's positions must leave the chain too"
+    assert m.allowed.any(axis=0).all()
+
+
+def test_model_B_discards_within_unit_recombination():
+    """The documented cost: the transition uses the GAP between units.
+
+    Model B cannot switch donors inside a unit, so the genetic length spanned by
+    the unit contributes nothing to the switch rate. Measured on chr21: expected
+    switches fall from 7,021.0 under C to 5,270.9 under B.
+    """
+    t, util, m_c = _toy_bundle()
+    m_b = H.from_arrays(t.haplotypes, t.genetic_pos, t.positions,
+                        blocks=np.array([0, 0, 1, 1, 1, 2, 2]))
+    assert m_b.expected_switches < m_c.expected_switches
+    gaps = t.genetic_pos[m_b.unit_spans[1:, 0]] - t.genetic_pos[m_b.unit_spans[:-1, 1]]
+    want = H.switch_mass_from_cm(np.concatenate(([0.0], np.cumsum(gaps))), m_b.K)
+    assert np.allclose(m_b.switch_mass, want, rtol=0, atol=1e-15), (
+        "model B's transitions are not the inter-unit gaps")
+    # and the gap form really does discard length: start-to-start would be larger
+    starts = t.genetic_pos[m_b.unit_spans[:, 0]]
+    bigger = H.switch_mass_from_cm(starts, m_b.K)
+    assert bigger.sum() > m_b.switch_mass.sum(), (
+        "the gap and start-to-start forms coincide, so this toy cannot tell them apart")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items())
              if n.startswith("test_") and callable(f)]

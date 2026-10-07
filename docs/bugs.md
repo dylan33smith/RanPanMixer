@@ -498,6 +498,31 @@ which was mostly a DIFFERENT set.
   cheapest counter is an auditor holding the spec who is told the docstrings are
   the claim under audit.
 
+### A docstring that described the model and code that implemented a different one
+- **[2026-10-07] Model B's transition used start-to-start, the docstring said the gap**
+  **[Symptom]** Model B ran, every test passed, and `expected_switches` came out
+  **5,270.9** against the **3,532** an independent calculation had predicted on
+  2026-09-28. A 49% discrepancy in a quantity with a published prediction.
+  **[Cause]** `from_arrays` set each unit's genetic position to its FIRST position
+  and let `switch_mass_from_cm` diff those, which is start-to-start spacing. That
+  silently charges a unit's own internal genetic length to the transition OUT of
+  it. The docstring two paragraphs above said "the transition uses the GAP between
+  units, from the last position of one to the first of the next, so the within-unit
+  genetic length is discarded" -- which is also what `docs/plan.md` specifies and
+  what makes model B "discard the within-block recombination". The prose was right
+  and the code was wrong.
+  **[Proven fix]** Compute the inter-unit gaps explicitly and build the transition
+  array from their cumulative sum, keeping each unit's real first-position cM in
+  `genetic_pos` for provenance. `expected_switches` then lands at **3,394.1**
+  against the predicted 3,532. A test now asserts the gap form AND asserts that the
+  start-to-start form would differ on the same fixture, so the two cannot be
+  confused again.
+  **[Severity]** ⚠ The whole model-B result set was wrong before this: the floor
+  moved from 14.78% to 14.57% of cells and the tilt's slope from -1.3355 to -1.7738
+  cells per unit `eta_tau`. **Caught only because a prediction existed to compare
+  against** -- no test failed, and the numbers looked entirely plausible. Where a
+  quantity has an independently predicted value, check it.
+
 ### A measurement script that did not measure the mechanism
 - **[2026-10-03] fid2.py tilted EACH haplotype at the full `eta_tau`, not half**
   **[Symptom]** A plausible differ-count table at every `tau`, with sensible

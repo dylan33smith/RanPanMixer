@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-03
+**Last updated:** 2026-10-07
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -479,6 +479,8 @@ segment count is set by the chromosome's genetic length, not by T.
 
 | ID | Intervention | Endpoint | n | Result | Verdict | memory |
 |---|---|---|---|---|---|---|
+| A-IMP-model-b | Build the LD-block chain so switching happens only between blocks | model C reproduced exactly by identity blocks; blocks from a panel that excludes the target | chr21, 8 capacities swept on the other arm | **BUILT.** 59,472 units, `expected_switches` 3,394.1 against 3,532 predicted independently; floor 14.5699% vs C's 14.8077%, slope −1.7738 vs −1.2381 — model B is a MILD contiguity lever, 1.43x, against 16x from re-scoping the utility. Cost: 1,222 positions dropped, 1,212-variant verbatim donor runs. ⚠ One bug, caught only by the prediction: transitions were start-to-start, not inter-unit gaps | done | 2026-10-07 |
+| A-EVL-capacity-sweep | Does PanMixer have a knob, and what does it reach? | its reachable `target_fidelity` range | 8 capacities, HG00438, seed 123 | **YES — `capacity`, and it SATURATES.** 1.20% at 0.01 rising to **16.41% at 0.2-0.3**, then four settings byte-identical. Our 14.81% is reached at **capacity ~= 0.17**, correcting the 0.45 interpolated from two points | done | 2026-10-07 |
 | A-FIX-mechanism-audit | Independent audit of the same day's mechanism build; docstrings declared non-evidence | every gap between docs and code, adversarially verified | 127 agents, 6 dimensions, 3 refuters per gap | **6 real defects the 88-test suite passed over**, 4 confirmed by mutation and all fixed; 30 gaps survived of 40 filed. Overturned the day's headline row and closed R5's leading option | done | 2026-09-30 |
 | A-THY-toy-enumeration | Brute-force correctness gate on a hand-written graph, built BEFORE the sampler | sampler matches exact enumeration; exact TV <= `tau`; `log_z_p` bracketed; `tau`=0 reproduces `R_D` | K=4, T=7; 96 output paths; 3,571,128 input pairs per `tau` | all clauses PASS. ⚠ AND A SIXTH WAS NEEDED: exact TV reaches only 27.4-43.1% of `tau`, so a doubled tilt exponent passes it at every `tau`; `ratio_spread` is sharp and is the only gate that fires | done | 2026-09-30 |
 | A-IMP-cohort-hmm | `baseline_model` from the cohort alone, constants re-derived from the Methods | the initial distribution and the `stay_switch` transitions built from `G` and `D` only, with no target reachable | chr21, K=88, T=305,886 | built; no target parameter, asserted from the AST; E[switches] **7,021.0** vs the **7,155** model C predicted; O(TK) agrees with dense O(TK^2) to **1.11e-16** | done | 2026-09-30 |
@@ -786,8 +788,9 @@ whose target is external to `G`, `D`, every panel and the attack database. **Nar
 we reuse PanMixer's DATA and its forward recursion. Blocks as a chain unit, the
 donor-panel-minus-target, and the cohort-distortion metrics are COMPARISON-ARM choices,
 not properties of our design. **The chromosome-wide chain is no longer deferred — model C
-is the architecture (decided 2026-09-28), with model B retained as a fallback if the PI
-wants closer parity with PanMixer.**
+is the architecture (decided 2026-09-28). ✅ MODEL B IS NOW BUILT TOO (2026-10-07):
+`hmm.from_arrays(..., blocks=...)`, with model C asserted identical to its identity case,
+so the fallback is one argument away rather than a rewrite.**
 
 **INHERIT UNCHANGED**
 - The data model: the int16 (subjects, sites, 2) matrix with `-1` for missing,
@@ -1216,8 +1219,7 @@ Ordered. Each item names what must pass before it starts and what closes it.
   of the target's called alleles the release alters — is computable on either arm's output
   and is the axis to align on. Measured: ours is **15.03%** and FLAT from `tau` = 0 to 0.9;
   PanMixer's is **10.50%** at capacity 0.1 and **16.41%** at capacity 0.5. **Their capacity
-  dial spans our fixed point**, so a matched-fidelity comparison exists at a capacity near
-  0.45 — which is the alignment this item needs and did not previously have.
+  dial spans our fixed point**, so a matched-fidelity comparison exists at **capacity ~= 0.17** (measured 2026-10-07 by sweeping all eight capacities; the earlier 0.45 interpolated across a FLAT region from only two points) — which is the alignment this item needs and did not previously have.
   ⚠ Three obstacles, all quantified in `docs/memory.md` 2026-10-03: 10.25% of their records
   sit outside our `chain_span`; the two VCFs agree on only 92.7% of sites by
   (POS, REF, ALT), so the count must run on the biallelic-SNP intersection (249,750

@@ -267,8 +267,8 @@ def _assert_bounded(u: np.ndarray, *, tol: float = 1e-9) -> None:
 
 
 def tilt_potentials(hmm_allowed: np.ndarray, haplotypes_chain: np.ndarray,
-                    target_chain: np.ndarray, beta: np.ndarray, eta: float
-                    ) -> np.ndarray:
+                    target_chain: np.ndarray, beta: np.ndarray, eta: float,
+                    *, unit_spans: np.ndarray | None = None) -> np.ndarray:
     """(T, K) `psi_t(j) = exp(eta_tau * beta_v * phi_v)`, times the RENORMALISE mask.
 
     The ONLY place the private target enters the sampler; the cohort chain stays
@@ -280,16 +280,30 @@ def tilt_potentials(hmm_allowed: np.ndarray, haplotypes_chain: np.ndarray,
     multiplies every entry, so a stale array is a release at the wrong privacy
     level with no visible symptom. Nothing here caches.
     """
-    K, T = haplotypes_chain.shape
-    if hmm_allowed.shape != (K, T):
-        raise ValueError(f"allowed is {hmm_allowed.shape}, expected {(K, T)}")
+    K, n_pos = haplotypes_chain.shape
     for name, arr in (("target", target_chain), ("beta", beta)):
-        if len(arr) != T:
-            raise ValueError(f"{name} has {len(arr)} positions, chain has {T}")
+        if len(arr) != n_pos:
+            raise ValueError(f"{name} has {len(arr)} positions, chain has {n_pos}")
     if eta < 0:
         raise ValueError(f"eta_tau must be non-negative, got {eta}")
 
     match = (haplotypes_chain == target_chain[None, :]) & (target_chain[None, :] >= 0)
-    psi = np.exp(eta * (match * beta[None, :]))
+    weighted = match * beta[None, :]                       # (K, n_pos)
+
+    if unit_spans is None:
+        if hmm_allowed.shape != (K, n_pos):
+            raise ValueError(f"allowed is {hmm_allowed.shape}, expected {(K, n_pos)}")
+        exponent = weighted
+    else:
+        # MODEL B: one donor covers a whole unit, so the unit's exponent is the SUM
+        # of its positions' beta * phi. `sum beta` over units is still 1, because it
+        # is the same weights regrouped -- the calibration is untouched.
+        T = len(unit_spans)
+        if hmm_allowed.shape != (K, T):
+            raise ValueError(f"allowed is {hmm_allowed.shape}, expected {(K, T)}")
+        cs = np.concatenate([np.zeros((K, 1)), np.cumsum(weighted, axis=1)], axis=1)
+        exponent = cs[:, unit_spans[:, 1] + 1] - cs[:, unit_spans[:, 0]]
+
+    psi = np.exp(eta * exponent)
     psi *= hmm_allowed
     return np.ascontiguousarray(psi.T)

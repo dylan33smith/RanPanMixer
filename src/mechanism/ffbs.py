@@ -127,6 +127,23 @@ def forward(hmm: CohortHMM, potentials: np.ndarray) -> Forward:
     return Forward(alpha=alpha, log_c=log_c)
 
 
+def expand_to_positions(hmm: CohortHMM, haplotypes_chain: np.ndarray,
+                        z: np.ndarray) -> np.ndarray:
+    """A sampled unit path -> the released allele at every CHAIN POSITION.
+
+    Under model C a unit IS a position and this is a gather. Under model B the
+    chosen donor is copied across the unit's whole span, which is what makes the
+    unit atomic -- and is also why the release carries a donor's real haplotype
+    verbatim over up to 618 chr21 variants. Departure (b), by construction.
+    """
+    if hmm.unit_spans is None:
+        return haplotypes_chain[z, np.arange(hmm.T)].astype(np.int16)
+    out = np.empty(hmm.n_positions, dtype=np.int16)
+    for u, (a, b) in enumerate(hmm.unit_spans):
+        out[a:b + 1] = haplotypes_chain[z[u], a:b + 1]
+    return out
+
+
 def baseline_log_norm(hmm: CohortHMM) -> float:
     """`sum_t log c_t` for the UNTILTED chain: the conditioning constant of `R_D`.
 
@@ -249,10 +266,19 @@ def expected_mismatches(hmm: CohortHMM, haplotypes_chain: np.ndarray,
     Positions where the target has no call are excluded, matching the denominator
     `target_fidelity` is quoted against. Zero Monte-Carlo error: this is a linear
     functional of the marginals, not an estimate from draws.
+
+    Under model B the marginals are per UNIT, so each donor's contribution is the
+    number of mismatching positions across the whole unit -- the same linearity,
+    just a coarser index.
     """
     known = target_1d >= 0
     mism = (haplotypes_chain != target_1d[None, :]) & known[None, :]
-    return float((gamma.T * mism).sum())
+    if hmm.unit_spans is None:
+        return float((gamma.T * mism).sum())
+    cs = np.concatenate([np.zeros((mism.shape[0], 1)),
+                         np.cumsum(mism, axis=1)], axis=1)
+    per_unit = cs[:, hmm.unit_spans[:, 1] + 1] - cs[:, hmm.unit_spans[:, 0]]
+    return float((gamma.T * per_unit).sum())
 
 
 def _categorical(p: np.ndarray, rng: np.random.Generator) -> int:
@@ -346,12 +372,13 @@ def _draw_one(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_1d: np.ndarra
     Keeping the split here means neither caller can quietly stamp a release with
     the wrong privacy parameter.
     """
-    psi = utility.tilt_potentials(hmm.allowed, haplotypes_chain, target_1d, beta, eta)
+    psi = utility.tilt_potentials(hmm.allowed, haplotypes_chain, target_1d, beta, eta,
+                                  unit_spans=hmm.unit_spans)
     fwd = forward(hmm, psi)
     lz = log_z_p(fwd, baseline_norm, eta)
 
     z = backward_sample(hmm, fwd, np.random.default_rng(seed))
-    released = haplotypes_chain[z, np.arange(hmm.T)].astype(np.int16)
+    released = expand_to_positions(hmm, haplotypes_chain, z)
     if (released == -1).any():
         raise AssertionError(
             "the released path carries a missing allele, so RENORMALISE did not "
@@ -394,16 +421,26 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
     # was built to prevent and the one shape it cannot catch. The `-1` check after
     # the draw only catches the subset that happens to be occupied, so the binding
     # is asserted here instead.
-    if haplotypes_chain.shape != (hmm.K, hmm.T):
+    if haplotypes_chain.shape != (hmm.K, hmm.n_positions):
         raise ValueError(
-            f"haplotypes_chain is {haplotypes_chain.shape}, but the model is "
-            f"(K, T) = {(hmm.K, hmm.T)}. These are different cohorts or a "
-            f"different chain_span.")
-    if not np.array_equal(haplotypes_chain != -1, hmm.allowed):
-        bad = int((( haplotypes_chain != -1) != hmm.allowed).sum())
+            f"haplotypes_chain is {haplotypes_chain.shape}, but the model covers "
+            f"(K, positions) = {(hmm.K, hmm.n_positions)} "
+            f"({hmm.T} chain units under model {hmm.model}). These are different "
+            f"cohorts or a different chain_span.")
+    # ⚠ The mask is rebuilt from the alleles the SAME way `from_arrays` built it --
+    # per position under model C, and ANDed across each unit under model B -- so the
+    # guard stays exact in both and cannot be satisfied by a reshaped near-miss.
+    called = haplotypes_chain != -1
+    if hmm.unit_spans is None:
+        rebuilt = called
+    else:
+        rebuilt = np.stack([called[:, a:b + 1].all(axis=1)
+                            for a, b in hmm.unit_spans], axis=1)
+    if not np.array_equal(rebuilt, hmm.allowed):
+        bad = int((rebuilt != hmm.allowed).sum())
         raise ValueError(
             f"haplotypes_chain disagrees with the model's availability mask at "
-            f"{bad} cells. The mask and the alleles describe different cohorts, so "
+            f"{bad} entries. The mask and the alleles describe different cohorts, so "
             f"R_D is not the distribution these alleles came from -- which is how a "
             f"target-pruned state space would enter (standing constraint 1).")
 

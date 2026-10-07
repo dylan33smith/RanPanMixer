@@ -452,10 +452,21 @@ Computed by:          src/cohort/genmap.py:chain_mask (built 2026-09-29) plus
                       One position per VCF record inside `chain_span`.
                       chr21: 305,886 positions (340,849 records less the 34,371 below
                       the coordinate cut).
-CHANGES MEANING WITH: the model. C = 340,849 raw / 305,886 after the cut; B = 100,757
-                      LD-block entries. Runtime and numerical headroom both scale with
-                      it — see beta_t for why finer T costs float32 headroom but NOT
+CHANGES MEANING WITH: the model. C = 340,849 raw / 305,886 after the cut. ✅ MODEL B IS
+                      BUILT (2026-10-07) and on OUR blocks gives **59,472** chain units,
+                      not the 100,757 quoted from PanMixer's block set — our blocks come
+                      from the 30x panel with the 10 test targets removed, SNPs only, and
+                      orphans stay singletons. Runtime and numerical headroom both scale
+                      with T — see beta_v for why finer T costs float32 headroom but NOT
                       privacy budget.
+                      ⚠ UNDER MODEL B A UNIT IS ATOMIC: one donor emits its whole span, so
+                      `allowed` is an AND across the unit and the transition is the GAP
+                      between units (last position of one to first of the next), which is
+                      what discards the within-block recombination. Measured: expected
+                      switches 3,394.1 against C's 7,021.0, and the longest verbatim donor
+                      run is 1,212 variants — departure (b), which `tau` does not bound.
+                      6 units have no donor callable across them and are dropped, costing
+                      1,222 chain positions.
 Valid vs:             the same model and the same chain_span.
 Status:               SECONDARY
 Aliases:              "T", "sites". ⚠ The name `T_blocks` is now a misnomer under C,
@@ -598,6 +609,32 @@ behaviour. The chain does not need to be broken by hand anywhere inside `chain_s
 ⚠ **INTERPOLATE WITH `left=nan, right=nan`**, then assert no NaN survives the cut. That one
 change converts a silent 34,371-position failure into a crash.
 
+
+### expected_switches  [implementation] [gate]
+```
+Is:                   E[number of donor changes] along the chain under the PRIOR,
+                      sum_t s_t (K-1)/K. A property of the cohort, the genetic map
+                      and the chain architecture -- never of the target.
+Computed by:          src/mechanism/hmm.py:CohortHMM.expected_switches (built
+                      2026-09-30)
+CHANGES MEANING WITH: the chain ARCHITECTURE above all. Measured on chr21 at K = 88:
+                      **7,021.0** under model C and **3,394.1** under model B, against
+                      7,155 and 3,532 predicted independently on 2026-09-28. Also with
+                      the genetic map, which is what makes it a canary -- PanMixer's
+                      shipped sampler gives about 0 because its distance is a VCF row
+                      index.
+Valid vs:             its own independent prediction, and the analytic segment length
+                      n/(Ne*r) = 0.0068 cM. It is the REPLACEMENT for mis-specified
+                      exit gate 3, which demanded switch mass of order 0.1-1 between
+                      adjacent positions and would have rejected a correct model.
+Status:               PRIMARY — mark * in tables. ⚠ It is the only quantity in the
+                      project with an independently predicted value, and that is what
+                      caught the model-B transition bug (`docs/bugs.md` 2026-10-07):
+                      nothing else disagreed, no test failed, and the wrong number
+                      looked entirely plausible. Check it whenever the chain changes.
+Aliases:              "E[switches]". ⚠ NOT `donor_switches`, which is the REALISED
+                      count in one release; this is the expectation before any draw.
+```
 
 ### donor_switches  [implementation] [evaluation]
 ```

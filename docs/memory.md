@@ -104,6 +104,111 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-07 — A-IMP-model-b: the LD-block chain, built; and PanMixer's knob, swept
+
+**Goal (Dylan).** Build the model-B fallback so switching happens only between LD
+blocks; measure how many variants each architecture changes across `tau`; and sweep
+PanMixer's own knob for comparison.
+
+### Model B is now a code path, and model C is its identity case
+
+`hmm.from_arrays(..., blocks=...)` takes a block id per chain position; consecutive
+positions sharing an id become ONE ATOMIC unit emitted entirely by one donor.
+`blocks=None` is model C. **With identity blocks the two are asserted identical** --
+`log_z_p`, `E[differ]`, the released path and `u_achieved` all agree -- so model B is
+a regrouping of one mechanism rather than a second mechanism. That assertion is the
+test that made the addition safe to make.
+
+**The blocks are OURS.** `scripts/build_blocks_chr21.sh` runs PLINK v1.9 on our staged
+30x panel with **the 10 test targets removed** (3,192 samples), giving **8,773** called
+haploblocks, longest span 172.7 kb. ⚠ PanMixer's own block set was computed on all
+3,202 samples, which CONTAINS our test targets, so its boundaries are weakly a function
+of the target -- a standing-constraint-1 problem we avoid by rebuilding. ⚠ RESIDUAL,
+the same shape as R4: a first-degree relative still carries half a target's haplotypes
+and we do not exclude those. For a real external target the block panel must be
+DECLARED IN ADVANCE and must not contain the target.
+
+### Model C against model B, chr21, HG00096, EXACT
+
+| metric | C (one variant) | B (LD blocks) |
+|---|---|---|
+| `T_blocks` chain units | 305,886 | **59,472** |
+| unit size median / p90 / max | 1 / 1 / 1 | 1 / 4 / **1,212** |
+| `expected_switches` under the prior | 7,021.0 | **3,394.1** |
+| alpha storage | 215 MB | 42 MB |
+| longest verbatim donor run | 1 variant | **1,212 variants** |
+| units with no occupiable donor | 0 | 6, dropped (1,222 positions) |
+| `E[cells differing]` at `tau` = 0 | 75,177.401 | **73,970.207** |
+| floor as a share of 507,692 known cells | 14.8077% | **14.5699%** |
+| change from the floor at `tau` = 0.9 | -1.8227 cells | **-2.6114 cells** |
+| slope, cells per unit `eta_tau` | -1.2381 | **-1.7738** |
+| `sum beta_v` after regrouping | 1.000000000000 | 1.000000000000 |
+
+**Provenance.** `scripts/compare_models_chr21.py`, `logs/A_models_B_vs_C_chr21.md` ·
+EXACT from the posterior state marginals, zero Monte-Carlo error · diploid, half
+`eta_tau` per haplotype · `chain_span` PROVISIONAL.
+
+**COLUMNS** · *C* is the decided architecture. · *B* is the retained fallback, now
+runnable in one argument.
+
+**ROWS** · *`expected_switches` 3,394.1* against the **3,532** predicted independently
+on 2026-09-28 -- a 3.9% agreement that is the best available check the implementation
+matches the specified model, and the discrepancy that caught a real bug (below). ·
+*floor* is BETTER under B, 14.57% against 14.81%: copying a donor across a whole LD
+block preserves haplotype structure, so the mosaic resembles a real genome more
+closely. · *slope* is **43% steeper** under B. · *1,212 variants verbatim* is
+departure (b) at full scale.
+
+**SYNTHESIS.** Model B helps, and it helps by **1.43x on the tilt's effect** -- not by
+the 16x a contiguous utility gives. Both the floor and the slope improve, for the same
+reason: fewer, longer donor runs mean the utility averages over 3,394 independent
+segments instead of 7,021, and variance scales inversely with that count. **So model B
+is a mild version of the contiguity lever**, reached by changing the chain rather than
+the utility, and it buys about a third of what re-scoping the utility buys. It also
+costs: 1,222 chain positions leave the release entirely because no donor is called
+across their unit, and the release carries a real donor's haplotype verbatim for up to
+1,212 variants, which `tau` does not bound.
+
+⚠ **A BUG THE PREDICTION CAUGHT.** The first implementation spaced units start-to-start
+rather than by the inter-unit gap, contradicting its own docstring and
+`docs/plan.md`'s model-B spec. Every model-B number was wrong until it was fixed
+(floor 14.78% -> 14.57%, slope -1.3355 -> -1.7738). **No test failed**; it surfaced only
+because `expected_switches` had an independently predicted value to disagree with.
+`docs/bugs.md` has the entry.
+
+### PanMixer's knob, swept -- and it SATURATES
+
+`capacity` is its utility-loss budget as a fraction 0-1 (`obfuscate.py:10`). Swept on
+HG00438, chr21, seed 123, its own pinned checkout unmodified:
+
+| `capacity` | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.7 | 0.9 |
+|---|---|---|---|---|---|---|---|---|
+| alleles changed | 7,838 | 33,682 | 68,335 | 105,737 | 106,534 | 106,549 | 106,549 | 106,549 |
+| share | 1.20% | 5.18% | 10.50% | 16.29% | **16.41%** | 16.41% | 16.41% | 16.41% |
+
+**Provenance.** `scripts/run_panmixer_capacity_sweep.sh`, `logs/pmsweep.log`, sentinel
+0 · `external/PanMixer` @ `c182c38`, unmodified · one run per capacity.
+
+**SYNTHESIS.** **The knob saturates at 16.41% from capacity 0.3 upward** -- four
+settings return the byte-identical count -- and is already within 0.12 points of its
+ceiling at 0.2. Its entire reachable range is **1.20% to 16.41%**. The 2026-09-18 note
+that "the knapsack saturates" is confirmed and sharpened: it saturates at **0.2-0.3**,
+not somewhere above 0.5, and the ceiling is a property of how many blocks are
+selectable at all, not of the budget.
+
+⚠⚠ **CORRECTION to the 2026-10-03 entry.** That entry put the matched-fidelity
+operating point "near capacity 0.45", interpolating from only two measured capacities
+(0.1 and 0.5) through a region where the curve is in fact FLAT. With the full sweep our
+model-C 14.81% is reached at **capacity ~= 0.17**. Stale copies hunted in
+`docs/plan.md` and the status deck.
+
+**And the frontier now exists.** Ours spans 14.8077% to 14.8070% across `tau` = 0 to
+0.99 -- a span of 3.28 cells, i.e. a point, not a curve. PanMixer spans 1.20% to 16.41%
+across its knob. **Our fixed point sits inside their range**, which is what makes a
+matched-fidelity comparison possible at all, and it is also the sharpest statement yet
+of R5: one tool has a usable dial on this axis and the other does not.
+
+
 ## 2026-10-03 (later) — the differ-rate at honest n, and a finding I nearly published from n=10
 
 **Dylan caught it.** The differ-rate table reported 76,283 cells at `tau` = 0, 0.05, 0.1,

@@ -74,11 +74,15 @@ class CohortHMM:
     that arithmetic lives.
     """
 
-    allowed: np.ndarray       # (K, T) bool     -- occupiable donors per position
-    switch_mass: np.ndarray   # (T-1,) float64  -- s_t, between t and t+1
-    genetic_pos: np.ndarray   # (T,) float64    -- cM, carried for provenance
-    positions: np.ndarray     # (T,) int64      -- bp, carried for reporting
+    allowed: np.ndarray       # (K, T) bool     -- occupiable donors per CHAIN UNIT
+    switch_mass: np.ndarray   # (T-1,) float64  -- s_t, between unit t and t+1
+    genetic_pos: np.ndarray   # (T,) float64    -- cM at each unit's first position
+    positions: np.ndarray     # (T,) int64      -- bp at each unit's first position
     cohort_id: str = ""
+    # (T, 2) inclusive [start, end] chain-position span of each unit. MODEL B.
+    # None means one position per unit, which IS model C -- so there is one code
+    # path and model C is the identity case of it, not a separate branch.
+    unit_spans: np.ndarray | None = None
 
     @property
     def K(self) -> int:
@@ -87,6 +91,24 @@ class CohortHMM:
     @property
     def T(self) -> int:
         return self.allowed.shape[1]
+
+    @property
+    def n_positions(self) -> int:
+        """Chain POSITIONS covered, which is T under model C and more under B."""
+        if self.unit_spans is None:
+            return self.T
+        return int((self.unit_spans[:, 1] - self.unit_spans[:, 0] + 1).sum())
+
+    @property
+    def unit_sizes(self) -> np.ndarray:
+        """(T,) positions per unit. All ones under model C."""
+        if self.unit_spans is None:
+            return np.ones(self.T, dtype=np.int64)
+        return (self.unit_spans[:, 1] - self.unit_spans[:, 0] + 1).astype(np.int64)
+
+    @property
+    def model(self) -> str:
+        return "C" if self.unit_spans is None else "B"
 
     @property
     def rho(self) -> np.ndarray:
@@ -157,6 +179,7 @@ def switch_mass_from_cm(genetic_pos: np.ndarray, n_states: int) -> np.ndarray:
 
 def from_arrays(haplotypes: np.ndarray, genetic_pos: np.ndarray,
                 positions: np.ndarray, *, in_chain: np.ndarray | None = None,
+                blocks: np.ndarray | None = None,
                 cohort_id: str = "") -> CohortHMM:
     """Build `R_D` from cohort arrays. ⚠ There is no target parameter.
 
@@ -164,6 +187,32 @@ def from_arrays(haplotypes: np.ndarray, genetic_pos: np.ndarray,
     here rather than upstream because the cut is provisional: it is stored as a
     mask, never as a row filter, so moving it rewrites one small array and leaves
     every other artifact's row numbering -- and the site-axis digest -- untouched.
+
+    `blocks` selects the CHAIN ARCHITECTURE and is the model-B fallback that
+    `docs/plan.md` retains for closer parity with PanMixer:
+
+    - `None` -> **MODEL C**, the decided architecture: one unit per variant.
+    - a block id per chain position -> **MODEL B**: consecutive positions sharing
+      an id become ONE ATOMIC unit. One donor is copied across the whole unit, so
+      the chain can only switch donors BETWEEN units. Positions in no called block
+      become their own singleton unit.
+
+    ⚠ MODEL B'S THREE CONSEQUENCES, all of them measured and none of them hidden.
+    (1) A donor may occupy a unit only if it is called at EVERY position in it --
+    that is what atomic means -- so `allowed` is an AND across the unit rather than
+    a per-position mask. Measured on chr21: the median unit still has all 88 donors
+    callable, and only 6 units of 74,670 have none, which are excluded from the
+    chain exactly as `support == 0` positions are. (2) The transition uses the GAP
+    between units, from the last position of one to the first of the next, so the
+    within-unit genetic length is discarded -- about half the recombination, which
+    is the documented cost of model B. (3) The release carries a donor's real
+    haplotype VERBATIM across each unit, up to 618 variants over 39.5 kb on chr21.
+    That is departure (b), and `tau` bounds what the TARGET leaks, not the donors.
+
+    ⚠ Where the blocks come from matters as much as the architecture. They must be
+    a function of `G` and `D` or of a panel DECLARED IN ADVANCE that excludes the
+    target -- see `scripts/build_blocks_chr21.sh`. PanMixer's own block set was
+    computed on all 3,202 panel samples, which contains our test targets.
     """
     if haplotypes.ndim != 2:
         raise ValueError(f"haplotypes must be (K, n_sites), got {haplotypes.shape}")
@@ -183,6 +232,40 @@ def from_arrays(haplotypes: np.ndarray, genetic_pos: np.ndarray,
     gpos = genetic_pos[in_chain].astype(np.float64)
     pos = positions[in_chain].astype(np.int64)
     allowed = hap != -1
+    unit_spans = None
+
+    if blocks is not None:
+        blocks = np.asarray(blocks)
+        if len(blocks) == len(in_chain):
+            blocks = blocks[in_chain]
+        if len(blocks) != hap.shape[1]:
+            raise ValueError(
+                f"blocks has {len(blocks)} entries; expected {hap.shape[1]} chain "
+                f"positions or {len(in_chain)} site-axis rows")
+        # consecutive runs of one id are one unit; a change of id starts a new one
+        cut = np.flatnonzero(np.diff(blocks) != 0) + 1
+        starts = np.concatenate(([0], cut))
+        ends = np.concatenate((cut - 1, [len(blocks) - 1]))
+        unit_spans = np.stack([starts, ends], axis=1).astype(np.int64)
+        # atomic: a donor may occupy a unit only if called at EVERY position in it
+        allowed = np.stack([allowed[:, a:b + 1].all(axis=1) for a, b in unit_spans],
+                           axis=1)
+        keep = allowed.any(axis=0)
+        if not keep.all():
+            unit_spans = unit_spans[keep]
+            allowed = allowed[:, keep]
+        # ⚠ THE TRANSITION USES THE GAP, last position of one unit to first of the
+        # next -- NOT start-to-start. The first version of this code used
+        # start-to-start, which silently attributes a unit's own internal genetic
+        # length to the transition out of it and contradicted the docstring above.
+        # The gap form is what `docs/plan.md` specifies for model B and is why the
+        # architecture "discards the within-block recombination".
+        gaps = gpos[unit_spans[1:, 0]] - gpos[unit_spans[:-1, 1]]
+        if (gaps < 0).any():
+            raise ValueError("units overlap in genetic position; blocks are not disjoint")
+        unit_cm_for_transitions = np.concatenate(([0.0], np.cumsum(gaps)))
+        gpos = gpos[unit_spans[:, 0]]
+        pos = pos[unit_spans[:, 0]]
 
     dead = np.flatnonzero(~allowed.any(axis=0))
     if len(dead):
@@ -194,9 +277,13 @@ def from_arrays(haplotypes: np.ndarray, genetic_pos: np.ndarray,
             f"matrix have drifted apart -- rebuild, do not fall back."
         )
 
+    # genetic_pos carries each unit's REAL first-position cM for provenance; the
+    # transitions come from the inter-unit gaps, which are a different array.
+    cm_for_transitions = gpos if unit_spans is None else unit_cm_for_transitions
     return CohortHMM(allowed=allowed,
-                     switch_mass=switch_mass_from_cm(gpos, hap.shape[0]),
-                     genetic_pos=gpos, positions=pos, cohort_id=cohort_id)
+                     switch_mass=switch_mass_from_cm(cm_for_transitions, hap.shape[0]),
+                     genetic_pos=gpos, positions=pos, cohort_id=cohort_id,
+                     unit_spans=unit_spans)
 
 
 def from_cohort_dir(cohort_dir: str | Path, *, verify: bool = True) -> CohortHMM:
