@@ -983,8 +983,8 @@ def test_model_B_drops_units_no_donor_can_cover():
 
     Same treatment as `support == 0` under model C -- the position is unusable, not
     merely awkward, and the exclusion is a function of the cohort alone so it stays
-    target-independent. Measured on chr21: 6 units of 59,478, costing 1,222 of
-    305,886 chain positions.
+    target-independent. Measured on chr21 with OUR blocks: 4 units, costing 1,222 of 305,886 chain
+    positions. (An earlier "6" came from PanMixer's block set, not ours.)
     """
     # positions 1 and 2 share a block and NO donor is called across both of them
     hap = np.array([[0, 0, -1, 1],

@@ -104,6 +104,93 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-07 (later) — why PanMixer's knob saturates, and whether it moves the same cells
+
+**Dylan's question.** A knapsack with a bigger budget should buy more. Why does
+`capacity` saturate, and are the same alleles changed at every setting?
+
+**A. THE KNAPSACK RUNS OUT OF ITEMS, not out of budget.** From the optimizer's own
+log lines:
+
+| `capacity` | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.7 | 0.9 |
+|---|---|---|---|---|---|---|---|---|
+| moves SELECTED | 14,342 | 34,340 | 47,070 | 85,264 | 159,225 | **177,865** | 177,865 | 177,865 |
+| utility loss SPENT, of the budget | 1.0% | 5.0% | 10.0% | 20.0% | 30.0% | **33.1%** | 33.1% | 33.1% |
+| cells changed (its stacker) | 7,838 | 33,682 | 68,335 | 105,737 | 106,534 | 106,549 | 106,549 | 106,549 |
+
+**At `capacity` = 0.5 it spends 33.1% of an allowed 50% — because 177,865 moves is
+EVERY candidate move that exists.** The constraint stops being the budget and becomes
+the inventory. So 0.7 and 0.9 are byte-identical to 0.5: there is nothing left to buy.
+
+**B. THE MARGINAL MOVES ARE ALMOST ALL NO-OPS**, which is the 2026-09-24 finding at
+the top end rather than the middle:
+
+| capacity step | extra moves | extra cells changed | cells per move |
+|---|---|---|---|
+| 0.05 -> 0.1 | +12,730 | +34,653 | 2.72 |
+| 0.1 -> 0.2 | +38,194 | +37,402 | 0.98 |
+| **0.2 -> 0.3** | **+73,961** | **+797** | **0.011** |
+| **0.3 -> 0.5** | **+18,640** | **+15** | **0.0008** |
+
+The last 92,601 moves bought 812 changed cells between them. So the knapsack's upper
+range is spent almost entirely on moves that resample the target's own alleles back.
+
+**C. THE CHANGED-CELL SETS ARE PERFECTLY NESTED.** Recomputed independently from each
+run's `new_haplotypes.npy` against the original column:
+
+| pair | lower is a SUBSET of higher | kept | dropped | new |
+|---|---|---|---|---|
+| 0.01 -> 0.05 | **True** | 7,838 | **0** | 25,860 |
+| 0.05 -> 0.1 | **True** | 33,698 | **0** | 34,816 |
+| 0.1 -> 0.2 | **True** | 68,514 | **0** | 38,693 |
+| 0.2 -> 0.3 | **True** | 107,207 | **0** | 805 |
+| 0.3 -> 0.5 | **True** | 108,012 | **0** | 15 |
+| 0.5 -> 0.7 -> 0.9 | **True** | 108,027 | **0** | **0** |
+
+**Not one cell is ever un-changed by raising the budget**, and 100% of the cells
+changed at `capacity` 0.01 are still changed at 0.9. The knob is purely ADDITIVE: it
+does not relocate edits, it only accretes them. That follows from the mechanism --
+`capacity` is a budget on a fixed item list and the LP is monotone in it, with the same
+seed fixing each block's resampled value.
+
+**D. THE 16.41% IS OF ALLELE CELLS, NOT OF VARIANTS.** At the ceiling the release
+differs from the original at **108,027 cells**, which fall on **86,578 distinct sites of
+340,824 = 25.40%** of the variants. So "16.41% changed" and "a quarter of the variants
+touched" are both true and describe different denominators; quoting one as the other
+inflates or deflates by 1.5x.
+
+**Provenance.** `logs/pmsweep.log` (sentinel 0) for moves and loss; the nesting and the
+site count recomputed here from each run's `new_haplotypes.npy` against row 0 of
+`pangenome.npy` (HG00438) · `external/PanMixer` @ `c182c38`, unmodified · seed 123.
+
+⚠ **AN UNEXPLAINED 1.39% DISCREPANCY, recorded rather than smoothed.** My independent
+recount gives **108,027** changed cells at the ceiling against the stacker's logged
+**106,549** — a difference of 1,478. I count `(new != orig) & (orig != -1)` over the
+whole site axis; their counter presumably restricts to some mask. The NESTING result is
+computed entirely from my own consistent counts and is unaffected, but the absolute
+figures should be quoted from one source or the other, never mixed.
+
+### Two corrections to the entry above this one
+
+⚠ **"6 units with no occupiable donor" was 6 on PANMIXER'S block set and is 4 on ours.**
+The 6 came from a feasibility check run before our blocks existed, and then survived as a
+HAND-TYPED literal in `scripts/compare_models_chr21.py` -- in an emitted table, which is
+the one thing emitting tables is supposed to prevent. With our 8,773-block set it is **4
+units, costing 1,222 chain positions**: 534, 257, 246 and 185 variants, at 33.3 Mb,
+44.4 Mb, 45.2 Mb and 46.2 Mb. Fixed to compute from the data.
+
+**And the reason only the giants fail is exponential.** The atomic requirement needs ONE
+donor called at EVERY position of the unit. At about 4% missingness that is roughly
+`0.96^n` per donor for a unit of `n` variants: at n = 20 about 44% of donors qualify, at
+n = 100 about 1.7%, and at n = 534 about 2e-10 — so for the largest units it is only
+clustered missingness that leaves any donor at all, and for four of them none does.
+
+⚠ **Model C never had the start-to-start bug.** Asked directly: the fix applies to model
+B only, and model C could not be affected, because a one-position unit has
+`last == first`, so the inter-unit gap and start-to-start spacing are THE SAME NUMBER.
+Verified: model C's `switch_mass` is bit-identical to model B's on identity blocks.
+
+
 ## 2026-10-07 — A-IMP-model-b: the LD-block chain, built; and PanMixer's knob, swept
 
 **Goal (Dylan).** Build the model-B fallback so switching happens only between LD
@@ -137,7 +224,7 @@ DECLARED IN ADVANCE and must not contain the target.
 | `expected_switches` under the prior | 7,021.0 | **3,394.1** |
 | alpha storage | 215 MB | 42 MB |
 | longest verbatim donor run | 1 variant | **1,212 variants** |
-| units with no occupiable donor | 0 | 6, dropped (1,222 positions) |
+| units with no occupiable donor | 0 | **4**, dropped (1,222 positions) |
 | `E[cells differing]` at `tau` = 0 | 75,177.401 | **73,970.207** |
 | floor as a share of 507,692 known cells | 14.8077% | **14.5699%** |
 | change from the floor at `tau` = 0.9 | -1.8227 cells | **-2.6114 cells** |

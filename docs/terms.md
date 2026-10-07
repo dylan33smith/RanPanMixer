@@ -465,8 +465,11 @@ CHANGES MEANING WITH: the model. C = 340,849 raw / 305,886 after the cut. ✅ MO
                       what discards the within-block recombination. Measured: expected
                       switches 3,394.1 against C's 7,021.0, and the longest verbatim donor
                       run is 1,212 variants — departure (b), which `tau` does not bound.
-                      6 units have no donor callable across them and are dropped, costing
-                      1,222 chain positions.
+                      4 units have no donor callable across them and are dropped, costing
+                      1,222 chain positions — and the reason is exponential: the atomic
+                      requirement needs ONE donor called at EVERY position, which at 4%
+                      missingness is about 0.96^n for a unit of n variants, so only the
+                      very largest units fail (534, 257, 246 and 185 variants).
 Valid vs:             the same model and the same chain_span.
 Status:               SECONDARY
 Aliases:              "T", "sites". ⚠ The name `T_blocks` is now a misnomer under C,

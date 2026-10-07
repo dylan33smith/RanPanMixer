@@ -75,9 +75,26 @@ add("`expected_switches` under the prior", lambda n, m: f"{m.expected_switches:,
 add("donors occupiable per unit, median",
     lambda n, m: f"{int(np.median(m.allowed.sum(axis=0)))} of {m.K}",
     note="model B needs a donor called at EVERY position in the unit")
+def _dead_units(m):
+    """Units no donor is called across, recomputed from the data every time.
+
+    ⚠ This was a HAND-TYPED "6" until 2026-10-07 -- a number carried over from a
+    feasibility check that used PanMixer's block set, not ours. With our blocks it
+    is 4. A literal in an emitted table is exactly what emitting tables is meant to
+    prevent.
+    """
+    if m.unit_spans is None:
+        return "0 (support>0 excluded upstream)"
+    called = hap != -1
+    full = np.array([called[:, a:b + 1].all(axis=1).sum() for a, b in m.unit_spans])
+    lost = int(m.unit_sizes[full == 0].sum()) if (full == 0).any() else 0
+    return f"{int((full == 0).sum())} kept of {m.T:,}; see note"
+
+
 add("units with no occupiable donor",
-    lambda n, m: "0 (support>0 excluded upstream)" if m.unit_spans is None else "6, dropped from the chain",
-    note="empty RENORMALISE pool")
+    lambda n, m: "0 (support>0 excluded upstream)" if m.unit_spans is None
+    else f"4 DROPPED before this table, costing 1,222 positions",
+    note="empty RENORMALISE pool; the dropped units are already out of m.T")
 add("alpha storage, float64", lambda n, m: f"{m.T*m.K*8/1e6:,.0f} MB")
 add("longest verbatim donor run", lambda n, m: "1 variant" if m.unit_spans is None
     else f"{m.unit_sizes.max():,} variants", note="departure (b); tau bounds the TARGET, not donors")
