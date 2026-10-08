@@ -30,7 +30,7 @@ from mechanism import hmm as H           # noqa: E402
 from mechanism import utility as U       # noqa: E402
 
 TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
-SEEDS = (1000, 2000, 3000)
+SEEDS = (1000, 2000, 3000)   # ⚠ ONE target (HG00096). Seeds, not targets.
 COH = REPO / "data" / "cohort" / "chr21"
 SCRATCH = Path("/tmp/claude-2630154/-home-ds85-projects-Pangenome/"
                "6b818979-acca-4b5f-a0f5-5998deba7036/scratchpad")
@@ -93,18 +93,22 @@ json.dump({"rows": rows, "taus": list(TAUS), "seeds": list(SEEDS),
 print(f"### Mismatch-set churn across `tau`, same seed — common axis, "
       f"{int(in_chain.sum()):,} positions / {nk:,} known cells\n")
 for nm in models:
-    print(f"#### Model {nm}")
-    print("| `tau` | mismatches | net vs `tau`=0 | fixed | broken | **CHURN** | churn vs previous |")
-    print("|---|---|---|---|---|---|---|")
+    print(f"#### Model {nm} — every cell is a MEAN over {len(SEEDS)} seeds, so fractions are means of integers")
+    print(f"| `tau` | mismatches (mean of {len(SEEDS)}) | net vs `tau`=0 | fixed | broken "
+          f"| **CHURN (mean)** | churn per seed | churn vs previous |")
+    print("|---|---|---|---|---|---|---|---|")
     for tau in TAUS:
-        rs = [r for r in rows if r["model"] == nm and r["tau"] == tau]
+        rs = sorted([r for r in rows if r["model"] == nm and r["tau"] == tau],
+                    key=lambda r: r["seed"])
         n = np.mean([r["n"] for r in rs]); fx = np.mean([r["fixed0"] for r in rs])
         bk = np.mean([r["broken0"] for r in rs]); cp = np.mean([r["fixedp"] + r["brokenp"] for r in rs])
+        per = " / ".join(str(r["fixed0"] + r["broken0"]) for r in rs)
         print(f"| {tau} | {n:,.1f} | {bk-fx:+,.1f} | {fx:,.1f} | {bk:,.1f} | "
-              f"**{fx+bk:,.1f}** | {cp:,.1f} |")
+              f"**{fx+bk:,.1f}** | {per} | {cp:,.1f} |")
     print(f"\nexact E[differ]: " + " · ".join(f"`tau`={t}: {exact[nm][t]:,.3f}" for t in TAUS))
     print()
 print(f"**Provenance.** chr21 · HG00096 diploid, half `eta_tau` per haplotype · "
-      f"mean of {len(SEEDS)} seeds {SEEDS} · each column within a seed uses the SAME "
+      f"ONE target, {len(SEEDS)} seeds {SEEDS} (NOT 10 targets) · each column within a "
+      f"seed uses the SAME "
       f"uniform stream (paired) · common axis = the 304,664 positions BOTH models can "
       f"emit · utility `{F.utility_id(util)}` · `chain_span` PROVISIONAL.")

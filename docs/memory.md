@@ -141,6 +141,16 @@ model B's advantage was not a denominator artifact.
 `churn` = positions that moved in either direction (fixed + broken); `net` = broken −
 fixed, which is what `E[differ]` reports.
 
+⚠ **EVERY CELL IS A MEAN OVER 3 SEEDS OF ONE TARGET (HG00096), NOT OVER THE 10 TARGETS**
+— which is why the figures are fractional, and the table header now says so rather than
+only the provenance line. **And the per-seed spread is enormous:** model C's churn at
+`tau` = 0.99 is **35 / 83 / 4** across seeds 1000/2000/3000, and model B's is
+**72 / 3 / 179**. A factor of 20 to 60 between seeds, so the mean of 3 is a weak summary
+of a highly variable quantity — churn depends on whether a flip lands in a long donor
+segment or a short one, and segment length is itself the thing that varies. Treat the
+churn means as an order of magnitude, not a measurement; the exact `E[differ]` figures
+are the quotable ones.
+
 **Provenance.** `scripts/churn_across_tau.py`, `logs/A_churn_across_tau.md` · chr21 ·
 HG00096 diploid · seeds 1000/2000/3000, each `tau` column drawn from the SAME uniform
 stream within a seed · common axis 304,664 positions.
