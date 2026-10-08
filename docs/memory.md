@@ -166,6 +166,34 @@ which donor is copied, and the donor persists for a segment, so consecutive posi
 change together. The tilt does not nudge positions independently; it occasionally swaps
 one donor segment for another.
 
+### Whole-chromosome mismatch map, added 2026-10-08 after Dylan asked why the figure showed only 200 variants
+
+⚠ **The first figure showed a 200-variant window — 0.07% of the chromosome — chosen for
+maximum churn, so BOTH its coverage and its local density were unrepresentative.** Its
+window density ran about 20% against the chromosome-wide 14.5%. Replaced by a binned
+whole-chromosome map; `scripts/mismatch_map_chr21.py` emits the data, with the window
+kept only as a labelled detail because 540 px cannot resolve 304,664 variants.
+
+| model | mean density | min bin | max bin | max shift caused by `tau` | bins holding a flip at `tau` = 0.99 |
+|---|---|---|---|---|---|
+| C | 0.1451 | 0.0000 | **0.4071** | **0.0077** | **4 of 540** |
+| B | 0.1430 | 0.0000 | **0.4051** | **0.0293** | **4 of 540** |
+
+**Provenance.** `logs/A_mismatch_map_chr21.md` · 540 bins of 564 variants over the
+304,664-position common axis · density PER CELL over 506,788 target-known cells · seed
+1000, every `tau` from the same uniform stream.
+
+**SYNTHESIS, and it is a better picture than the window gave.** Mismatch density has
+**strong regional structure that has nothing to do with `tau`**: bins range from
+**0.0% to 40.7%**, so some 564-variant stretches are reproduced almost exactly and
+others are nearly half wrong. That is ancestry and local haplotype sharing between the
+target and the cohort, visible as banding. Against that, **the largest shift `tau`
+causes anywhere on the chromosome is 0.0077** (model C) — two orders of magnitude below
+the regional variation, which is why the seven `tau` rows are indistinguishable by eye.
+And the flips are confined to **4 of 540 bins** in both models. So the whole-chromosome
+view says the same thing as the exact derivative, in a form that also shows what DOES
+vary: region, not `tau`.
+
 
 ## 2026-10-07 (later) — why PanMixer's knob saturates, and whether it moves the same cells
 
