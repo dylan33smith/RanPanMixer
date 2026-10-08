@@ -498,6 +498,24 @@ which was mostly a DIFFERENT set.
   cheapest counter is an auditor holding the spec who is told the docstrings are
   the claim under audit.
 
+### Two no-op-rate measurements of the same run disagree by 2.2x
+- **[2026-10-08] 30.9% recorded on 2026-09-24; 66.5% measured now, same capacity and seed**
+  **[Symptom]** Both figures describe "selected moves that changed nothing" for
+  PanMixer at `capacity` 0.1, HG00438, seed 123. The 2026-09-24 entry says 14,526 of
+  47,070 (30.9%); recomputing from `xsol.npy` and `new_haplotypes.npy` gives 31,315
+  (66.5%).
+  **[Cause]** UNRESOLVED. Candidates: a different notion of "changed" (the earlier
+  pass may have looked only at a block's ANCHOR variants rather than all its sites);
+  a different block mapping than `simple_blocks_idx.npy`; or different treatment of
+  blocks where the target's genotype is missing throughout, which the current
+  definition counts as no-ops.
+  **[Proven fix]** None yet. Both are recorded with their definitions and neither is
+  quotable as settled. The cells-changed counts do NOT depend on the no-op definition
+  and are unaffected.
+  **[Severity]** ⚠ A 2.2x disagreement on a number used to characterise the other
+  arm. It is in the comparison arm, not our mechanism, so nothing of ours rests on
+  it -- but it must be closed before either figure appears in a writeup.
+
 ### Model B silently created two coordinate systems and could not release
 - **[2026-10-08] Dropped block units left `unit_spans` and `n_positions` disagreeing**
   **[Symptom]** `release()` refused with a shape error under model B on chr21.

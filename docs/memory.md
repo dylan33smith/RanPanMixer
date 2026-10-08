@@ -104,6 +104,65 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-08 (later) — selected moves vs actual changes, swept; and a clash with the recorded 30.9%
+
+**Dylan's question.** `moves selected` counts items taken from the knapsack, but a
+resampled block can come back carrying the target's own alleles, so many are effectively
+no moves. How many moves actually CHANGE the target's haplotype?
+
+**Method.** A move is a (block, strand) slot of `xsol.npy`. It is a no-op if no site in
+that block changed on that strand, i.e. `(new_haplotypes != original) & (original != -1)`
+is false throughout. Blocks from `simple_blocks_idx.npy`; original is row 0 of
+`pangenome.npy` (HG00438). Comparison arm only; nothing in `src/` reads any of it.
+
+| `capacity` | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.7 | 0.9 |
+|---|---|---|---|---|---|---|---|---|
+| moves selected | 14,342 | 34,340 | 47,070 | 85,264 | 159,225 | 177,865 | 177,865 | 177,865 |
+| **no-op moves** | 13,820 | 26,673 | 31,315 | 61,532 | 126,177 | **142,718** | 142,718 | 142,718 |
+| **no-op share** | **96.4%** | 77.7% | **66.5%** | 72.2% | 79.2% | **80.2%** | 80.2% | 80.2% |
+| moves that changed something | 522 | 7,667 | 15,755 | 23,732 | 33,048 | **35,147** | 35,147 | 35,147 |
+| cells changed | 7,838 | 33,698 | 68,514 | 107,207 | 108,012 | **108,027** | 108,027 | 108,027 |
+
+**Marginal cost of raising the knob:**
+
+| step | extra moves | of which no-ops | extra cells changed |
+|---|---|---|---|
+| 0.01 -> 0.05 | +19,998 | 64% | +25,860 |
+| 0.05 -> 0.1 | +12,730 | 36% | +34,816 |
+| 0.1 -> 0.2 | +38,194 | 79% | +38,693 |
+| **0.2 -> 0.3** | **+73,961** | **87%** | **+805** |
+| **0.3 -> 0.5** | **+18,640** | **89%** | **+15** |
+| 0.5 -> 0.9 | +0 | — | +0 |
+
+**Provenance.** `xsol.npy` and `new_haplotypes.npy` under `/data/ds85/RanPanMixer/runs/capacity_sweep/`, one directory per capacity
+· `external/PanMixer` @ `c182c38`, unmodified · HG00438, seed 123 · candidate list
+100,757 blocks x 2 strands = 201,514 slots.
+
+**SYNTHESIS.** Dylan's reading is right and the magnitude is the finding: **at
+saturation, 80.2% of the 177,865 selected moves change nothing at all.** Only **35,147**
+moves ever touch the genome, and they account for all 108,027 changed cells. The no-op
+share is WORST at the extremes -- 96.4% at `capacity` 0.01, where the LP buys the
+cheapest moves and the cheapest moves are the ones that resample a common allele back to
+itself -- and the marginal moves at the top are almost pure no-ops: **the 92,601 moves
+added between `capacity` 0.2 and 0.5 are 87-89% no-ops and buy 820 changed cells
+between them.** So `moves selected` is close to meaningless as a measure of how much the
+release was altered, and the two should never be quoted as if they tracked each other.
+
+⚠⚠ **THIS CLASHES WITH THE 30.9% RECORDED ON 2026-09-24 AND I HAVE NOT RESOLVED IT.**
+That entry reports "of 47,070 selected moves, 14,526 changed NOTHING (30.9%)" at
+`capacity` 0.1; I measure **31,315 (66.5%)** at the same capacity and seed. Both cannot
+be right. Candidate explanations, none verified: a different notion of "changed"
+(perhaps restricted to the block's ANCHOR variants rather than all its sites); a
+different block mapping; or different handling of blocks where the target's genotype is
+missing throughout, which my definition counts as no-ops. **Do not quote either figure
+as settled until this is closed.** What is NOT in doubt, because it does not depend on
+the no-op definition, is the cells-changed row and the saturation it shows.
+
+⚠ Also unresolved, and noted before: my recount gives 108,027 changed cells at the
+ceiling against the stacker's logged 106,549, a 1.39% gap. The columns above use my
+recount throughout so they are internally consistent.
+
+
 ## 2026-10-08 — churn of the mismatch set across tau, and a model-B release bug
 
 **Dylan's question.** The exact `E[differ]` figures are NET. Is the tilt moving a
