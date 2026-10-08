@@ -177,6 +177,39 @@ def switch_mass_from_cm(genetic_pos: np.ndarray, n_states: int) -> np.ndarray:
     return s
 
 
+def dead_block_positions(haplotypes: np.ndarray, blocks: np.ndarray,
+                         in_chain: np.ndarray | None = None) -> np.ndarray:
+    """Site-axis mask of positions in a block unit NO donor can cover.
+
+    Model B is atomic, so a donor qualifies for a unit only if it is called at
+    EVERY position in it. At about 4% missingness that is roughly 0.96^n per donor
+    for a unit of n variants -- about 44% of donors at n = 20, 1.7% at n = 100 and
+    2e-10 at n = 534 -- so only the very largest units fail, and on chr21 exactly
+    4 do, covering 1,222 positions.
+
+    Compose it into the chain mask before building the model:
+        in_chain_b = in_chain & ~dead_block_positions(hap, blocks, in_chain)
+    """
+    n_sites = haplotypes.shape[1]
+    if in_chain is None:
+        in_chain = np.ones(n_sites, dtype=bool)
+    blk = np.asarray(blocks)
+    if len(blk) == n_sites:
+        blk_c = blk[in_chain]
+    else:
+        blk_c = blk
+    called = (haplotypes[:, in_chain] != -1)
+    cut = np.flatnonzero(np.diff(blk_c) != 0) + 1
+    starts = np.concatenate(([0], cut))
+    ends = np.concatenate((cut - 1, [len(blk_c) - 1]))
+    out = np.zeros(n_sites, dtype=bool)
+    idx = np.flatnonzero(in_chain)
+    for a, b in zip(starts, ends):
+        if not called[:, a:b + 1].all(axis=1).any():
+            out[idx[a:b + 1]] = True
+    return out
+
+
 def from_arrays(haplotypes: np.ndarray, genetic_pos: np.ndarray,
                 positions: np.ndarray, *, in_chain: np.ndarray | None = None,
                 blocks: np.ndarray | None = None,
@@ -250,10 +283,23 @@ def from_arrays(haplotypes: np.ndarray, genetic_pos: np.ndarray,
         # atomic: a donor may occupy a unit only if called at EVERY position in it
         allowed = np.stack([allowed[:, a:b + 1].all(axis=1) for a, b in unit_spans],
                            axis=1)
-        keep = allowed.any(axis=0)
-        if not keep.all():
-            unit_spans = unit_spans[keep]
-            allowed = allowed[:, keep]
+        bad = ~allowed.any(axis=0)
+        if bad.any():
+            lost = int((unit_spans[bad, 1] - unit_spans[bad, 0] + 1).sum())
+            raise ValueError(
+                f"{int(bad.sum())} block units have NO donor callable across their "
+                f"whole span, covering {lost} chain positions (largest "
+                f"{int((unit_spans[bad, 1] - unit_spans[bad, 0] + 1).max())} "
+                f"variants). A unit is atomic, so RENORMALISE has an empty pool "
+                f"there and the mechanism cannot emit it.\n"
+                f"⚠ DROPPING THEM HERE WAS THE FIRST IMPLEMENTATION AND IT WAS "
+                f"WRONG: it left `unit_spans` indexing the full chain while "
+                f"`n_positions` excluded the dropped spans, so `release()` could "
+                f"not run and every fidelity denominator was the full chain's. "
+                f"Exclude them from `in_chain` instead -- "
+                f"`in_chain & ~hmm.dead_block_positions(...)` -- so the exclusion "
+                f"is visible on the axis every artifact shares, exactly as "
+                f"`support == 0` is excluded by genmap.chain_mask.")
         # ⚠ THE TRANSITION USES THE GAP, last position of one unit to first of the
         # next -- NOT start-to-start. The first version of this code used
         # start-to-start, which silently attributes a unit's own internal genetic

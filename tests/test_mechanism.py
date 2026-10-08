@@ -978,13 +978,15 @@ def test_model_B_is_atomic_one_donor_covers_each_whole_unit():
                 f"seed {seed}: unit {u} was not emitted by a single donor")
 
 
-def test_model_B_drops_units_no_donor_can_cover():
-    """A unit no donor is called across has an empty RENORMALISE pool: excluded.
+def test_model_B_refuses_units_no_donor_can_cover_and_hands_back_the_mask():
+    """A unit no donor is called across cannot be emitted: REFUSE, don't drop.
 
-    Same treatment as `support == 0` under model C -- the position is unusable, not
-    merely awkward, and the exclusion is a function of the cohort alone so it stays
-    target-independent. Measured on chr21 with OUR blocks: 4 units, costing 1,222 of 305,886 chain
-    positions. (An earlier "6" came from PanMixer's block set, not ours.)
+    REGRESSION 2026-10-08. The first version DROPPED such units, which left
+    `unit_spans` indexing the full chain while `n_positions` summed only the
+    survivors -- two coordinate systems, so `release()` could not run and every
+    fidelity share was divided by the other axis's denominator. Refusing and
+    handing back a mask puts the exclusion on the axis every artifact shares, the
+    same treatment `support == 0` gets from `genmap.chain_mask`.
     """
     # positions 1 and 2 share a block and NO donor is called across both of them
     hap = np.array([[0, 0, -1, 1],
@@ -992,9 +994,20 @@ def test_model_B_drops_units_no_donor_can_cover():
                     [0, -1, -1, 1]], dtype=np.int16)
     cm = np.array([0.0, 0.0001, 0.0002, 0.0003])
     pos = np.array([10, 20, 30, 40])
-    m = H.from_arrays(hap, cm, pos, blocks=np.array([0, 1, 1, 2]))
-    assert m.T == 2, f"expected the dead unit dropped, got T={m.T}"
-    assert m.n_positions == 2, "the dropped unit's positions must leave the chain too"
+    blocks = np.array([0, 1, 1, 2])
+    try:
+        H.from_arrays(hap, cm, pos, blocks=blocks)
+    except ValueError as e:
+        assert "NO donor callable" in str(e) and "in_chain" in str(e), str(e)
+    else:
+        raise AssertionError("a unit no donor can cover was accepted")
+
+    dead = H.dead_block_positions(hap, blocks)
+    assert dead.tolist() == [False, True, True, False], dead.tolist()
+    m = H.from_arrays(hap, cm, pos, in_chain=~dead, blocks=blocks)
+    assert m.T == 2 and m.n_positions == 2, (m.T, m.n_positions)
+    assert m.n_positions == int((~dead).sum()), (
+        "n_positions must equal the chain length, or the denominators diverge")
     assert m.allowed.any(axis=0).all()
 
 

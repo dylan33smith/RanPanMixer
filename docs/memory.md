@@ -104,6 +104,69 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-08 — churn of the mismatch set across tau, and a model-B release bug
+
+**Dylan's question.** The exact `E[differ]` figures are NET. Is the tilt moving a
+handful of positions, or reshuffling many and netting to a handful? Both models, same
+seed.
+
+### ⚠ FIRST, A BUG: model B could not produce a release at all
+
+`from_arrays(..., blocks=...)` DROPPED the 4 units no donor can cover, which left
+`unit_spans` indexing the full 305,886-position chain while `n_positions` was 304,664.
+Two coordinate systems. `release()` refused outright (the constraint-1 shape guard
+caught it), so model B was unusable for actual releases — and **every model-B fidelity
+share reported on 2026-10-07 used the full chain's denominator while its numerator
+covered only 304,664 positions.**
+
+**Fixed:** `from_arrays` now REFUSES dead units and names the remedy, and
+`hmm.dead_block_positions()` returns the mask to compose into `in_chain` — so the
+exclusion lives on the axis every artifact shares, exactly as `support == 0` does.
+Re-measured on the COMMON axis both models can emit (304,664 positions, 506,788 known
+cells), the floors barely move and the gap survives: **C 14.8073%, B 14.5959%**. So
+model B's advantage was not a denominator artifact.
+
+### The churn, same seed, mean of 3 seeds
+
+| `tau` | model C mismatches | net | churn | model B mismatches | net | churn |
+|---|---|---|---|---|---|---|
+| 0.0 | 74,760.0 | — | 0 | 73,175.7 | — | 0 |
+| 0.05 | 74,760.0 | +0.0 | **0** | 73,175.7 | +0.0 | **0.7** |
+| 0.10 | 74,760.0 | +0.0 | **0** | 73,175.7 | +0.0 | 0.7 |
+| 0.25 | 74,756.0 | -4.0 | 5.3 | 73,175.7 | +0.0 | 0.7 |
+| 0.50 | 74,756.0 | -4.0 | 5.3 | 73,175.7 | +0.0 | 1.3 |
+| 0.90 | 74,755.3 | -4.7 | 6.7 | 73,185.7 | +10.0 | 19.3 |
+| 0.99 | 74,747.3 | -12.7 | **40.7** | 73,199.0 | +23.3 | **84.7** |
+
+`churn` = positions that moved in either direction (fixed + broken); `net` = broken −
+fixed, which is what `E[differ]` reports.
+
+**Provenance.** `scripts/churn_across_tau.py`, `logs/A_churn_across_tau.md` · chr21 ·
+HG00096 diploid · seeds 1000/2000/3000, each `tau` column drawn from the SAME uniform
+stream within a seed · common axis 304,664 positions.
+
+**SYNTHESIS — the answer is "a bit of both, and still tiny".** The distribution DOES
+shift more than the net suggests: at `tau` = 0.99 model C moves **40.7** positions to
+net **−12.7**, and model B moves **84.7** to net **+23.3**. So roughly **3x more
+positions move than the net change**, because the tilt both fixes and breaks matches.
+But the absolute scale is unchanged: tens of positions out of 304,664. And below
+`tau` = 0.25 model C's churn is **exactly zero** — the released path is bit-identical,
+which is the thin-tilt finding seen position by position rather than in aggregate.
+
+⚠ **The sampled nets are noise and the exact values are authoritative.** Exact
+`E[differ]` at `tau` = 0.99 gives **−3.30** cells for C and **−4.72** for B; the
+sampled −12.7 and +23.3 are 3-seed estimates against a paired sd near 50. Model B's
+positive sign is sampling noise, not a reversal — the exact figure is negative, i.e.
+the tilt helps. Quote the exact numbers.
+
+**AND THE CHANGES CLUSTER, which is the structural finding.** They are not spread
+across the chromosome: **12 of model C's 23 changed positions fall in one 400-variant
+window, and 51 of model B's 64.** That is what the mechanism predicts — a flip changes
+which donor is copied, and the donor persists for a segment, so consecutive positions
+change together. The tilt does not nudge positions independently; it occasionally swaps
+one donor segment for another.
+
+
 ## 2026-10-07 (later) — why PanMixer's knob saturates, and whether it moves the same cells
 
 **Dylan's question.** A knapsack with a bigger budget should buy more. Why does

@@ -498,6 +498,28 @@ which was mostly a DIFFERENT set.
   cheapest counter is an auditor holding the spec who is told the docstrings are
   the claim under audit.
 
+### Model B silently created two coordinate systems and could not release
+- **[2026-10-08] Dropped block units left `unit_spans` and `n_positions` disagreeing**
+  **[Symptom]** `release()` refused with a shape error under model B on chr21.
+  Marginals and `expected_mismatches` worked, so the comparison table looked fine.
+  **[Cause]** `from_arrays` dropped the 4 units no donor can cover but left
+  `unit_spans` indexing the full 305,886-position chain, while `n_positions`
+  summed only the surviving spans (304,664). `expand_to_positions` then wrote past
+  the end of its output array. ⚠ **And the fidelity shares were wrong**: the
+  numerator covered 304,664 positions while the denominator was the full chain's
+  506,788-plus-1,222 known cells.
+  **[Proven fix]** Refuse instead of dropping. `from_arrays` raises and names the
+  remedy; `hmm.dead_block_positions()` returns the mask to compose into `in_chain`,
+  so the exclusion lives on the axis every artifact shares -- the same treatment
+  `support == 0` already gets from `genmap.chain_mask`. Re-measured on the common
+  axis, the floors are C 14.8073% and B 14.5959%, so B's advantage was real and not
+  a denominator artifact.
+  **[Severity]** ⚠ The guard caught it rather than producing a plausible wrong
+  path, which is the guard working. But the quantity that DID run -- the marginals
+  -- was reported against a denominator from the other coordinate system, and
+  nothing flagged that. **A derived quantity that works while the main path is
+  broken is a warning, not a reassurance.**
+
 ### A docstring that described the model and code that implemented a different one
 - **[2026-10-07] Model B's transition used start-to-start, the docstring said the gap**
   **[Symptom]** Model B ran, every test passed, and `expected_switches` came out

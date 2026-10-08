@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-07
+**Last updated:** 2026-10-08
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -479,6 +479,7 @@ segment count is set by the chromosome's genetic length, not by T.
 
 | ID | Intervention | Endpoint | n | Result | Verdict | memory |
 |---|---|---|---|---|---|---|
+| A-EVL-churn-across-tau | Does raising `tau` move a few positions or reshuffle many? | the mismatch SET, not just its size, at a fixed seed | 2 models, 7 `tau`, 3 seeds, common axis | **Both, and still tiny.** At `tau`=0.99 model C moves 40.7 positions to net −12.7 and model B 84.7 to net +23.3 — about 3x more movement than the net. Below `tau`=0.25 model C's churn is EXACTLY ZERO. ⚠ The changes CLUSTER: 12 of C's 23 and 51 of B's 64 fall in one 400-variant window, because a flip swaps a whole donor segment. Sampled nets are noise; exact is −3.30 (C) and −4.72 (B) | done | 2026-10-08 |
 | A-IMP-model-b | Build the LD-block chain so switching happens only between blocks | model C reproduced exactly by identity blocks; blocks from a panel that excludes the target | chr21, 8 capacities swept on the other arm | **BUILT.** 59,472 units, `expected_switches` 3,394.1 against 3,532 predicted independently; floor 14.5699% vs C's 14.8077%, slope −1.7738 vs −1.2381 — model B is a MILD contiguity lever, 1.43x, against 16x from re-scoping the utility. Cost: 1,222 positions dropped, 1,212-variant verbatim donor runs. ⚠ One bug, caught only by the prediction: transitions were start-to-start, not inter-unit gaps | done | 2026-10-07 |
 | A-EVL-capacity-sweep | Does PanMixer have a knob, and what does it reach? | its reachable `target_fidelity` range | 8 capacities, HG00438, seed 123 | **YES — `capacity`, and it SATURATES.** 1.20% at 0.01 rising to **16.41% at 0.2-0.3**, then four settings byte-identical. Our 14.81% is reached at **capacity ~= 0.17**, correcting the 0.45 interpolated from two points | done | 2026-10-07 |
 | A-FIX-mechanism-audit | Independent audit of the same day's mechanism build; docstrings declared non-evidence | every gap between docs and code, adversarially verified | 127 agents, 6 dimensions, 3 refuters per gap | **6 real defects the 88-test suite passed over**, 4 confirmed by mutation and all fixed; 30 gaps survived of 40 filed. Overturned the day's headline row and closed R5's leading option | done | 2026-09-30 |
