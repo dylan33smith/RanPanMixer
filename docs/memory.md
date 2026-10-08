@@ -104,6 +104,52 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-08 (later still) — the directly comparable number, in both units
+
+**Dylan's question.** Our table shows ~74,000 changes. What is that comparable to in
+PanMixer's table?
+
+**Answer: PanMixer's `cells changed` row, and nothing else in it.** `moves selected` is
+not comparable to anything of ours — we have no selection step — and the two must never
+be put side by side. The comparable quantity is `target_fidelity`: cells where the
+released allele differs from the target's own, which is computable on either output.
+
+| | per CELL (variant x strand) | share | per VARIANT (>=1 strand) | share |
+|---|---|---|---|---|
+| **ours, model C**, `tau` = 0.5 | **74,988** of 506,788 | **14.80%** | **61,750** of 253,394 | **24.37%** |
+| **ours, model B**, `tau` = 0.5 | 74,311 of 506,788 | 14.66% | 60,138 of 253,394 | 23.73% |
+| PanMixer, `capacity` 0.01 | 7,838 of 650,720 | 1.20% | 5,360 of 336,677 | 1.59% |
+| PanMixer, `capacity` 0.1 | 68,514 | 10.53% | 56,033 | 16.64% |
+| PanMixer, `capacity` 0.2 | 107,207 | 16.48% | 86,069 | 25.56% |
+| PanMixer, `capacity` 0.5+ (saturated) | 108,027 | 16.60% | 86,578 | 25.72% |
+
+**Provenance.** OURS: HG00096 (external), chr21, `tau` = 0.5, seed 1000, diploid, common
+axis of 304,664 positions. PANMIXER: HG00438 (a cohort member), chr21, seed 123, my
+recount from `new_haplotypes.npy` against row 0 of `pangenome.npy`.
+
+**SYNTHESIS.** **Our ~75,000 lands inside PanMixer's range of 7,838 to 108,027**, and the
+matched-fidelity capacity is **~0.17 on the per-cell axis and ~0.19 per-variant** — close
+enough that either is a fair statement of where the arms meet. That crossing point is the
+whole value of this axis: it is the only place the two tools can be compared at all,
+because `capacity` and `tau` are not comparable parameters.
+
+⚠ **THE SAME MEASUREMENT, OPPOSITE MEANING, AND THIS IS THE POINT TO MAKE OUT LOUD.**
+For PanMixer a changed cell is DELIBERATE — the release starts as the target's own
+genotype column and a subset is rewritten, so changes are the product and more of them is
+more obfuscation. For us a differing cell is a RESIDUAL — the release never contained the
+target's data, it is a cohort mosaic, and a difference means the mosaic failed to
+reproduce the target there. **14.80% of ours is reached at `tau` = 0**, so almost none of
+it is caused by the mechanism. Same number, opposite sign of intent.
+
+⚠ **THE DENOMINATORS ARE NOT EQUAL AND THE TARGETS ARE DIFFERENT PEOPLE.** Three reasons,
+all measured: (1) our chain excludes **34,937 of their records (10.25%)**, the p arm and
+the telomere; (2) we lose **104,080 cells (17.0%)** where our join finds no record for the
+target, against about 4.5% for them, because their target is a cohort member read from
+the same VCF; (3) HG00096 is external and HG00438 is in the cohort. **So compare the
+SHARES, treat the raw counts as indicative, and do not quote a difference of counts as a
+result.**
+
+
 ## 2026-10-08 (later) — selected moves vs actual changes, swept; and a clash with the recorded 30.9%
 
 **Dylan's question.** `moves selected` counts items taken from the knapsack, but a
