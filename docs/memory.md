@@ -162,6 +162,31 @@ the no-op definition, is the cells-changed row and the saturation it shows.
 ceiling against the stacker's logged 106,549, a 1.39% gap. The columns above use my
 recount throughout so they are internally consistent.
 
+⚠ **AND THE RIGHT DENOMINATOR FOR MY RECOUNT IS 650,720, NOT THEIRS.** Cells with a
+called target allele across all 340,824 variants x 2 = **650,720**. So my 108,027 is
+**16.60%**, while the stacker's 106,549 over its own 649,242 is **16.41%**. Both are
+internally consistent; crossing them (my numerator over their denominator) gives a
+spurious 16.64% and must not be quoted.
+
+### How a move relates to a cell, and a partial explanation of the no-op gap
+
+A **move** is one (block, strand): 100,757 x 2 = 201,514 candidates. A **cell** is one
+(variant, strand): 681,648 slots, 650,720 with a called allele. Blocks hold median 1,
+mean 3.38, max 618 variants, so **one move can change anywhere from 0 to 618 cells.**
+
+At saturation: 177,865 moves selected, 142,718 no-ops, **35,147 changing moves**, which
+carry **104,390** of the 108,027 changed cells at median 1 / mean 2.97 / max 262 cells
+each. **68.7% of changing moves altered exactly one cell** and 6.0% altered ten or more.
+
+⚠ **The remaining 3,553 cells (3.3%) changed in slots that were NOT selected**, plus 84
+at sites outside any block id. That is possible because **PanMixer's blocks are not
+disjoint** — `docs/memory.md` 2026-09-22 measured 9.2% of records sitting inside another
+record's span and 15.4% of blocks containing such a record — so a write from a selected
+block can land on a site whose own block id is unselected, and my per-block attribution
+scores that move as a no-op.
+**But 3.3% cannot close a 2.2x gap**, so this is a minor contributor and the
+66.5%-versus-30.9% discrepancy stays unexplained.
+
 
 ## 2026-10-08 — churn of the mismatch set across tau, and a model-B release bug
 
