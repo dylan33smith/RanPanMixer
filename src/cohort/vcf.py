@@ -95,9 +95,25 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
             with gzip.open(gfa, "rb") as fi, open(plain, "wb") as fo:
                 shutil.copyfileobj(fi, fo, length=1 << 24)
         gfa = plain
+        decompressed_here = True
+    else:
+        decompressed_here = False
 
     _run([str(resolved), "deconstruct", "-P", ref_prefix, "-a", "-t", str(threads), str(gfa)],
          stdout_path=out_vcf)
+
+    # ⚠ DELETE THE DECOMPRESSED COPY. It is 4-9 GB per chromosome and is
+    # regenerable from the .gz in seconds, so caching it costs about 86 GB across
+    # 22 autosomes to save nothing that matters. The earlier code kept it
+    # deliberately ("if not plain.exists()") as a resume convenience for one
+    # chromosome, which does not scale to a genome: measured 2026-10-10, six
+    # finished chromosomes were holding 25 GB of graphs nothing would read again.
+    # ⚠ Only removed if WE created it, so a hand-decompressed graph a caller staged
+    # on purpose is left alone.
+    if decompressed_here and gfa.exists():
+        gfa.unlink()
+        print(f"    removed the decompressed {gfa.name} "
+              f"(regenerable from the .gz; keeping it costs GB per chromosome)")
     out = {"vcf": str(out_vcf), "gfa_used": str(gfa),
            "sha256": store.sha256_file(out_vcf), "vg": vginfo}
     # close the lineage: GFA + vg -> deconstruct.vcf had no sidecar at all
