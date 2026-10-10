@@ -82,8 +82,14 @@ Read at session start. This file exists so a new session never has to grep
   UTILITY.** HG00096, chr21, `beta` scope `chain`. Between `tau` = 0 and `tau` = 0.9 the
   released path MOVES — 8 of 10 disjoint-stream draws differ, by a mean of **417 state
   positions** and **54 allele positions** per haplotype — while expected utility moves
-  **2.94e-06** across the whole `tau` grid. `utility_retained` is 0.6940 against a
-  `u_ceiling` of 0.8155 at every `tau`. Not a bug: `log_z_p` tracks `eta_tau` at a
+  **2.94e-06** across the whole `tau` grid. `utility_retained` is **0.6931** against a
+  `u_ceiling` of 0.8155 at every `tau` (0.6932 at `tau` = 0.9). ⚠ **[CORRECTION -
+  2026-10-10]** This bullet read **0.6940**, the superseded v1 value from the
+  correlated-seed run, which this same file already retracts two sections down
+  (0.6940 -> 0.6931, at `tau` = 0 through 0.50, n = 10 disjoint-stream draws, over
+  253,846 called chain positions) and which line 78 above already quotes correctly. A retraction that does not reach the board's present tense has not
+  landed; `docs/plan.md` line 525 still carries it inside a historical entry, where
+  it belongs. Not a bug: `log_z_p` tracks `eta_tau` at a
   constant 69.5% and the sampler is proven exact on the toy. Measured sampling-free from
   the derivatives of `log Z_p`: `Var_Q(u)` = **4.046e-06**, `sd(u)` = **2.011e-03**, so
   the gain is about **1:900** against a single draw's noise.
@@ -193,11 +199,11 @@ Nine decisions opened Phase B. They were taken after a seven-surface audit
 | 2 | Whether **interior zero-cM plateaus** are eventually overridden too. Deferred deliberately: `docs/terms.md` states P(switch) = 0 there is CORRECT, and `tests/test_toy_enumeration.py` enforces it as a Theorem-1 **support** property. Overriding it reverses a tested position, and is the most rework-costly item on the board. ✅ **NOW SIZED** (2026-10-10): **93.9 Mb / 3.27%** of autosomal bp, LARGER than the class the declared rate covers; chr9 alone 25.61 Mb, chr16 10.69 Mb; and **8,327 chr21 positions**, all with `support > 0`. | nothing yet |
 | 2b | ⚠ **The N-GAP POLICY — UNDECLARED, no longer blocked.** The gap table is acquired (`data/raw/ucsc_gap/gap.txt.gz`, 12 KB). ✅ **MEASURED: 79.8% of the map-silent sequence is gap** (68.8 of 86.2 Mb), so accumulating the declared rate across it asserts 109.5 cM of which **87.4 cM sits on placeholder bp** — 2.5% of the autosomal genetic length invented from spacers. ✅ **And NO variant of ours falls inside any gap** (chr21: 0 of 340,849), so gaps hold nothing and skipping their spans changes **no position's chain membership** — it only fixes `Delta_x` between variants that straddle one, dropping the map-silent distance 109.5 -> 22.1 cM. Recommendation: SKIP gap spans. ⚠ Dylan's call; it is a pre-registration item. | preprocessing |
 | 2c | ✅ **SETTLED 2026-10-10 as decision J** — `beta_share` is allocated by variant count, `T_c / T_total`, with `T_c` on the full 88-haplotype cohort. Supersedes the genetic-length recommendation made the same day, which was wrong: it would have made a position's weight depend on which chromosome it sat on. | — |
-| 3 | The **`tau` grid.** Pinned only AFTER the genome-wide endpoint is re-measured exactly — see the work order. | pre-registration |
-| 4 | **Arm 2's `beta_v` normalising set** (R1 + R4): all chain positions, or the subset readable against a named public callset declared in advance. Arm 1 normalises over all chain positions on every branch. | pre-registration |
-| 5 | **R3** — `w_v = 1/support(v)` is inherited, not argued for. | pre-registration |
-| 6 | The **secondary window's** width, count, and whether it is ever DRAWN (expectation-only avoids the constraint-5 composition problem entirely). | the secondary arm only |
-| 7 | **Arm 2's attacker set and target count.** ⚠ The repo has **no implemented attacker of any kind**; `attacker_accuracy` names a module that does not exist. | every Arm 2 privacy number |
+| 3 | ✅ **CLOSED 2026-10-10.** The **`tau` grid** is written into `paper/prereg_2026-10-10.md` section 1: 0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99, each with its role declared. Unblocked by `B-EVL-exact-endpoint`. ⚠ Written is not frozen — the file is UNSIGNED and field 6 is `[OPEN]` again. | — |
+| 4 | ✅ **CLOSED 2026-10-10.** **Arm 2's `beta_scope`** is pinned to the value "chain" in the pre-registration section 2, which closes R1 by DECLINING its fix, on R4's grounds. | — |
+| 5 | ✅ **CLOSED 2026-10-10.** **R3** — `w_v = 1 / support(v)`, pinned and declared as INHERITED rather than argued for, which is the honest form. | — |
+| 6 | ✅ **DROPPED 2026-10-10.** The **secondary window** is not pursued: the pre-registration section 0 drops the contiguous-window second arm. | — |
+| 7 | ✅ **CLOSED 2026-10-10.** **Arm 2's attacker set** is pinned (A1-A4, each with a mandatory positive control) and the **target count** is all 10 — chr21 for the powered attack, genome-wide for exact utility. ⚠ **[CORRECTION - 2026-10-10]** This row said the repo has "no implemented attacker of any kind" and that `attacker_accuracy` "names a module that does not exist": `src/attacks.py` was built 2026-10-10 with the Neyman-Pearson optimal statistic, the exact ceiling, a BALANCED `src/attacks.py:empirical_accuracy`, the arm guard and the pre-registration lock, with `tests/test_attacks.py` over it. | — |
 
 ## ⚠ PHASE B WORK ORDER — what must happen before the first number
 
@@ -231,7 +237,12 @@ Ordered, and the order is load-bearing.
    ✅ **The secondary windowed-utility arm is DROPPED** — the toy genome
    demonstration does its job without a second release of the same person, which
    would have composed.
-   ⚠ **8 FIELDS REMAIN OPEN** and the file is not in force until all are filled.
+   ⚠ **1 FIELD IS OPEN: field 6** (reopened 2026-10-10 — the pinned attack design was
+   ONE-SIDED and could not measure the quantity `p_succ_bound` bounds; options and a
+   recommendation are in the file's section 4). Seven are filled. The file is not in
+   force until every field is filled AND its status line reads `SIGNED` with a
+   `git_rev`. ⚠ **[CORRECTION - 2026-10-10]** This line read "8 FIELDS REMAIN OPEN",
+   which was true when written and was false from the moment the fields were filled.
    The load-bearing one is **the minimum detectable advantage the experiment is
    powered for**: the repository forecasts a chance-level null, and without a power
    statement a null is not evidence (standing constraint 7).
@@ -638,6 +649,7 @@ segment count is set by the chromosome's genetic length, not by T.
 | B-THY-toy-genome | Demonstrate what the mechanism DOES, exactly, on a 2-chromosome toy genome | the tilt visible, and the sampler matching the enumeration | 2 chr, 7 `tau`, 40,000 draws | **THE TILT IS VISIBLE.** Shares 7/9 and 2/9 by decision J; mean `beta_v` 0.111 against chr21's 3.27e-06. TV(Q, R_D) reaches **0.3090**, `E_Q[u]` moves **0.4502 -> 0.6477** against chr21's 2.94e-06, `Var_Q(u)` 7.3e-02 against 4.05e-06. `ratio_spread` equals `exp(epsilon_tau)` to the last digit at every `tau`. Same `ffbs` path, no special case — **so it is budget dilution that makes the chr21 effect invisible, not the mechanism.** ⚠ A correlated-seed bug in the demo was caught by its own joint assertion: every marginal was right and only the joint was wrong | done | 2026-10-10 |
 | B-EVL-exact-endpoint | Re-measure the PRIMARY endpoint at a genome-wide share, since every figure on record used the whole budget on chr21 | monotone and exactly computable at the share that will be used | 3 shares x 7 `tau`, two independent routes | **MARGINALS ROUTE WORKS, DERIVATIVE ROUTE BREAKS.** Movement scales EXACTLY linearly in the share (5 s.f. at two shares); monotone at every share; 3.45e+09x float64 headroom at the smallest. ⚠⚠ But `Var_Q(u)` from the finite-difference second derivative goes **NEGATIVE** at chr21's genetic-length share and scatters over 5x at 1/22 — and every recorded `Var_Q(u)` came from that route. The pre-registered endpoint must name the marginals route; the derivative route survives only as a chr21-scale diagnostic. ⚠ New residual: the share ALLOCATION RULE is undecided and the candidates span 2.8x | done | 2026-10-10 |
 | B-DAT-map-coverage | Measure how much of each autosome the map speaks to, before the declared rate is chosen | the three classes reported separately, and chr21's split reconciling with the record | 22 autosomes, bp; chr21 positions | **MEASURED.** Map-silent **3.00%** of autosomal bp (86.2 Mb), **96% of it the five acrocentric p arms**; interior zero-cM **3.27%** (93.9 Mb), LARGER than the class the rate covers, chr9 alone 25.61 Mb. Autosomal mean mapped rate **1.2707 cM/Mb**, per-chromosome spread **1.84x**. chr21: 26,044 map-silent + 8,327 in-span plateau = 34,371, RECONCILES. ⚠⚠ **A per-chromosome rate is LESS defensible than a global one** — the acrocentrics' rates are the genome's highest and are measured entirely on the q arm, so they would extrapolate a hot q-arm rate onto heterochromatin. ⚠ N-gap policy BLOCKED: no reference assembly on disk | done | 2026-10-10 |
+| B-FIX-tau-definition-audit | Audit every statement of the `tau` guarantee against the proposal's abstract, after Dylan found the introduction defining it differently | each finding must survive two independent adversarial refutations | 6 sources, 36 candidates, 78 agents | **20 CONFIRMED, AND ONE WAS A LIVE FALSE-POSITIVE RISK ON A PRIVACY CLAIM.** ✅ The DEFINITION is fine: the abstract says TV <= `tau` and attacker <= (1+`tau`)/2, `docs/terms.md` matches it, and no file states the loose form. ⚠ The proposal's INTRODUCTION is wrong as written — "distinguished with the probability of no more than `tau`" is impossible for `tau` < 0.5, since a coin gets 0.5; it means ADVANTAGE, which equals TV. Needs a one-line fix before submission. ⚠⚠ `scripts/arm2_attack.py` compared a ONE-SIDED rate to a bound that only covers the balanced quantity — it would have reported a violation with the theorem intact. ⚠⚠ The pre-registration's field 6 is REOPENED: the pinned design draws only from `Q_p` and so cannot measure what it is compared to. ⚠ Three stale copies of the superseded 300-draw design, including TWO ADJACENT TICKED BOXES in the signature checklist pinning 300 and 50. ⚠ 12 stale doc claims, and the contract's absence-marker skip had no converse — a known hole recorded 2026-10-08 and left open | done | 2026-10-10 |
 | B-DAT-panel | Acquire the 1000G 30x panel for all 22 chromosomes and prove it is on OUR reference build | the build must be checked against our own deconstruct output, and a GRCh37 length must be refused | 21 chromosomes; 9 tests | **COMPLETE AND BUILD-VERIFIED.** 21 files, 29.3 GB, **69,689,262 records**, **3,202 samples on every chromosome**, zero failures, no leftover partials; plus chr21's pre-existing panel, so all 22 are covered. ⚠⚠ **The build check compares the panel's contig lengths against OUR OWN pangenome's**, not against constants I typed — a wrong-build panel produces a low match rate that reads as biology, which is exactly how decision F's hazard would present. All 21 verified. ⚠ Truncation is caught by SEEKING to the far end, because a cut-short download still opens and still indexes against its own partial content. Deleting the build comparison fails exactly its two tests. ⚠ Checksums are RECORDED but not re-verified (`--deep` re-reads 29 GB) | done | 2026-10-10 |
 | B-DAT-genomewide-build | Build all 22 autosomes on one consistent axis, and make a manifest unable to claim a rule its artifacts do not support | driver exit 0 over all 22, verifier exit 0, and chr21 reconciling with the superseded cut | 22 chromosomes; 8 checks each | **ALL 22 BUILT AND PASSING.** 22,307,009 records, **22,306,704 chain positions**, only **305 excluded genome-wide**. ⚠⚠ **`mean beta_v` = 4.4830e-08, 73x smaller than chr21-alone's 3.27e-06** — the dilution is now measured, not projected, and every chr21-scope per-position figure shrinks by it. Declared rate spans **434x**, top four are four of five acrocentrics. chr21 reconciles with the old cut **to the position** (26,044 + 592 declared + 8,327 interpolated = 34,963 = exactly what the cut dropped). ⚠ **The manifest described the CONFIG, not the BUILD** — chr21's 2026-09-29 arrays were relabelled `chain_rule` = "declared_rate_fill" because every resume sentinel was satisfied and only the manifest re-ran. Now the claim is CHECKED against `cm_source.npy`, whose absence the coordinate cut cannot fake; fired on the live case. ⚠ chr21's old tree moved to `DEPRECATED_chr21_coordinate_cut` — its LD blocks carried the OLD axis digest | done | 2026-10-10 |
 | B-FIX-resume-deconstruct | Make the expensive step resumable, and stop the verifier failing a correct chromosome | recovery must reproduce the originally recorded digest exactly, and a tie must not be reported | 3 real chromosomes; 14 tests | **BOTH FIXED, AND ONE WAS A FALSE POSITIVE OF MINE.** (1) `deconstruct` was missing from the resume map, so any late failure cost a whole chromosome rebuild (measured 437.9 s, ~2 CPU-hours); it is now resumable AND the skip branch repairs missing provenance rather than carrying the gap forward. chr10 recovered in **9 s** against a measured 437.9 s full rebuild, and the recomputed graph digest matches the originally recorded one **byte for byte on chr9, chr16 and chr19** — so the recovery is identical provenance, not an approximation. (2) ⚠ The verifier's position check demanded STRICT increase and failed chr9, which has one tied position where a parent bubble (`lv` 1) and a nested 1 bp deletion (`lv` 2) share a start. Nesting is routine at 10-18% of records per autosome, so the tie is legal output; the check now forbids only a DECREASE and reports ties as a column | done | 2026-10-10 |
@@ -1311,7 +1323,14 @@ Ordered. Each item names what must pass before it starts and what closes it.
 - `new_haplotypes` for the comparison arm is NOT emitted yet; it was never part of this
   gate and belongs to `[A-EVL-headtohead]`.
 
-### [B-THY-diploid-gate] A diploid, TWO-SEGMENT falsification gate — THE TOP PRIORITY
+### [B-THY-diploid-gate] A diploid, TWO-SEGMENT falsification gate — ✅ DONE 2026-10-10
+
+⚠ **[CORRECTION - 2026-10-10]** This section's heading read "— THE TOP PRIORITY" and
+its body claimed "no gate in the repo can currently detect" the full-`eta_tau`-per-
+segment composition error. Both are now false: `tests/test_diploid_gate.py` has 64
+clauses, is mutation-tested against the real `ffbs.py`, and the invariant
+`sum beta == ploidy` catches BOTH composition errors. The body below is retained as
+the record of what the gate was built to do.
 
 ⚠ **RE-SCOPED 2026-10-08.** Decision E makes Arm 1 diploid AND decision B makes it
 multi-chromosome with a per-chromosome budget share, so a diploid gate on a single
@@ -1407,7 +1426,10 @@ board: it reads nothing from disk and needs no rebuild, download or rate decisio
   the chr21-normalised figure on record. `B-EVL-exact-endpoint` must run first, or
   the grid is pinned in ignorance of whether the endpoint moves over it at all.
 - **Renamed `B-LCK-preregister`.** ONE dated file at `paper/prereg_<date>.md`
-  covering both arms (PLANNED — it does not exist yet).
+  covering both arms — ✅ **WRITTEN 2026-10-10 as `paper/prereg_2026-10-10.md`**,
+  seven of eight fields filled, field 6 `[OPEN]`, UNSIGNED. ⚠ **[CORRECTION -
+  2026-10-10]** This read "(PLANNED — it does not exist yet)" while the same file's
+  work order already named the drafted document.
 - **Exit gate:** a committed, dated file pinning, **per arm**: the `tau` grid, the
   utility id and `beta` scope, the primary endpoint, the attacker set, **which
   attack database**, and — per decision C — the declared recombination rate.

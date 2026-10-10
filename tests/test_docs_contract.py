@@ -577,3 +577,123 @@ def test_nothing_was_lost_in_migration():
         assert p.exists(), (
             f"{p.relative_to(REPO)} is gone. It was moved out of docs/ during the "
             f"2026-08-29 migration; see docs/memory.md. Restore it from git.")
+
+
+# ---------------------------------------------------------------------------
+# 4b. THE CONVERSE: a path the docs claim is ABSENT must really be absent
+#
+# ⚠⚠ WHY THIS EXISTS, AND WHY IT IS A GATE-POWER FIX RATHER THAN A NEW RULE.
+# Check 4 above verifies that every path the docs MENTION exists -- and then skips any
+# line carrying an absence marker, because such a line is honestly declaring a gap.
+# That skip is a blind spot with no counterpart: nothing ever verified that a declared
+# gap is still a gap. So a line could claim a file was unbuilt forever and the suite
+# would agree by looking away.
+#
+# This is not hypothetical and it is not newly discovered. `docs/terms.md` RECORDED the
+# blind spot on 2026-10-08 -- "the row survived only because the contract test's
+# _ABSENT_MARKERS skips any line containing PLANNED" -- and the hole was left open. On
+# 2026-10-10 it swallowed four more stale claims in the same file, including one
+# asserting there was "no pinned attacker set yet for either arm" when the
+# pre-registration pins four, and one calling `src/attacks.py` PLANNED three days after
+# it was written. A known blind spot left open is worse than an unknown one.
+#
+# Both halves below would have caught all five.
+# ---------------------------------------------------------------------------
+
+# ⚠ A NARROWER set than _ABSENT_MARKERS, and the narrowing is the point. These phrases
+# assert the thing is NOT ON DISK. "DEPRECATED" is deliberately excluded: a deprecated
+# artifact is usually renamed and still present, which is what the naming rule asks for.
+# ⚠ THE ESCAPE MUST BE POSITIONAL, NOT LINE-WIDE. A `docs/data.md` row is often two
+# thousand characters long and can carry a [CORRECTION] about one claim while still
+# making a stale claim about another. A line-wide escape swallowed exactly that case:
+# the pre-registration row was corrected for its existence claim and kept a stale
+# `<date>` placeholder as its subject, and the gate stayed silent on a verified
+# mutation -- decoration, by this project's own standard. So an escape only excuses
+# what comes AFTER it, which is also how the in-place correction rule reads: the marker
+# introduces the superseded text it quotes.
+_ESCAPES = ("[INCORRECT]", "[CORRECTION", "SUPERSEDED", "superseded", "corrected",
+            "but the files exist")
+
+
+def _excused(line: str, at: int) -> bool:
+    """Is the claim at character `at` introduced by a correction marker before it?"""
+    return any(0 <= line.find(e) < at for e in _ESCAPES)
+
+
+_CLAIMS_NOT_ON_DISK = ("PLANNED", "not yet exist", "does not exist", "not built",
+                       "none yet", "is PLANNED")
+
+
+def test_a_path_claimed_absent_is_actually_absent():
+    """A doc that says a file does not exist, when it does, is worse than silence --
+    it instructs the next session not to look."""
+    stale = []
+    for doc in (TERMS, PLAN, DATA, CLAUDE_MD):
+        for i, line in enumerate(_read(doc).splitlines(), 1):
+            if not any(m in line for m in _CLAIMS_NOT_ON_DISK):
+                continue
+            # ⚠ ONLY THE ROW'S SUBJECT -- the FIRST backticked path on the line. A long
+            # data.md row names many paths incidentally while its absence claim covers
+            # only what the row is about, and flagging all of them produced four false
+            # positives on the first run (src/cli.py, docs/plan.md and two others, all
+            # mentioned in passing on rows whose subject was something else). Precision
+            # matters as much as power here: a gate that cries wolf gets switched off.
+            paths = [r for r in _PATHY.findall(line)
+                     if not any(ch in r for ch in "<>*") and not r.endswith("/")]
+            # ⚠ KEYED TO THE ABSENCE MARKER, not to the path. The CLAIM is the marker
+            # ("PLANNED", "does not exist"); the path is just what the claim is about,
+            # and on a long row it usually appears earlier. Keying on the path made a
+            # correctly-corrected row fire, because the path sat before the correction
+            # marker that excuses the quoted claim after it.
+            mark_at = min((line.find(m) for m in _CLAIMS_NOT_ON_DISK
+                           if m in line), default=-1)
+            if paths and (REPO / paths[0]).exists() and not _excused(line, mark_at):
+                # ⚠ REPORT THE ROW, NOT JUST THE PATH. The named path is the first
+                # concrete one on the line and may be mentioned only in passing, while
+                # the stale claim belongs to the row's SUBJECT -- which is often prose
+                # or a placeholder and so cannot be tested directly. On the first run
+                # all three flagged rows were genuinely stale even though the path each
+                # named was incidental, so the signal is the LINE; the message has to
+                # send the reader to the row rather than to the path.
+                subject = line.split("|")[1].strip()[:70] if line.startswith("|") else ""
+                stale.append(f"  {doc.name}:{i} carries an absence marker while "
+                             f"`{paths[0]}` EXISTS"
+                             + (f" -- check this row's subject: {subject}" if subject
+                                else ""))
+    assert not stale, (
+        "Docs claim a path is absent while it is on disk:\n" + "\n".join(stale) +
+        "\nApply the in-place correction rule: prepend [INCORRECT] to the original "
+        "line and add a [CORRECTION - YYYY-MM-DD] below it, then hunt the stale "
+        "copies by grepping the distinctive phrase."
+    )
+
+
+def test_a_placeholder_path_is_resolved_once_the_file_exists():
+    """⚠ `paper/prereg_<date>.md` is the exact shape that hid four stale claims:
+    check 4 skips anything containing `<` or `>`, so a placeholder is never tested
+    against the filesystem even after the real file lands."""
+    import re as _re
+    PLACEHOLDER = _re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*<[^>`]+>[A-Za-z0-9_./-]*)`")
+    stale = []
+    for doc in (TERMS, PLAN, DATA, CLAUDE_MD):
+        for i, line in enumerate(_read(doc).splitlines(), 1):
+            # ⚠ ONLY where the line ALSO claims the thing is not on disk. A placeholder
+            # used as a GENERIC PATTERN is correct usage -- `data/cohort/<chrom>/` means
+            # "every chromosome's directory" and matching 23 of them is the point, not a
+            # defect. What goes stale is a placeholder attached to an absence claim.
+            if not any(m in line for m in _CLAIMS_NOT_ON_DISK):
+                continue
+            for raw in PLACEHOLDER.findall(line):
+                # the placeholder stands for one or more characters
+                pat = _re.sub(r"<[^>]+>", "*", raw)
+                hits = sorted(REPO.glob(pat))
+                if hits and not _excused(line, line.find(f"`{raw}`")):
+                    stale.append(
+                        f"  {doc.name}:{i} uses the placeholder `{raw}`, but "
+                        f"{len(hits)} real file(s) now match it: "
+                        f"{', '.join(h.name for h in hits[:3])}")
+    assert not stale, (
+        "Placeholder paths in the docs now resolve to real files:\n" + "\n".join(stale) +
+        "\nName the real file. A placeholder is invisible to the path-existence check, "
+        "so any claim attached to it goes stale silently."
+    )

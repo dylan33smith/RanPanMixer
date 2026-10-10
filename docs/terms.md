@@ -67,14 +67,28 @@ Computed by:          not computed — CHOSEN, and pre-registered before any att
                       outcome is inspected. See constraint 6 in CLAUDE.md (it was
                       constraint 5 before the 2026-10-08 two-arm rewrite, and it now
                       also pre-registers the attacker set and the attack database).
-                      ⚠ THE tau GRID IS NOT PINNED (2026-10-08) and must not be
-                      written down as if it were. It can only be chosen after the
-                      genome-wide endpoint is re-measured exactly, because under
-                      decision B chr21 carries a SHARE of the beta_v budget, which
-                      makes the endpoint far smaller than the chr21-normalised figure
-                      on record. The pre-registration file will be
-                      `paper/prereg_<date>.md`, one file covering both arms — PLANNED,
-                      it does not exist yet.
+                      ✅ THE tau GRID IS WRITTEN DOWN (2026-10-10), in
+                      paper/prereg_2026-10-10.md section 1: SEVEN points, 0, 0.05,
+                      0.10, 0.25, 0.50, 0.90 and 0.99, one file covering both arms.
+                      Each point's ROLE is part of the pin and must be carried into
+                      every table: tau = 0 is the mandatory FLOOR (an untilted draw
+                      from baseline_model, zero target information, the control that
+                      stops a cohort-level fidelity figure reading as a free lunch);
+                      tau = 0.05 to 0.25 is the ONLY range claimed as an operating
+                      setting; tau = 0.50 is reported as context, not claimed; tau =
+                      0.90 and 0.99 are BOUND-CHECKING ONLY.
+                      ⚠⚠ BUT THE FILE IS NOT IN FORCE. Its status line must read
+                      SIGNED with a git_rev, and as of 2026-10-10 FIELD 6 IS [OPEN]
+                      AGAIN — the attack design it pinned was one-sided and could not
+                      measure the quantity p_succ_bound bounds. So the grid is written
+                      but not frozen, no attack may run against it, and
+                      attacks.require_signed_prereg refuses until both are fixed.
+                      [INCORRECT] - The superseded text said the grid "IS NOT PINNED
+                      (2026-10-08)" and that the pre-registration "does not exist
+                      yet"; it was unblocked by B-EVL-exact-endpoint on 2026-10-10.
+                      ⚠ That endpoint must be E[differ] via the MARGINALS route; the
+                      finite-difference derivative route returns a NEGATIVE variance
+                      at a genome-wide share and is forbidden there.
 CHANGES MEANING WITH: nothing. tau is definitional. But every quantity that DEPENDS
                       on it (utility_retained, attacker_accuracy) is meaningless
                       without its tau stamped alongside.
@@ -2122,21 +2136,44 @@ Is:                   The empirical success rate of an IMPLEMENTED binary attack
                       path against an admissible decoy at slot k; in Arm 2 it is the
                       external target against any other admissible path. See
                       `p_succ_bound`.
-Computed by:          PLANNED — src/attacks.py (or src/attack/ alongside cohort/ and
-                      mechanism/). ⚠ CORRECTED 2026-10-08: this field named
-                      src/ranpanmixer/attacks.py, a package layout this repo does not
-                      use — src/ holds cli.py, sites.py, store.py, cohort/ and
-                      mechanism/. The row survived only because the contract test's
-                      _ABSENT_MARKERS skips any line containing "PLANNED".
+Computed by:          src/attacks.py — BUILT 2026-10-10, and load-bearing: it holds
+                      the Neyman-Pearson optimal statistic (lrt_statistic), the exact
+                      ceiling (exact_advantage), the BALANCED empirical_accuracy, the
+                      arm guard assert_well_posed, AttackSpec with a mandatory
+                      positive_control field, and require_signed_prereg. The harness
+                      is scripts/arm2_attack.py. ⚠ CORRECTED 2026-10-08: this field
+                      once named src/ranpanmixer/attacks.py, a package layout this
+                      repo does not use. [INCORRECT] - and it then said "PLANNED"
+                      until 2026-10-10, three days after the module was written.
+                      ⚠⚠ BOTH ERRORS SURVIVED FOR THE SAME REASON: the contract
+                      test's _ABSENT_MARKERS skips any line containing "PLANNED", so
+                      a line can claim a file is unbuilt forever without the suite
+                      noticing. Recorded here on 2026-10-08 and STILL not fixed when
+                      it bit a second time on 2026-10-10 — a known blind spot left
+                      open is worse than an unknown one.
 CHANGES MEANING WITH: the attacker. It is a LOWER bound on distinguishability and
                       nothing else. It cannot validate the mechanism; it can only
                       falsify an implementation.
-                      ⚠ AND WITH THE ATTACKER SET, WHICH IS PRE-REGISTERED (constraint
-                      6) AND NOT YET WRITTEN DOWN. The pre-registration file
-                      `paper/prereg_<date>.md` is PLANNED and does not exist, so there
-                      is no pinned attacker set yet for either arm, and **Arm 2's
-                      attacker set and target count are explicitly OPEN** as of
-                      2026-10-08. What IS settled: ARM 1's linkage attack scores "self"
+                      ⚠ AND WITH THE ATTACKER SET, WHICH IS PRE-REGISTERED
+                      (constraint 6) AND IS NOW WRITTEN DOWN —
+                      paper/prereg_2026-10-10.md section 4 pins FOUR attackers for
+                      both arms: A1 the exact likelihood-ratio distinguisher, A2
+                      exact enumeration of TV and ratio_spread, A3 rarity-weighted
+                      genotype linkage re-posed as a 1-of-2 discrimination, and A4 a
+                      segment-restricted likelihood ratio. Each carries a chance
+                      level and a MANDATORY positive control. Database search and
+                      membership inference are ill posed in arm 2 and must RAISE
+                      rather than return a number (src/attacks.py). Arm 2's target
+                      count is settled at all 10, chr21 for the powered attack and
+                      genome-wide for exact utility.
+                      [INCORRECT] - The superseded text said the file "is PLANNED and
+                      does not exist, so there is no pinned attacker set yet for
+                      either arm, and Arm 2's attacker set and target count are
+                      explicitly OPEN". ⚠ That mattered more than ordinary staleness:
+                      this is a GATE whose meaning changes with the attacker set, so
+                      telling a future session nothing is pinned invites it to choose
+                      an attacker AFTER seeing an outcome — precisely what constraint
+                      6 exists to prevent. What IS settled: ARM 1's linkage attack scores "self"
                       from the target's OWN assembly-derived path, defined for all 44
                       cohort members, NOT from its 1000G panel row, which exists for
                       only 39 of the 44 (decision I); PanMixer's panel-row semantics
@@ -2209,13 +2246,21 @@ CHANGES MEANING WITH: the estimator and the support size — see tv_empirical: p
                       quantity: it mixes two cohorts in one comparison, which standing
                       constraint 8 forbids and which tau does not bound. Draw both
                       members of the pair at one slot.
-                      ⚠ THE DECOY CONSTRUCTION IS A PRE-REGISTRATION ITEM and is not
-                      yet pinned: the intended form is the EXTREMAL pair
-                      (`toy.sharp_pair` generalises — a diploid pair differing on both
-                      haplotypes everywhere drives u_p - u_q to +/-1) PLUS a seeded
-                      random sample, with the SEED and the SAMPLE SIZE recorded so the
-                      coverage is stated rather than implied. It must land in
-                      `paper/prereg_<date>.md`, which is PLANNED and does not exist yet.
+                      ✅ THE DECOY CONSTRUCTION IS PINNED (2026-10-10) in
+                      paper/prereg_2026-10-10.md as THREE conditions, reported
+                      SEPARATELY and never pooled: D1 extremal, D2 nearest by
+                      genotype concordance (deterministic, so it takes no seed), and
+                      D3 random. Decoy RNG seed 20261010 via
+                      numpy.random.SeedSequence. ⚠ One release is tested against all
+                      three, so the three are CORRELATED through the shared draw.
+                      [INCORRECT] - The superseded text said the construction "is not
+                      yet pinned" and forecast "the EXTREMAL pair PLUS a seeded random
+                      sample" — the pinned form has THREE conditions, not two, and
+                      the nearest-concordance condition it omits is the hard one that
+                      carries the claim.
+                      ⚠ The DRAW COUNT is NOT settled: field 6 was reopened
+                      2026-10-10 because the design was one-sided and could not
+                      measure the quantity p_succ_bound bounds. See that field.
 Valid vs:             tau, at matched settings, on a stated support, at one release
                       slot.
 Status:               PRIMARY — this is the headline privacy claim.

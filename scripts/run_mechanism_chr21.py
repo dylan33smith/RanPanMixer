@@ -110,10 +110,18 @@ def main(argv=None) -> int:
 
     # Rows that CANNOT be computed here. Named, with the reason, never omitted.
     unavailable = {
+        # ⚠ UPDATED 2026-10-10. The attacker is implemented and the set is pinned;
+        # what blocks this cell is the signature and the reopened field 6. The old
+        # reason ("no attacker implemented") became false the day src/attacks.py was
+        # written, and this block exists precisely because the contract forbids an
+        # omitted row -- so the reason going stale defeats its only purpose.
         "attacker_accuracy":
-            "n/a -- no attacker implemented. Pre-registration (A-LCK-preregister) "
-            "must fix the attacker set and the attack database first; and a weak "
-            "attacker would prove nothing anyway (constraint 7).",
+            "n/a -- the pre-registration is UNSIGNED and its field 6 is OPEN. The "
+            "attacker IS built (src/attacks.py: the Neyman-Pearson optimal statistic, "
+            "a balanced empirical_accuracy, the arm guard) and the attacker set IS "
+            "pinned (prereg section 4, A1-A4 with mandatory positive controls). "
+            "Constraint 6 blocks the run until signed; and a weak attacker would "
+            "prove nothing anyway (constraint 7).",
         "two_target_indistinguishability":
             "n/a at this scale -- plug-in TV over a support of this size is biased "
             "UPWARD and cannot falsify anything. Exact at K=4, T=7 in "

@@ -183,8 +183,15 @@ add("`ratio_spread` *", f(toy_spread, 6), f"{NA} — toy-only; needs the enumera
     gate=True, note=f"worst over all pairs; bound exp(eps_tau)={math.exp(C.epsilon_tau(TAU)):.4f}")
 add("`ratio_spread` on the constructed sharp pair *", f(toy_sharp_spread, 6), NA, gate=True,
     note="SATURATES the bound exactly")
-add("`attacker_accuracy` *", f"{NA} — no attacker implemented", f"{NA} — same", gate=True,
-    note="pre-registration must fix the attacker set first; constraint 6")
+# ⚠ The reason here is NARROWER than it used to be, and the narrowing matters: the
+# attacker IS implemented (src/attacks.py, 2026-10-10) and the attacker set IS pinned
+# (prereg section 4, A1-A4). What blocks the cell is the SIGNATURE plus field 6, which
+# was reopened because the pinned design was one-sided. "No attacker implemented" would
+# now be false, and this is the one place the reporting contract requires a reason
+# rather than an omitted row -- so a stale reason is the whole cost.
+add("`attacker_accuracy` *", f"{NA} — pre-registration UNSIGNED", f"{NA} — same", gate=True,
+    note="attacker built (src/attacks.py) and the set pinned (A1-A4); blocked on the "
+         "SIGNATURE and on field 6, reopened 2026-10-10 — constraint 6")
 add("`p_succ_bound` *", f(C.p_succ_bound(TAU)), f(C.p_succ_bound(TAU)), gate=True,
     note=f"equal-prior bound at tau={TAU}")
 add("`target_fidelity` *", f"{NA} — no graph-representability ceiling for a synthetic cohort",

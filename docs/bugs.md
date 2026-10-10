@@ -1039,3 +1039,56 @@ which was mostly a DIFFERENT set.
   chromosomes where both exist (chr9, chr16, chr19). ⚠ The map now also requires a
   NON-EMPTY output, because a zero-byte file is what a killed step leaves behind and
   treating it as complete feeds a truncated artifact to the next step.
+
+- **[Symptom]** The Arm 2 attack harness would have reported a privacy VIOLATION with
+  Theorem 1 fully intact, and its own comment said such a measurement "falsifies the
+  implementation" — so the next action would have been hunting a bug that does not exist.
+  **[Cause]** `p_succ_bound` = (1 + `tau`)/2 bounds the EQUAL-PRIOR accuracy
+  `0.5 * P_p(Lambda > 0) + 0.5 * P_q(Lambda < 0)`, which needs draws from BOTH input
+  paths. `scripts/arm2_attack.py` drew every release from `Q_p` and compared the
+  ONE-SIDED rate `P_p(Lambda > 0)` to that bound. From
+  `balanced = 0.5*TPR + 0.5*(1 - FPR) <= (1 + TV)/2` we get `TPR <= TV + FPR`, so an
+  attacker fully respecting the theorem with FPR 0.5 reaches `TPR = tau + 0.5`, which
+  EXCEEDS (1 + `tau`)/2 at every `tau` > 0; and a degenerate attacker that always
+  answers "p" scores **1.0** one-sided while sitting at exactly chance balanced.
+  **[Root cause, and the generalisable part]** `src/attacks.py` ALREADY had a correct
+  balanced `empirical_accuracy`. The script reimplemented the accuracy inline, wrongly.
+  ⚠ A statistic defined twice will drift; the second definition is where the error
+  lives, and it is invisible because the first one is right and tested.
+  **[Why 265 tests could not see it]** Every test exercised the correct helper. Nothing
+  tested the SCRIPT's arithmetic, and nothing asserted the relationship BETWEEN the
+  one-sided and balanced quantities.
+  **[Proven fix]** The script calls `src/attacks.py:empirical_accuracy` and asserts it
+  agrees with `0.5*TPR + 0.5*TNR`. The trial draws one release from `Q_q` per condition
+  with an independent seed. `--one-sided` survives as a quarter-cost diagnostic that
+  REFUSES to compare anything to `p_succ_bound`, printing why instead of a number. Two
+  new tests encode the derivation and both fail if `empirical_accuracy` is made
+  one-sided.
+  **[Severity]** The worst class available: a false POSITIVE on a privacy claim. It
+  would not have been caught by inspection, because the number would have looked like a
+  finding.
+
+- **[Symptom]** Four stale claims in `docs/terms.md` — including "there is no pinned
+  attacker set yet for either arm" when four are pinned, and `src/attacks.py` marked
+  `PLANNED` three days after it was written — survived a passing 21-test docs contract.
+  **[Cause]** The contract's path check skips any line carrying an absence marker, on
+  the reasoning that such a line is honestly declaring a gap. It had NO COUNTERPART:
+  nothing ever verified that a declared gap is still a gap. So a line could claim a file
+  was unbuilt forever and the suite would agree by looking away. The `<date>`-style
+  placeholder was doubly invisible, because the check also skips anything containing
+  `<` or `>`.
+  ⚠⚠ **AND THIS WAS A KNOWN HOLE.** `docs/terms.md` recorded it on 2026-10-08 — "the
+  row survived only because the contract test's `_ABSENT_MARKERS` skips any line
+  containing PLANNED" — and it was left open. A known blind spot left open is worse than
+  an unknown one, because the record creates the impression it is handled.
+  **[Proven fix]** Two converse checks: a path claimed absent must really be absent, and
+  a `<placeholder>` attached to an absence claim must not resolve to a real file. Both
+  are mutation-tested and both fail on their own injected claim with a clean control.
+  ⚠ **The escape for corrected text had to be made POSITIONAL.** A `docs/data.md` row
+  runs to thousands of characters and can carry a `[CORRECTION]` about one claim while
+  making a stale claim about another; a line-wide escape swallowed exactly that and the
+  gate stayed SILENT on a verified mutation — decoration, by this project's own
+  standard. An escape now excuses only what follows it, which is also how the in-place
+  correction rule reads: the marker introduces the superseded text it quotes. ⚠ The
+  escape is keyed to the ABSENCE MARKER's position, not the path's — the path is merely
+  what the claim is about and usually appears earlier on the row.
