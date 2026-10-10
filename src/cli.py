@@ -63,7 +63,8 @@ def cohort_main(argv=None) -> int:
     for step in steps:
         done = {
             # ⚠ `deconstruct` WAS MISSING FROM THIS MAP, and it is the most expensive
-            # step by far -- one to two hours of vg per chromosome. So every re-run
+            # step by far -- MEASURED 437.9 s and 449.9 s for a whole chromosome from
+            # scratch (chr18, chr20, running 3-wide), nearly all of it vg. So every re-run
             # redid it even with a complete VCF already on disk, which is what made a
             # crash anywhere later in the pipeline cost the whole chromosome. Found
             # 2026-10-10 while recovering nine chromosomes whose VCFs had survived.
@@ -143,6 +144,28 @@ def _manifest(out: Path, cfg: dict, chrom: str) -> dict:
             arts[f.name] = store.load_prov(f)
         except FileNotFoundError:
             arts[f.name] = {"ERROR": "no provenance sidecar -- not written by store.save()"}
+    # ⚠⚠ THE MANIFEST MUST NOT CLAIM A RULE THE ARTIFACTS DO NOT SUPPORT. `chain_rule`
+    # is derived from the CONFIG below, which says what was ASKED FOR, not what built
+    # the files. The two diverge whenever a step is skipped: chr21's arrays were dated
+    # 2026-09-29 and built under the coordinate cut, every step skipped because those
+    # files satisfied the resume sentinels, and the manifest then labelled them
+    # `declared_rate_fill`. A manifest that confidently names the wrong rule is worse
+    # than a missing one -- it is the trap `store.git_rev`'s dirty check exists for.
+    # The declared-rate rule has an OBSERVABLE signature: it writes `cm_source.npy`,
+    # which the coordinate cut cannot produce. So check the claim rather than assert it.
+    if cfg.get("declared_rate") and not (out / "cm_source.npy").exists():
+        raise SystemExit(
+            f"REFUSING to write {out / 'manifest.json'}. The config declares a "
+            f"declared_rate, so this manifest would record chain_rule="
+            f"'declared_rate_fill', but {out / 'cm_source.npy'} does not exist and "
+            f"only the declared-rate genmap step writes it. The arrays in {out} were "
+            f"therefore built under the OLD coordinate cut and these two disagree.\n\n"
+            f"This happens when a chromosome with pre-existing artifacts is re-run: the "
+            f"resume sentinels (haplotypes.npy, support.npy, in_chain.npy) are all "
+            f"satisfied by the old build, every step is skipped, and only the manifest "
+            f"is rewritten -- from the new config. Re-run that chromosome with --force "
+            f"so the arrays and the manifest come from the same rule.")
+
     digests = {v.get("axis_digest") for v in arts.values() if v.get("axis_digest")}
     man = {
         "chrom": chrom,

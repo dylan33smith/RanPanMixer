@@ -1,7 +1,7 @@
 """The deconstruct step must record the GFA it read BEFORE deleting it.
 
 ⚠ WHY THIS FILE EXISTS. On 2026-10-10 six chromosomes (chr10-14, chr17) failed
-after vg had already spent one to two hours each, because the decompressed GFA was
+after vg had already run on each, because the decompressed GFA was
 unlinked three lines before its digest was taken. Nothing in the suite could see it:
 every existing test either passed a plain `.gfa` (so `decompressed_here` was False
 and the unlink never fired) or stubbed the provenance call away. The failure needed

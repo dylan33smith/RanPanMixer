@@ -105,7 +105,8 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
     # ⚠⚠ THE GFA DIGEST IS TAKEN BEFORE THE FILE IS DELETED, AND THE ORDER IS THE
     # WHOLE POINT. An earlier version of this function unlinked the decompressed
     # copy first and then passed the same path to `sha256_file` three lines later,
-    # which raises FileNotFoundError AFTER vg has already done 1-2 hours of work.
+    # which raises FileNotFoundError AFTER vg has already done ~6 minutes of wall work
+    # and about 2 CPU-hours across 32 threads.
     # Six chromosomes failed that way on 2026-10-10 (chr10-14, chr17) and the
     # traceback named `store.sha256_file`, not the unlink, so the cause read as a
     # provenance bug rather than an ordering one. Digest first, delete second.
@@ -143,8 +144,8 @@ def attach_deconstruct_prov(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch
     and the sidecar is attached afterwards, so a crash between the two leaves a
     COMPLETE, CORRECT VCF with no provenance -- and this project treats an artifact
     without provenance as not quotable, so the VCF is unusable while being perfectly
-    good. Re-running vg to recover a 32-byte JSON file costs one to two hours per
-    chromosome. This recovers it in about a minute by streaming the .gz.
+    good. Re-running vg to recover a 1 KB JSON file costs about 6 minutes of wall time
+    and 2 CPU-hours per chromosome. This recovers it in 9 s, measured on chr10.
 
     ⚠ IT REFUSES TO OVERWRITE an existing sidecar. A sidecar that is already there
     was written by the run that produced the VCF, and silently replacing it with one

@@ -110,6 +110,10 @@ It is a defect in the document, found by reading it, before any code was written
 running when this was written. Everything below is settled; the per-chromosome results
 table is NOT here and must be added when the build completes.
 
+✅ **[COMPLETED - 2026-10-10]** The build finished and the table is now in section 9
+below, together with the two failures it took to get there. The panel download was
+still running at 15 of 21 and is NOT part of this entry.
+
 ### 1. The fix that was blocking every chromosome
 
 The pipeline treated "no genetic distance here" as a fatal error: `interpolate` returns
@@ -942,6 +946,115 @@ privacy cost, not merely a utility one.
 
 **Gate.** 102 tests pass. Every distinctive stale number greps clean in live text, and each
 historical copy carries an `[INCORRECT]`/`[CORRECTION]` pair rather than an overwrite.
+
+### 9. The 22-chromosome build: the table, and the two failures behind it
+
+**Emitted by `scripts/verify_cohorts.py` into `logs/B_verify_cohorts.md`, never hand-assembled.** Driver exit 0, "all 22 chromosome(s) built and complete"; verifier exit 0, 22 of 22 passing every check. `K_states` = 88 on every chromosome.
+
+| chr | records | T (chain) | on declared rate | shared pos |
+|---|---|---|---|---|
+| 1 | 1,770,539 | 1,770,497 | 1,005 (0.06%) | 0 |
+| 2 | 1,863,830 | 1,863,796 | 1,246 (0.07%) | 0 |
+| 3 | 1,525,902 | 1,525,895 | 875 (0.06%) | 0 |
+| 4 | 1,562,222 | 1,562,222 | 360 (0.02%) | 0 |
+| 5 | 1,416,299 | 1,416,288 | 4,703 (0.33%) | 0 |
+| 6 | 1,371,784 | 1,371,783 | 247 (0.02%) | 0 |
+| 7 | 1,325,214 | 1,325,199 | 425 (0.03%) | 0 |
+| 8 | 1,239,721 | 1,239,709 | 2,764 (0.22%) | 0 |
+| 9 | 1,038,544 | 1,038,447 | 2,979 (0.29%) | 1 |
+| 10 | 1,107,235 | 1,107,234 | 1,485 (0.13%) | 0 |
+| 11 | 1,070,675 | 1,070,654 | 2,438 (0.23%) | 0 |
+| 12 | 1,036,941 | 1,036,940 | 1,515 (0.15%) | 0 |
+| 13 | 780,418 | 780,418 | 1,097 (0.14%) | 0 |
+| 14 | 731,433 | 731,423 | 12,037 (1.65%) | 1 |
+| 15 | 701,906 | 701,899 | 6,773 (0.96%) | 0 |
+| 16 | 743,865 | 743,846 | 3,018 (0.41%) | 0 |
+| 17 | 656,751 | 656,749 | 4,578 (0.70%) | 0 |
+| 18 | 615,266 | 615,252 | 336 (0.05%) | 0 |
+| 19 | 549,362 | 549,359 | 3,313 (0.60%) | 0 |
+| 20 | 512,838 | 512,837 | 172 (0.03%) | 0 |
+| 21 | 340,849 | 340,848 | 26,635 (7.81%) | 0 |
+| 22 | 345,415 | 345,409 | 4,806 (1.39%) | 0 |
+| **total** | **22,307,009** | **22,306,704** | **82,807 (0.371%)** | **2** |
+
+**Genome-wide.** 22,307,009 records, **22,306,704 chain positions**, and only **305
+positions excluded in the whole genome** (0.0014%, all of them `support` == 0). The
+chain is effectively the entire deconstructed autosome, which is what decision C was
+for — under the superseded coordinate cut chr21 alone lost 34,963 positions (10.3%).
+
+⚠⚠ **`mean beta_v` per position is 4.4830e-08 genome-wide**, against chr21-alone's
+3.27e-06 — **73x smaller**. This is the budget-dilution figure that `B-THY-toy-genome`
+was built to separate from "the mechanism does nothing", and it is now measured on the
+real axis rather than projected. Every per-position utility effect shrinks by that
+factor relative to every chr21-scope number on record.
+
+**The declared rate spans 434x across autosomes** (chr21 7.81% to chr6 0.02%), and the
+top four are **chr21, chr14, chr22, chr15 — four of the five acrocentrics**, whose p
+arms are heterochromatin the genetic map does not speak to. chr13 is the exception at
+0.14%. This is a real, explainable biological signal and belongs in the paper: it says
+how much of each chromosome's transition structure rests on a declared constant rather
+than a measured map.
+
+**chr21 reconciles EXACTLY with the superseded cut**, which is the strongest available
+evidence that decision C was implemented as specified and not approximately:
+
+| | positions | cM source now |
+|---|---|---|
+| below the map's first marker (10,326,676) | 26,044 | declared rate |
+| above the map's last marker | 592 | declared rate |
+| the zero-cM plateau, inside the marker span | 8,327 | interpolated |
+| **total** | **34,963** | = exactly what the cut dropped |
+
+and `340,849 - 34,963 = 305,886`, the recorded keep count, to the position. ⚠ The
+figure **26,044** on record is the LOWER tail only; the map has two silent tails and
+the build's declared-rate count of 26,636 is `26,044 + 592`. That is a scope
+difference, NOT a discrepancy — it was checked before being reported, and reporting it
+as an error would have been a fifth false finding of the day.
+
+⚠ **Zero declared-rate positions fall inside the mapped span.** `numpy.interp` cannot
+leave an interior gap, so the fill is provably confined to the tails; the verifier
+checks this and it is a check that can fail rather than a restatement of the code.
+
+#### What it took: two failures, both mine
+
+**(1) A mid-run commit cost nine chromosomes.** `8d56346`, whose purpose was reclaiming
+25 GB, inserted the decompressed-GFA cleanup ABOVE the provenance call, so the graph
+was unlinked three lines before its digest was taken. ⚠⚠ **The commit landed WHILE the
+build was running**, and each chromosome imports `vcf.py` in a fresh subprocess, so the
+damage split by **process start time, not wall clock**: chr9's manifest is stamped 32
+minutes AFTER the commit and is fine, while every chromosome whose process started
+after it failed. Eleven succeeded, the next nine did not, and no boundary is visible in
+the artifacts or the timestamps. No test could see it — every test passed a plain
+`.gfa`, so the unlink never fired — and the traceback named the provenance call rather
+than the cleanup above it. `run_jobs` raising was the one thing that worked as designed.
+
+Recovery was cheap because **vg writes the VCF BEFORE the step that crashed**: all nine
+survived complete (543 MB - 2.15 GB). `vcf.attach_deconstruct_prov` attaches the
+sidecar without invoking vg, and `store.sha256_gz_plain` reproduced the digest the
+ORIGINAL code recorded **byte for byte on chr9, chr16 and chr19** — identical
+provenance, not an approximation. chr10 recovered in **9 s** against a measured 437.9 s
+full rebuild.
+
+**(2) The manifest described the CONFIG, not the BUILD — and chr21 proved it.**
+`_manifest` derived `chain_rule` from `cfg.get("declared_rate")`, so it recorded what
+was ASKED FOR. chr21 had artifacts from **2026-09-29**, every resume sentinel was
+satisfied by that old coordinate-cut build, every step was skipped, and the manifest
+rewritten at 16:44 labelled 11-day-old arrays `declared_rate_fill`. ⚠ A manifest that
+confidently names the wrong rule is worse than a missing one — the same trap
+`store.git_rev`'s dirty check exists for. The fix makes the claim CHECKABLE: the
+declared-rate rule has an observable signature (`cm_source.npy`, which the coordinate
+cut cannot produce), so the manifest refuses to write rather than assert. Verified by
+firing it on the live chr21 case, not a mock. chr21's old tree was moved to
+`DEPRECATED_chr21_coordinate_cut` — its LD-block artifacts carried the OLD axis digest
+and would have flipped `axis_consistent` to false if left in place — and rebuilt clean.
+
+⚠ **[CORRECTION - 2026-10-10]** I reported `vg deconstruct` as costing "one to two
+hours per chromosome" in several places. That was `ps -o time=`, which is CUMULATIVE
+CPU across 32 threads, read as elapsed time. A whole chromosome from scratch is
+**437.9 s (chr18) and 449.9 s (chr20)** running 3-wide. `ps -o time=` is CPU time;
+`ps -o etime=` is elapsed. The recovery saved about 12 CPU-hours, roughly an hour of
+wall time — not 12 hours.
+
 
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 

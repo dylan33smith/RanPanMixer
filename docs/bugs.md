@@ -985,7 +985,8 @@ which was mostly a DIFFERENT set.
   deletes.
   **[Recovery, and why it is cheap]** vg writes the VCF BEFORE the crash, so all
   nine VCFs survived complete (543 MB - 2.15 GB each). Re-running vg to recover a
-  small JSON sidecar would cost 1-2 h per chromosome, so
+  small JSON sidecar would cost about 6 min of wall time and 2 CPU-hours per
+  chromosome, so
   `vcf.attach_deconstruct_prov` attaches the sidecar to an existing VCF without
   invoking vg, recomputing the GFA digest with `store.sha256_gz_plain` — which
   streams the `.gz`'s decompressed bytes and writes nothing, since gzip
@@ -994,7 +995,14 @@ which was mostly a DIFFERENT set.
   `prov_recovered_after_crash: true` so a reconstructed sidecar says so.
   **[Severity]** Loud, not silent — `run_jobs` raises and the driver exits non-zero,
   which is the one thing that went right. But it cost 9 chromosomes' worth of
-  scheduling and would have cost ~12 h of vg time without the recovery path.
+  scheduling and would have cost about 12 CPU-HOURS of vg (roughly an hour of wall
+  time at this parallelism) without the recovery path.
+  ⚠ **[CORRECTION - 2026-10-10]** An earlier version of this entry said "1-2 hours
+  per chromosome", which was WALL time read off `ps -o time=` -- a CUMULATIVE CPU
+  figure summed over 32 threads, not elapsed time. The measured elapsed cost of a
+  whole chromosome from scratch is **437.9 s (chr18) and 449.9 s (chr20)**, running
+  3-wide. `ps -o time=` is CPU time; `ps -o etime=` is elapsed. Same instrument
+  error class as the four false findings recorded earlier today.
 
 - **[Symptom]** The new cohort verifier reported `chr9: positions are not strictly
   increasing (1 violations)` on a chromosome that is correct.
@@ -1018,7 +1026,8 @@ which was mostly a DIFFERENT set.
   back.
 
 - **[Symptom]** Re-running a chromosome after a late-pipeline failure redid
-  `vg deconstruct` from scratch, one to two hours, although a complete VCF was on disk.
+  `vg deconstruct` from scratch -- about 6 min of wall time and 2 CPU-hours -- although
+  a complete VCF was on disk.
   **[Cause]** `src/cli.py`'s resume map listed `arrays`, `support`, `genmap` and
   `cohort-vcf` but NOT `deconstruct` — the single most expensive step. So any crash
   anywhere later in the pipeline cost the whole chromosome rather than the step.
