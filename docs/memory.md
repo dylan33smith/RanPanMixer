@@ -104,6 +104,132 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (chunk 4, continued) — gaps skipped, the arm guard built, and the tilt made visible
+
+Three things Dylan asked for, and two defects found while building them.
+
+### 1. Gap spans are SKIPPED when the declared rate accumulates (settled by Dylan)
+
+`src/cohort/genmap.py` gains `read_gaps`, `gap_free_span` and `declared_cm`. The
+declared rate now converts only GAP-FREE base pairs. ⚠ It applies nowhere else:
+inside the mapped span the cM comes from the map, whose markers sit at real
+positions, so interpolating between them already accounts for whatever lies between.
+The subtraction belongs exactly where distance is manufactured from base pairs.
+
+**Verified on chr21:** the 10,326,676 bp map-silent lead is **3,866,676 bp gap-free
+(37.4%)**, taking the declared distance from **13.122 cM to 4.913 cM**. A span wholly
+inside a gap returns 0 bp; a gap-free span is unchanged. Autosome-wide this is 109.5
+cM -> 22.1 cM, of which 87.4 cM was placeholder.
+
+### 2. The arm guard — the Arm 1 attacker cannot be read as an Arm 2 result
+
+`src/attacks.py`. `assert_well_posed(kind, arm)` REFUSES two combinations that would
+otherwise return a plausible number:
+- **`db_search` in arm 2** — the target is outside G, D, every panel and the attack
+  database by construction, so no database row produced the release and a 0% link
+  rate is the experimental design. The refusal names the well-posed alternative.
+- **`membership` in arm 2** — no positive class, and the release is a donor mosaic
+  so a high match fraction identifies DONORS. Read as membership it would reverse
+  the conclusion.
+The arm is part of an `AttackSpec`'s identity, checked in `__post_init__`, so an Arm 1
+attack cannot be re-pointed by editing a field. **`positive_control` is a mandatory
+non-empty field**, which puts standing constraint 7 in the type rather than in
+anyone's memory. 23 tests.
+
+Also implemented, because a guard with nothing to guard is thin: `lrt_statistic`, the
+Neyman-Pearson optimum from the proposal's own algebra, and `exact_advantage`, the
+`(1 + TV)/2` ceiling no attacker can exceed. The sign rule on `Lambda` is asserted to
+ATTAIN that ceiling exactly at every `tau`, which is the strongest statement available
+anywhere in this project: not "the attacker failed" but "the attacker provably attains
+the optimum, and the optimum is below the bound".
+
+### ⚠⚠ 3. AND `p_succ_bound` CANNOT DETECT A MISCALIBRATION — third instance of a pattern
+
+The first positive control required a mechanism broken with `epsilon_tau` in place of
+`eta_tau` to push the optimal attacker past `p_succ_bound`. **It failed at every
+`tau`.** Metrics are rows; `tau` is the column.
+
+| | 0.05 | 0.10 | 0.25 | 0.50 | 0.90 |
+|---|---|---|---|---|---|
+| optimal attacker, correct mechanism | 0.5069 | 0.5137 | 0.5350 | 0.5750 | 0.6940 |
+| optimal attacker, doubled exponent | 0.5137 | 0.5275 | 0.5698 | 0.6476 | **0.8412** |
+| `p_succ_bound` | 0.5250 | 0.5500 | 0.6250 | 0.7500 | **0.9500** |
+| the break moved the attacker by | +0.0069 | +0.0137 | +0.0348 | +0.0725 | +0.1473 |
+
+**Provenance.** `tests/test_attacks.py`, toy K = 4 T = 7, the saturating pair, exact by
+enumeration · 2026-10-10.
+
+The break NEVER crosses the bound and ALWAYS moves the attacker. The cause is already
+on record for exact TV: the worst TV on this toy reaches only 27.4-43.1% of `tau`, so
+doubling something sitting at 40% of its ceiling leaves it inside. **This is the third
+time a gate written against a theoretical bound turned out to have no power** —
+clause (b) `tv_empirical <= tau` passes a doubled exponent everywhere; the genome-wide
+`log_z_p` bracket catches one only at `tau` = 0.9; and now `p_succ_bound`. The rule
+that falls out: **before writing a gate against a bound, measure how close the real
+quantity gets to it.** What works is a saturating construction or a paired comparison.
+Fixed as a paired comparison, with an assertion that the threshold version would still
+fail so the stale reasoning cannot be silently inherited.
+
+### 4. The toy genome demonstration — and the tilt IS visible
+
+Dylan asked for a full toy model, noting we might already have one. **We had half.**
+`tests/test_diploid_gate.py` is a two-chromosome diploid GATE — it checks that bounds
+hold — and its segments were deliberately tiny (4 output paths each), sized for budget
+algebra rather than behaviour. What was missing is a DEMONSTRATION of what the
+mechanism does. Built as `scripts/toy_genome_demo.py`: chrA = the main toy (K = 4,
+T = 7, 96 output paths), chrB = the small segment (K = 3, T = 2, 4 paths), shares
+**7/9 and 2/9 by decision J** — the variant-count rule, not hand-tuned.
+
+Exact, by enumeration over the full support. Metrics are rows.
+
+| metric | `tau`=0 | 0.25 | 0.50 | 0.90 | 0.99 |
+|---|---|---|---|---|---|
+| **TV(Q, R_D)** — the release's distance from the prior | 0 | 0.0292 | 0.0635 | 0.1740 | **0.3090** |
+| `two_target_indistinguishability` * | 0 | 0.0557 | 0.1197 | 0.3136 | 0.5300 |
+| `tau`, its bound | 0 | 0.25 | 0.50 | 0.90 | 0.99 |
+| `ratio_spread` * | 1.0 | 1.6667 | 3.0000 | 19.0000 | 199.0000 |
+| exp(`epsilon_tau`), its bound | 1.0 | 1.6667 | 3.0000 | 19.0000 | 199.0000 |
+| optimal attacker accuracy * | 0.5 | 0.5279 | 0.5598 | 0.6568 | 0.7650 |
+| `p_succ_bound` * | 0.5 | 0.625 | 0.750 | 0.950 | 0.995 |
+| **E_Q[u]** | 0.4502 | 0.4690 | 0.4911 | 0.5616 | **0.6477** |
+| Var_Q(u) | 7.30e-02 | 7.45e-02 | 7.57e-02 | 7.62e-02 | 6.92e-02 |
+
+**Provenance.** `logs/B_toy_genome_demo.md` + `.json` · 2 chromosomes, haploid and
+diploid · mean `beta_v` = 0.111 against chr21's 3.269e-06, about **34,000x** larger ·
+all moments by ENUMERATION, never finite differences (the chunk-4 derivative lesson) ·
+sampler checked at 40,000 draws per `tau` · 2026-10-10.
+
+**ROWS** · *`ratio_spread` equals its bound to the last digit at every `tau`*, so the
+saturating pair attains it across chromosomes and the sharp gate is genuinely sharp. ·
+*`two_target_indistinguishability` stays under `tau` everywhere*, reaching 54% of it at
+`tau` = 0.99 — closer than the 27-43% the single-chromosome toy reaches. · **E_Q[u]
+moves 0.197 across the grid against chr21's 2.94e-06**, and `Var_Q(u)` is 7.3e-02
+against 4.05e-06, about 18,000x.
+
+**SYNTHESIS.** This is the artifact that separates two claims which look identical in
+a chr21 table and are not: *"the mechanism does nothing"* and *"the budget is spread
+too thin at genome scale"*. The same `ffbs` code path, with no special case, moves the
+output distribution by TV 0.309 from the prior and lifts expected utility by 0.197 when
+`beta_v` averages 0.111 per position. It is the budget dilution that makes the chr21
+effect invisible, not the mechanism. ⚠ Whether this carries the headline privacy claim
+is Dylan's conversation with his PI and is NOT settled here.
+
+### ⚠ 5. A correlated-seed bug, caught by the demonstration's own assertion
+
+The sampler check passed at `tau <= 0.5` and FAILED at 0.9 and 0.99 — worst deviation
+0.03066 against a 4-sigma band of 0.02342. Cause: the loop passed the SAME seed to
+`release` for both chromosomes, and `release` derives its streams from that seed alone,
+so chrA and chrB drew from one stream and were correlated. **Every marginal stayed
+exactly correct and only the joint was wrong**, which is why low `tau` passed — there
+is little structure for a correlation to distort. Confirmed a bias rather than noise by
+the scaling: at 10x the draws pure noise would have reached only ~0.0097, still outside
+the band, and the measured value after a distinct seed per chromosome is **0.00137**,
+with all seven `tau` passing. `log_z_p` matched the exact value to **9 decimals**
+throughout, which is deterministic and was never the issue.
+⚠ Same shape as the 2026-09-30 diploid defect (`seed` and `seed + 1`). **A correlated
+stream is invisible in every marginal and in every per-chain assertion**; only a joint
+comparison catches it, and only where the distributions carry structure.
+
 ## 2026-10-10 (later) — the gaps are empty, and the Arm 2 attacker was in our own algebra all along
 
 **Two questions from Dylan, both answered by measurement rather than argument.**

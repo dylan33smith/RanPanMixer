@@ -442,6 +442,55 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
 
 ## Mechanism / sampler
 
+### ⚠ A GATE STATED AGAINST A BOUND THAT IS NEVER APPROACHED HAS NO POWER — third instance
+
+- **[2026-10-10] `p_succ_bound` cannot detect a miscalibrated mechanism**
+  **[Symptom]** A positive control for the optimal attacker required that a mechanism
+  miscalibrated with `epsilon_tau` in place of `eta_tau` push the attacker's accuracy
+  past `p_succ_bound`. It FAILED at every `tau`. Measured on the toy: at `tau` = 0.9
+  the doubled exponent reaches **0.8412** against a bound of **0.9500**; at `tau` = 0.5,
+  0.6476 against 0.7500.
+  **[Cause]** `p_succ_bound = (1 + tau)/2` is derived from `TV <= tau`, and the worst
+  exact TV on this toy reaches only **27.4% to 43.1% of `tau`**. Doubling a quantity
+  that sits at 40% of its ceiling leaves it inside the ceiling. The bound is not
+  wrong; it is simply never approached, so it has no discriminating power.
+  **[Proven fix]** Make the control a PAIRED COMPARISON rather than a threshold test:
+  the break must move the attacker's own advantage relative to its correct-mechanism
+  value. That fires at every `tau` (+0.0069 at 0.05 rising to +0.1473 at 0.9). The
+  test also asserts the threshold version would still fail, so if TV ever does
+  approach `tau` the stale reasoning is caught rather than silently inherited.
+  **[⚠ THE PATTERN, and this is the third instance in three days]** Clause (b) of the
+  haploid toy gate (`tv_empirical <= tau`) passes a doubled exponent at every `tau`.
+  The genome-wide `log_z_p` bracket catches one only at `tau` = 0.9. And now
+  `p_succ_bound`. **Before writing any gate against a theoretical bound, measure how
+  close the real quantity gets to it.** If the answer is "a third of the way", the
+  gate cannot detect a doubling. What works in every case here is a saturating
+  construction (`ratio_spread`, which the sharp pair attains exactly) or a paired
+  comparison against the unbroken mechanism.
+
+### Correlated RNG streams across chromosomes keep every marginal right and break the joint
+
+- **[2026-10-10] Found by the demonstration script's own assertion**
+  **[Symptom]** `scripts/toy_genome_demo.py` compared the sampler's empirical joint
+  distribution over two chromosomes against the exact enumeration. It passed at
+  `tau` <= 0.5 and FAILED at 0.9 and 0.99 — worst deviation 0.03066 against a 4-sigma
+  band of 0.02342 at `tau` = 0.99.
+  **[Cause]** The loop passed the SAME `seed` to `ffbs.release` for both chromosomes.
+  `release` derives its streams from that seed alone, so chrA and chrB drew from the
+  same stream and their outputs were correlated. **Every marginal stayed exactly
+  correct and only the JOINT was wrong**, which is why it passed at low `tau`: with
+  near-uniform distributions there is little structure for a correlation to distort.
+  The chromosomes of one release are independent chains and must be seeded as such.
+  **[Proven fix]** A distinct seed per chromosome. Confirmed to be a bias rather than
+  noise by the scaling: at 10x the draws pure noise would have improved the worst
+  deviation only to ~0.0097, still outside the band, and the measured value after the
+  fix is **0.00137**. All seven `tau` values now pass.
+  **[How to recognise it]** This is the same shape as the 2026-09-30 diploid defect,
+  where the two haplotype streams were `seed` and `seed + 1` so one release's
+  haplotype 1 was bit-identical to the next release's haplotype 0. **A correlated
+  stream is invisible in every marginal and in every per-chain assertion.** Only a
+  joint comparison catches it, and only where the distributions carry structure.
+
 ### A test that checks the same bound an assertion checks cannot detect the assertion being loosened
 
 - **[2026-10-10] 20 clauses passing, and 3 of 5 mutations of the new guards survived**
