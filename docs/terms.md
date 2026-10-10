@@ -1028,6 +1028,117 @@ invariant above. Clamping remains forbidden: it is what hid 34,371 positions in 
 place.
 
 
+### support  [dataset] [implementation]
+```
+Is:                   The number of COHORT HAPLOTYPES with a CALLED allele at position
+                      v, written support(v). Out of `K_states` = 88 (the 44 diploid
+                      cohort members). It is a property of D alone — never of the
+                      target — which is what makes every use of it below safe under
+                      standing constraint 1.
+                      It does THREE separate jobs, and conflating them is the drift
+                      this entry exists to stop:
+                      (1) CHAIN MEMBERSHIP. support(v) == 0 is the ONLY ground on which
+                          a position leaves the chain after decision C. With no called
+                          allele anywhere in D the sampler has nothing to emit and
+                          RENORMALISE has an empty pool, so the position is not
+                          sampleable rather than merely uninformative.
+                      (2) THE WEIGHT, via `phi_v` = 1/support(v) under
+                          `w_v = inv_support`, so a position only a few donors speak to
+                          counts for more than a position everyone shares.
+                      (3) THE DENOMINATOR of the per-position emission, since the
+                          baseline R_D draws a donor from the called ones.
+Computed by:          src/cohort/vcf.py at parse time, stored as data/cohort/chrN/
+                      support.npy (int, one row per site on the site axis). ALSO read
+                      independently from the VCF's INFO/AN field into an_info.npy.
+                      ⚠⚠ **TWO INDEPENDENT ROUTES TO ONE QUANTITY, SO THEY CAN
+                      DISAGREE** — one counts non-missing genotypes, one reads a field
+                      the variant caller wrote. scripts/verify_cohorts.py checks all
+                      three against each other (support.npy, the recomputed count, and
+                      an_info.npy) on every built chromosome, and it is the
+                      highest-power check in that script because a row misalignment
+                      shows up here and nowhere else.
+CHANGES MEANING WITH: the cohort D and the missingness policy (`missing_policy`). ⚠ It
+                      changes under ARM 1 LEAVE-ONE-OUT: both of the target's
+                      haplotypes leave the panel, so support(v) drops by up to 2 and
+                      positions the target alone carried fall to 0 and LEAVE the chain.
+                      So support(v) is per-target in arm 1 and cohort-wide in arm 2 —
+                      never quote one for the other (standing constraint 8).
+Valid vs:             the same cohort, the same arm and the same leave-one-out status.
+Status:               PRIMARY — an input to the weight, the chain and the emission.
+Aliases:              "AN", "allele number", "called count" — ⚠ `an_info` is the VCF
+                      FIELD, a corroborating second route, not a synonym for the
+                      quantity.
+```
+
+### chain_rule  [dataset] [method]
+```
+Is:                   WHICH policy decided each position's cM, recorded as one string
+                      in every chromosome's manifest. Exactly two values exist:
+                      `declared_rate_fill` — the post-decision-C rule: the chain runs
+                          over the whole assembled autosome, positions inside the map's
+                          marker span take an INTERPOLATED cM, positions outside it take
+                          a cM accumulated at `declared_rate` over gap-free sequence,
+                          and nothing is dropped for want of a cM.
+                      `coordinate_cut` — the SUPERSEDED rule: positions outside the
+                          marker span were EXCLUDED from the chain entirely
+                          (`chain_span`).
+                      ⚠ It exists because the two rules produce trees of the SAME SHAPE
+                      with DIFFERENT CONTENT. Under the cut a map-silent position is
+                      absent; under the fill it is present with a declared-rate cM. Both
+                      yield a complete, self-consistent chromosome, so without this
+                      field the only way to tell which one you are holding is to notice
+                      that `cm_source.npy` is missing.
+Computed by:          src/cli.py, written into data/cohort/chrN/manifest.json. It
+                      REPLACED a required `chain_span` key — a manifest reader that
+                      demands the span cannot express a declared-rate build.
+CHANGES MEANING WITH: nothing; it is the policy label itself. But EVERY cM-dependent
+                      quantity changes with it: `stay_switch`, `expected_switches`,
+                      `T_blocks`, and every denominator that counts chain positions.
+Valid vs:             the SAME rule. ⚠⚠ **MIXING RULES ACROSS CHROMOSOMES IS A
+                      STANDING-CONSTRAINT-8 VIOLATION AT GENOME SCALE**, and it is the
+                      live risk, not a hypothetical: `beta_v` sums to 1 over all 22
+                      autosomes (standing constraint 4), so ONE chromosome built under
+                      the other rule contaminates the genome-wide budget. chr21's tree
+                      was pre-decision-C and carried no `chain_rule` at all.
+                      scripts/verify_cohorts.py fails any chromosome not built under
+                      `declared_rate_fill`.
+Status:               PRIMARY — a genome-wide number is uninterpretable without it.
+Aliases:              none. ⚠ Do not call it "the span"; `chain_span` is one of its two
+                      values' input, not the field.
+```
+
+### cm_source  [dataset] [implementation]
+```
+Is:                   PER POSITION, which of the two cM sources `chain_rule`
+                      = `declared_rate_fill` actually used: 0 = interpolated from the
+                      genetic map's markers, 1 = accumulated at `declared_rate` over
+                      gap-free sequence. The `chain_rule` label says which POLICY built
+                      the chromosome; this says what the policy DID at each position,
+                      which is the resolution any cM-dependent claim needs.
+                      ⚠ Its existence is what makes a declared-rate build auditable. A
+                      position's cM is a number either way, and a number carries no
+                      record of how it was obtained.
+Computed by:          src/cohort/genmap.py:fill_map_silent, which returns
+                      (cm_filled, source) as a PAIR so the two cannot be written
+                      separately and drift. Stored as data/cohort/chrN/cm_source.npy.
+CHANGES MEANING WITH: the genetic map's marker span and the declared rate. ⚠ A
+                      position's source is a property of the MAP and the ASSEMBLY, never
+                      of the target, so it is fixed before any target is opened.
+Valid vs:             the same map and the same rate.
+Status:               PRIMARY for provenance, DIAGNOSTIC as a quantity — the SHARE of
+                      chain positions on the declared rate is what makes a chromosome's
+                      map coverage legible (`map_coverage`), and it varies by an order
+                      of magnitude across autosomes.
+                      ⚠ numpy.interp cannot leave an INTERIOR gap, so a declared-rate
+                      position inside the mapped span means the fill was applied where
+                      it should not have been. scripts/verify_cohorts.py checks exactly
+                      that, and it is a check that CAN fail rather than a restatement of
+                      the implementation.
+Aliases:              none. ⚠ Not "the gap mask" — assembly gaps are SKIPPED when
+                      accumulating declared distance (`declared_rate`) and are a
+                      different thing.
+```
+
 ### declared_rate  [dataset] [method]
 ```
 Is:                   The DECLARED CONSTANT RECOMBINATION RATE, in cM/Mb, used to give

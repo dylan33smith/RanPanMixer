@@ -1,0 +1,185 @@
+#!/usr/bin/env python
+"""Check that built cohort artifacts are CORRECT, not merely present.
+
+⚠ WHY THIS IS SEPARATE FROM THE DRIVER. `build_all_cohorts.py` asserts COMPLETENESS —
+every chromosome ran, every expected file exists and is non-empty. That is necessary
+and says nothing about whether the contents agree with each other. A chromosome whose
+`support.npy` is row-misaligned with its `haplotypes.npy` passes every completeness
+check and then silently scores the wrong variants, because the arrays are positional
+and a shift produces numbers rather than an error.
+
+Each check below corresponds to a way this pipeline can actually go wrong, not to a
+property that is true by construction. A check that cannot fail is decoration.
+
+    python scripts/verify_cohorts.py [--chroms 1 2 21]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+PER_SITE = ("positions.npy", "support.npy", "an_info.npy", "genetic_pos.npy",
+            "in_chain.npy", "cm_source.npy")
+
+
+def check(c: int, root: Path = None) -> list[str]:
+    d = (root or REPO / "data" / "cohort") / f"chr{c}"
+    if not (d / "manifest.json").exists():
+        return [f"chr{c}: not built"]
+
+    # 0. every artifact this checker reads must EXIST. ⚠ A missing artifact is a
+    #    finding, not a crash: a traceback here stops the other 21 chromosomes from
+    #    being checked at all, which is exactly the "found nothing vs ran nothing"
+    #    confusion the driver was written to avoid. The case this fires on is real --
+    #    a chromosome built BEFORE decision C has no `cm_source.npy`, because the
+    #    coordinate cut had nothing to record.
+    missing = [f for f in ("haplotypes.npy",) + PER_SITE if not (d / f).exists()]
+    if missing:
+        rule = json.loads((d / "manifest.json").read_text()).get("chain_rule")
+        note = ("" if rule == "declared_rate_fill" else
+                f" -- manifest says chain_rule={rule!r}, so this is a PRE-DECISION-C "
+                f"build and must be rebuilt before any genome-wide number is quoted")
+        return [f"chr{c}: missing {', '.join(missing)}{note}"]
+
+    bad: list[str] = []
+    hap = np.load(d / "haplotypes.npy")
+    pos = np.load(d / "positions.npy")
+    sup = np.load(d / "support.npy")
+    an = np.load(d / "an_info.npy")
+    cm = np.load(d / "genetic_pos.npy")
+    ic = np.load(d / "in_chain.npy").astype(bool)
+    src = np.load(d / "cm_source.npy")
+    K, n = hap.shape
+
+    # 1. every per-site array is the SAME length. A positional array one row short
+    #    silently shifts every downstream join.
+    for nm, arr in (("positions", pos), ("support", sup), ("an_info", an),
+                    ("genetic_pos", cm), ("in_chain", ic), ("cm_source", src)):
+        if len(arr) != n:
+            bad.append(f"chr{c}: {nm} has {len(arr)} rows, haplotypes has {n}")
+    # ⚠ RETURN EARLY on a length disagreement. Every check below is POSITIONAL --
+    # it compares arrays element by element -- so once two of them have different
+    # lengths the rest are not merely uninformative, they raise on broadcast and
+    # take the whole run down with them. Found by the mutation test: truncating
+    # `support.npy` by one row crashed check 2 instead of reporting check 1.
+    if bad:
+        return bad
+
+    # 2. support(v) equals INFO/AN. Two independent routes to one quantity -- one
+    #    parsed from genotypes, one read from a VCF field -- so they COULD disagree.
+    #    This is the cheapest real correctness check in the pipeline.
+    called = (hap != -1).sum(axis=0)
+    if not np.array_equal(called, sup):
+        bad.append(f"chr{c}: support.npy disagrees with the called-genotype count at "
+                   f"{int((called != sup).sum())} sites")
+    if not np.array_equal(sup, an):
+        bad.append(f"chr{c}: support.npy disagrees with INFO/AN at "
+                   f"{int((sup != an).sum())} sites")
+
+    # 3. positions strictly increasing. A VCF out of order makes every genetic
+    #    distance wrong, and np.interp would not complain.
+    if not (np.diff(pos) > 0).all():
+        bad.append(f"chr{c}: positions are not strictly increasing "
+                   f"({int((np.diff(pos) <= 0).sum())} violations)")
+
+    # 4. no NaN cM inside the chain, and cM non-decreasing there. A negative step
+    #    puts the switch probability outside [0,1].
+    if not np.isfinite(cm[ic]).all():
+        bad.append(f"chr{c}: {int((~np.isfinite(cm[ic])).sum())} chain positions have "
+                   f"no cM -- the declared-rate fill did not run")
+    dd = np.diff(cm[ic])
+    if (dd < -1e-12).any():
+        bad.append(f"chr{c}: cM decreases at {int((dd < -1e-12).sum())} chain steps")
+
+    # 5. the chain excludes exactly the support == 0 positions and nothing else.
+    #    Decision C retired the coordinate cut, so any OTHER exclusion is a bug or an
+    #    accidentally reintroduced span.
+    expect = sup > 0
+    if not np.array_equal(ic, expect):
+        extra = int((expect & ~ic).sum())
+        bad.append(f"chr{c}: in_chain is not exactly (support > 0) -- "
+                   f"{extra} usable positions excluded, "
+                   f"{int((ic & ~expect).sum())} unusable included")
+
+    # 6. cm_source marks declared-rate positions, and they are only at the ENDS.
+    #    numpy.interp cannot leave an interior gap, so an interior declared-rate
+    #    position means the fill was applied to something it should not have been.
+    if src.max() > 0:
+        idx = np.flatnonzero(src == 0)
+        if len(idx) and (src[idx[0]:idx[-1] + 1] != 0).any():
+            bad.append(f"chr{c}: declared-rate positions appear INSIDE the mapped "
+                       f"span, which the fill should never produce")
+
+    # 7. one axis digest across every artifact. Mixing two builds' arrays is the
+    #    error `store.check_axis` exists for, and the manifest already records it.
+    man = json.loads((d / "manifest.json").read_text())
+    if not man.get("axis_consistent", False):
+        bad.append(f"chr{c}: manifest reports axis_consistent=False "
+                   f"({man.get('axis_digests_seen')})")
+    if man.get("chain_rule") != "declared_rate_fill":
+        bad.append(f"chr{c}: built under {man.get('chain_rule')!r}, not the "
+                   f"post-decision-C declared_rate_fill")
+    return bad
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--chroms", type=int, nargs="+", default=list(range(1, 23)))
+    ap.add_argument("--root", type=Path, default=REPO / "data" / "cohort",
+                    help="cohort tree to check; used by the mutation test")
+    a = ap.parse_args(argv)
+
+    built, problems, rows = [], [], []
+    for c in a.chroms:
+        d = a.root / f"chr{c}"
+        if not (d / "manifest.json").exists():
+            continue
+        built.append(c)
+        bad = check(c, a.root)
+        problems.extend(bad)
+        # ⚠ The row is built from the SAME files `check` reads, so it has the same
+        # way of being absent. Guard it here too rather than relying on `check`
+        # having returned early -- two readers of one artifact is two crash sites,
+        # and fixing only the first is how the traceback came back identical.
+        try:
+            hap = np.load(d / "haplotypes.npy", mmap_mode="r")
+            ic = np.load(d / "in_chain.npy").astype(bool)
+            src = np.load(d / "cm_source.npy")
+        except FileNotFoundError:
+            rows.append({"chrom": c, "records": None, "K": None, "T": None,
+                         "declared": None, "ok": False})
+            continue
+        rows.append({"chrom": c, "records": hap.shape[1], "K": hap.shape[0],
+                     "T": int(ic.sum()),
+                     "declared": int((src[ic] == 1).sum()),
+                     "ok": not bad})
+
+    print(f"| chr | K | records | T (chain) | on declared rate | checks |")
+    print("|" + "---|" * 6)
+    for r in sorted(rows, key=lambda r: r["chrom"]):
+        if r["T"] is None:
+            print(f"| {r['chrom']} | ? | ? | ? | ? | **FAIL** |")
+            continue
+        print(f"| {r['chrom']} | {r['K']} | {r['records']:,} | {r['T']:,} | "
+              f"{r['declared']:,} ({100*r['declared']/r['T']:.2f}%) | "
+              f"{'pass' if r['ok'] else '**FAIL**'} |")
+    print(f"\n{len(built)} of {len(a.chroms)} chromosome(s) built; "
+          f"{sum(1 for r in rows if r['ok'])} passed every check")
+    if problems:
+        print("\nPROBLEMS — do not quote a number from these:")
+        for p in problems:
+            print(f"  {p}")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -926,3 +926,30 @@ which was mostly a DIFFERENT set.
   scoring script. Report both or neither.
   **[Severity]** Silent and bidirectional — against 1 it understates the mechanism,
   against 0.8155 unlabelled it overstates it.
+
+- **[Symptom]** A whole-tree checker dies with `FileNotFoundError` on the first
+  chromosome that lacks an artifact, so the other 21 are never checked at all.
+  **[Cause]** `scripts/verify_cohorts.py` loaded every per-site array unconditionally.
+  chr21 was built BEFORE decision C, so it has no `cm_source.npy` — the coordinate
+  cut had nothing to record — and the loader raised before any check ran. The same
+  artifact was then read a SECOND time in `main()` to build the results table, so
+  fixing only the first reader reproduced an identical traceback.
+  **[Proven fix]** A missing artifact is now a reported FINDING naming the
+  chromosome, the file and the manifest's `chain_rule`, so a pre-decision-C tree
+  says so instead of crashing. Both readers are guarded; `tests/test_verify_cohorts.py`
+  asserts the report, not an exception.
+  **[Severity]** Exactly the "found nothing vs ran nothing" confusion the fan-out
+  rule exists for — one stale chromosome suppressed the verification of all 22.
+
+- **[Symptom]** A checker reports a length mismatch and then raises
+  `ValueError: operands could not be broadcast together` on the next check.
+  **[Cause]** Every check after the length comparison is POSITIONAL — it compares
+  arrays element by element — so once two of them have different lengths the rest
+  are not merely uninformative, they raise. The length check appended its problem
+  and fell through. Found by the mutation test, not by use: truncating
+  `support.npy` by one row is a corruption nothing in the real tree had yet.
+  **[Severity]** Would have turned the single most likely real corruption — a
+  per-site array off by one row — into a crash rather than the finding it is.
+  **[Proven fix]** `check()` returns immediately on any length disagreement, and
+  `test_length_mismatch_returns_before_positional_checks` pins that the report is
+  the ONLY problem returned, so a later check cannot creep back in front of it.
