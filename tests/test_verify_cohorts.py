@@ -102,12 +102,32 @@ def test_an_info_disagreement_is_caught(tree: Path) -> None:
     assert any("INFO/AN" in b for b in _check(tree)), _check(tree)
 
 
-def test_unsorted_positions_are_caught(tree: Path) -> None:
+def test_decreasing_positions_are_caught(tree: Path) -> None:
+    """A DECREASE makes a genetic distance negative, which puts the Li--Stephens
+    switch probability outside [0,1] and raises nothing."""
     f = tree / f"chr{CHROM}" / "positions.npy"
     p = np.load(f)
     p[10], p[11] = p[11], p[10]
     np.save(f, p)
-    assert any("strictly increasing" in b for b in _check(tree)), _check(tree)
+    assert any("positions DECREASE" in b for b in _check(tree)), _check(tree)
+
+
+def test_a_shared_position_is_allowed(tree: Path) -> None:
+    """⚠ THE FALSIFYING CASE. The first version of this check demanded STRICTLY
+    increasing positions and failed chr9, where a parent bubble (lv=1) and a 1 bp
+    deletion nested inside it (lv=2) genuinely share a start coordinate. Nesting is
+    routine -- 10-18% of records per autosome carry lv > 0 -- so a tie is legal
+    `vg deconstruct` output and must NOT be reported as a defect.
+
+    This test is the reason the check is "non-decreasing" rather than "increasing",
+    and it fails if anyone tightens it back."""
+    f = tree / f"chr{CHROM}" / "positions.npy"
+    p = np.load(f)
+    p[11] = p[10]                      # a tie, exactly as chr9 has at 37,752,316
+    np.save(f, p)
+    assert _check(tree) == [], (
+        "a shared start coordinate was reported as a defect; two records at one "
+        "position is legal nested-variant output, not corruption")
 
 
 def test_nan_cm_inside_chain_is_caught(tree: Path) -> None:

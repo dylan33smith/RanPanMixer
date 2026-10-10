@@ -1139,6 +1139,45 @@ Aliases:              none. ⚠ Not "the gap mask" — assembly gaps are SKIPPED
                       different thing.
 ```
 
+### deconstruct  [implementation] [dataset]
+```
+Is:                   The FIRST and most expensive pipeline step: `vg deconstruct -P
+                      grch38 -a` turns the HPRC PGGB graph into a VCF of variant
+                      records on the GRCh38 backbone, one column per assembly. It is
+                      what converts a pangenome graph into the site axis everything
+                      else is indexed by, so `positions.npy`, `haplotypes.npy` and
+                      every denominator in the project descend from it.
+                      ⚠ Records may SHARE a start coordinate, because the graph's
+                      bubbles NEST: a parent bubble and a variant inside it can begin
+                      at the same reference position. The `lv` field is the nesting
+                      level and 10-18% of records on every autosome carry `lv` > 0, so
+                      a tied position is normal output (`nested_variant`). chr9 has one
+                      such tie at 37,752,316 and it is correct.
+Computed by:          src/cohort/vcf.py:deconstruct, via src/cli.py step
+                      `deconstruct`, writing data/temp/chrN/deconstruct.vcf plus its
+                      provenance sidecar.
+                      ⚠ COSTS ONE TO TWO HOURS OF vg PER CHROMOSOME and about 10-15 GB
+                      of RSS, which is what sizes every batch in
+                      scripts/build_all_cohorts.py (22.3 MB of RSS per MB of gzipped
+                      GFA, measured). It is RESUMABLE: a complete VCF on disk is
+                      reused, and a complete VCF whose sidecar is missing gets one from
+                      vcf.attach_deconstruct_prov without re-running vg.
+CHANGES MEANING WITH: **the vg VERSION, which is load-bearing** — it decides ALT allele
+                      ordering and therefore every allele index downstream, so the
+                      binary's sha256 is verified against the config before it runs and
+                      a mismatch REFUSES rather than warns. Also with the reference
+                      prefix: `-P grch38` is what makes GRCh38 the backbone, and a
+                      different prefix would produce a different coordinate system
+                      under the same file name.
+Valid vs:             the same graph, the same vg binary and the same reference prefix.
+                      ⚠ Never compare records across two deconstruct runs without
+                      checking both sidecars' `gfa` and `vg` digests.
+Status:               PRIMARY — the root of the whole data lineage.
+Aliases:              "the VCF" is ambiguous; this is the 45-sample
+                      `deconstruct.vcf` BEFORE chm13 is dropped. The 44-sample product
+                      is `cohort44.vcf.gz`, from a separate step.
+```
+
 ### declared_rate  [dataset] [method]
 ```
 Is:                   The DECLARED CONSTANT RECOMBINATION RATE, in cM/Mb, used to give

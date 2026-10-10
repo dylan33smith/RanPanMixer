@@ -84,11 +84,23 @@ def check(c: int, root: Path = None) -> list[str]:
         bad.append(f"chr{c}: support.npy disagrees with INFO/AN at "
                    f"{int((sup != an).sum())} sites")
 
-    # 3. positions strictly increasing. A VCF out of order makes every genetic
-    #    distance wrong, and np.interp would not complain.
-    if not (np.diff(pos) > 0).all():
-        bad.append(f"chr{c}: positions are not strictly increasing "
-                   f"({int((np.diff(pos) <= 0).sum())} violations)")
+    # 3. positions NON-DECREASING -- not strictly increasing.
+    #    ⚠ THIS CHECK WAS WRONG WHEN FIRST WRITTEN and chr9 falsified it. It demanded
+    #    STRICT increase and flagged chr9's position 37,752,316, where two records
+    #    genuinely share a start: a parent bubble (lv=1, 302 bp REF, 4 alts) and a
+    #    1 bp deletion NESTED inside it (lv=2, GG->G). Nesting is not an anomaly here
+    #    -- 10-18% of records on every autosome carry lv > 0 -- so a shared start
+    #    coordinate is legal `vg deconstruct` output, and refusing it would have
+    #    condemned a correct chromosome.
+    #    What is NOT legal is a DECREASE: it makes a genetic distance negative, which
+    #    puts the Li--Stephens switch probability outside [0,1], and `np.interp`
+    #    would not complain. That is the error worth catching, so that is what this
+    #    checks. Ties are counted and REPORTED in the table rather than failed,
+    #    because a count that jumps is worth seeing even when it is not an error.
+    dec = int((np.diff(pos) < 0).sum())
+    if dec:
+        bad.append(f"chr{c}: positions DECREASE at {dec} step(s) -- a negative genetic "
+                   f"distance puts the switch probability outside [0,1]")
 
     # 4. no NaN cM inside the chain, and cM non-decreasing there. A negative step
     #    puts the switch probability outside [0,1].
@@ -155,22 +167,23 @@ def main(argv=None) -> int:
             src = np.load(d / "cm_source.npy")
         except FileNotFoundError:
             rows.append({"chrom": c, "records": None, "K": None, "T": None,
-                         "declared": None, "ok": False})
+                         "declared": None, "shared_pos": None, "ok": False})
             continue
         rows.append({"chrom": c, "records": hap.shape[1], "K": hap.shape[0],
                      "T": int(ic.sum()),
                      "declared": int((src[ic] == 1).sum()),
+                     "shared_pos": int((np.diff(np.load(d / "positions.npy")) == 0).sum()),
                      "ok": not bad})
 
-    print(f"| chr | K | records | T (chain) | on declared rate | checks |")
-    print("|" + "---|" * 6)
+    print(f"| chr | K | records | T (chain) | on declared rate | shared pos | checks |")
+    print("|" + "---|" * 7)
     for r in sorted(rows, key=lambda r: r["chrom"]):
         if r["T"] is None:
-            print(f"| {r['chrom']} | ? | ? | ? | ? | **FAIL** |")
+            print(f"| {r['chrom']} | ? | ? | ? | ? | ? | **FAIL** |")
             continue
         print(f"| {r['chrom']} | {r['K']} | {r['records']:,} | {r['T']:,} | "
               f"{r['declared']:,} ({100*r['declared']/r['T']:.2f}%) | "
-              f"{'pass' if r['ok'] else '**FAIL**'} |")
+              f"{r['shared_pos']} | {'pass' if r['ok'] else '**FAIL**'} |")
     print(f"\n{len(built)} of {len(a.chroms)} chromosome(s) built; "
           f"{sum(1 for r in rows if r['ok'])} passed every check")
     if problems:

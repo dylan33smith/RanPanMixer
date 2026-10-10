@@ -62,12 +62,32 @@ def cohort_main(argv=None) -> int:
 
     for step in steps:
         done = {
+            # ⚠ `deconstruct` WAS MISSING FROM THIS MAP, and it is the most expensive
+            # step by far -- one to two hours of vg per chromosome. So every re-run
+            # redid it even with a complete VCF already on disk, which is what made a
+            # crash anywhere later in the pipeline cost the whole chromosome. Found
+            # 2026-10-10 while recovering nine chromosomes whose VCFs had survived.
+            "deconstruct": temp / "deconstruct.vcf",
             "arrays": out / "haplotypes.npy",
             "support": out / "support.npy",
             "genmap": out / "in_chain.npy",
             "cohort-vcf": temp / "cohort44.vcf.gz",
         }.get(step)
-        if done and done.exists() and not a.force:
+        # ⚠ An EMPTY output does not count as done. A zero-byte file is what a killed
+        # step leaves behind, and treating it as complete is how a truncated artifact
+        # reaches the next step.
+        if done and done.exists() and done.stat().st_size > 0 and not a.force:
+            # ⚠⚠ A REUSED ARTIFACT MUST STILL CARRY PROVENANCE. `vg` writes the VCF
+            # and its sidecar is attached afterwards, so a crash between the two
+            # leaves a COMPLETE, CORRECT VCF that this project may not quote. Skipping
+            # it silently would carry that gap forward into every downstream artifact.
+            # Recovering it needs no vg -- see vcf.attach_deconstruct_prov.
+            if step == "deconstruct":
+                prov = done.with_name(done.name + store.PROV_SUFFIX)
+                if not prov.exists():
+                    print(f"  recover {step}  (output is complete, sidecar is missing)")
+                    summary[step] = vcf.attach_deconstruct_prov(
+                        Path(cfg["inputs"]["graph"]["path"]), done, cfg=cfg)
             print(f"  skip   {step}  ({done.name} exists; --force to rebuild)")
             continue
 

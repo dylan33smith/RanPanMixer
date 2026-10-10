@@ -995,3 +995,38 @@ which was mostly a DIFFERENT set.
   **[Severity]** Loud, not silent — `run_jobs` raises and the driver exits non-zero,
   which is the one thing that went right. But it cost 9 chromosomes' worth of
   scheduling and would have cost ~12 h of vg time without the recovery path.
+
+- **[Symptom]** The new cohort verifier reported `chr9: positions are not strictly
+  increasing (1 violations)` on a chromosome that is correct.
+  **[Cause]** MY CHECK, not the data. It demanded a STRICT increase. chr9 has exactly
+  one tied position, 37,752,316, where two genuinely distinct records share a start:
+  a parent bubble (`lv` = 1, 302 bp REF, 4 ALTs) and a 1 bp deletion NESTED inside it
+  (`lv` = 2, GG -> G). Nesting is routine rather than anomalous — 10-18% of records on
+  every autosome carry `lv` > 0 — so a shared start coordinate is legal
+  `vg deconstruct` output. Every other built chromosome happens to have zero ties,
+  which is why only chr9 tripped it.
+  **[Severity]** A FALSE POSITIVE on real data, and the expensive kind: the natural
+  next action is to rebuild or discard a chromosome that was fine. Same class as the
+  four false findings recorded on 2026-10-10 — a check that fails for the wrong
+  reason is worse than one that cannot fail.
+  **[Proven fix]** The check now forbids a DECREASE, which is the error that actually
+  matters (it makes a genetic distance negative and puts the Li--Stephens switch
+  probability outside [0,1], and `numpy.interp` would not complain). Ties are counted
+  and REPORTED as a `shared pos` column rather than failed, so a jump in the count is
+  still visible. `tests/test_verify_cohorts.py` has both directions: a decrease must
+  be caught, and a tie must NOT be reported — the second fails if anyone tightens it
+  back.
+
+- **[Symptom]** Re-running a chromosome after a late-pipeline failure redid
+  `vg deconstruct` from scratch, one to two hours, although a complete VCF was on disk.
+  **[Cause]** `src/cli.py`'s resume map listed `arrays`, `support`, `genmap` and
+  `cohort-vcf` but NOT `deconstruct` — the single most expensive step. So any crash
+  anywhere later in the pipeline cost the whole chromosome rather than the step.
+  **[Proven fix]** `deconstruct` is in the map, and the skip branch REPAIRS missing
+  provenance instead of carrying the gap forward: a complete VCF with no sidecar gets
+  one from `vcf.attach_deconstruct_prov`, which needs no vg. Verified on real data —
+  chr10 recovered in 9 s against a 1-2 h rebuild, and `store.sha256_gz_plain`
+  reproduced the digest the ORIGINAL code recorded, byte for byte, on all three
+  chromosomes where both exist (chr9, chr16, chr19). ⚠ The map now also requires a
+  NON-EMPTY output, because a zero-byte file is what a killed step leaves behind and
+  treating it as complete feeds a truncated artifact to the next step.
