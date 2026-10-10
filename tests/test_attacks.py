@@ -307,3 +307,51 @@ def test_the_real_prereg_currently_blocks_attacks():
     raise AssertionError(
         f"{name} now reads as SIGNED (git_rev {rev!r}). If that was intended, update "
         f"this test in the same commit that signed it.")
+
+
+# ---------------------------------------------------------------------------
+# ⚠⚠ THE ONE-SIDED TRAP. `p_succ_bound` = (1 + tau)/2 bounds the EQUAL-PRIOR
+# accuracy and NOTHING ELSE. On 2026-10-10 `scripts/arm2_attack.py` drew every
+# release from `Q_p`, computed the one-sided rate P_p(Lambda > 0), and compared THAT
+# to the bound -- a comparison that fires with the theorem fully intact. The suite
+# had 265 passing tests and could not see it, because `empirical_accuracy` was
+# correct and the script had reimplemented it inline.
+# ---------------------------------------------------------------------------
+
+def test_empirical_accuracy_is_balanced_not_one_sided() -> None:
+    """A degenerate attacker that ALWAYS answers "p": one-sided 1.0, balanced 0.5."""
+    always_p_under_p = np.ones(100)      # Lambda > 0 on every draw from p
+    always_p_under_q = np.ones(100)      # ...and on every draw from q too
+    one_sided = float((always_p_under_p > 0).mean())
+    assert one_sided == 1.0
+    bal = A.empirical_accuracy(always_p_under_p, always_p_under_q)
+    assert bal == 0.5, (
+        f"a constant 'always p' answer must score exactly chance when balanced, got "
+        f"{bal}. If this returns the one-sided rate instead, every attack figure in "
+        f"the paper is compared to a bound that does not apply to it.")
+
+
+def test_one_sided_rate_can_exceed_the_bound_without_violating_it() -> None:
+    """⚠ The derivation, as a test: balanced = 0.5*TPR + 0.5*(1-FPR) <= (1+TV)/2
+    implies TPR <= TV + FPR, so a theorem-respecting attacker with FPR = 0.5 reaches
+    TPR = tau + 0.5 > (1+tau)/2 for every tau > 0.
+
+    This test exists so that anyone reinstating a one-sided comparison has to delete
+    an assertion that spells out why it is wrong."""
+    for tau in (0.05, 0.10, 0.25, 0.50, 0.90):
+        bound = C.p_succ_bound(tau)
+        n = 1000
+        # ⚠ capped at n: TPR = tau + 0.5 exceeds 1 for tau > 0.5, where the
+        # constraint TPR <= TV + FPR is no longer the binding one.
+        k_tpr = min(n, int(round((tau + 0.5) * n)))     # TPR = min(1, tau + 0.5)
+        under_p = np.concatenate([np.ones(k_tpr), -np.ones(n - k_tpr)])
+        under_q = np.concatenate([np.ones(n // 2), -np.ones(n - n // 2)])  # FPR = 0.5
+        one_sided = float((under_p > 0).mean())
+        bal = A.empirical_accuracy(under_p, under_q)
+        assert one_sided > bound + 1e-9, (
+            f"tau={tau}: the one-sided rate {one_sided:.4f} should exceed the bound "
+            f"{bound:.4f} -- that is the whole point of this test")
+        assert bal <= bound + 1e-9, (
+            f"tau={tau}: the BALANCED accuracy {bal:.4f} must respect the bound "
+            f"{bound:.4f}; if it does not, the constructed example is wrong, not the "
+            f"theorem")
