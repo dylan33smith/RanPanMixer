@@ -36,7 +36,7 @@ this cohort it is nearly uniform -- median support 88, and 98.6% of chain
 positions have support >= 80 and hold 96.8% of the weight -- so the 88x ratio
 exists in principle and applies to almost nothing. Probably it should be rarity
 (`-log f`) instead. That is a pre-registration item, not a code change to make
-casually: standing constraint 5 says the utility function is frozen before any
+casually: standing constraint 6 says the utility function is frozen before any
 attack outcome is inspected.
 """
 
@@ -130,7 +130,7 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
     chromosome, which silently means "`tau` per chromosome". A genome-wide `tau`
     needs a genome-wide normaliser, with each chromosome taking a SHARE of the
     budget; 22 chromosomes each normalised to 1 would be 22 independent releases
-    of the same person and would compose, which standing constraint 4 forbids.
+    of the same person and would compose, which standing constraint 5 forbids.
     Decide before any multi-chromosome run.
     """
     if scope not in BETA_SCOPES:

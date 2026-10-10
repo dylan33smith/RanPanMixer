@@ -69,7 +69,8 @@ class CohortHMM:
     probability of actually leaving state `j` is `s_t (K-1) / K`.
 
     ⚠ `A` IS NEVER MATERIALISED. At chr21 scale a dense matrix per position is
-    340,849 * 88 * 88 * 8 B = about 21 TB. The rank-one-plus-diagonal structure
+    340,849 * 88 * 88 * 8 B = about 21.1 GB (this read "21 TB" until 2026-10-09 --
+    wrong by 1000x, and the same error stood in `ffbs.py`). The rank-one-plus-diagonal structure
     makes the forward step O(K) from one scalar, and `ffbs.py` is the only place
     that arithmetic lives.
     """

@@ -16,6 +16,7 @@ which is the error the first version of this comparison made.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -32,8 +33,12 @@ from mechanism import utility as U       # noqa: E402
 TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 SEEDS = (1000, 2000, 3000)   # ⚠ ONE target (HG00096). Seeds, not targets.
 COH = REPO / "data" / "cohort" / "chr21"
-SCRATCH = Path("/tmp/claude-2630154/-home-ds85-projects-Pangenome/"
-               "6b818979-acca-4b5f-a0f5-5998deba7036/scratchpad")
+# Outputs. Overridable with RANPANMIXER_SCRATCH (same convention as
+# RANPANMIXER_VG); the default is repo-relative and gitignored, so a fresh
+# checkout reruns without editing this file.
+SCRATCH = Path(os.environ.get("RANPANMIXER_SCRATCH",
+                              REPO / "logs" / "churn_across_tau"))
+SCRATCH.mkdir(parents=True, exist_ok=True)
 
 hap_full = np.load(COH / "haplotypes.npy")
 gpos = np.load(COH / "genetic_pos.npy")

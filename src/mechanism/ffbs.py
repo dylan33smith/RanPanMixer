@@ -17,16 +17,35 @@ FOUR THINGS THIS FILE IS CAREFUL ABOUT, each a real failure it would otherwise h
 2. ⚠ EVERY ALPHA COLUMN IS STORED, in float64. PanMixer keeps only the running
    vector, which is all a forward-only ancestral simulation needs; backward
    sampling needs the whole (T, K) array. float64 is LOAD-BEARING here, not a
-   preference: under model C the per-position tilt at tau = 0.5 is 1.61e-06
-   against float32's resolution of 1.19e-07, so only 13.5x the noise floor
-   (a block partition would have had 45.7x). Rounding would consume a meaningful
-   fraction of the target's entire influence on its own release. Storage is
-   about 215 MB at chr21's T = 305,886 and K = 88.
+   preference: under model C the per-position tilt is eta_tau * mean(beta_v) =
+   eta_tau / T, so at tau = 0.5 over the CHAIN's T = 305,886 it is
+   0.549306 / 305,886 = 1.80e-06 against float32's resolution of 1.19e-07, only
+   15.1x the noise floor (MODEL B's coarser T = 100,757 would have had 5.45e-06,
+   45.7x -- a fallback-model figure, quoted for contrast only, not a model-C
+   number). ⚠ The denominator is the chain, NOT the 340,849-record site
+   axis; quoting the site axis understates the tilt's headroom by 10%. Rounding
+   would consume a meaningful fraction of the target's entire influence on its
+   own release. Storage is about 215 MB at chr21's T = 305,886 and K = 88.
+
+   ⚠ FORWARD-LOOKING, NOT IMPLEMENTED (the genome-wide work is tracked in
+   `docs/plan.md`; nothing below describes a code path that exists). At genome
+   scale float64 stops being a preference and becomes a CORRECTNESS requirement.
+   `beta_v` sums to 1 genome-wide over the 22 autosomes (standing constraint 4),
+   so T is the genome-wide chain length and the per-position tilt eta_tau / T
+   falls BELOW float32's resolution once T exceeds eta_tau / 1.19e-07 -- about
+   4.6e6 positions at tau = 0.5 and only 8.4e5 at tau = 0.10 (derived; the
+   threshold tightens as tau falls). The 22-autosome chain length is UNMEASURED,
+   but chr21 alone already contributes 305,886. Below that floor a dtype
+   downgrade does not round the tilt, it ERASES it: the draw silently becomes an
+   untilted sample from `R_D`, and `log_z_p` would sit at 0, inside its own
+   bracket, so no assertion in this file would fire. The float64 check in
+   `forward` is the only thing standing there.
 
 3. ⚠ `A` IS NEVER MATERIALISED. `A_t = (1 - s_t) I + (s_t / K) J` is rank-one plus
    diagonal, so the forward step is one scalar sum and the backward draw is one
-   vector update -- O(K) each. A dense matrix per position would be about 21 TB on
-   chr21.
+   vector update -- O(K) each. A dense matrix per position would be about
+   21.1 GB on chr21 (340,849 * 88 * 88 * 8 B). ⚠ This read "21 TB" until
+   2026-10-09 -- wrong by 1000x, in both this docstring and `hmm.py`.
 
 4. ⚠ `log_z_p` IS THE TILTED NORMALISER MINUS THE BASELINE'S OWN, and this is the
    trap. `missing_policy` = RENORMALISE enters as a 0/1 potential (see `hmm.py`
@@ -90,7 +109,8 @@ def forward(hmm: CohortHMM, potentials: np.ndarray) -> Forward:
     if potentials.dtype != np.float64:
         raise TypeError(
             f"potentials are {potentials.dtype}; float64 is load-bearing here "
-            f"(the per-position tilt is only ~13.5x float32 resolution)")
+            f"(the per-position tilt is only ~15.1x float32 resolution on "
+            f"chr21's chain, and less on any longer axis)")
     if (potentials < 0).any():
         raise ValueError("negative potential; psi = exp(...) times a 0/1 mask cannot be")
 
@@ -166,9 +186,13 @@ def log_z_p(tilted: Forward, baseline_log_norm_: float, eta: float,
     asserted and not reported.
 
     The tolerance covers accumulated floating-point error in the difference of two
-    large sums, not modelling slack. On chr21 each sum is about -1.2e4 over
-    305,886 terms, so the difference carries roughly 1e-9 of error against a
-    bracket of width 0.549 at `tau` = 0.5. A failure at 1e-6 is a real defect.
+    large sums, not modelling slack. On chr21 each sum is about -5.85e2 over
+    305,886 terms -- MEASURED `baseline_log_norm` = -584.8135, the same figure
+    point 4 of the module docstring quotes -- so the difference carries roughly
+    5e-11 of error against a bracket of width 0.549 at `tau` = 0.5. (DERIVED, and
+    unmeasured: the estimate scales with the magnitude of the sums, so correcting
+    that magnitude from a stale -1.2e4 lowers the error figure by the same ~20x.)
+    A failure at 1e-6 is a real defect.
     """
     lz = tilted.log_norm - baseline_log_norm_
     if not (-tol <= lz <= eta + tol):
@@ -309,7 +333,7 @@ class Release:
     (`target_id`, `tau`, `utility_id`, `seed`), and a collision must raise rather
     than overwrite. ⚠ ONE RELEASE PER GENOME, cached and reused -- independent
     re-releases of the same path compose and degrade the guarantee, so nothing
-    here may be called per query (standing constraint 4).
+    here may be called per query (standing constraint 5).
     """
 
     target_id: str
@@ -481,7 +505,7 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
         if not (-1e-6 <= lz <= eta + 1e-6):
             raise AssertionError(
                 f"diploid log_z_p = {lz!r} is outside [0, eta_tau] = [0, {eta!r}] "
-                f"(haplotype values {draws[0][2]!r} and {draws[1][3]!r}). The two "
+                f"(haplotype values {draws[0][2]!r} and {draws[1][2]!r}). The two "
                 f"chains must each run at eta_tau/2 so their sum lands in the "
                 f"bracket; running each at the full eta_tau doubles the effective "
                 f"tilt and tau no longer covers the release.")

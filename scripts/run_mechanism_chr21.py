@@ -8,7 +8,7 @@ computed appears as `n/a` with a reason rather than being omitted.
 ⚠ WHAT THIS IS AND IS NOT. It is a diagnostic run at real scale: does the sampler
 work at T = 305,886 and K = 88, what does the utility curve look like, and do the
 runtime assertions hold on real data. It is NOT a pre-registered result. Standing
-constraint 5 freezes `tau`, the utility and the endpoints before any attack
+constraint 6 freezes `tau`, the utility and the endpoints before any attack
 outcome is inspected, and `A-LCK-preregister` has not run -- nor have the four
 deferred decisions R1-R4 been settled. EVERY NUMBER FROM HERE IS A v1 NUMBER AND
 MUST SAY SO.
@@ -46,7 +46,7 @@ def main(argv=None) -> int:
     p.add_argument("--seeds", type=int, default=3,
                    help="independent draws per tau. ⚠ These are an EVALUATION "
                         "device: a real release is ONE draw per genome, because "
-                        "independent re-releases compose (constraint 4).")
+                        "independent re-releases compose (constraint 5).")
     p.add_argument("--beta-scope", default="chain",
                    choices=list(U.BETA_SCOPES),
                    help="deferred decision R1; stamped on every number")
@@ -113,7 +113,7 @@ def main(argv=None) -> int:
         "attacker_accuracy":
             "n/a -- no attacker implemented. Pre-registration (A-LCK-preregister) "
             "must fix the attacker set and the attack database first; and a weak "
-            "attacker would prove nothing anyway (constraint 6).",
+            "attacker would prove nothing anyway (constraint 7).",
         "two_target_indistinguishability":
             "n/a at this scale -- plug-in TV over a support of this size is biased "
             "UPWARD and cannot falsify anything. Exact at K=4, T=7 in "

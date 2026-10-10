@@ -458,7 +458,12 @@ def test_tilt_potentials_carry_both_the_mask_and_the_tilt():
 # ---------------------------------------------------------------------------
 
 def test_the_forward_pass_never_materialises_a_transition_matrix():
-    """A dense `A` per position would be about 21 TB on chr21. Measured, not asserted.
+    """A dense `A` per position would be about 21.1 GB on chr21 (340,849 * 88 * 88 * 8 B).
+    Measured, not asserted.
+
+    ⚠ CORRECTED 2026-10-10: this read "21 TB", wrong by 1000x. The same slip stood in
+    `ffbs.py`, `hmm.py` and `docs/memory.md`. It survived because the conclusion it
+    supports -- never materialise `A` -- is correct either way.
 
     Peak allocation is compared against what a single K x K matrix would cost, at
     a K where the difference is three orders of magnitude. This is the one claim
@@ -488,9 +493,16 @@ def test_every_alpha_column_is_stored_in_float64():
     """PanMixer keeps only the running vector; backward sampling needs all of them.
 
     float64 is load-bearing under model C, not a preference: the per-position
-    tilt at `tau` = 0.5 is 1.61e-06 against float32's resolution of 1.19e-07, so
-    only 13.5x the noise floor. Rounding would consume a meaningful fraction of
-    the target's entire influence on its own release.
+    tilt at `tau` = 0.5 is `eta_tau / T` = 0.549306 / 305,886 = 1.80e-06 against
+    float32's resolution of 1.19e-07, so only 15.1x the noise floor. Rounding
+    would consume a meaningful fraction of the target's entire influence on its
+    own release.
+
+    ⚠ CORRECTED 2026-10-10: this read 1.61e-06 / 13.5x, computed over the
+    340,849-record site axis rather than the chain's T = 305,886.
+    ⚠ Under decision B (`beta_v` summing to 1 genome-wide) the per-position tilt
+    falls BELOW float32 eps, so this dtype assertion stops being a 15x margin and
+    becomes the only thing preventing a silently untilted draw. See `docs/bugs.md`.
     """
     t, util, m = _toy_bundle()
     psi = U.tilt_potentials(m.allowed, t.haplotypes, t.haplotypes[0], util.beta,

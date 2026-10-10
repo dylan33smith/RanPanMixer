@@ -10,7 +10,9 @@ Read before touching data, runs or paths.
 half-written file is NOT quotable) · `MISSING` (referenced but absent) · `STALE`
 (present but superseded) · `DEPRECATED` (renamed, retained, never quote).
 
-Verified against disk 2026-09-18. `tests/test_docs_contract.py` re-verifies.
+Verified against disk 2026-09-18. The PanMixer input table (§3), the `data/` tree
+and `paper/` were re-verified against disk **2026-10-08** during the scope-change
+sweep. `tests/test_docs_contract.py` re-verifies.
 
 > **STANDING NOTE (2026-09-18).** This project still has **no mechanism code and
 > no released paths**. What now exists is the upstream PanMixer checkout, its
@@ -55,7 +57,7 @@ in git as history.
 | path | contents | state |
 |---|---|---|
 | `src/` | the code. `src/cohort/` builds from the graph and cohort alone and **takes no target argument**; `src/target/` is strictly downstream. `src/sites.py` owns the site axis and its digest, `src/store.py` is the only module that writes an artifact | `OK` |
-| `configs/` | the input manifest and the four sample lists | `OK` |
+| `configs/` | the input manifest, three sample lists and a README | `OK` |
 | `tests/tiny/` | a 24-record hand-written fixture, the only one committable | `OK` |
 | `data/` | symlink -> `/data/ds85/RanPanMixer/data`, gitignored | `OK` |
 
@@ -75,23 +77,50 @@ the manifest) and the 1000G panel to `data/raw/` (third-party, evaluation-only).
 own chr21 VCF sha256 `5b880a3a…` appears in **no** artifact's inputs.
 
 ```
-data/
-  tools/vg        v1.68.0, pinned in configs/inputs.chr21.yaml
-  raw/            the staged inputs
-  temp/chr21/     deconstruct.vcf.gz, cohort44.vcf.gz   (deletable)
+data/                                                      measured 2026-10-08
+  tools/          vg v1.68.0 (49,244,936 B) and plink v1.9.0-b.8 (2,241,176 B),
+                  both pinned by sha256                            51,486,153 B
+  raw/            the staged inputs, plus chrY.hprc-v1.0-pggb.gfa.gz, which is a
+                  DIAGNOSTIC input only -- decision D excludes chrY  882,917,881 B
+  temp/chr21/     deconstruct.vcf (UNCOMPRESSED), cohort44.vcf.gz,
+                  blocks_build/ (panel.bed alone is 699,392,739 B)
+                  (deletable)                                   1,053,621,059 B
   cohort/chr21/   haplotypes reason missing_runs positions genetic_pos in_chain
                   support allele_lengths sites.tsv haplotype_ids manifest.json
-  dev/            the same tree, built from the 14-16 Mb slice
+                  an_info allele_lengths_offsets blocks_idx blocks.blocks.det
+                                                                  246,146,173 B
+  dev/            the same tree, built from the 14-16 Mb slice      51,531,838 B
   targets/<id>/chr21/   target.chr21.vcf.gz, path.npy, target_reason.npy,
-                        readable.npy, representability.json
-  attack/         1000g_30x_chr21_attackdb.vcf.gz  (evaluation only)
+                        readable.npy, representability.json      1,008,111,552 B
+  attack/         1000g_30x_chr21_attackdb.vcf.gz  (evaluation only),
+                  excluded_targets.txt -- a CONFIG that lives in the data tree
+                  and is consumed by the attack-DB build (see configs/README.md)
+                                                                  431,990,032 B
 ```
 
-⚠ **chr21 is a TESTING scope, not the product.** The tool must work genome-wide.
+⚠ Paths inside the block above carry no backticks, so `test_every_referenced_path_exists`
+never sees them. Four of them went unregistered for weeks for exactly that reason
+(`data/tools/plink`, `data/temp/chr21/blocks_build/`, `data/attack/excluded_targets.txt`,
+`data/raw/chrY.hprc-v1.0-pggb.gfa.gz`); all four are now in the block, and the chrY GFA has
+its own row in §3. Add new paths HERE as well as in a row.
+
+⚠ **chr21 is a TESTING scope, not the product.** Decision D makes the product the
+**22 autosomes** — no chrX, no chrY — so the `chr21/` level of `temp/`, `cohort/` and
+`targets/<id>/` becomes 22 chromosome directories. The sizes above are the chr21
+figures; **the 22-autosome total is UNMEASURED** and must be measured, not scaled by
+a factor carried over from a different scope, before the rerun is sized.
 Preprocessing is already per-chromosome and parallel across chromosomes, so
 extending it is a driver loop — but see `docs/plan.md` for the one thing that is
-NOT just a loop: `beta_v` must sum to 1 over whatever scope `tau` covers, so a
-genome-wide `tau` means a genome-wide normaliser, not 22 per-chromosome ones.
+NOT just a loop: under decision B `beta_v` sums to 1 **genome-wide over the 22
+autosomes**, each chromosome taking a SHARE, so a genome-wide `tau` means a
+genome-wide normaliser, not 22 per-chromosome ones.
+
+⚠ **Decision E adds no second tree per target.** Arm 1's leave-one-out is applied by
+**masking the target's two haplotype rows in memory at release time**, not by
+materialising 44 cohort trees — so `data/cohort/<chrom>/` stays single, the
+`axis_digest` stays single (there is no second digest per target), and the thing that
+records which rows were dropped is the **release record**, not the data tree. See §4
+(`loo_masked_haplotype_ids`) and §8.
 
 ## 2. Upstream dependencies
 
@@ -116,14 +145,19 @@ Paths are written in full so the docs contract can check them. None are committe
 | `external/PanMixer/starting_data/chr21/1000g_phased.vcf.gz` | ⚠ **Now a SYMLINK to the 30x GRCh38 panel.** PanMixer's code hardcodes this filename, so re-pointing the slot lets the pinned checkout run UNMODIFIED on the build-correct data. The original GRCh37 file is retained beside it as `DEPRECATED_1000g_phase3_grch37.vcf.gz`. | `OK` |
 | `external/PanMixer/starting_data/chr21/DEPRECATED_1000g_phase3_grch37.vcf.gz` | 1000G **Phase 3** chr21, 0.21 GB, sha256 `1942e070...`, 2,504 samples. ⚠ **`assembly=b37`, `hs37d5.fa`, contig `21` length 48,129,895 — GRCh37.** This is what the released pipeline wires in. See the standing blocker. | `OK` |
 | `external/PanMixer/starting_data/chr21/1000g_30x_phased.vcf.gz` | 1000G 30x **GRCh38** chr21, 0.43 GB, sha256 `a925c112...`, 3,202 samples, contig `chr21` length 46,709,983, 1,002,752 unique (POS,REF,ALT). The build-correct panel, from the URL in the repo's own unwired `get_blocks_grch38.sh`. **258,610 exact matches against the pangenome (75.88%) vs 1,025 (0.30%) for Phase 3.** | `OK` |
-| `external/PanMixer/starting_data/pangenome_no_X.vcf.gz` | Autosome-only pangenome (pipeline step 2, `remove_X`). Being written by the local run; log `logs/pm_prep1.log` (its .status sentinel is written only on exit, so its absence means still running). | `BUILDING` |
-| `external/PanMixer/starting_data/chr21/pangenome.npy` etc. | The preprocessed numpy model: `(n_subjects, n_sites, 2)` int16 allele codes, `-1` = missing, site axis row-aligned to the chr21 VCF record order. | `PLANNED` |
+| `external/PanMixer/starting_data/pangenome_no_X.vcf.gz` | Autosome-only pangenome (pipeline step 2, `remove_X`). **The job finished 2026-09-18** — `logs/pm_prep1.status` is `0` and `logs/pm_prep1.log` ends `### done Fri Sep 18 01:09:30 PM EDT 2026`; the file is 4,802,080,188 B (+ `.csi`). It sat marked `BUILDING` for three weeks after it stopped being written, which is the state column failing in the one direction the key cannot catch. ⚠ Marked `STALE` rather than `OK`: it derives from the PUBLISHED vg-1.36 `pangenome.vcf.gz`, and **decision F requires our own 22-chromosome vg-1.68 deconstruction**. Retained, like the `DEPRECATED` Phase 3 file, so the build deviation stays visible. | `STALE` |
+| `external/PanMixer/starting_data/pangenome_no_X_no_chm13.vcf.gz` | ADDED 2026-10-08 — it was **unregistered and therefore unattributable**, 4,800,670,620 B (+ `.csi` 1,583,940 B), written 2026-09-18 by the same run. The 44-sample autosome-only VCF, i.e. the file an Arm 1 run would reach for first, which is exactly why leaving it off the registry was dangerous. ⚠ `STALE` for the same reason as the row above: vg-1.36-derived, and decision F requires our own build. | `STALE` |
+| `external/PanMixer/starting_data/chr21/pangenome.npy` etc. | The preprocessed numpy model: `(n_subjects, n_sites, 2)` int16 allele codes, `-1` = missing, site axis row-aligned to the chr21 VCF record order. ⚠ **State corrected 2026-10-08:** this was marked `PLANNED` but the files exist (`pangenome.npy` 59,985,152 B, plus `pangenome_positions.npy` and `pangenome_subjects.npy`, all written 2026-09-18). It is `STALE`, not `OK`: row-aligned to PanMixer's vg-1.36 record order, which decision F replaces. The row escaped `test_data_md_layout_rows_marked_ok_exist_on_disk` because the ` etc.` after the closing backtick stops the row regex matching. | `STALE` |
 | `external/PanMixer/downloaded_tools/vg` | vg v1.68.0 binary, 49 MB. Needed for read-mapping utility only. | `OK` |
 | `external/PanMixer/downloaded_tools/beagle.27Feb25.75f.jar` | Beagle 27Feb25, 0.3 MB. Needed for the reconstruction attack. ⚠ `environment.yaml` ships no `java`. | `OK` |
 | `external/PanMixer/read_fastqs` | chr21 read slices for the paper's five external donors (HG00138 EUR, HG00635 EAS, HG01112 AMR, HG02698 SAS, NA18853 AFR), extracted from the 1000G 30x CRAMs. ~880 MB per donor paired, 4.3 GB total. ⚠ `constants.py` substitutes HG01600 for NA18853; we follow the PAPER. | `OK` |
 | `external/PanMixer/starting_data/references` | GRCh38 analysis-set FASTA (for CRAM decoding), plus chr21 extracted from it and from UCSC hg38. ⚠ The two chr21 copies are the same length but the analysis set masks 2.05 Mb more (8,671,409 N vs 6,621,364 N); measured to make no difference to read mapping here. | `OK` |
-| the 1000G Phase 3 panel for chr1-chr20, chr22 | Only chr21 was downloaded; the paper's tradeoff curves are all-autosome. | `PLANNED` |
-| `external/genetic_maps/chr21.b38.gmap` | chr21 extracted, 971,965 B, columns pos/chr/cM with a header. Span **10,326,676 - 46,680,243 bp**, **0.5841 - 62.7865 cM**, monotonic, no duplicate positions. ⚠ **26,018 of our 340,824 chr21 variants (7.63%) fall BELOW the map start** and 592 (0.17%) above; interpolation clamps both, so cM is flat there and the sampler cannot recombine. 618 interior intervals (1.4%, 2.71 Mb) also have zero cM change. | `OK` |
+| the 1000G **Phase 3** panel for chr1-chr20, chr22 | ⚠ **WAS `PLANNED`; now `DEPRECATED` (2026-10-08).** This row planned to download 21 more chromosomes of the **GRCh37** Phase 3 panel — the panel whose every derivative is already `DEPRECATED` in §6 and whose chr21 copy sits on disk renamed `DEPRECATED_1000g_phase3_grch37.vcf.gz` (verified 2026-10-08). **Decision F — one consistent GRCh38 build — makes it exactly the wrong thing to download.** Never acquire it. The panel actually needed for 21 more chromosomes is the 30x GRCh38 one, in the row below. | `DEPRECATED` |
+| the 1000G **30x GRCh38** panel for chr1-chr20, chr22 | ADDED 2026-10-08 under decisions D and F: the all-autosome build needs the build-correct panel for the other 21 autosomes, for the EVALUATION roles only (target pool, attack database) — never as a mechanism input. Same URL pattern as chr21, with the chromosome substituted: `https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.<chrom>.filtered.SNV_INDEL_SV_phased_panel.vcf.gz` (the chr21 URL is pinned in `configs/inputs.chr21.yaml`). Size: chr21 is **427,136,458 B**; the 21-chromosome total is **UNMEASURED** — read the EBI directory listing before committing disk, do not scale the chr21 figure. Stage under `data/raw/`, never read from PanMixer's tree. | `PLANNED` |
+| 21 more **HPRC v1.0 PGGB** chromosome GFAs (chr1-chr20, chr22) | ADDED 2026-10-08 under decision D: the product is the 22 autosomes and only `chr21.hprc-v1.0-pggb.gfa.gz` is staged (`data/raw/`, verified 2026-10-08). Same `.../freeze1/pggb/chroms/` prefix with the chromosome substituted — graph files are under `chroms/`, NOT `vcfs/`. Size: chr21 is **434,772,428 B** and the whole-genome GFA is 15.64 GB compressed / 86.5 GB raw (per the manifest), which **bounds** the 22-autosome total from above since it also carries chrX and chrY; the per-chromosome sum is **UNMEASURED**. `vg deconstruct` must then run per chromosome at vg 1.68 (decision F). | `PLANNED` |
+| the per-chromosome **genetic maps** for chr1-chr20, chr22 | ADDED 2026-10-08 under decision D. ⚠ **This is an EXTRACTION, not a download.** `external/genetic_maps/genetic_maps.b38.tar.gz` is already on disk (23,440,558 B, sha256 `04f97acc...`) and holds **all 22 autosomes plus chrX** — verified 2026-10-08 by listing the archive: 25 members, `chr1.b38.gmap.gz` … `chr22.b38.gmap.gz`, `chrX.b38.gmap.gz`, `chrX_par1`, `chrX_par2`. Only chr21 has been extracted so far — `external/genetic_maps/chr21.b38.gmap` and `.gz` are the only EXTRACTED MAPS; the directory also holds the source tarball, `plink.GRCh38.map.zip` and a `chr_in_chrom_field/` subdirectory (⚠ corrected 2026-10-10: this read "and nothing else in that directory", which fails `ls`). Extract the remaining 21 autosomes; **do not extract chrX** (decision D). Each needs its own map-silent span measured before the declared constant rate of decision C can be applied — and four more acrocentric p-arms (chr13, chr14, chr15, chr22) will hit the same void chr21's p arm does, per the `chain_span` entry in `docs/terms.md`. | `PLANNED` |
+| `data/raw/chrY.hprc-v1.0-pggb.gfa.gz` | ADDED 2026-10-08 — **it was on disk since 2026-09-29 in no row and no configs manifest, so by this file's own rule it was not quotable, while two numbers quoted all over the repo were measured on it.** 20,000,273 B, downloaded 2026-09-29 (`logs/chry_dl.log`, status `0`) and deconstructed (`logs/chry_deconstruct.status` = `0`). Its two roles, both DIAGNOSTIC: (1) the vg-1.68-vs-1.36 site-agreement measurement — 99.55% of the published VCF's sites by POS, **92.7% by (POS, REF, ALT)** — quoted in §3b and in `configs/inputs.chr21.yaml`; (2) the 34,014-record smoke test that vg 1.68 groups PanSN samples correctly, cited in `src/cohort/vcf.py`. ⚠ **Decision D excludes chrY from the product** — autosomes only — so this will never be promoted to a mechanism input and no release ever covers it. Kept `OK` rather than `DEPRECATED` deliberately: `DEPRECATED` means *never quote*, and the two figures above are live and must stay traceable to this file. | `OK` |
+| `external/genetic_maps/chr21.b38.gmap` | chr21 extracted, 971,965 B, columns pos/chr/cM with a header. Span **10,326,676 - 46,680,243 bp**, **0.5841 - 62.7865 cM**, monotonic, no duplicate positions. ⚠ **26,018 chr21 variants (7.63%) fall BELOW the map start** and 592 (0.17%) above. The denominator for those two counts is PanMixer's vg-1.36 **340,824**; OUR build has **340,849** records and neither count has been re-measured on it — the 2026-09-29 recount covered the `chain_span` cut (`dropped_below` 34,371, `dropped_above` 592), not the map-span edges. ⚠ **POLICY CHANGED — decision C (2026-10-08).** These map-silent regions, where the map gives **no cM at all**, are no longer excluded: they are sampled under a **declared constant recombination rate**. The old description — interpolation clamps, cM is flat, the sampler cannot recombine — describes the SUPERSEDED policy. **The rate's numeric value is NOT yet chosen** and must not be invented (still-open question 1 in `docs/plan.md`; the per-autosome map-coverage measurement it rests on does not exist yet). Separately, 618 interior intervals inside the mapped span (1.4%, 2.71 Mb, chr21 only) have zero cM change; **decision C does NOT override those** — `P(switch) = 0` between two variants with no genetic separation remains CORRECT, and the 22-autosome figure for them is UNMEASURED. ⚠ **One residual needs Dylan and is flagged, not resolved**, in the `chain_span` block of `configs/inputs.chr21.yaml`: the superseded cut at 12,968,320 reached ABOVE the map's first marker at 10,326,676, so part of what it dropped is an **in-span plateau** that the declared rate does NOT reach and the plateau rule says to leave — the split of those positions into map-silent and in-span is UNMEASURED. | `OK` |
 
 ⚠ **Not downloadable from this repo:** the five read FASTQs the mapping utility
 needs, `chr21.fa` / `hg38_cleaned.fa`, and the three `.npy` files of the 30x
@@ -142,6 +176,13 @@ Three inputs, and only three. What model C removed is as important as what it ke
 Staged on the `pipeline` branch under `data/raw/`, with the full manifest at
 `pipeline:configs/inputs.chr21.yaml`. PGGB freeze1 publishes **no `.gbz`, `.og` or
 `.snarls`** — GFA is the only form.
+
+⚠ **All three rows are chr21-only, and decision D makes the product the 22 autosomes.**
+Inputs 1 and 2 therefore need 21 more instances each; both are registered as `PLANNED`
+rows in §3 (the GFAs are downloads, the maps are an extraction from a tarball already on
+disk). Input 3 is arm-dependent and the row above describes **Arm 2's** stand-in only: in
+**Arm 1 the target is one of the 44 cohort members** and no external sample is drawn at
+all, so the eligibility rules and pools below apply to Arm 2 alone.
 
 ### Target selection (decided 2026-09-29)
 
@@ -212,8 +253,10 @@ ceiling.
 on chrY: `vg` 1.68 recovers 99.55% of the published VCF's sites by POS but only **92.7% by
 (POS, REF, ALT)**, concentrated at multi-allelic sites, because the published file was built
 with `vg` 1.36. Accepted knowingly. We must also apply chrX and `chm13` removal ourselves —
-the published VCF carries 45 samples, we need 44. **If the head-to-head is ever run, both
-arms must run on the SAME VCF.**
+the published VCF carries 45 samples, we need 44. ⚠ **REVISED 2026-10-08: this is no longer
+conditional.** The head-to-head IS Arm 1, and decision F requires PanMixer's starting data
+to be **rebuilt on our GRCh38 build** so that **both arms run on ONE consistent VCF** — the
+thing upstream's own release got wrong. Every `STALE` row in §3 is stale for this reason.
 
 ⚠ **The graph is published only as GFA for PGGB freeze1** — no `.gbz`, no `.snarls`. The two
 `.gbz` files on disk under `/data/ds85/RanPanMixer/runs/` are outputs of our own
@@ -222,18 +265,30 @@ no information the VCF does not.
 
 ## 4. Record schema — released path
 
-**PLANNED.** Fields fixed now so releases are self-describing from the first run.
+**LIVE.** ⚠ Corrected 2026-10-10: this read "**PLANNED.** Fields fixed now so releases
+are self-describing from the first run." Releases exist and carry these fields —
+`logs/A_HG00096_chr21_v2.releases.json` (2026-09-30, one record per release) is
+registered LIVE in section 7. What is still PLANNED is routing them through
+`store.save()`: today they are written by a bare `write_text` from
+`scripts/run_mechanism_chr21.py`, with no `.prov.json`, no `git_rev` and no
+`axis_digest`, so by this file's own rule the released paths are not yet quotable
+artifacts. ⚠ And the genome-wide fields are not fixed: a release spanning 22
+autosomes needs a summed `log_z_p`, a weighted `u_achieved`, an arm, a `loo_id` and
+per-chromosome digests, none of which this schema carries (`release_id` currently
+collides across all 22 chromosomes of one release).
 A release that cannot answer "at what tau, under what utility" is not quotable.
 
 | field | type | notes |
 |---|---|---|
-| `release_id` | str | ⚠ **not a unique key on its own.** The unique key is (`target_id`, `tau`, `utility_id`, `seed`). Collisions must raise, never overwrite. |
+| `release_id` | str | ⚠ **not a unique key on its own.** The unique key is (`arm`, `target_id`, `loo_id`, `tau`, `utility_id`, `seed`). Collisions must raise, never overwrite. ⚠ **EXTENDED 2026-10-08:** without `arm` and `loo_id` an Arm 1 release of a cohort member could not be distinguished from an Arm 2 release at the same `tau` and utility, and the schema says collisions raise — so the two arms would have collided. |
+| `arm` | str | ADDED 2026-10-08. `"arm1"` or `"arm2"`, and **never absent** — the arm decides what is true of the target, so a record without it is uninterpretable, not merely imprecise. Arm 1: the target IS one of the 44 cohort members, released under leave-one-out at K = 86. Arm 2: the target is outside `G`, `D`, every panel and the attack database, full cohort as panel, K = 88, nothing held out. |
 | `target_id` | str | pseudonymous target identifier |
 | `tau` | float | the privacy parameter. Absent = the record is unusable. |
 | `eta_tau` | float | stored, not recomputed at read time, so a calibration change is detectable |
 | `utility_id` | str | identifies phi_t, its weights, and the beta_t scheme |
-| `graph_id` | str | graph + cohort + chain segmentation. ⚠ NOT a leave-one-out id: our target is external, so nothing is held out |
-| `loo_id` | str/null | the held-out stand-in, **comparison arm only**. `null` for a genuine external-target release |
+| `graph_id` | str | graph + **cohort composition** + chain extent. ⚠ **In Arm 1 this IS a leave-one-out id** — the cohort differs per target, so `graph_id` carries the LOO identity; in Arm 2 nothing is held out. ⚠ The chain extent must name the **chromosome SET**, not one chromosome: the emitted form on record (`chr21/hprc-v1.0-pggb/K88/T305886`) silently claims a per-chromosome release, which decision B forbids — a release is genome-wide over the 22 autosomes. |
+| `loo_id` | str/null | the held-out individual. ⚠ **MANDATORY and non-null when `arm == "arm1"`**, `null` when `arm == "arm2"`. Decision E makes leave-one-out a defining property of Arm 1, not an option: it is half the paper, not a "comparison arm". |
+| `loo_masked_haplotype_ids` | str[2]/null | ADDED 2026-10-08, and load-bearing. The construction itself is `loo_cohort` in `docs/terms.md`; this field is its provenance in the record. Decision E applies leave-one-out by **masking two haplotype rows in memory at release time**, not by materialising 44 cohort trees (identical artifacts, ~160-380 GB cheaper). Consequence: **there is no second `axis_digest` per target** and nothing in `data/cohort/` records which rows were dropped, so the only place the provenance can live is here. Both of the target's haplotype ids, exactly as they appear in `haplotype_ids.npy`. `null` in Arm 2. A record without this is not reproducible: the K = 86 panel cannot be reconstructed from the artifacts alone. |
 | `seed` | int | the private random draw |
 | `state_path` | int[T] or int[T,2] | sampled Z_1:T; (T,2) when `ploidy` = 2 |
 | `released_path` | int16[T] or int16[T,2] | the alleles actually released. The quotable object |
@@ -243,14 +298,31 @@ A release that cannot answer "at what tau, under what utility" is not quotable.
 | `ploidy` | int | ADDED 2026-09-30. 1 or 2. A diploid target's two haplotypes are ONE private input and get ONE release — one `tau`, one `log_z_p`, one bracket |
 | `released_at` | date | one release per genome; re-releases compose |
 
-**Integration contract (COMPARISON ARM ONLY).** Our sampler MAY also emit PanMixer's
+**Integration contract (ARM 1).** Our sampler MAY also emit PanMixer's
 artifact — `new_haplotypes.npy`, shape `(n_sites, 2)` int16 with `-1` for missing,
 row-aligned to the chr VCF — because every PanMixer evaluator consumes exactly that file.
-⚠ It is NOT a requirement of the mechanism, and emitting it does NOT make their whole
-stack meaningful on our output: `af_loss`, `ld_loss` and the Beagle attack will run and
+⚠ It is NOT a requirement of the mechanism. **What transfers depends on the arm, and the
+two cases are opposite** — never state one as if it covered both.
+
+**Arm 2 (external target).** `af_loss`, `ld_loss` and the Beagle attack will run and
 return numbers that mean nothing for a release which never edits the cohort. Only the
 gap-score attack transfers, and only after its "self" becomes the external target's true
 path and the target is excluded from the attack database.
+
+**Arm 1 (the target IS a cohort member).** Both clauses above invert. The release edits a
+cohort column, so `af_loss` and `ld_loss` ARE defined here. ⚠ **We still report
+`utility_loss_panmixer` only (decision H) — but the reason is a SCOPE CHOICE, not a
+definitional impossibility.** Any text saying they are omitted "because we never modify
+the cohort" is false in Arm 1 and must not be reinstated. On the attack side:
+`diploid_gap_score`, `MIA_privacy`, `sampled_gap_score` and the Beagle reconstruction
+attack all become meaningful once a cohort column is edited, so "only one attack
+transfers" is false here. The target is a cohort member, so **excluding it from the attack
+database would remove the thing being attacked**; the database retains it under the Arm 1
+rule, and `self` is scored from **the member's own assembly-derived path** (defined for all
+44), not its 1000G panel row (defined for only 39 of 44) — decision I; PanMixer's
+panel-row semantics run as a labelled parity column. The exact wording of the retention
+rule is fixed in the pre-registration — **`paper/prereg_<date>.md`, which is `PLANNED` and
+does not exist yet** (see §7), so cite it as PLANNED, never as settled text.
 ⚠ The row-order coupling is UNCHECKED upstream — the shape assertion in their gap-score
 evaluators is vacuous (both sides equal `site_mask.sum()` by construction). Ship a
 `sites.tsv` (chrom, pos, ref, alt) beside any emitted copy and verify it before scoring.
@@ -270,10 +342,12 @@ evaluators is vacuous (both sides equal `site_mask.sum()` by construction). Ship
 
 ## 7. Artifact registry
 
-**Status key:** LIVE (quotable) · SUPERSEDED · INVALID (never quote)
+**Status key:** LIVE (quotable) · SUPERSEDED · INVALID (never quote) · PLANNED (not
+built; not quotable, and every reference to it must say PLANNED)
 
 | artifact | date | contents | status |
 |---|---|---|---|
+| `paper/prereg_<date>.md` | — | **The pre-registration: ONE dated file covering BOTH arms.** Fixes `tau`, the utility function, the endpoints, the attacker set and the attack database before any attack outcome is inspected (constraint 6), plus the Arm 1 attack-database retention rule and the `self` semantics of decision I. ⚠ **IT DOES NOT EXIST YET** — verified against `paper/` 2026-10-08, which holds only the two PDFs. Any reference to it, anywhere in the repo, must be marked PLANNED; it is the work item `B-LCK-preregister` in `docs/plan.md` and it is blocked, so nothing may be quoted as "pre-registered" until the file is dated and committed. | PLANNED |
 | `paper/Private_Genome_Path_Release.pdf` | 2026-08-29 | The proposal: mechanism, Theorem 1, Corollary 1, Algorithm 1, runtime analysis. | LIVE |
 | `archive_docs/The_Six_File_Lab_Record.pdf` | 2026-08-29 | The documentation framework this repository follows. | LIVE |
 | `paper/s41467-026-77591-0_reference.pdf` | 2026-09-18 | **The PUBLISHED PanMixer paper** (Nature Communications, DOI 10.1038/s41467-026-77591-0, Article in Press, 12 pages, sha256 `2bbba736...`), supplied by Dylan. **The version of record — all reproduction targets come from here.** | LIVE |
@@ -293,11 +367,25 @@ evaluators is vacuous (both sides equal `site_mask.sum()` by construction). Ship
 
 ## 8. Reproducibility contract
 
-A result is reproducible here only if all five are recorded: the graph+cohort id,
-`tau`, the utility id, the number of draws, and the seed. Two results are comparable only
-when the first three match. ⚠ A held-out individual is recorded **only for comparison-arm
-runs** (`loo_id`); a genuine external-target release holds out nobody, and requiring one
-would make a condition no real release can satisfy into a gate on every result.
+A result is reproducible here only if all six are recorded: the **arm**, the graph+cohort
+id, `tau`, the utility id, the number of draws, and the seed. Two results are comparable
+only when the first four match — and **never across arms**, which differ in K (86 vs 88),
+in what is held out, and in whether the target is in the cohort at all.
+
+⚠ **REVISED 2026-10-08 (decision E).** The held-out individual (`loo_id`) is **mandatory
+in Arm 1 and forbidden in Arm 2**, not "comparison-arm only". Arm 2 holds out nobody, so
+requiring one there would make a condition no external-target release can satisfy into a
+gate on every result; Arm 1 holds out both of the target's haplotypes by definition, so a
+missing `loo_id` there means the panel is unknown and the release is not reproducible.
+⚠ Because Arm 1's leave-one-out is applied by **masking two haplotype rows in memory**
+rather than by building a per-target cohort tree, the artifacts on disk are **identical
+across all 44 targets and carry a single `axis_digest`** — the digest therefore cannot
+witness which rows were dropped. `loo_masked_haplotype_ids` in the §4 record is the only
+provenance for that, so a release record missing it is unreproducible even though every
+artifact digest matches. ⚠ `tests/test_mechanism.py` currently hard-asserts
+`rec["loo_id"] is None` with the reason "a genuine external-target release holds out
+nobody"; that assertion is correct for Arm 2 and will fail on **every** Arm 1 release.
+Fixing it is code work, outside this file.
 
 **The private input is the target path.** The `PLANNED` target directory must
 never be committed, copied into an artifact directory, or quoted in any document.

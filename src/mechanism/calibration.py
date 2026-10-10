@@ -74,7 +74,7 @@ def p_succ_bound(tau: float) -> float:
     membership is a different question this does not answer. A measured
     `attacker_accuracy` above this at the same `tau` means the implementation is
     wrong, not the theorem -- and one below it is not evidence of anything
-    (standing constraint 6).
+    (standing constraint 7).
     """
     if not 0.0 <= tau < 1.0:
         raise ValueError(f"tau must be in [0, 1), got {tau}")

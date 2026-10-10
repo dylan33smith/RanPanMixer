@@ -91,6 +91,40 @@ inputs:
 # ---------------------------------------------------------------------------
 # chain_span — the coordinate interval the chain actually runs over.
 # Fixed BEFORE any target file is opened, so R_D stays a function of D alone.
+#
+# ⚠⚠ SUPERSEDED BY DECISION C (2026-10-08). READ THIS BEFORE USING THE BLOCK.
+#
+# Decision C: regions where the genetic map gives NO cM AT ALL are no longer
+# EXCLUDED — they are SAMPLED UNDER A DECLARED CONSTANT RECOMBINATION RATE.
+# This block is the machine-readable form of the policy that decision replaces,
+# and it also supersedes deferred decision R2 (the provisional cut).
+#
+# It is RETAINED, not rewritten, because every artifact in data/cohort/chr21 was
+# built under this cut (measured in_chain.sum() = 305,886) — so it stays the
+# authority for what the chr21 numbers ON RECORD were measured under, and for
+# nothing else. src/ still reads start/end until the preprocessing rerun.
+#
+# ⚠ THE RATE'S VALUE IS NOT CHOSEN, AND MUST NOT BE INVENTED HERE. Whether it is
+#   one genome-wide constant or 22 per-chromosome values is equally open. Both
+#   wait on a per-autosome map-coverage measurement that does not exist in this
+#   repo yet (still-open question 1 in docs/plan.md): measure first, declare
+#   second. The MECHANICS of applying the rate — where it is declared, how the
+#   per-site cM source is recorded so the constant-rate share is reportable
+#   rather than asserted — are implementation work, deliberately not specified.
+#
+# ⚠ SCOPE, AND IT IS NARROW. Decision C covers MAP-SILENT regions ONLY: the
+#   positions with no cM at all, i.e. below the map's first marker and above its
+#   last. INTERIOR ZERO-cM PLATEAUS INSIDE THE MAPPED SPAN ARE NOT OVERRIDDEN.
+#   P(switch) = 0 between two variants with no genetic separation remains the
+#   CORRECT model; docs/terms.md states it and tests/test_toy_enumeration.py
+#   enforces it as a Theorem-1 SUPPORT property. Whether that is ever revisited
+#   is a separate OPEN question, deferred until a per-autosome gap measurement
+#   exists. Do not read decision C as touching it.
+#
+# ⚠ This manifest is chr21-only and decision D makes the product the 22
+#   autosomes. Generalising it (one file per autosome, or one per-chromosome
+#   section generated from a template so a value can only diverge deliberately)
+#   is implementation work that has not been done.
 # ---------------------------------------------------------------------------
 chain_span:
   start: 12968320      # exclusive
@@ -98,22 +132,73 @@ chain_span:
   keeps: 305886        # of OUR 340,849 chr21 records = 89.74%
   dropped_below: 34371
   dropped_above: 592
-  provisional: true    # Dylan to settle with his PI; this is the cut that lets v1 run
-  why: >
+  status: superseded_by_decision_c   # 2026-10-08; was `provisional: true`
+  superseded_note: >
+    The flag this replaces read "Dylan to settle with his PI; this is the cut
+    that lets v1 run". It is settled: not by moving the cut, but by replacing
+    exclusion with a declared rate. Nothing in src/ ever read the flag, so it
+    recorded the state of a conversation rather than gating anything.
+  why_it_was_cut: >
     Below 12,968,320 the clamped interpolation and the map's own zero-cM
-    centromeric plateau give 34,345 consecutive positions at IDENTICAL cM, so
+    centromeric plateau give 34,371 consecutive positions at IDENTICAL cM on OUR
+    vg-1.68 build (34,345 on PanMixer's vg-1.36 build, which is the figure that
+    stood here), so
     P(switch) = 0 and the sampler would emit one donor's real haplotype verbatim
-    across 7.25 Mb. Five independent reasons support the cut; see chain_span in
-    docs/terms.md for the full table and the REVISIT list.
-  unresolved:
+    across 7.25 Mb. Five independent reasons supported the cut; see chain_span in
+    docs/terms.md for the full table. The DEFECT is real and unchanged — what
+    decision C changes is the REMEDY, from excluding the map-silent region to
+    sampling it under a declared constant rate.
+  resolved_by_decision_c:
     - >
-      592 variants sit ABOVE the map end (46,680,243 vs positions to
-      46,699,788), giving a 593-position zero-distance run at the telomere.
-      Same defect, 58x smaller. UNDECIDED — do not clamp it silently.
+      The positions below the map START (the map's first marker is 10,326,676)
+      are map-silent — no cM at all — so under decision C they get the declared
+      constant rate and are INCLUDED, not cut. ⚠ Two different counts, do not
+      conflate them: 34,371 positions fall below the CUT at 12,968,320, and the
+      count below the MAP START is smaller. ⚠ CORRECTED 2026-10-10 — an earlier
+      version of this block said the map-start count "has NOT been re-measured on
+      ours". It HAS: docs/terms.md records the split as 34,371 = 26,044 NaN below
+      the map start (OUR 340,849-record build) plus 8,327 on the map's zero-cM
+      centromeric plateau, all at cM 0.584144 exactly. The 26,018 in docs/data.md
+      is PanMixer's 340,824-record build; 26,044 is ours. So on chr21 the quantity
+      the declared rate applies to is 26,044 positions, measured. What still needs
+      measuring is the same split on the other 21 autosomes.
+    - >
+      The 592 variants ABOVE the map end (46,680,243 vs positions to
+      46,699,788), a 593-position zero-distance run, are map-silent too, so they
+      are INCLUDED under the same declared rate. This supersedes BOTH earlier
+      positions on them: the "UNDECIDED — do not clamp it silently" that stood
+      here, and the 2026-09-29 telomeric CUT recorded in the chain_span entry of
+      docs/terms.md. The two documents disagreed; decision C settles it in the
+      direction of neither cutting nor clamping.
+  residual_needing_a_decision:
+    - >
+      ⚠ FLAGGED 2026-10-08, NOT RESOLVED, AND IT NEEDS DYLAN. The cut at
+      12,968,320 sits ABOVE the map's first marker at 10,326,676, so the stretch
+      between them is INSIDE the mapped span: the map gives cM there, and the
+      reason the cut reached that far is that those cM values are IDENTICAL — the
+      map's own zero-cM centromeric plateau. That makes it an INTERIOR plateau,
+      which decision C explicitly does NOT override. Decision C supersedes R2, so
+      the cut is no longer policy and those positions come back into the chain
+      with P(switch) = 0 — i.e. the verbatim-emission defect the cut was created
+      to prevent returns for exactly the in-span portion, because the declared
+      rate does not reach it and the plateau rule says leave it.
+      ⚠ CORRECTED 2026-10-10: this said the split was UNMEASURED. On chr21 it is
+      measured — 34,371 = 26,044 below the map start (map-silent, the declared
+      rate applies) + 8,327 on the in-span zero-cM plateau (it does not). So the
+      residual has a size: 8,327 chr21 positions, all at cM 0.584144, come back
+      into the chain with P(switch) = 0 and will be emitted as a verbatim donor
+      run. That is 2.7% of a 305,886-position chain. Still needs Dylan, and still
+      must not be written as decided — but it is a known quantity, not an unknown.
+      The same split on the other 21 autosomes IS unmeasured and is B-DAT-map-coverage.
+  not_overridden_by_decision_c:
     - >
       618 interior map intervals have dcM = 0 over 2.71 Mb, holding ~1,650 kept
       variants. These are REAL map plateaus; P(switch) = 0 between two variants
-      with no genetic separation is CORRECT. Leave them.
+      with no genetic separation is CORRECT. This position STANDS — decision C
+      does not touch it. ⚠ But 2.71 Mb is a chr21-ONLY figure: the 22-autosome
+      extent of interior zero-cM intervals is UNMEASURED, so it must not be
+      quoted genome-wide. Measure it per autosome before the deferred question
+      "are interior plateaus eventually overridden" can be answered either way.
 
 # ---------------------------------------------------------------------------
 # Target selection — for testing, until a real external target is available.
@@ -201,7 +286,11 @@ not_used:
   allele_frequency_table: >
     No privacy score and no allele-frequency sampling branch to feed. Note that
     support(v) needs no computation either: INFO/AN in the graph VCF is
-    bit-identical to the non-missing count across all 340,824 chr21 records.
+    bit-identical to the non-missing count across all 340,849 chr21 records of
+    OUR vg-1.68 build (verified on ours, 2026-09-29; the 340,824 that stood here
+    is PanMixer's vg-1.36 count, and the identity was first measured on theirs).
+    ⚠ The same stale 340,824 still sits in src/cohort/support.py as if it
+    described our build.
 
 # ---------------------------------------------------------------------------
 # Attack database -- EVALUATION ONLY, never an input to the mechanism.

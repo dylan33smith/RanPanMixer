@@ -205,7 +205,7 @@ add("`ffbs` vs exact enumeration, max per-path z *", f(toy_z, 2),
 add("TV(empirical, exact) *", f(toy_tv_emp, 6), NA, gate=True,
     note=f"n={N_DRAWS:,}; analytic expectation {0.5*np.sqrt(2*toy_Qp*(1-toy_Qp)/(math.pi*N_DRAWS)).sum():.6f}")
 add("O(TK) vs dense O(TK^2) alphas, max abs dev *", e_(toy_dense_dev, 2),
-    f"{NA} — 21 TB if materialised", gate=True, note="the rank-one recursion check")
+    f"{NA} — 21.1 GB if materialised", gate=True, note="the rank-one recursion check")
 add("KILL CRITERION: any exact TV above `tau` *", "none", f"{NA} — not testable at scale",
     gate=True, note="the only thing that can falsify Theorem 1")
 add("DIPLOID gate *", "ABSENT — every clause above is haploid",
@@ -258,7 +258,7 @@ add("per-position tilt at mean `beta_v`", e_(float(np.expm1(eta*toy_u.beta.mean(
 add("seconds per release [dip]", e_(toy_secs, 2), f(c_secs, 2),
     note=f"n={len(SEEDS)}")
 add("alpha storage, float64", f"{t.T*t.K*8} B", f"{c_hmm.T*c_hmm.K*8/1e6:,.0f} MB",
-    note="load-bearing: tilt is ~13.5x float32 resolution")
+    note="load-bearing: tilt is ~15.1x float32 resolution")
 
 # ------------------------------- DEMOTED -----------------------------------
 add("**DEMOTED / NOT APPLICABLE**", "", "")

@@ -442,6 +442,76 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
 
 ## Mechanism / sampler
 
+### ⚠ LATENT AT GENOME SCALE ONLY: a running-float `log_c` accumulator breaches the `log_z_p` tolerance
+
+- **[2026-10-09] Found by arithmetic, before the code was written. NOT yet a bug in
+  the repo — recorded so it is not introduced.**
+  **[Symptom it would produce]** `log_z_p` fails its `[0, eta_tau]` bracket, or worse
+  passes it with a wrong value, **only on a genome-wide run.** Every chr21 test
+  passes. There is no error and no symptom at the scale the suite covers.
+  **[Cause]** `log_z_p = tilted.log_norm - baseline_log_norm` is a difference of two
+  sums whose magnitude grows with T, while the result stays bounded by `eta_tau` —
+  catastrophic cancellation that worsens with chromosome length. At chr21 each sum is
+  about -584.81; genome-wide it is of order 1e4. Today `log_c` is materialised as a
+  `(T,)` array and summed by `np.sum`'s PAIRWISE algorithm, which holds the error to
+  ~1.5e-10 at genome scale. The obvious memory optimisation — stop materialising the
+  array and accumulate `log_z += math.log(c)` as a running Python float — gives
+  sequential summation, whose worst case reaches **~9.9e-05 against the 1e-6
+  tolerance**: a 100x breach.
+  **[Proven fix]** Keep `log_c` as an array, or use `math.fsum`/Kahan. Both are free.
+  Add a regression test that the naive sequential form FAILS at T ~ 1.5e7, so the
+  optimisation cannot be reintroduced by someone who only runs chr21.
+  **[Why it is in this file]** It is the exact silent-degradation shape this file's
+  banner warns about, and it is invisible to the entire current suite.
+
+### ⚠ float64 stops being a preference and becomes a correctness requirement genome-wide
+
+- **[2026-10-09] Arithmetic, not a run. The guard already exists; what was missing is
+  the reason it is load-bearing.**
+  **[Symptom it would produce]** The mechanism silently becomes an UNTILTED draw from
+  `baseline_model`. Every release is a valid path, every gate passes, `tau` appears to
+  be honoured, and the target's influence is simply absent. No error.
+  **[Cause]** The tilt enters as `psi = exp(eta_tau * beta_v * phi_v)`, per position,
+  so the exponent is at most `mean(beta_v) = 1/T`. At chr21 (T = 305,886, tau = 0.5)
+  that is 1.80e-06 against float32 eps of 1.19e-07 — only **15.1x** the noise floor.
+  Under a genome-wide `beta_v` (standing constraint 4) the exponent falls **BELOW**
+  float32 eps, so every potential rounds to exactly 1.0.
+  **[Proven fix]** The dtype refusal in `ffbs.forward` already raises on anything but
+  float64 and must never be relaxed. Record the arithmetic beside it — done
+  2026-10-09 — so the next person reading "float64 is load-bearing" knows why.
+  float64 itself is comfortable: the boundary is `exp(x) == 1.0` iff `x <= eps/2` =
+  1.110e-16, which a genome-wide exponent clears by ~1.6e+08.
+
+### A dense-transition memory figure was wrong by 1000x, in two files
+
+- **[2026-10-09] `21 TB` where the arithmetic gives `21.1 GB`**
+  **[Symptom]** `src/mechanism/ffbs.py` and `src/mechanism/hmm.py` both justified the
+  rank-one decomposition by claiming a dense `A_t` per position would be "about
+  21 TB on chr21". `hmm.py` printed its own arithmetic one line later —
+  `340,849 * 88 * 88 * 8 B` — which is **21,116,277,248 B = 21.1 GB**.
+  **[Cause]** A unit slip, copied between the two modules, that survived because the
+  conclusion it supports (never materialise `A`) is correct either way, so nothing
+  downstream disagreed with it.
+  **[Proven fix]** Corrected in both files with the arithmetic kept inline. ⚠ The
+  lesson is the one this project keeps relearning: **a number that supports a correct
+  conclusion is never checked.** When a docstring shows its own arithmetic, recompute
+  it — this one was off by three orders of magnitude for six weeks.
+
+### A diploid assertion message printed the wrong field of the wrong chain
+
+- **[2026-10-09] The bracket fires correctly and then misreports why**
+  **[Symptom]** The diploid `log_z_p` bracket in `ffbs.py` raised with
+  `f"(haplotype values {draws[0][2]!r} and {draws[1][3]!r})"`. Index 2 is `log_z`;
+  index 3 is `u_achieved`. So the message printed chain 0's `log_z` beside chain 1's
+  **utility**, as though both were log-normalisers.
+  **[Cause]** An index typo on the message path only. The assertion's own arithmetic
+  uses `lz`, which is correct, so the guard worked and only its explanation lied.
+  **[Proven fix]** `draws[1][3]` -> `draws[1][2]`. ⚠ **No test covers this** — the
+  message is only produced on the failure path, and the suite asserts that the bracket
+  raises, not what it says. That is the general hole: an error message is code that
+  only ever runs when something is already wrong, so it is the least-exercised and
+  most-trusted text in the repo.
+
 The classes most worth watching were known from the proposal before any code
 existed and are written as constraints in `CLAUDE.md`: a target-dependent
 `output_support` or `baseline_model`, an unnormalized `u_path`, `beta_t` not

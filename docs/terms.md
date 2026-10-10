@@ -11,6 +11,50 @@ the heading is the form used in code, tables and filenames.
 
 ---
 
+## The arm — the stamp every number needs first
+
+### arm  [method] [evaluation]
+```
+Is:                   WHICH OF THE PAPER'S TWO SECTIONS a number belongs to. It is
+                      the first stamp on every figure, before tau, the denominator
+                      and n, because it decides what is true of the TARGET and
+                      therefore what half the glossary means. Two values, and only
+                      two:
+                      **arm1** — the HEAD-TO-HEAD. The target is one of the 44 HPRC
+                      cohort members. We release the obfuscated paths of all 44,
+                      DIPLOID, over the 22 autosomes, and run PanMixer's own
+                      evaluations so the comparison is direct. Requires per-target
+                      leave-one-out at K = 86: BOTH of the target's haplotypes leave
+                      the donor panel (see `loo_cohort`). Every leave-one-out,
+                      reduced-K and cohort-distortion quantity belongs to this arm
+                      alone, and cohort-member protection is in scope HERE ONLY.
+                      **arm2** — the EXTERNAL target. The target is outside G, D,
+                      every panel and the attack database, so the full cohort is the
+                      donor panel (K = 88) and nothing is held out. Nothing in the
+                      mechanism is a function of the target but the tilt.
+Computed by:          not computed — it is a property of the RUN, set by the
+                      configuration and carried on every artifact and every table
+                      column. Settled by Dylan 2026-10-08 (the two-arm scope change).
+CHANGES MEANING WITH: nothing; it is definitional. But it changes the meaning of
+                      `u_ceiling`, `target_fidelity`, `beta_v`'s scope, `loo_cohort`,
+                      `K_states`, `af_loss`, `ld_loss`, `p_succ_bound`'s pair and
+                      `new_haplotypes`. ⚠ **AN UNSTAMPED NUMBER IS UNINTERPRETABLE,
+                      NOT IMPRECISE** — the 2026-09-28 scope correction and the
+                      2026-10-08 rewrite were both about exactly this confusion.
+Valid vs:             nothing. The two arms are NOT comparable to each other on any
+                      ceiling-bearing axis: each number is read against ITS OWN arm's
+                      ceiling and floor. Both arms DO run on one consistent GRCh38
+                      build (decision F) — the thing PanMixer's own release got wrong
+                      — so a site set is shared even where a ceiling is not.
+Status:               PRIMARY — every table column names it.
+Aliases:              "the head-to-head arm" = arm1; "the external-target arm" =
+                      arm2. ⚠ "the comparison arm" is the OLD name for arm1 from when
+                      it was optional; entries still carrying `COMPARISON-ARM ONLY`
+                      are stale by that much. Never write "the arm" with no value.
+```
+
+---
+
 ## The privacy parameter and its derived constants
 
 ### tau  [theory] [privacy]
@@ -20,7 +64,17 @@ Is:                   The pre-specified privacy parameter, tau in [0, 1). It is 
                       distributions induced by ANY two admissible input paths.
                       tau = 0 means the release ignores the target entirely.
 Computed by:          not computed — CHOSEN, and pre-registered before any attack
-                      outcome is inspected. See constraint 5 in CLAUDE.md.
+                      outcome is inspected. See constraint 6 in CLAUDE.md (it was
+                      constraint 5 before the 2026-10-08 two-arm rewrite, and it now
+                      also pre-registers the attacker set and the attack database).
+                      ⚠ THE tau GRID IS NOT PINNED (2026-10-08) and must not be
+                      written down as if it were. It can only be chosen after the
+                      genome-wide endpoint is re-measured exactly, because under
+                      decision B chr21 carries a SHARE of the beta_v budget, which
+                      makes the endpoint far smaller than the chr21-normalised figure
+                      on record. The pre-registration file will be
+                      `paper/prereg_<date>.md`, one file covering both arms — PLANNED,
+                      it does not exist yet.
 CHANGES MEANING WITH: nothing. tau is definitional. But every quantity that DEPENDS
                       on it (utility_retained, attacker_accuracy) is meaningless
                       without its tau stamped alongside.
@@ -74,11 +128,25 @@ Aliases:              "epsilon". NEVER write epsilon_tau = arctanh(tau) — that
 ### p_succ_bound  [theory] [privacy] [gate]
 ```
 Is:                   The upper bound on an optimal binary attacker's success
-                      probability under equal priors: (1 + tau)/2. "Did this release
-                      come from the target, or from a cohort member?" cannot be
-                      answered better than this by ANY attacker, including one who
-                      knows the graph, the cohort, the utility function, tau and the
-                      full implementation — everything except the private random draw.
+                      probability under equal priors: (1 + tau)/2. The question it
+                      bounds is over INPUT PATHS, which is what Theorem 1 is stated
+                      over: "did this release come from input path p, or from input
+                      path q?", for ANY two admissible inputs at the SAME release
+                      slot. It cannot be answered better than this by ANY attacker,
+                      including one who knows the graph, the cohort, the utility
+                      function, tau and the full implementation — everything except
+                      the private random draw.
+                      ⚠ **READ THE PAIR PER ARM (restated 2026-10-08).** In ARM 2, p
+                      is the external target and q is any other admissible path. In
+                      ARM 1 the target IS one of the 44 cohort members, so the older
+                      phrasing of this field — "did this release come from the target,
+                      or from a cohort member?" — is VACUOUS there: both branches name
+                      the same event. Arm 1's pair is member k's own true diploid path
+                      against an admissible DECOY path at the same release slot k. The
+                      bound is unchanged either way (it is over pairs of admissible
+                      input paths, not over populations); only the sentence that
+                      explained it was Arm-2-only, and it is the sentence the paper
+                      will quote. See `two_target_indistinguishability`.
 Computed by:          (1 + tau) / 2
 CHANGES MEANING WITH: the prior. It is an EQUAL-PRIOR bound. An attacker with an
                       informative prior over cohort membership is a different
@@ -172,13 +240,33 @@ Is:                   The largest u_path a GIVEN target could achieve at any tau
                       It is the honest denominator for utility_retained, and it is
                       BELOW 1 whenever the target has no call at a weighted position.
 Computed by:          src/mechanism/utility.py:u_ceiling (built 2026-09-30)
-CHANGES MEANING WITH: the beta_v SCOPE, which is deferred decision R1, and the
-                      target. Measured 2026-09-30 on HG00096, chr21, scope="chain":
-                      **0.815455** over 253,846 of 305,886 chain positions --
-                      independently reproducing the 0.815 that R1 predicted from the
-                      weight arithmetic. Under scope="chain_readable" it is 1.000 for
-                      a target drawn from the same panel `readable` was built from.
-Valid vs:             the same scope and the same target. ⚠ NEVER quote
+CHANGES MEANING WITH: the ARM first, then the beta_v SCOPE (deferred decision R1)
+                      and the target.
+                      ⚠ **THE TWO ARMS HAVE DIFFERENT CEILINGS AND THEY ARE NOT
+                      COMPARABLE TO EACH OTHER** (2026-10-08). In ARM 2 the ceiling is
+                      set by what the graph can READ of an external target. In ARM 1
+                      the target's own assembly is one of the 44 G was built from, so
+                      it is readable essentially everywhere and the binding limit is a
+                      DIFFERENT one: DONOR-PANEL REACHABILITY under per-target
+                      leave-one-out at K = 86. An allele that no REMAINING donor
+                      carries cannot be emitted at any tau, including tau -> 1, and
+                      the target's own two haplotypes are exactly what left the panel.
+                      **Arm 1's ceiling is UNMEASURED** — it needs the LOO panel, so
+                      it cannot be inferred from the Arm-2 figure below. Never put the
+                      two arms' ceilings in one column.
+                      Measured 2026-09-30, **ARM 2** (external stand-in target), on
+                      HG00096, chr21, scope="chain": **0.815455** over 253,846 of
+                      305,886 chain positions -- independently reproducing the 0.815
+                      that R1 predicted from the weight arithmetic. Under
+                      scope="chain_readable" it is 1.000 for a target drawn from the
+                      same panel `readable` was built from.
+                      ⚠ **AND THAT NUMBER IS CHR21-NORMALISED.** It was measured with
+                      beta_v summing to 1 over chr21's chain alone. Under decision B
+                      beta_v sums to 1 GENOME-WIDE over the 22 autosomes and chr21
+                      carries only a SHARE of the budget (`beta_share`), so the
+                      genome-wide ceiling is a different number and is UNMEASURED. Do
+                      not carry 0.815455 into a genome-wide table.
+Valid vs:             the same ARM, the same scope and the same target. ⚠ NEVER quote
                       utility_retained against an implicit ceiling of 1 -- that
                       understates the mechanism by exactly this factor. And never
                       quote it against this number without saying so, which
@@ -186,11 +274,14 @@ Valid vs:             the same scope and the same target. ⚠ NEVER quote
 Status:               PRIMARY — mark * in tables.
 Aliases:              none. ⚠ NOT target_fidelity's ceiling, which is a different
                       loss in the opposite direction: that one is about target
-                      variants with NO record in G (about 9.9% of non-reference
-                      calls, 20.5% of the -log f information). This one is about
-                      graph positions where we cannot READ the target. `docs/plan.md`
-                      item 1b keeps the three losses apart; conflating them inverts
-                      the conclusion.
+                      variants with NO record in G — **ARM 2 ONLY** (about 9.9% of
+                      non-reference calls, 20.5% of the -log f information). In ARM 1
+                      the target's own assembly helped build G, so that particular
+                      loss is near zero and Arm 1's binding ceiling is the LOO panel
+                      instead. This one is about graph positions where we cannot READ
+                      the target. `docs/plan.md` item 1b keeps the three losses apart;
+                      conflating them inverts the conclusion, and conflating them
+                      ACROSS ARMS inverts it twice.
 ```
 
 ### phi_v  [utility]
@@ -204,7 +295,11 @@ Is:                   The local per-position similarity in [0,1] between the tar
 Computed by:          src/mechanism/utility.py:phi_v (built 2026-09-30)
 CHANGES MEANING WITH: the missing_policy (an excluded donor has no phi_v at all), and
                       whether the target's own allele is missing at v — in which case
-                      the position contributes no tilt and every donor gets factor 1.
+                      phi_v is **ZERO for every donor**, so the tilt POTENTIAL is 1
+                      everywhere and the position is a pure prior draw. ⚠ That is NOT
+                      a wildcard match (settled; `src/mechanism/utility.py:phi_v`
+                      returns zeros at an uncalled target allele): rewarding donors
+                      for agreeing with an unknown value would invent information.
 Valid vs:             the same phi_v on the same site axis.
 Status:               PRIMARY
 Aliases:              "local agreement". ⚠ RENAMED from `phi_t` 2026-09-29. The old
@@ -230,8 +325,32 @@ Aliases:              "local agreement". ⚠ RENAMED from `phi_t` 2026-09-29. Th
 Is:                   Non-negative per-position weights with sum_v beta_v = 1. They
                       decide which parts of the path the mechanism tries to preserve.
                       Under model C: beta_v = w_v / sum_u w_u with w_v = 1/support(v).
+                      ✅ **THE SUM IS GENOME-WIDE (decision B, 2026-10-08).** beta_v
+                      sums to 1 over the whole scope tau covers — the 22 AUTOSOMES
+                      TOGETHER (decision D: no chrX, no chrY) — and each chromosome
+                      takes a SHARE of that one budget, which is `beta_share`. NOT per
+                      chromosome: 22 chromosomes each normalised to 1 would be 22
+                      independent releases of the same person and would compose, which
+                      standing constraint 5 forbids. Constraint 4 is the rule that
+                      stops it arising; constraint 5 is the one it would violate.
+                      ⚠ w_v = 1/support(v) is INHERITED, not argued for — deferred
+                      decision R3 is still open and is a pre-registration item under
+                      constraint 6.
 Computed by:          src/mechanism/utility.py:beta_v (built 2026-09-30), which takes an
-                      explicit `scope` -- see u_ceiling and deferred decision R1.
+                      explicit `scope` -- see u_ceiling, `beta_scope` and deferred
+                      decision R1.
+                      ⚠ **THE CODE CANNOT EXPRESS A SHARE TODAY, AND SAYS SO.** beta_v
+                      normalises over the chain positions it is handed and then HARD
+                      ASSERTS the result -- src/mechanism/utility.py:171 raises
+                      "sum beta_v = ..., not 1. The calibration is void." So run per
+                      chromosome it necessarily produces a per-chromosome sum of 1,
+                      which is exactly what decision B forbids, and its own docstring
+                      (src/mechanism/utility.py:129-135, "AND IT IS PER-CHROMOSOME
+                      EITHER WAY ... Decide before any multi-chromosome run") names the
+                      gap. A genome-wide normaliser with per-chromosome shares is NOT
+                      YET IMPLEMENTED. Until it is, every beta_v, u_ceiling, E_Q[u] and
+                      utility_retained figure on record is CHR21-NORMALISED and is not
+                      a genome-wide number.
                       ⚠ support(v) needs NO computation — measured 2026-09-28,
                       the pangenome VCF's own INFO/AN field is bit-identical to
                       np.sum(pangenome != -1, axis=(0,2)) across all 340,849 chr21
@@ -240,7 +359,19 @@ CHANGES MEANING WITH: whether they are uniform (1/T) or support-weighted, and wh
                       length-weighting is ever adopted. The normalization is what keeps
                       u_path inside [0,1]; weights that do not sum to 1 break the
                       calibration, not just the emphasis.
-Valid vs:             the same weighting scheme.
+                      ⚠ AND WITH THE ARM, through the scope (2026-10-08). **ARM 1's
+                      scope is SETTLED as "chain" on every branch:** `readable` is
+                      produced only by the external-target pipeline, and a
+                      readable-off-G scope is degenerate in Arm 1 because the chain
+                      axis IS G's own deconstructed site list. **ARM 2's scope is
+                      STILL OPEN** (R1/R4): "chain" against a named-public-callset
+                      "chain_readable". See `beta_scope`.
+                      ⚠ AND WITH THE ARM a second way: under per-target leave-one-out
+                      each Arm 1 target has its own support(v) and therefore its own
+                      beta_v, so the 44 releases carry 44 DIFFERENT utility functions.
+                      Pool measured attack outcomes, never utilities (constraint 8).
+Valid vs:             the same weighting scheme, the same arm, and the same
+                      normalisation axis (genome-wide, or one chromosome).
 Status:               SECONDARY
 Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_v`.
 ⚠ THE BUDGET IS INVARIANT IN T. Since u = sum_v beta_v phi_v with sum beta = 1, u lands
@@ -255,10 +386,15 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
                       block design must take a whole block from one donor while C can
                       collect partial credit position by position.
 ⚠ THE REAL CONSEQUENCE OF FINE T IS NUMERICAL. The per-position tilt under C is only
-                      **13.5x** the float32 resolution of 1.19e-07, against 45.7x under
+                      **15.1x** the float32 resolution of 1.19e-07, against 45.7x under
                       a block partition. float64 for the stored alphas is load-bearing,
                       not a preference — float32 would consume a meaningful fraction of
                       the target's entire influence.
+                      ⚠ CORRECTED 2026-10-10: this read **13.5x**, computed over the
+                      340,849-record site axis instead of the chain's T = 305,886. The
+                      chain is the denominator, so it is 0.549306/305,886 = 1.80e-06 and
+                      15.1x. ⚠ Under decision B (genome-wide `beta_v`) the tilt falls
+                      BELOW float32 eps outright — see `docs/bugs.md`.
 ⚠ THE THIN-BUDGET PROBLEM IS A PROPERTY OF tau, NOT OF T. At tau = 0.5 the best-matching
                       path is only 1.73x more likely than the worst; that is what
                       tau = 0.5 MEANS. exp(arctanh(tau)) = 1.1055 / 1.2910 / 1.7321 /
@@ -269,8 +405,11 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
                       The two paragraphs above are correct and are about the wrong
                       quantity for predicting utility. The tilt can only move mass within
                       the range of u that R_D actually REACHES, and that range is not
-                      [0,1]: measured on chr21, HG00096, scope "chain",
+                      [0,1]: measured on chr21, HG00096, scope "chain", ARM 2, with
+                      beta CHR21-NORMALISED (not the decision-B genome-wide axis),
                       Var_Q(u) = 4.046e-06, so sd(u) = 2.011e-03 around E_Q[u] = 0.6951.
+                      These are `e_q_u` and `var_q_u`; both must be re-measured on the
+                      genome-wide beta before any endpoint is pre-registered.
                       The achievable gain is about eta_tau * Var = 2.222e-06 at
                       tau = 0.5 — a signal-to-noise ratio against a single draw of about
                       1:900, needing ~8.3e+05 draws to resolve. MEASURED CONSEQUENCE: the
@@ -297,10 +436,70 @@ Aliases:              ⚠ RENAMED from `beta_t` 2026-09-29, same reason as `phi_
                       between-position COVARIANCE from the mosaic's segment structure,
                       which no beta_v touches. So R3 (rarity weighting instead of call
                       rate) is worth settling on its own merits and is a PRE-REGISTRATION
-                      item under constraint 5, but it is NOT the answer to R5. What
+                      item under constraint 6, but it is NOT the answer to R5. What
                       remains is the tension between exact sampling — phi_v must decompose
                       per position for ffbs — and a utility with real variance. See
                       `docs/plan.md` R5 and `docs/memory.md` 2026-09-30.
+```
+
+### beta_scope  [utility] [method]
+```
+Is:                   WHICH POSITION SET beta_v's normaliser runs over, and therefore
+                      what "sum_v beta_v = 1" is a statement about. The axis is
+                      GENOME-WIDE over the 22 autosomes (decision B); this names the
+                      position set WITHIN that axis. Three values:
+                      **chain** — every chain position. Honest, the current default,
+                      and SETTLED for ARM 1 on every branch.
+                      **chain_readable** — chain positions the target's callset can
+                      also speak to. Legitimate only if `readable` is a function of
+                      something fixed and public (G itself, or a named public callset
+                      pinned in advance), never of the target's own VCF — that is
+                      deferred decision R4, and it is ARM 2's open question (R1/R4).
+                      **window** — a contiguous-window scope for decision A's
+                      SECONDARY utility arm. ⚠ NOT IMPLEMENTED: BETA_SCOPES at
+                      src/mechanism/utility.py:51 is ("chain", "chain_readable") only,
+                      so this value is a glossary placeholder until the code admits it.
+Computed by:          src/mechanism/utility.py:beta_v's `scope` argument, validated
+                      against BETA_SCOPES (src/mechanism/utility.py:51,136-137).
+                      `Utility.scope` carries it onto every figure.
+CHANGES MEANING WITH: the arm, and whether `readable` is target-derived. A
+                      target-derived scope is a standing-constraint-1 violation, not a
+                      utility choice: it makes the normaliser a function of the
+                      private input. ⚠ It also moves `u_ceiling`, so no ceiling is
+                      quotable without it.
+Valid vs:             the same scope only. Two runs under different scopes are
+                      different quantities wearing one name.
+Status:               PRIMARY — a pre-registration item under constraint 6 (R1/R4),
+                      settled for Arm 1 and OPEN for Arm 2.
+Aliases:              "the beta scope", `scope` in code. Never "the window" bare —
+                      the secondary window's width, count, and whether it is ever
+                      DRAWN are all still open.
+```
+
+### beta_share  [utility] [method]
+```
+Is:                   The fraction of the ONE genome-wide beta_v budget that a single
+                      autosome carries: sum of beta_v over that chromosome's positions,
+                      with the 22 shares summing to 1 (decision B). It is what replaces
+                      the per-chromosome "sums to 1" the code enforces today, and it is
+                      why a chr21-normalised figure is not a genome-wide figure: on the
+                      genome-wide axis chr21's weight is its SHARE, not 1.
+Computed by:          NOT YET IMPLEMENTED. It needs a genome-wide normaliser over the
+                      22 autosomes; src/mechanism/utility.py:beta_v normalises over the
+                      positions it is handed and asserts the sum is 1
+                      (src/mechanism/utility.py:171), so it cannot emit a share.
+CHANGES MEANING WITH: the weighting scheme, through w_v = 1/support(v): the share is
+                      NOT the chromosome's position count over the total, because
+                      support varies along the genome. Also with `chain_span` under
+                      decision C, since declared-rate regions add positions that carry
+                      weight. ⚠ Any share computed on a subset of the 22 autosomes is
+                      not this quantity.
+Valid vs:             the other 21 shares from the SAME genome-wide normaliser, and
+                      their sum against 1.
+Status:               PRIMARY — the endpoint under decision A is the genome-wide
+                      utility, and it cannot be read without these.
+Aliases:              "the per-chromosome budget share". ⚠ UNMEASURED for every
+                      autosome, chr21 included. Never estimate it from T alone.
 ```
 
 ### psi_t  [implementation] [mechanism]
@@ -373,6 +572,72 @@ Status:               DIAGNOSTIC — but load-bearing. ⚠ log_z_p IS THE TILTED
                       widening the bracket would discard the cheapest correctness
                       check in the project.
 Aliases:              none. Never "Z_base" in a table; it is not a reportable number.
+```
+
+### e_q_u  [utility] [theory] [evaluation]
+```
+Is:                   E_Q[u], the EXACT expected utility of a release under Q^tau_p —
+                      the first derivative of the log normaliser,
+                      E_Q[u] = d log Z_p / d eta. No sampling and no Monte-Carlo error.
+                      ✅ **THE PRIMARY PRE-REGISTERED ENDPOINT (decision A, 2026-10-08)
+                      IS THIS QUANTITY, GENOME-WIDE**, reported exactly. The sampled
+                      average (`utility_retained`) is its DIAGNOSTIC counterpart, not
+                      the endpoint. A contiguous-window version is a clearly-labelled
+                      SECONDARY arm (see `beta_scope`'s `window` value).
+Computed by:          scripts/results_table.py:var_and_mean — three forward passes of
+                      src/mechanism/ffbs.py:log_z_p at eta - h, eta, eta + h, central
+                      difference, with the step PINNED at H_STEP = 0.05
+                      (scripts/results_table.py:39). Cross-checked against direct
+                      enumeration on the toy. The marginals route —
+                      src/mechanism/ffbs.py:state_marginals, exact for any quantity
+                      that is a per-position sum — is the alternative and is what
+                      src/mechanism/ffbs.py:expected_mismatches already uses.
+                      ⚠ NOT YET A GENOME-WIDE ROUTINE: nothing assembles it across the
+                      22 autosomes, and no script emits it under a genome-wide beta.
+CHANGES MEANING WITH: the ESTIMATOR ROUTE and, for the finite-difference route, the
+                      step h — a derivative taken at a different h is a different
+                      number, so h must be stamped. And with `beta_v`'s scope and
+                      normalisation axis: the recorded value **E_Q[u] = 0.6951**
+                      (HG00096, chr21, scope "chain", ARM 2, tau = 0.5) was taken with
+                      beta CHR21-NORMALISED, so it is NOT the genome-wide endpoint
+                      decision A pre-registers. The genome-wide value is UNMEASURED.
+                      ⚠ AND WITH THE ARM, through the ceiling it must be read against:
+                      quote it beside `u_ceiling` for its OWN arm, never against 1.
+Valid vs:             the same route at matched tau, beta scope and normalisation axis;
+                      and against its own arm's `u_ceiling` and the tau = 0 floor.
+                      On the toy, against direct enumeration — that equivalence is what
+                      licenses the derivative route at scale.
+Status:               PRIMARY — the pre-registered endpoint under decision A.
+Aliases:              "E_Q[u]", "the exact expected utility". ⚠ Never "the utility"
+                      bare, and never interchangeable with `utility_retained`, which is
+                      a finite-sample average of the same quantity.
+```
+
+### var_q_u  [utility] [theory] [diagnostic]
+```
+Is:                   Var_Q(u), the EXACT variance of the utility under Q^tau_p — the
+                      second derivative of the log normaliser,
+                      Var_Q(u) = d2 log Z_p / d eta2. It is what says whether a
+                      measurement of `e_q_u` is resolvable at a feasible number of
+                      draws, which is why it is reported beside it rather than hidden.
+Computed by:          scripts/results_table.py:var_and_mean, the same three forward
+                      passes as `e_q_u` (second central difference, H_STEP = 0.05), and
+                      cross-checked against direct enumeration on the toy
+                      (scripts/results_table.py emits both rows).
+CHANGES MEANING WITH: the estimator route and the step h, exactly as for `e_q_u`; and
+                      with `beta_v` — the recorded **Var_Q(u) = 4.046e-06**, so
+                      sd(u) = 2.011e-03 (HG00096, chr21, scope "chain", ARM 2,
+                      tau = 0.5) is CHR21-NORMALISED and the genome-wide value is
+                      UNMEASURED. ⚠ 94.8% of Var_R(u) is between-position COVARIANCE
+                      from the mosaic's segment structure, which no reweighting of
+                      beta_v touches — see `beta_v`'s last block before concluding that
+                      a utility can be given variance by reweighting.
+Valid vs:             itself across tau at matched beta scope, and against the per-draw
+                      sd it implies. ⚠ It is the denominator of the project's own
+                      feasibility argument: quoting a sampled utility difference without
+                      it is how an unresolvable measurement gets reported as a result.
+Status:               DIAGNOSTIC — reported beside `e_q_u`, never alone.
+Aliases:              "Var_Q(u)", "sd(u)" for its square root. Never "the noise".
 ```
 
 ### ratio_spread  [privacy] [evaluation] [gate]
@@ -452,7 +717,12 @@ Computed by:          src/cohort/genmap.py:chain_mask (built 2026-09-29) plus
                       One position per VCF record inside `chain_span`.
                       chr21: 305,886 positions (340,849 records less the 34,371 below
                       the coordinate cut).
-CHANGES MEANING WITH: the model. C = 340,849 raw / 305,886 after the cut. ✅ MODEL B IS
+CHANGES MEANING WITH: the model, AND the `chain_span` policy. ⚠ Every T on record was
+                      measured under the SUPERSEDED coordinate cut. Under decision C the
+                      map-silent positions are kept and sampled under `declared_rate`,
+                      so T GROWS; the post-decision-C T is UNMEASURED on every autosome,
+                      chr21 included. The figures below are stamped to the old cut.
+                      C = 340,849 raw / 305,886 after the cut. ✅ MODEL B IS
                       BUILT (2026-10-07) and on OUR blocks gives **59,472** chain units,
                       not the 100,757 quoted from PanMixer's block set — our blocks come
                       from the 30x panel with the 10 test targets removed, SNPs only, and
@@ -488,7 +758,12 @@ CHANGES MEANING WITH: the VCF. A re-sort, a re-filter or a different `vg` versio
                       which row is which SILENTLY, because every join in the pipeline is
                       positional. ⚠ Distinct from T: `n_sites` is the axis, T is the
                       number of CHAIN positions, which is `n_sites` restricted to
-                      `chain_span` (chr21: 305,886 of 340,849).
+                      `chain_span` (chr21: 305,886 of 340,849 under the SUPERSEDED cut;
+                      under decision C the restriction is support(v) > 0 alone, so T
+                      rises toward `n_sites` by an amount that is UNMEASURED).
+                      ⚠ And with the BUILD: decision F rebuilds both arms' starting data
+                      on one consistent GRCh38, and the 22 autosomes each have their own
+                      `n_sites` — only chr21's is measured.
 Valid vs:             the same VCF, verified by the `sites.tsv` digest.
 Status:               SECONDARY
 Aliases:              "the site axis", "rows". Never "T".
@@ -520,30 +795,66 @@ Aliases:              none
 ### chain_span  [dataset] [method]
 ```
 Is:                   The coordinate interval of a chromosome the chain actually runs
-                      over. ✅ chr21 (decided 2026-09-28, closed at both ends 2026-09-29):
-                      **12,968,320 < POS <= 46,680,243** — the interval over which the
-                      genetic map carries real markers — keeping **305,886** of 340,849
-                      variants (89.74%). Everything outside is excluded from the chain
-                      and from the release.
-                      ⚠ **PROVISIONAL — Dylan to settle with his PI.** This is the cut
-                      that lets v1 run, not a defended answer. Revisit it before any
-                      result is published; the full option set is in the REVISIT block.
+                      over, and — since decision C — the cM SOURCE of every position
+                      inside it.
+                      ✅ **THE COORDINATE CUT IS SUPERSEDED FOR THE MAP-SILENT REGIONS
+                      (decision C, Dylan, 2026-10-08).** Regions where the genetic map
+                      gives NO cM AT ALL are no longer EXCLUDED — they are SAMPLED
+                      under a DECLARED CONSTANT RECOMBINATION RATE (`declared_rate`).
+                      So the chain runs over the whole assembled autosome, the map's
+                      marker span becomes an INPUT PROPERTY that selects which
+                      positions get a MAP-INTERPOLATED cM and which get a declared-rate
+                      cM, and nothing is dropped for want of a cM. This RESOLVES
+                      deferred decision R2 (the provisional cut). Positions may still
+                      leave the chain on named, NON-MAP grounds: support(v) == 0, where
+                      no donor has a called allele, so the sampler has nothing to emit
+                      and RENORMALISE has an empty pool.
+                      ⚠ **SCOPE, NARROW AND DELIBERATE: decision C REACHES THE
+                      MAP-SILENT REGIONS ONLY.** The INTERIOR zero-cM map PLATEAUS
+                      inside the mapped span are NOT overridden — see the block below,
+                      which still stands. That question is DEFERRED until a per-autosome
+                      gap measurement exists.
+                      ⚠ **THE RATE'S VALUE IS NOT YET CHOSEN** and whether it is global
+                      or per-chromosome is open, so the bp and position counts the two
+                      cM sources cover are UNMEASURED on every autosome, chr21
+                      included (`map_coverage`). Do not quote a post-decision-C span
+                      until they are measured.
+                      THE SUPERSEDED chr21 CUT, retained because every number on record
+                      was measured under it: chr21 (decided 2026-09-28, closed at both
+                      ends 2026-09-29) ran **12,968,320 < POS <= 46,680,243** — the
+                      interval over which the genetic map carries real markers —
+                      keeping **305,886** of 340,849 variants (89.74%), with everything
+                      outside excluded from the chain and from the release.
 Computed by:          configs/inputs.chr21.yaml `chain_span`, applied by
                       src/cohort/genmap.py:chain_mask (built 2026-09-29). Stored as a
                       MASK over the full axis, never as a row filter.
+                      ⚠ **BOTH STILL ENCODE THE SUPERSEDED CUT, and neither can express
+                      a declared-rate position.** The config block carries `start`,
+                      `end`, `keeps: 305886`, `dropped_below`, `dropped_above`,
+                      `provisional: true` and two `unresolved` entries;
+                      src/cohort/genmap.py:chain_mask RAISES on any position inside the
+                      span with no interpolated cM. Not yet rewritten — the rate's value
+                      is unchosen, so there is nothing to encode yet.
 CHANGES MEANING WITH: the chromosome and the genetic map. It is a property of the
                       ASSEMBLY and the MAP, never of the target — which is what makes it
                       safe: it is fixed before the target is opened, so R_D stays a
                       function of D alone and Theorem 1 is untouched. ⚠ NEVER let an
                       exclusion become target-dependent (e.g. "drop positions where the
                       target is missing"); that would leak.
-Valid vs:             the same span. Any utility or fidelity number must name it, since
-                      the denominator changes with it.
-Status:               PRIMARY — a release that does not state its span is not quotable.
-Aliases:              "the coordinate cut"
+Valid vs:             the same span AND the same cM-source policy. Any utility or
+                      fidelity number must name both, since the denominator changes
+                      with the span and the transition model changes with the source.
+Status:               PRIMARY — a release that does not state its span is not quotable,
+                      and after decision C a span stated without its declared rate and
+                      its per-position cM source is not a stated span.
+Aliases:              "the coordinate cut" — ⚠ now a HISTORICAL name: under decision C
+                      the map-silent regions are no longer cut. Do not use it for the
+                      post-decision-C span.
 ```
 
-**WHAT THE p ARM IS, and why chr21's is excluded.** Every chromosome has a pinch point,
+**WHAT THE p ARM IS, and why chr21's WAS excluded** (the exclusion is superseded by
+decision C; the p arm is now sampled under `declared_rate`, and everything below is the
+recorded reason it needs a DECLARED rate rather than interpolation). Every chromosome has a pinch point,
 the **centromere**, dividing it into a short arm — **p**, from French *petit* — and a long
 arm, **q** (simply the next letter). On most chromosomes both arms carry genes. But five
 human chromosomes — **13, 14, 15, 21 and 22** — are **acrocentric**: the centromere sits
@@ -552,15 +863,61 @@ long tandem arrays of **rDNA** genes (the ones encoding ribosomal RNA). Those ar
 near-identical *between* the five acrocentric chromosomes, which is why assemblers cannot
 place them uniquely and why GRCh38 fills them with N. chr21's p arm is the 0–~12 Mb region.
 
-**The live defect the cut fixes.** `np.interp` clamps by default, so all 26,018 variants
-below the map's start (10,326,676) receive the map's first value; and the map's own first
-interval (10,326,676 → 12,968,320, spanning the centromere) carries **dcM = 0.000000**.
+**The live defect the cut fixed — and which decision C fixes only HALF of.**
+⚠ **CORRECTED 2026-10-09.** This block briefly read that a declared rate "gives these
+positions a NON-ZERO `Delta_x`, so `P(switch) > 0` and the verbatim-emission failure
+below is answered by sampling rather than by exclusion." **That over-states decision C's
+reach**, because the failure below has two halves and the rate reaches only one:
+- **Half one — MAP-SILENT, and the rate DOES apply.** `np.interp` clamps by default, so
+  all **26,044** variants below the map's start (10,326,676) receive the map's first
+  value. ⚠ **MEASURED ON OUR BUILD 2026-10-10**, replacing the 26,018 that stood here —
+  that figure is PanMixer's vg-1.36 340,824-record build. On our 340,849-record build it
+  is 26,044, of which 26,043 have `support > 0`. This is the quantity the declared rate
+  actually applies to on chr21.
+- **Half two — A MEASURED ZERO INSIDE THE MAPPED SPAN, and the rate does NOT apply.** The
+  map's own first interval (10,326,676 → 12,968,320, spanning the centromere) carries
+  **dcM = 0.000000**. Under decision C as scoped this is an interior zero-cM plateau and
+  is deliberately untouched.
+
+⚠⚠ **THE CONSEQUENCE, AND IT IS A LIVE RESIDUAL — NOW WITH A SIZE.** The superseded cut
+ran to 12,968,320, which sits **above** the map's first marker at 10,326,676 — so 2.64 Mb
+of what the cut removed is INSIDE the mapped span. Decision C re-admits those positions to
+the chain, and because their `dcM` is a measured zero they will be emitted as a **verbatim
+donor run**. So decision C does not simply restore the p arm: it restores part of it under
+the declared rate and part of it under `P(switch) = 0`.
+
+**MEASURED 2026-10-10 on our 340,849-record build**, resolving two figures in these docs
+that did not reconcile:
+
+| class | positions | `support > 0` | declared rate? |
+|---|---|---|---|
+| below the map start (< 10,326,676) — map-silent | **26,044** | 26,043 | **applies** |
+| in [10,326,676, 12,968,320] — in-span zero-cM plateau | **8,327** | 8,327 | **does NOT** |
+| sum | **34,371** | — | — |
+| above the map end (> 46,680,243) — map-silent | **592** | — | **applies** |
+
+The sum matches the recorded below-cut count exactly, and the plateau is genuinely flat:
+**one** distinct cM value (0.584144) among all map markers in that interval. ⚠ The 26,018
+that circulated in these docs is PanMixer's 340,824-record build, and 26,018 + 8,327 =
+34,345 is why a second total was also on record. Ours is 26,044 + 8,327 = 34,371.
+
+**So the residual is 8,327 chr21 positions — 2.7% of a 305,886-position chain — all of
+them usable (`support > 0`) and all at `P(switch) = 0`.** Whether that is acceptable is
+open question 2 and is Dylan's call; the point is that it is a known quantity, not an
+unknown. The same split on the other 21 autosomes IS unmeasured and belongs to
+`B-DAT-map-coverage`. In Arm 1 the donors are the protected population, so a verbatim run
+there is a privacy cost, not merely a utility one.
 Together that is **34,371 positions excluded by the cut** (26,044 NaN below the map plus 8,327 on the map's zero-cM centromeric plateau, all at cM 0.584144 exactly), so `Delta_x = 0`,
 `P(switch) = 0`, and the sampler emits **one donor's real haplotype verbatim across
 7.25 Mb** — departure (b) at roughly 200x the scale of the worst single block. This is a
 privacy failure, not a utility one, and it is silent.
 
-**Five independent reasons, each sufficient** (all measured or cited 2026-09-28):
+**Five independent reasons, each sufficient** (all measured or cited 2026-09-28). ⚠ Under
+decision C these are no longer grounds for EXCLUSION — they are the recorded justification
+for a DECLARED rate instead of an interpolated one, and the record of what the released
+p-arm calls rest on. **Reason 1 inverts into a live hazard:** a constant cM/Mb applied to
+fabricated N-gap distance MANUFACTURES genetic distance, so the declared rate must NOT be
+accumulated across the fabricated N-gaps — see `declared_rate`.
 
 | leg | evidence |
 |---|---|
@@ -570,8 +927,11 @@ privacy failure, not a utility one, and it is silent.
 | no measured recombination | deCODE's pedigree map (4.5M observed crossovers) assigns **0.0 cM/Mb to every 1 Mb bin from 0–13 Mb** |
 | none observed directly | a four-generation CEPH pedigree: *"Not a single allelic recombination was observed on the p-arm"* — 107 transmissions across ~38 Mbp of acrocentric short arms |
 
-⚠ **REVISIT — this is a pragmatic cut to get v1 running, not a settled answer.** Recorded
-here so it can be picked up once the base mechanism works:
+✅ **REVISITED AND SETTLED IN PART (decision C, 2026-10-08).** The option taken is none of
+the ones below: the region is kept and given a DECLARED CONSTANT RATE, which is why the
+rejections below still matter — they are the reasons an interpolated map was refused. What
+remains OPEN is the rate's numeric VALUE and whether it is global or per-chromosome. The
+original revisit list, recorded verbatim:
 - **Maps that nominally cover the region exist.** pyrho hg38 (Spence & Song 2019, Zenodo
   11437540) covers chr21 from **5,088,754 bp** and gives every variant a distinct cM; the
   Eagle redistribution of our own HapMap map carries **66 markers** and 0.6166 cM inside the
@@ -595,13 +955,48 @@ end** (map ends 46,680,243; positions run to 46,699,788) formed a **593-position
 zero-distance run** — structurally the identical defect to the p arm, 58x shorter. They are
 excluded, on the same principle: extrapolating there would invent genetic distance in a
 subtelomeric region, which is exactly what we declined to do at the other end. Cost: 592 of
-306,479 = **0.19%**. The invariant *every chain position carries a genuine interpolated cM*
-is now literally true, which is what makes the `assert no NaN` gate meaningful.
+306,479 = **0.19%**.
+
+⚠ **AND THE TELOMERIC END IS MAP-SILENT, SO DECISION C REACHES IT TOO.** Those 592
+positions are above the map's last marker — no cM at all — so under decision C they are
+kept and sampled under `declared_rate` rather than excluded, on the same footing as the
+p arm. The refusal to EXTRAPOLATE the map stands; a declared rate is not an extrapolation
+of the map.
+
+⚠ **THE no-NaN INVARIANT IS RESTATED, NOT KEPT.** The old invariant — *every chain position
+carries a genuine interpolated cM* — is **false by design** under decision C, and so is the
+`assert no NaN` reading of the gate that rested on it. The replacement invariant: *every
+chain position carries a FINITE cM from exactly ONE of the two DECLARED sources — map
+interpolation or the declared constant rate — the SOURCE is recorded per position, and
+cumulative cM is non-decreasing along the chromosome.* ⚠ NOT YET IMPLEMENTED:
+src/cohort/genmap.py:chain_mask still RAISES on a non-finite cM inside the span
+(src/cohort/genmap.py:59-88), which is the old invariant, and no per-position source array
+exists. The gate must be replaced rather than widened — widening it to accept NaN would
+discard the check entirely.
 
 ⚠ **ONE ZERO-DISTANCE CASE REMAINS, and it is correct to leave.** **618 interior map
 intervals have dcM = 0**, covering 2.71 Mb, with ~1,650 kept variants inside them. These are
 REAL map plateaus, and `P(switch) = 0` between two variants with no genetic separation is
 the CORRECT model, not a defect.
+
+✅ **AND DECISION C DOES NOT TOUCH THEM (2026-10-08).** The declared constant rate applies
+ONLY to the MAP-SILENT regions — no cM at all. Interior plateaus sit INSIDE the mapped span,
+where the map does speak and says zero, so the repo's position above STANDS and is not
+stale. It is enforced as a Theorem-1 SUPPORT property by
+tests/test_toy_enumeration.py:154-185 (`test_a_forced_stay_step_really_forbids_switching`),
+whose docstring cites this very block: a tilt that pushed mass onto a path requiring a
+switch across a zero-distance step would be emitting a path `R_D` assigns zero probability,
+which is outside the support the theorem is stated over.
+
+⚠ **WHAT IS DEFERRED, AND IT IS NOT NOTHING.** Whether interior plateaus are eventually
+overridden is OPEN, and it is deferred until a PER-AUTOSOME gap measurement exists — the
+chr21 figures above (618 intervals, 2.71 Mb) are the only ones measured, and the genome-wide
+extent over the 22 autosomes is **UNMEASURED** (`map_coverage`). Measure it before arguing
+the question either way, and do not carry a chr21 figure into a genome-wide claim. The
+reason it needs settling at all: where `P(switch) = 0` over a long run, the sampler emits
+one donor's real haplotype verbatim, and in **ARM 1** that donor is a cohort member whose
+protection is in scope — the same departure (b) the p-arm cut was made to avoid. In **ARM 2**
+the donors are the public cohort and this project makes no claim about protecting them.
 
 ✅ **WHAT CLOSING BOTH ENDS SIMPLIFIES.** Two planned artifacts fall away. `genetic_pos_valid`
 is unnecessary — inside the span every position has a real cM by construction. And explicit
@@ -610,8 +1005,108 @@ chain SEGMENTS are unnecessary: a long variant-free stretch inside the span prod
 behaviour. The chain does not need to be broken by hand anywhere inside `chain_span`.
 
 ⚠ **INTERPOLATE WITH `left=nan, right=nan`**, then assert no NaN survives the cut. That one
-change converts a silent 34,371-position failure into a crash.
+change converts a silent 34,371-position failure into a crash. ⚠ Under decision C the FIRST
+half of that rule stays — never clamp, so the map-silent positions are identifiable rather
+than silently given the map's first value — and the SECOND half changes: a NaN from the
+interpolation is now the SIGNAL that a position takes the declared rate, so the assertion
+becomes "every chain position ends with a finite cM and a recorded source", per the restated
+invariant above. Clamping remains forbidden: it is what hid 34,371 positions in the first
+place.
 
+
+### declared_rate  [dataset] [method]
+```
+Is:                   The DECLARED CONSTANT RECOMBINATION RATE, in cM/Mb, used to give
+                      a genetic distance to the MAP-SILENT regions of an autosome —
+                      the regions where the genetic map gives NO cM AT ALL. Introduced
+                      by decision C (Dylan, 2026-10-08), which replaced the coordinate
+                      cut: those regions are now SAMPLED rather than excluded, so the
+                      chain needs a `Delta_x` there, and a declared constant is the one
+                      choice that does not pretend to be a measurement.
+                      ⚠ **ITS VALUE IS NOT YET CHOSEN, AND MUST NOT BE INVENTED.**
+                      Neither the number nor whether it is GLOBAL or PER-CHROMOSOME is
+                      settled. Both are genuinely open as of 2026-10-08. Any figure
+                      appearing for this quantity before Dylan sets it is fabricated.
+Computed by:          not computed — DECLARED, and pre-registered with tau, the utility
+                      function, the endpoints, the attacker set and the attack database
+                      under constraint 6. NOT YET IMPLEMENTED: nothing in
+                      src/cohort/genmap.py can assign a non-map cM, and
+                      configs/inputs.chr21.yaml has no field for a rate.
+CHANGES MEANING WITH: the reach it is given and the distance it is applied to.
+                      ⚠ IT APPLIES TO THE MAP-SILENT REGIONS ONLY. The INTERIOR
+                      zero-cM map plateaus inside the mapped span are NOT overridden —
+                      see `chain_span`. Applying it there is a different decision,
+                      still open.
+                      ⚠ AND IT MUST NOT BE ACCUMULATED ACROSS FABRICATED SEQUENCE. The
+                      largest map-silent region on chr21 is placeholder GRCh38 model
+                      sequence (5,010,000-10,814,560: 25 contigs separated by fabricated
+                      N-gaps, 22 of them exactly 50 kb), where base-pair distance is
+                      fictitious. A constant cM/Mb times a fabricated bp span
+                      MANUFACTURES genetic distance. The declared policy must say what
+                      happens at an N-gap before any rate is applied.
+                      ⚠ AND WITH THE MONOTONICITY IT IMPLIES: the declared-rate cM has
+                      to be stitched to the mapped cM so cumulative cM stays
+                      non-decreasing across the boundary in GRCh38 coordinates.
+Valid vs:             itself, as a declared constant, and against the measured maps
+                      that were REJECTED for the same region (pyrho hg38 from
+                      5,088,754 bp; the Eagle redistribution's 66 markers and 0.6166 cM
+                      inside the old cut) — rejected because they spend ~10 cM across
+                      intervals defined by two markers, 23-26% of chr21's genetic length
+                      in a region with ZERO observed crossovers. A declared constant is
+                      honest about being a declaration; those were interpolation across
+                      a void wearing the clothes of measurement.
+Status:               PRIMARY — it supersedes deferred decision R2 and it is on the
+                      critical path: `chain_span`, T, `beta_v`, `expected_switches` and
+                      every denominator move with it.
+Aliases:              "the constant rate", "the declared rate". ⚠ NEVER "the
+                      genome-wide average rate" (~1.2 cM/Mb is a POPULATION-GENETIC
+                      fact about mapped sequence, not this project's declaration) and
+                      never "the interpolated rate" — the whole point is that it is
+                      declared, not interpolated.
+```
+
+### map_coverage  [dataset] [method]
+```
+Is:                   How much of an autosome the genetic map actually speaks to, and
+                      therefore how much of it decision C hands to `declared_rate`.
+                      Per autosome, three quantities that must be reported together:
+                      (a) the MAPPED span's bp and the count of VCF records inside it;
+                      (b) the MAP-SILENT bp and record count — below the first marker,
+                      above the last, and any gap in the middle with no marker at all,
+                      which is what decision C's declared rate covers; and (c) the
+                      INTERIOR ZERO-cM bp and record count — inside the mapped span,
+                      where the map speaks and says zero — which decision C does NOT
+                      cover and which is reported separately so the two are never added.
+Computed by:          NOT MEASURED for 21 of 22 autosomes. No script computes it;
+                      `src/cohort/genmap.py` interpolates one chromosome against one map
+                      and asserts, and nothing tabulates coverage. `B-DAT-map-coverage`
+                      is the work item.
+                      ✅ **chr21 IS measured, 2026-10-10, on our 340,849-record build:**
+                      **26,044** records below the map's start (10,326,676), of which
+                      26,043 have `support > 0`; **8,327** in [10,326,676, 12,968,320],
+                      the in-span zero-cM plateau, all with `support > 0`; the two sum to
+                      the recorded **34,371** dropped by the superseded cut; and **592**
+                      above the map's end (46,680,243). ⚠ The **26,018** previously
+                      quoted here is PanMixer's 340,824-record build — pairing it with
+                      8,327 gives 34,345, which is why two different totals were on
+                      record. Ours is 26,044. Plus 618 interior zero-cM
+                      intervals covering 2.71 Mb with ~1,650 kept variants.
+CHANGES MEANING WITH: the MAP (a different map has different markers, so this is a
+                      property of the map-and-assembly pair, never of the target), the
+                      autosome, and above all WHICH OF THE THREE QUANTITIES is being
+                      quoted. ⚠ Conflating (b) with (c) is the specific error decision
+                      C's scope narrowing exists to prevent: they get different
+                      treatment, so a single "zero-distance bp" number is not usable.
+Valid vs:             the same map on the same build, per autosome. A genome-wide total
+                      is quotable only once all 22 are measured — the 22 are NOT
+                      interchangeable (chr21 is acrocentric; most are not).
+Status:               PRIMARY — the deferred interior-plateau question is explicitly
+                      deferred UNTIL this exists, and `declared_rate`'s reach cannot be
+                      stated without it.
+Aliases:              "map silence", "the no-cM regions". ⚠ UNMEASURED genome-wide. Any
+                      genome-wide Mb or percentage for this quantity is unverified: do
+                      not quote one, and do not scale chr21's figures to 22 autosomes.
+```
 
 ### expected_switches  [implementation] [gate]
 ```
@@ -620,9 +1115,19 @@ Is:                   E[number of donor changes] along the chain under the PRIOR
                       and the chain architecture -- never of the target.
 Computed by:          src/mechanism/hmm.py:CohortHMM.expected_switches (built
                       2026-09-30)
-CHANGES MEANING WITH: the chain ARCHITECTURE above all. Measured on chr21 at K = 88:
+CHANGES MEANING WITH: the chain ARCHITECTURE above all. Measured on chr21 at K = 88,
+                      ARM 2, under the SUPERSEDED coordinate cut (T = 305,886):
                       **7,021.0** under model C and **3,394.1** under model B, against
-                      7,155 and 3,532 predicted independently on 2026-09-28. Also with
+                      7,155 and 3,532 predicted independently on 2026-09-28.
+                      ⚠ BOTH MOVE UNDER DECISION C, in both of their inputs: the chain
+                      gains the map-silent positions, and those positions carry a
+                      `declared_rate` cM instead of a zero one, so they contribute
+                      switch mass where they previously contributed none and were then
+                      excluded. The post-decision-C value is UNMEASURED and its
+                      independent prediction has to be re-derived with the rate, which
+                      is unchosen. ⚠ AND WITH K: at ARM 1's K = 86 the (K-1)/K factor
+                      and the per-state mass both change, so an Arm-1 figure is not an
+                      Arm-2 figure. Also with
                       the genetic map, which is what makes it a canary -- PanMixer's
                       shipped sampler gives about 0 because its distance is a VCF row
                       index.
@@ -655,8 +1160,16 @@ CHANGES MEANING WITH: the PLOIDY — a diploid release reports the sum over both
                       ⚠ Also with the genetic map, which is what makes it a useful
                       canary: PanMixer's shipped sampler gives ~0 because its distance
                       is a VCF row index.
-Valid vs:             expected_switches under the same cohort and chain_span, and
-                      against the analytic segment length. Measured 2026-09-30 on our
+Valid vs:             expected_switches under the same cohort, the same arm and the
+                      same chain_span, and against the analytic segment length.
+                      ⚠ **EVERY FIGURE BELOW IS ARM 2, K = 88, UNDER THE SUPERSEDED
+                      COORDINATE CUT (T = 305,886)** — stamped 2026-10-10 to match
+                      `expected_switches`. All of them MOVE under decision C (more
+                      positions enter the chain, and map-silent positions gain a
+                      declared-rate cM where they previously had none) and under
+                      decision E (Arm 1's K = 86 changes the (K-1)/K factor). The
+                      post-decision-C values are UNMEASURED.
+                      Measured 2026-09-30 on our
                       chr21 build at K = 88: prior expectation **7,021.0** per
                       haplotype, against the **7,155** the model-C decision predicted
                       independently; realised **14,169** for a diploid release
@@ -678,20 +1191,42 @@ Is:                   K, the number of cohort haplotype states. At most ~2n for 
                       are collapsed.
 Computed by:          src/mechanism/hmm.py:CohortHMM.K = haplotypes.shape[0]
                       (built 2026-09-30).
-CHANGES MEANING WITH: whether duplicates have been collapsed. A K quoted before
-                      collapse and a K quoted after are different numbers; runtime
-                      claims must say which.
+CHANGES MEANING WITH: ⚠ **THE ARM, FIRST OF ALL (decision E, 2026-10-08).**
+                      **ARM 2: K = 88** — the target is external, so the full cohort is
+                      the donor panel and nothing is held out. **ARM 1: K = 86** — the
+                      target is a cohort member and per-target leave-one-out removes
+                      BOTH of its haplotypes. A K quoted without its arm is ambiguous,
+                      and the two are not interchangeable: alpha storage, runtime, the
+                      uniform initial distribution and every per-state switch
+                      probability s_t/K are all functions of K. The K = 86 figures are
+                      ~2.3% smaller than the K = 88 ones.
+                      ⚠ Arm 1's K = 86 is applied by MASKING two haplotype rows in
+                      memory at release time, not by building a second cohort tree, so
+                      the K = 88 artifacts on disk remain the source and the release
+                      record must carry the masked haplotype ids.
+                      Also with whether duplicates have been collapsed. A K quoted before
+                      collapse and a K quoted after are different numbers.
                       ⚠ **COLLAPSE IS NOT IMPLEMENTED (gap found by audit, 2026-09-30).**
                       No collapse, no policy, no declaration, and no assertion that
-                      duplicates are absent. **EVERY K = 88 this project quotes is
-                      therefore PRE-COLLAPSE**, including the runtime and alpha-storage
-                      figures, and none of them said so until now. Two donors identical
-                      across all 305,886 chain positions would be two states the
-                      mechanism treats as distinct — which changes the uniform initial
-                      distribution and every per-state switch probability s_t/K, since
-                      both are functions of K. Whether it OCCURS on this cohort is
-                      unmeasured. Measure it before quoting K again.
-Valid vs:             the same cohort at the same collapse policy.
+                      duplicates are absent. **EVERY K this project quotes is therefore
+                      PRE-COLLAPSE**, including the runtime and alpha-storage figures.
+                      Two donors identical across all chain positions would be two
+                      states the mechanism treats as distinct, putting twice the prior
+                      mass on one haplotype.
+                      ✅ **BUT IT DOES NOT OCCUR ON THIS COHORT — MEASURED 2026-09-30:**
+                      all 88 haplotypes are DISTINCT over the 305,886 chain positions,
+                      and the closest pair differs at **32,741** of them (10.7%). So
+                      every K = 88 quoted is correct; what was missing is that nothing
+                      said so and nothing checked. The gap is a missing ASSERTION, not a
+                      wrong number. ⚠ CORRECTED 2026-10-10: this field previously read
+                      "Whether it OCCURS on this cohort is unmeasured. Measure it before
+                      quoting K again" — stale, since the measurement was taken the same
+                      day the gap was filed and is recorded in `docs/plan.md`.
+                      ⚠ Removing two haplotypes cannot CREATE a duplicate, so the
+                      measurement carries to Arm 1's K = 86 — but a different cohort or a
+                      shorter chain could produce one, so the assertion is still worth
+                      adding.
+Valid vs:             the same cohort at the same collapse policy AND the same arm.
 Status:               SECONDARY
 Aliases:              "K", "donor states"
 ```
@@ -1044,10 +1579,19 @@ Computed by:          external/PanMixer/tools/panmixer/obfuscate.py:207-211,279-
 CHANGES MEANING WITH: whether support is computed on the cohort INCLUDING the target
                       (as shipped it is); whether -1 is masked before comparing; and
                       a legacy 2/support variant in get_support.py:25.
-Valid vs:             itself across capacities on one cohort. It is a COST, unbounded
-                      above — it is NOT a similarity and must not be used as phi_t
-                      without the normalization recorded under phi_t.
-Status:               DIAGNOSTIC
+                      ⚠ AND WITH THE ARM, via that first clause. In ARM 1 the target is
+                      a cohort member and `loo_cohort` removes BOTH its haplotypes, so
+                      support(v) is over K = 86 on our side while PanMixer's shipped
+                      support is over all 88. Report which support each column used; a
+                      head-to-head that silently mixes the two is comparing
+                      denominators, not mechanisms.
+Valid vs:             itself across capacities on one cohort, at a stated support. It
+                      is a COST, unbounded above — it is NOT a similarity and must not
+                      be used as phi_v without the normalization recorded under phi_v.
+Status:               ARM 1: PRIMARY — **the ONLY metric adopted from PanMixer's
+                      utility suite** (decision H, 2026-10-08); `af_loss` and `ld_loss`
+                      are not adopted. ARM 2: DIAGNOSTIC — an axis we can plot on, not
+                      an endpoint.
 Aliases:              "utility loss". Ours is `utility_retained`; do not mix the names.
 ```
 
@@ -1059,16 +1603,35 @@ Is:                   PanMixer's allele-frequency utility loss U_AF: the L1 chan
 Computed by:          external/PanMixer/tools/downstream/utility_in/af_loss.py:77-183
 CHANGES MEANING WITH: the MAF strata, which are read from pangenome_mask.npy — the
                       cross-build match set. Under the GRCh37/GRCh38 mismatch every
-                      stratum is 0/0. Also with the row count: comparing a 44-row
-                      cohort AF to a 45-row one shifts every frequency by ~1/45.
+                      stratum is 0/0; `docs/data.md` section 6 marks everything derived
+                      from that mask DEPRECATED, and decision F requires it rebuilt on
+                      OUR consistent GRCh38 build, genome-wide, before the quantity
+                      could be computed at all.
+                      Also with the row count: comparing a 44-row cohort AF to a 45-row
+                      one shifts every frequency by ~1/45. ⚠ That caveat was a property
+                      of the EXTERNAL-target reading — pretending the target is a 45th
+                      member. In ARM 1 the release REPLACES one of the 44 columns, so
+                      the row count is 44 on both sides and the shift does not arise;
+                      the identical-site-set and identical-row-count requirement still
+                      has to be ASSERTED rather than assumed.
 Valid vs:             the other arm at the identical site set and row count.
-Status:               PANMIXER-ONLY. ⚠ **This is not a metric this project computes.**
-                      Its signal is the change in the COHORT's allele frequencies caused
-                      by overwriting one member's genotype column. We never modify the
-                      cohort, so the quantity is not defined for our release object —
-                      running it on our output would measure the distortion of pretending
-                      our external target were cohort member k. Our utility axes are
-                      `target_fidelity` (always against its ceiling) and `utility_retained`.
+Status:               PANMIXER-ONLY — **NOT ADOPTED by this project in either arm
+                      (decision H, 2026-10-08), and that is a SCOPE CHOICE, not a
+                      definitional impossibility.**
+                      ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE.** This entry
+                      used to say "we never modify the cohort, so the quantity is not
+                      defined for our release object". That is true of ARM 2 only. In
+                      ARM 1 the released object IS the 44 cohort members' obfuscated
+                      paths, so a release does change the released cohort's allele
+                      frequencies and U_AF is FULLY DEFINED for us there. The reason we
+                      do not report it is that **Arm 1 reports
+                      `utility_loss_panmixer` ONLY** from PanMixer's utility suite
+                      (decision H); af_loss and ld_loss are out of scope for the
+                      head-to-head, not out of reach.
+                      ARM 2: n/a BY DEFINITION — the release never edits the cohort.
+                      Our own utility axes remain `target_fidelity` (always against
+                      its OWN ARM's ceiling), `utility_retained` and, as the
+                      pre-registered endpoint, `e_q_u`.
 Aliases:              "U_AF"
 ```
 
@@ -1077,17 +1640,31 @@ Aliases:              "U_AF"
 Is:                   PanMixer's linkage-disequilibrium utility loss U_LD: the change
                       in pairwise LD among nearby sites induced by a release.
 Computed by:          external/PanMixer/tools/downstream/utility_in/ld_loss.py:16-123
-CHANGES MEANING WITH: the window — the shipped KB_WINDOW_SIZE = 5 is compared against
-                      raw bp, so the window is 5 BASE PAIRS, not the paper's 5 kb; and
-                      the site set (pangenome_mask.npy again), which under the build
-                      mismatch makes it return (0.0, 0) rather than raising.
-Valid vs:             the other arm at the identical window and site set. Run it both
-                      as-shipped (for parity with the paper) and corrected, reporting both.
-Status:               PANMIXER-ONLY — same as `af_loss`: a cohort-distortion metric that
-                      is not defined for a release which never edits the cohort. Not a
-                      metric this project computes. The honest analogue, if one is wanted,
-                      is the LD DECAY CURVE of our release ensemble against the cohort's
-                      over R draws at real distances — a different quantity, not `ld_loss`.
+CHANGES MEANING WITH: the window — the shipped KB_WINDOW_SIZE = 5
+                      (external/PanMixer/tools/downstream/utility_in/ld_loss.py:8) is
+                      compared against raw bp at ld_loss.py:107, so the window is
+                      5 BASE PAIRS, not the paper's 5 kb; and the site set
+                      (pangenome_mask.npy again, DEPRECATED in `docs/data.md`
+                      section 6), which under the build mismatch makes it return
+                      (0.0, 0) rather than raising.
+Valid vs:             the other arm at the identical window and site set. If it is ever
+                      run, run it BOTH as-shipped (5 bp, for parity with the published
+                      figure) and corrected to 5,000 bp, as two separate rows — never
+                      one row whose window is unstated.
+Status:               PANMIXER-ONLY — **NOT ADOPTED by this project in either arm
+                      (decision H, 2026-10-08), as a SCOPE CHOICE.**
+                      ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE,** exactly as
+                      for `af_loss`: this entry used to say it "is not defined for a
+                      release which never edits the cohort". That describes ARM 2 only.
+                      In ARM 1 the released object is the 44 cohort members' paths, so
+                      the release does change the released cohort's LD and U_LD is
+                      FULLY DEFINED for us there. We decline it because Arm 1 reports
+                      `utility_loss_panmixer` only (decision H), not because it cannot
+                      be computed.
+                      ARM 2: n/a BY DEFINITION — the release never edits the cohort.
+                      The honest analogue, if one is wanted, is the LD DECAY CURVE of
+                      our release ensemble against the cohort's over R draws at real
+                      distances — a different quantity, not `ld_loss`.
 Aliases:              "U_LD"
 ```
 
@@ -1110,56 +1687,132 @@ Is:                   PanMixer's integration artifact: the released allele vecto
                       target, shape (n_sites, 2) int16, -1 = missing, row-aligned to
                       that chromosome's pangenome VCF record order. Every PanMixer
                       attack and utility evaluator consumes exactly this file.
-Computed by:          PanMixer writes it from tools/panmixer/stacker.py. OPTIONAL for us.
+Computed by:          PanMixer writes it from tools/panmixer/stacker.py. On our side it
+                      is PLANNED and UNIMPLEMENTED — nothing in src/ emits this format.
+                      ⚠ It is no longer optional: under decision E Arm 1 runs PanMixer's
+                      own evaluations on our release, and this file is what every one of
+                      their evaluators consumes. It is ARM 1 PLUMBING.
 CHANGES MEANING WITH: the site axis. It is positional — a row-order mismatch silently
                       scores the wrong variants rather than erroring. ⚠ The shape
                       assertion in PanMixer's gap-score evaluators is VACUOUS (both sides
                       equal site_mask.sum() by construction), so nothing upstream catches
                       this. Ship a `sites.tsv` beside any emitted copy and verify it.
-Valid vs:             another new_haplotypes over the identical site axis and cohort.
-Status:               COMPARISON-ARM ONLY. Emitting it is the cheapest way to run
-                      PanMixer's ATTACK evaluators on our release unmodified, and it is
-                      worth doing for the head-to-head. It is NOT a requirement of the
-                      mechanism, and emitting it does not make PanMixer's cohort-level
-                      utility metrics applicable to us — `af_loss` and `ld_loss` would
-                      run and return meaningless numbers.
+                      ⚠ AND WITH THE BUILD. Decision F rebuilds PanMixer's starting data
+                      on OUR consistent GRCh38 build and runs BOTH arms on it, so a
+                      new_haplotypes written against their shipped axis and one written
+                      against ours are not the same object. Name the build.
+                      ⚠ AND WITH THE ARM, in extent: Arm 1 emits all 44 targets, DIPLOID,
+                      over the 22 AUTOSOMES (decision D) — 44 files per chromosome, one
+                      per target, each written under that target's own K = 86 LOO panel.
+Valid vs:             another new_haplotypes over the identical site axis, build and
+                      cohort.
+Status:               ARM 1: REQUIRED — it is the interface the head-to-head runs
+                      through, and emitting it is the cheapest way to run PanMixer's
+                      ATTACK evaluators on our release unmodified. ARM 2: OPTIONAL — not
+                      a requirement of the mechanism.
+                      ⚠ **CORRECTED 2026-10-08:** this entry used to read
+                      `COMPARISON-ARM ONLY ... NOT a requirement`, and to say that
+                      emitting it "does not make PanMixer's cohort-level utility metrics
+                      applicable to us — `af_loss` and `ld_loss` would run and return
+                      meaningless numbers". In ARM 1 those metrics ARE defined on this
+                      object (the release edits a cohort column); we decline them as a
+                      SCOPE CHOICE under decision H, reporting
+                      `utility_loss_panmixer` only. See `af_loss` and `ld_loss`.
 Aliases:              "the release", "the obfuscated haplotypes"
 ```
 
 ### loo_cohort  [dataset] [method]
 ```
-Is:                   The leave-one-out cohort D = HPRC \ {target}, with every derived
-                      artifact recomputed without the target: donor panel, allele
-                      frequencies, support counts, the site list, and the block assignment.
-Computed by:          PLANNED
+Is:                   The PER-TARGET leave-one-out cohort D = HPRC \ {target}, with
+                      every derived artifact recomputed without the target. ✅ **THE
+                      CORE CONSTRUCTION OF ARM 1 (decision E, 2026-10-08):** BOTH of
+                      the target's haplotypes leave the donor panel, so **K = 86**, and
+                      it is applied PER TARGET — 44 times, once per cohort member.
+                      What must be recomputed without the target, under model C:
+                      the donor panel (K = 86), support(v) and therefore w_v = 1/support
+                      and `beta_v`, the allowed-state mask and `output_support` Y_D, the
+                      baseline `R_D` with its `baseline_log_norm`, `u_ceiling`, and
+                      `expected_switches`. ⚠ NOT allele frequencies and NOT a block
+                      assignment: model C has neither — there is one chain position per
+                      VARIANT and no block object in the mechanism.
+                      ✅ **HOW IT IS APPLIED (settled, 2026-10-08):** by MASKING the
+                      target's two haplotype ROWS in memory at release time, not by
+                      materialising 44 cohort trees. The artifacts are identical and it
+                      is ~160-380 GB cheaper.
+                      ✅ The attack database is built ONCE, with the target removed AT
+                      USE rather than 44 databases built.
+Computed by:          PLANNED — the row mask is not implemented; `CohortHMM` is built
+                      from all K rows today and nothing takes a held-out pair.
 CHANGES MEANING WITH: which artifacts were actually recomputed. Recomputing only the
-                      donor panel (what PanMixer does) is NOT a loo_cohort.
-Valid vs:             the same held-out individual in the other arm.
-Status:               COMPARISON-ARM ONLY. ⚠ **Not a concept our mechanism needs.** Our
-                      target is external to `G`, `D` and every panel, so there is nothing
-                      to hold out: `K = 88`, unconditionally. `loo_cohort` exists solely
-                      for the head-to-head arm, where a cohort member stands in as target
-                      and externality must therefore be SIMULATED. See `target_fidelity`,
-                      which reasons correctly about a genuinely external target throughout
-                      and is the model for how these entries should read.
+                      donor panel (what PanMixer does) is NOT a loo_cohort — and under
+                      decision E, every item in the list above must be recomputed per
+                      target or standing constraint 1 is violated.
+                      ⚠ AND WITH THE ARM. It is ARM 1's construction and ARM 2 has no
+                      instance: there the target is outside `G`, `D`, every panel and
+                      the attack database, so nothing is held out and `K = 88`.
+                      ⚠ AND IT GIVES EACH ARM-1 TARGET ITS OWN SETTINGS — its own D, its
+                      own `beta_v`, its own Y_D, its own ceiling. So the 44 releases
+                      carry 44 utility functions: pool measured attack outcomes, never
+                      utilities (constraint 8), and see `joint_release_gap`.
+Valid vs:             the same held-out individual under the same recompute list. ⚠ Not
+                      against ARM 2: a K = 86 LOO release and a K = 88 external release
+                      are different mechanisms on different panels.
+Status:               ARM 1: PRIMARY — the construction the whole arm rests on, and what
+                      makes standing constraint 1 hold there at all. ARM 2: n/a — there
+                      is nothing to hold out.
+                      ⚠ **CORRECTED 2026-10-08.** This entry used to read
+                      `COMPARISON-ARM ONLY ... Not a concept our mechanism needs`, with
+                      "`K = 88`, unconditionally" and "externality must therefore be
+                      SIMULATED". All three are now false for half the paper. Arm 1 does
+                      NOT simulate externality — the target genuinely IS a cohort member,
+                      and that is the point of the arm, since what is obfuscated is a
+                      released donor path. The LOO survives for a different reason:
+                      keeping Y_D, the support counts and `beta_v` out of the protected
+                      individual's own data, which is standing constraint 1.
 Aliases:              "LOO". ⚠ Even a full loo_cohort is an APPROXIMATION of the
                       external-target setting: the PGGB graph TOPOLOGY was built from all
-                      HPRC assemblies, so G itself saw the stand-in. That is a limit of
-                      the comparison arm, not of our design — with a real external target
-                      the graph never saw them.
+                      HPRC assemblies, so G itself saw the stand-in. ⚠ That is now an
+                      ACCEPTED LIMITATION OF THE PAPER, stated in Arm 1 rather than a
+                      caveat about an optional arm: Arm 1's guarantee is CONDITIONAL ON
+                      THE GRAPH. State it; never claim it away.
 ```
 
 ### target_fidelity  [utility] [evaluation]
 ```
-Is:                   How much of the TRUE target the release retains — as opposed to
+Is:                   **The share of the target's CALLED alleles that the release
+                      ALTERS — a DIFFER rate, where LOWER is more faithful.** It is the
+                      axis that transfers between the two arms, as opposed to
                       cohort-level utility, which a pure prior draw satisfies perfectly
                       while carrying zero target information.
+                      ⚠ **DIRECTION CORRECTED 2026-10-08, and it was an inversion.**
+                      This field used to read "how much of the TRUE target the release
+                      retains", which is the COMPLEMENT of what every script and every
+                      reported number in this repo computes: `docs/plan.md` calls it
+                      "the share of the target's called alleles the release alters" and
+                      quotes ours at 15.03%; `docs/data.md` section 7 reports our
+                      frontier as 14.8077%-14.8070% against PanMixer's 1.20%-16.41% on
+                      that same convention; `docs/memory.md` 2026-10-03 tabulates it as
+                      "cells differing from the target". Under the old wording 15.03%
+                      would have meant the release retains 15% of the target, when it
+                      in fact retains 84.97%. The DIFFER rate is kept as the definition
+                      because it is what is measured; the identifier is unchanged so
+                      existing table rows still resolve. ⚠ The NAME still reads like a
+                      retention, which is a rename decision for Dylan, not a silent fix.
 Computed by:          external/PanMixer/tools/downstream/privacy/MIA_privacy.py:80-83,140
                       already computes match fractions of a release against the target's
-                      ORIGINAL haplotypes, mechanism-agnostically.
-CHANGES MEANING WITH: the site set it is measured over, and whether a half-missing
-                      genotype is treated as hom-ref (MIA_privacy.py:49-51 does).
-⚠ CEILING:            In the EXTERNAL-target setting this quantity has a maximum BELOW 1
+                      ORIGINAL haplotypes, mechanism-agnostically. ⚠ Those are MATCH
+                      fractions — take the complement to get this quantity, and say
+                      which you printed.
+CHANGES MEANING WITH: the ARM (see the two ceilings below), the site set it is measured
+                      over, and whether a half-missing genotype is treated as hom-ref
+                      (MIA_privacy.py:49-51 does).
+                      ⚠ AND WITH WHAT COUNTS AS THE TARGET'S OWN PATH IN ARM 1
+                      (decision I, 2026-10-08). Arm 1 scores "self" from the target's
+                      OWN ASSEMBLY-DERIVED path, which is defined for all 44 cohort
+                      members — not from its 1000G panel row, which exists for only 39
+                      of the 44. PanMixer's panel-row semantics run as a separate,
+                      LABELLED PARITY COLUMN, never pooled with ours.
+⚠ CEILING (ARM 2):    In the EXTERNAL-target setting this quantity has a maximum BELOW 1
                       that does not depend on `tau`. The release is a path through `G`, so
                       a target variant with no record in `G` cannot be retained at any
                       `tau`, including `tau` -> 1. Measured 2026-09-27 on six 1000G samples
@@ -1175,10 +1828,31 @@ CHANGES MEANING WITH: the site set it is measured over, and whether a half-missi
                       defined over chain positions, which come from VCF rows, so u can
                       reach 1.0 while a fifth of the target's variation was dropped before
                       the mechanism ran. u is fidelity-on-what-the-graph-can-see.
+                      ⚠ EVERYTHING IN THIS BLOCK IS ARM-2 REASONING and says so in its
+                      first clause. Carrying the 79.5% into ARM 1 would understate the
+                      mechanism by about 20 points on the one axis the two arms are
+                      aligned on.
+⚠ CEILING (ARM 1):    A DIFFERENT ceiling, from a different cause, and **UNMEASURED.**
+                      In Arm 1 the target's own assembly is one of the 44 the graph was
+                      built from, so essentially every target variant HAS a record in
+                      `G` and the graph-representability limit above does not bind. What
+                      binds instead is DONOR-PANEL REACHABILITY under `loo_cohort`: at
+                      K = 86, with both of the target's own haplotypes removed, an
+                      allele no remaining donor carries cannot be emitted at any `tau`.
+                      It must be computed ON THE LOO PANEL, per target, and it CANNOT be
+                      derived from the Arm-2 figure — see `u_ceiling`, whose own warning
+                      is about exactly this conflation, and `private_allele_survival`,
+                      which is the extreme case of it.
 Valid vs:             the other arm at matched empirical privacy, and only against a
-                      stated ceiling computed on the same graph.
+                      stated ceiling computed on the same graph and **in the same arm**.
+                      ⚠ The rule is now ARM-INDEXED: never report target_fidelity
+                      without ITS OWN ARM's ceiling, and never put the two arms'
+                      ceilings in one column.
 Status:               PRIMARY — without this axis our tau = 0 point looks like a free lunch.
-Aliases:              none
+Aliases:              none. ⚠ **"retained" is FORBIDDEN for this quantity** — it is a
+                      DIFFER rate, and `utility_retained` is a different quantity in the
+                      opposite direction. "fidelity loss" and "the differ rate" are the
+                      safe informal names.
 ```
 
 ---
@@ -1191,7 +1865,14 @@ these are not, and every one of them needs an `n` and a `tau`.
 ### utility_retained  [utility] [evaluation]
 ```
 Is:                   u_path(p_g, released_path) achieved by an actual release, for
-                      the true target path p_g. Averaged over independent draws.
+                      the true target path p_g. Averaged over independent draws. It is
+                      the FINITE-SAMPLE counterpart of `e_q_u`.
+                      ⚠ **DEMOTED BY DECISION A (2026-10-08).** The primary
+                      pre-registered endpoint is the genome-wide EXACT expectation
+                      `e_q_u`, reported from derivatives of log Z_p or from state
+                      marginals with NO sampling. This sampled average is a diagnostic:
+                      per decision G, 3 seeds on a single configuration, as a
+                      diagnostic only. The paper's numbers do not rest on it.
 Computed by:          src/mechanism/ffbs.py:Release.u_achieved per draw; averaged and
                       tabulated by scripts/run_mechanism_chr21.py (built 2026-09-30).
                       ⚠ Never quotable without u_ceiling beside it.
@@ -1205,23 +1886,53 @@ Valid vs:             the same utility function at another tau, against the floo
                       measured 0.815455 on HG00096 chr21 at beta scope "chain". The old
                       wording is what produced the 0.6940-against-1 misreading recorded in
                       docs/bugs.md; see u_ceiling.
-Status:               PRIMARY
-Aliases:              "utility". Never quoted bare without its tau, its denominator, or
-                      its u_ceiling.
+                      ⚠ AND THE CEILING IS NOW ARM-INDEXED: Arm 2's is `u_ceiling`
+                      measured on graph readability, Arm 1's is set by the K = 86 LOO
+                      panel and is UNMEASURED. Read each against its own arm's.
+Status:               DIAGNOSTIC — demoted from PRIMARY by decision A, 2026-10-08. The
+                      PRIMARY utility endpoint is `e_q_u`, exact and genome-wide.
+Aliases:              "utility". Never quoted bare without its tau, its denominator, its
+                      arm or its u_ceiling. ⚠ Not `target_fidelity`, which is a DIFFER
+                      rate in the opposite direction.
 ```
 
 ### attacker_accuracy  [attack] [evaluation] [gate]
 ```
 Is:                   The empirical success rate of an IMPLEMENTED binary attacker
-                      asked to decide whether a release came from the target or from
-                      a cohort member, under equal priors.
-Computed by:          PLANNED — src/ranpanmixer/attacks.py
+                      asked to decide which of two admissible INPUT PATHS a release
+                      came from, at one release slot, under equal priors. ⚠ RESTATED
+                      2026-10-08: the older wording — "came from the target or from a
+                      cohort member" — is VACUOUS in ARM 1, where the target IS a
+                      cohort member. In Arm 1 the pair is member k's own true diploid
+                      path against an admissible decoy at slot k; in Arm 2 it is the
+                      external target against any other admissible path. See
+                      `p_succ_bound`.
+Computed by:          PLANNED — src/attacks.py (or src/attack/ alongside cohort/ and
+                      mechanism/). ⚠ CORRECTED 2026-10-08: this field named
+                      src/ranpanmixer/attacks.py, a package layout this repo does not
+                      use — src/ holds cli.py, sites.py, store.py, cohort/ and
+                      mechanism/. The row survived only because the contract test's
+                      _ABSENT_MARKERS skips any line containing "PLANNED".
 CHANGES MEANING WITH: the attacker. It is a LOWER bound on distinguishability and
                       nothing else. It cannot validate the mechanism; it can only
                       falsify an implementation.
-Valid vs:             p_succ_bound at the SAME tau — as a one-sided check that the
-                      implementation is not leaking more than the theory allows.
-                      Never as evidence the mechanism is "more private than tau".
+                      ⚠ AND WITH THE ATTACKER SET, WHICH IS PRE-REGISTERED (constraint
+                      6) AND NOT YET WRITTEN DOWN. The pre-registration file
+                      `paper/prereg_<date>.md` is PLANNED and does not exist, so there
+                      is no pinned attacker set yet for either arm, and **Arm 2's
+                      attacker set and target count are explicitly OPEN** as of
+                      2026-10-08. What IS settled: ARM 1's linkage attack scores "self"
+                      from the target's OWN assembly-derived path, defined for all 44
+                      cohort members, NOT from its 1000G panel row, which exists for
+                      only 39 of the 44 (decision I); PanMixer's panel-row semantics
+                      run as a separate LABELLED PARITY COLUMN. The attack database is
+                      built ONCE with the target removed AT USE.
+                      ⚠ AND WITH THE ARM, for pooling: Arm 1's 44 releases have 44
+                      different utility functions, so measured attack OUTCOMES pool
+                      across targets and utilities never do (constraint 8).
+Valid vs:             p_succ_bound at the SAME tau and in the SAME arm — as a one-sided
+                      check that the implementation is not leaking more than the theory
+                      allows. Never as evidence the mechanism is "more private than tau".
 Status:               PRIMARY — mark * in tables.
 Aliases:              "attack accuracy", "identification rate"
 ```
@@ -1247,12 +1958,22 @@ Aliases:              "measured TV". Never write "the TV distance" for the estim
 ```
 Is:                   The test our guarantee ACTUALLY makes, and the reason the
                       evaluation cannot simply be inherited. Run the mechanism on two
-                      admissible targets X and Y under identical settings, draw R
-                      releases of each, and estimate the distance between the two
-                      release distributions. The theorem says it is <= tau for EVERY
-                      such pair; PanMixer's design cannot bound it at all, because it
-                      releases unselected blocks verbatim, so two inputs differing in
-                      an unselected block have DISJOINT supports and TV = 1.
+                      admissible INPUT PATHS p and q **at one FIXED release slot** —
+                      one D, one R_D, one beta_v, one Y_D — draw R releases of each,
+                      and estimate the distance between the two release distributions.
+                      The theorem says it is <= tau for EVERY such pair; PanMixer's
+                      design cannot bound it at all, because it releases unselected
+                      blocks verbatim, so two inputs differing in an unselected block
+                      have DISJOINT supports and TV = 1.
+                      ⚠ **RESTATED 2026-10-08, and the old wording had no Arm-1
+                      instance.** It read "two admissible TARGETS X and Y under
+                      identical settings". Under decision E the 44 Arm-1 releases do
+                      NOT share settings — per-target leave-one-out gives each its own
+                      D, its own K = 86 panel, its own beta_v and its own output
+                      support — so "two targets under identical settings" cannot be
+                      instantiated in Arm 1 at all. The pair is a pair of INPUTS AT ONE
+                      SLOT, which is what Theorem 1 quantifies over, and that version
+                      exists in both arms.
 Computed by:          tests/test_toy_enumeration.py, EXACTLY, on the toy support
                       (built 2026-09-30): all 3,571,128 pairs of admissible inputs per
                       tau, worst pair reported. ⚠ STILL PLANNED at chr21 scale, and see
@@ -1267,9 +1988,99 @@ CHANGES MEANING WITH: the estimator and the support size — see tv_empirical: p
                       exact enumeration on a toy support can falsify Theorem 1.
                       Also with the PAIR: the bound is over all pairs, so a single
                       favourable pair proves nothing. Report the worst pair found.
-Valid vs:             tau, at matched settings, on a stated support.
+                      ⚠ AND WITH WHERE THE PAIR IS DRAWN FROM (2026-10-08). Under
+                      per-target leave-one-out the SETTINGS are per-target, so a pair
+                      drawn ACROSS TWO Arm-1 members is a DIFFERENT and UNBOUNDED
+                      quantity: it mixes two cohorts in one comparison, which standing
+                      constraint 8 forbids and which tau does not bound. Draw both
+                      members of the pair at one slot.
+                      ⚠ THE DECOY CONSTRUCTION IS A PRE-REGISTRATION ITEM and is not
+                      yet pinned: the intended form is the EXTREMAL pair
+                      (`toy.sharp_pair` generalises — a diploid pair differing on both
+                      haplotypes everywhere drives u_p - u_q to +/-1) PLUS a seeded
+                      random sample, with the SEED and the SAMPLE SIZE recorded so the
+                      coverage is stated rather than implied. It must land in
+                      `paper/prereg_<date>.md`, which is PLANNED and does not exist yet.
+Valid vs:             tau, at matched settings, on a stated support, at one release
+                      slot.
 Status:               PRIMARY — this is the headline privacy claim.
 Aliases:              "the matched-pair experiment", cf. `A-ATK-matched-pair`
+```
+
+### joint_release_gap  [privacy] [theory] [evaluation]
+```
+Is:                   The COMPOSITION GAP in ARM 1: the paper reports 44 releases whose
+                      donor panels are each other's true haplotypes, so the PER-RELEASE
+                      tau bound holds for every one of them and the JOINT bound over
+                      the 44 does NOT follow. Member j's released path is a mosaic of
+                      the other 43 members' real haplotypes, so the 44 releases are
+                      CORRELATED through the panel, and an attacker who reads all 44
+                      together is not the attacker `p_succ_bound` bounds.
+                      ⚠ It is a NAMED LIMITATION, not a defect to design around and not
+                      a quantity to leave implicit. Standing constraint 5 says so:
+                      report it; do not quietly design around it.
+Computed by:          NOT COMPUTED, and no bound for it is claimed. What CAN be reported
+                      is stated rather than derived: R = 1 release per (target, tau),
+                      cached and reused (decision G and constraint 5), so no single
+                      genome is re-released; the 3-seed run is a DIAGNOSTIC on one
+                      configuration, never 3 releases of a person. ⚠ Any numeric joint
+                      bound appearing for this quantity is unverified — none exists.
+CHANGES MEANING WITH: the ARM. ARM 1 only: it exists because the released objects ARE
+                      cohort members and the donors are each other. ARM 2 has no
+                      instance — one external target, one release, the panel is public
+                      and is not released by us.
+                      ⚠ AND WITH R. It is a composition over RELEASES, so any second
+                      release of the same genome at another tau compounds it. A tau grid
+                      is an evaluation device, never a release procedure.
+Valid vs:             nothing — there is no matched quantity to compare it against. It
+                      is reported as a stated limitation beside the per-release bound,
+                      with the per-release bound never presented as covering the set.
+Status:               PRIMARY — it is a reporting obligation in Arm 1, and an omitted
+                      row here would misrepresent what the theorem covers.
+Aliases:              "the joint bound gap", "the 44-release composition". ⚠ NEVER call
+                      it "the joint bound" — there is no joint bound; that is the point.
+```
+
+### private_allele_survival  [privacy] [evaluation]
+```
+Is:                   ARM 1 ONLY. The share of a target's COHORT-SINGLETON alleles —
+                      alleles carried by that member and by no other cohort haplotype —
+                      that SURVIVE into the released path. It is the sharpest available
+                      measure of whether a release can hand back the one thing that
+                      identifies a donor outright.
+                      ✅ **OURS IS ZERO BY CONSTRUCTION under `loo_cohort`**, and the
+                      construction is the argument: the release is a path through the
+                      donor panel, `output_support` Y_D contains only cohort-supported
+                      traversals, and at K = 86 the target's own two haplotypes are out
+                      of the panel. An allele no remaining donor carries is therefore
+                      not emittable at any tau. PanMixer's knapsack carries no such
+                      property: it releases UNSELECTED blocks verbatim, so a singleton
+                      allele in an unselected block survives intact.
+                      ⚠ THE SAME CONSTRUCTION IS WHY IT IS ALSO A UTILITY CEILING: what
+                      cannot be emitted cannot be retained. Report it beside
+                      `target_fidelity`'s Arm-1 ceiling, never alone — zero survival is
+                      both the privacy result and the fidelity cost.
+Computed by:          PLANNED — not implemented. It needs the per-target singleton set
+                      (derivable from support(v) and the target's own alleles on the LOO
+                      panel) and a released path to score against. ⚠ OURS is zero by the
+                      construction above and should still be ASSERTED on the real
+                      release rather than assumed; PANMIXER'S value on the same 44
+                      targets and the same site set is UNMEASURED.
+CHANGES MEANING WITH: whether the panel is the LOO panel (K = 86) or the full cohort
+                      (K = 88) — at K = 88 the target's own haplotypes are donors, the
+                      quantity is not zero by construction, and it stops measuring what
+                      it is for. Also with the site set and the build (decision F), and
+                      with how a -1 is treated: an UNCALLED target allele is not a
+                      singleton and must not be counted as one.
+Valid vs:             PanMixer on the identical 44 targets, site set, build and panel
+                      definition — this is an ARM 1 head-to-head row. ⚠ Not comparable
+                      across arms: ARM 2's target is not in the cohort, so it has no
+                      cohort-singleton alleles and the quantity is n/a there.
+Status:               PRIMARY in ARM 1 — a mechanism-level claim our construction makes
+                      and PanMixer's does not. n/a in ARM 2.
+Aliases:              "singleton survival", "private-allele leakage". ⚠ Never "the
+                      singleton rate", which is a property of the COHORT, not of a
+                      release.
 ```
 
 ---

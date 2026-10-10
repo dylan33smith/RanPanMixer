@@ -483,10 +483,19 @@ def test_corrections_do_not_survive_elsewhere():
 
 
 def test_corrections_are_well_formed():
+    """⚠ STRENGTHENED 2026-10-10. The marker is not always at column 0.
+
+    This check used `line.startswith("[INCORRECT]")`, which silently skipped every
+    marker that was indented or sat behind a list bullet -- i.e. every correction
+    written inside a nested bullet, which is most of them. Two such corrections
+    were added on 2026-10-10 and this test passed over both. Strip leading
+    whitespace and any list marker first, so the gate sees what a reader sees.
+    """
     lines = _read(MEMORY).splitlines()
     bad = []
     for i, line in enumerate(lines):
-        if not line.startswith("[INCORRECT]"):
+        stripped = re.sub(r"^[\s>]*(?:[-*+]\s+|\d+\.\s+)?", "", line)
+        if not stripped.startswith("[INCORRECT]"):
             continue
         nxt = " ".join(lines[i + 1: i + 3])
         if not re.search(r"\[CORRECTION - \d{4}-\d{2}-\d{2}\]", nxt):

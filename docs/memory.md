@@ -104,6 +104,267 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 — CHUNK 0: the known-wrong facts landed, and one of them was a real measurement
+
+**Goal.** Clear the stale and wrong facts out of the authority documents before any Phase B
+code reads them. Chunk 0 of the review-gated plan; no new capability, only corrections.
+
+**What was corrected, and the two that mattered.**
+
+**1. The float32 headroom pair, wrong in five live places.** `1.61e-06` and `13.5x` were
+computed over the **340,849-record site axis** instead of the chain's T = 305,886. The
+denominator is the chain — `eta_tau * mean(beta_v) = eta_tau / T` — so at `tau` = 0.5 it is
+0.549306 / 305,886 = **1.80e-06**, i.e. **15.1x** float32's 1.19e-07, not 13.5x. The old
+pair understated the tilt's headroom by 10%. Fixed at `docs/plan.md`, `docs/terms.md`,
+`tests/test_mechanism.py` and `scripts/results_table.py`; corrected in place in this file.
+⚠ **The conclusion is stronger than the old text claimed, not weaker:** under decision B
+`beta_v` sums to 1 genome-wide, which drops the per-position tilt BELOW float32 eps
+entirely, so float64 is not a 15x margin — it is the only thing preventing a silently
+untilted draw. In `docs/bugs.md`.
+
+**2. The `21 TB` dense-transition figure, wrong by 1000x in three places.** `340,824 x 88 x
+88 x 8 B` is **21.1 GB**. It stood in `src/mechanism/ffbs.py`, `src/mechanism/hmm.py` and
+this file, with `hmm.py` printing its own arithmetic one line below the wrong unit. It
+survived because the conclusion it supports — never materialise `A` — is correct either
+way. **A number supporting a correct conclusion is never checked**, and that is the general
+lesson, not the unit slip.
+
+**3. `15.03%` -> `14.8077%`.** Same statistic, same denominator (cells differing from the
+target, over 507,692 target-known cells, HG00096 diploid chr21), but 15.03% is 76,283 from
+ONE draw at seed 1000 and 14.8077% is 75,177.401 computed exactly from the posterior
+marginals with zero Monte-Carlo error. The sampled draw ran **1,106 cells high**, ~1.5%
+relative. Corrected on the live board; a `[CORRECTION]` block at the head of the 2026-10-03
+entry covers the seven copies there, whose conclusions all survive the substitution. ⚠ The
+`capacity ~= 0.17` crossing needed **no** change — the capacity sweep had already used the
+exact 14.81%, so only one plan.md line was ever out of step.
+
+**4. `K_states` and `donor_switches` stamped by arm.** `K = 88` is Arm 2; `K = 86` is Arm 1
+under per-target leave-one-out. Also removed a stale "whether duplicates OCCUR on this
+cohort is unmeasured — measure it before quoting K again": it WAS measured 2026-09-30, all
+88 haplotypes are distinct over the chain and the closest pair differs at 32,741 positions
+(10.7%). The gap is a missing assertion, not a wrong number.
+
+### ⚠ AND ONE "UNMEASURED" THAT WAS A REAL MEASUREMENT WAITING TO BE TAKEN
+
+Yesterday's pass wrote, in two places, that the split of chr21's 34,371 dropped-below
+positions into map-silent and in-span-plateau was UNMEASURED. An independent verifier
+flagged it as a false UNMEASURED; chasing it down found **two totals on record that did not
+reconcile** (34,371 and 34,345). Rather than pick one, measured directly.
+
+**Method.** `data/cohort/chr21/positions.npy` (340,849 records) and
+`data/cohort/chr21/support.npy` against the extracted `external/genetic_maps/chr21.b38.gmap`
+(span 10,326,676 - 46,680,243). Counted records by class and checked `support > 0` in each.
+
+| class | positions | `support > 0` | declared rate reaches it? |
+|---|---|---|---|
+| below the map start (< 10,326,676) — map-silent | **26,044** | 26,043 | **yes** |
+| in [10,326,676, 12,968,320] — in-span zero-cM plateau | **8,327** | 8,327 | **no** |
+| sum | **34,371** | — | — |
+| above the map end (> 46,680,243) — map-silent | **592** | — | **yes** |
+
+**Provenance.** chr21/hprc-v1.0-pggb, our 340,849-record build · 305,886 chain positions ·
+measured 2026-10-10 · the plateau interval contains exactly **one** distinct cM value among
+all map markers (0.584144), confirming it is a genuine map plateau and not an artifact.
+
+**Result, and it resolves the discrepancy.** The sum matches the recorded 34,371 exactly.
+**26,018 is PanMixer's vg-1.36 340,824-record figure**, and pairing it with 8,327 gives
+34,345 — which is why a second total existed. Ours is 26,044.
+
+⚠⚠ **THE CONSEQUENCE IS A LIVE RESIDUAL WITH A SIZE: 8,327 positions, 2.7% of the chain.**
+Decision C re-admits everything the cut dropped, but its declared rate reaches only the
+map-silent class. The 8,327 in-span-plateau positions come back with `dcM = 0`, hence
+`P(switch) = 0`, hence a **verbatim donor run** — and all 8,327 are usable (`support > 0`),
+so none is filtered out downstream. **So decision C restores part of the p arm under the
+declared rate and part of it under zero switching.** Whether that is acceptable is open
+question 2 and is Dylan's; what changed today is that it is a known quantity rather than an
+unknown. In Arm 1 the donors ARE the protected population, so a verbatim run there is a
+privacy cost, not merely a utility one.
+
+**The same split on the other 21 autosomes remains unmeasured** and is `B-DAT-map-coverage`
+(chunk 3). Four more acrocentrics — chr13, chr14, chr15, chr22 — will have the same shape.
+
+**Gate.** 102 tests pass. Every distinctive stale number greps clean in live text, and each
+historical copy carries an `[INCORRECT]`/`[CORRECTION]` pair rather than an overwrite.
+
+## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
+
+**Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The
+first is a direct head-to-head against PanMixer, obfuscating donors from within the
+same 44-person pangenome using our mechanism instead of theirs, with their own
+evaluations so the numbers are comparable. The second is the external-target work of
+Phase A carried to genome scale. This entry records the decisions, the measurements
+taken to size them, and two defects the audit found in our own plan.
+
+**The decisions (A-I) and the seven items still open live in `docs/plan.md`** under
+"THE DECISIONS OF 2026-10-08" — not duplicated here. They were taken after a
+seven-surface, 71-agent audit of what the change implies; 20 residual decisions
+survived adversarial refutation and collapsed to five distinct forks plus five
+classes nobody had asked, of which Dylan answered three.
+
+### M1 — autosomal genetic-map coverage: the chromosome-ends problem is a chr21 artifact
+
+**Method.** Extracted all 25 files from `external/genetic_maps/genetic_maps.b38.tar.gz`
+(SHAPEIT4 b38; the archive holds all 22 autosomes plus chrX/PAR, so the 21 missing
+maps are an EXTRACTION, not a download). For each autosome, parsed the three-column
+marker table (`pos`, `chr`, `cM`), compared first and last marker positions against GRCh38 primary assembly
+chromosome lengths, and summed intervals where consecutive markers carry identical cM.
+Script in session scratchpad, not committed.
+
+| quantity | autosomal total | share |
+|---|---|---|
+| total length | 2,875.0 Mb | — |
+| bp before the first marker | 84.2 Mb | 2.93% |
+| bp after the last marker | 2.0 Mb | 0.07% |
+| **no cM at all (lead + trail)** | **86.2 Mb** | **3.00%** |
+| interior zero-cM intervals (inside the span) | ~93.9 Mb | 3.27% |
+
+- **98.5% of all lead bp is the five acrocentric p-arms**: chr13 18.45, chr14 19.03,
+  chr15 19.81, chr21 10.33, chr22 15.29 Mb = 82.91 of 84.2 Mb.
+- Every non-acrocentric autosome has a lead under 0.25 Mb and a trail under 0.25 Mb.
+- Largest interior zero-cM extents: **chr9 25.61 Mb**, chr16 10.69 Mb.
+- ⚠ **chr21 is the WORST autosome by fraction** — 10.33 of 46.71 Mb is 22.1% lead,
+  27.8% to the end of its flat plateau. The chromosome we built everything on
+  overstates this problem by roughly 8x.
+
+**Reading.** The exclusion rule costs 3.00% genome-wide, not the ~10% chr21 implied,
+and it is a UTILITY decision rather than a privacy one: `R_D` stays target-independent
+under any map choice. This is what made decision C affordable. ⚠ The interior
+zero-cM total is LARGER than the ends problem, sits INSIDE `chain_span`, and is where
+the chain cannot recombine — so a donor is emitted verbatim there. Decision C
+deliberately does NOT touch it; see open question 2.
+⚠ **Position counts are UNMEASURED.** These are base pairs. How many chain positions
+sit in each class, and how many survive `support(v) > 0`, is what `B-DAT-map-coverage`
+must produce before the declared rate can be given a value.
+
+### M2 — Arm 1's representability ceiling: a cohort member is reconstructible from the rest
+
+**Method.** Loaded `data/cohort/chr21/haplotypes.npy` (88 x 340,849 int16, -1 missing),
+restricted to `in_chain.npy` (T = 305,886). Verified from `haplotype_ids.npy` that
+haplotypes 2i and 2i+1 belong to individual i. For each of the 88 haplotypes, removed
+BOTH of that individual's haplotypes (K = 86, decision E) and asked whether any
+remaining haplotype carries the same allele at the same position.
+
+| metric | value |
+|---|---|
+| target's called alleles carried by >= 1 of the other 86 | **99.51%** (min 99.12, max 99.78) |
+| target's non-ref alleles carried by >= 1 of the other 86 | **97.33%** (min 95.71, max 98.57, median 97.23) |
+| mean called alleles per haplotype | 304,073 of 305,886 chain positions |
+| mean non-ref alleles per haplotype | 54,712 |
+
+**Reading.** Arm 1 is VIABLE, and its ceiling sits ABOVE Arm 2's (~90% of non-ref
+calls have a graph record at all). ⚠ The two are therefore NOT comparable to each
+other — see the `u_ceiling` and `target_fidelity` entries in `docs/terms.md`.
+
+### M3 — and the mechanism protects the rarest alleles by construction
+
+**Method.** Same arrays and leave-one-out as M2, stratified by cohort-wide allele
+count over all 88 haplotypes and weighted by `-log f` with f = AC/88.
+
+| stratum (AC over 88 haplotypes) | non-ref alleles | unrepresentable under LOO | share |
+|---|---|---|---|
+| AC = 1 (private singleton) | 126,065 | 126,065 | **100.0%** |
+| AC = 2-4 | 231,577 | 4,068 | 1.8% |
+| AC = 5-8 | 257,031 | 0 | 0.0% |
+| AC > 8 | 4,199,977 | 0 | 0.0% |
+
+Per haplotype: **1,479 of 54,712** non-ref alleles (2.70%) are carried by no other
+individual, and they hold **11.03%** of that haplotype's total `-log f` information —
+a **4.08x** over-representation.
+
+**Reading, and the predicted Arm 1 headline.** Under leave-one-out the sampler
+**cannot emit a cohort singleton at any `tau`**, because no donor state carries it.
+That is protection by CONSTRUCTION, not by `tau`. PanMixer starts from a verbatim copy
+of the target's own column (`stacker.py:53`) and releases whatever the knapsack did not
+select, and its privacy score reads only anchor alleles, so the most identifying sites
+are the ones most likely to survive. **We resample everything; they resample a selected
+subset.**
+⚠ **UNVERIFIED — the comparison half.** PanMixer's survival rate for this same allele
+class has NOT been measured. The claim above is a prediction, not a result.
+
+### M4 — float64 at genome scale: the hazard is the accumulator, not the potentials
+
+**Method.** Arithmetic, not a run. `mean(beta_v) = 1/T`; chr21's T = 305,886 gives
+3.269e-06. A genome-wide T is UNMEASURED; at 50-62x chr21 the mean falls to roughly
+5e-08 to 6.5e-08. The float64 boundary is `exp(x) == 1.0` iff `x <= eps/2` =
+1.110e-16.
+
+- At `tau` = 0.5 the genome-wide exponent sits ~1.6e+08 ABOVE that boundary. **No
+  precision problem**: T would need ~5e+15 positions to reach it.
+- ⚠ **But float32 eps is 1.19e-07, and the genome-wide exponent falls BELOW it.** A
+  dtype downgrade would make every tilt potential exactly 1.0 and silently turn the
+  mechanism into an untilted `R_D` draw. At chr21 the same ratio is 15x — merely
+  marginal. The dtype refusal in `ffbs.forward` stops being a preference and becomes
+  the only thing standing between us and a mechanism that does nothing.
+- ⚠ **The real cancellation hazard is the `log_c` ACCUMULATOR.** `log_z_p` is a
+  difference of two sums whose magnitude grows with T. Materialised as a `(T,)` array
+  and summed by `np.sum`'s pairwise algorithm, the error stays ~1.5e-10 at genome
+  scale. Accumulated as a running Python float — the obvious fix when the alpha memory
+  bites — it reaches **~9.9e-05 against a 1e-6 tolerance**, a 100x breach that passes
+  every chr21 test. `math.fsum` or Kahan costs nothing and should go in before the
+  driver.
+
+### What PanMixer actually evaluated (gates how Arm 1 must be built)
+
+From `paper/s41467-026-77591-0_reference.pdf` and the pinned `external/PanMixer`.
+
+- **DIPLOID, not haploid:** *"Each individual genome inside the pangenome graph has
+  two haplotype paths, which we obfuscate at the same time"*, with all downstream
+  analysis at the genome level.
+- **44 targets, ALL cohort members:** *"applying PanMixer 44 times for all 44
+  individuals in the HPRC v1 pangenome reference graph created using PGGB"*.
+- **22 autosomes.** chrX stripped by `remove_X.sh`; chrY never mentioned in either PDF.
+- **`capacity` is applied PER CHROMOSOME** — against our genome-wide `tau` (decision
+  B), which makes us strictly more conservative in scope. Say so rather than matching.
+- The release object **starts as a verbatim copy of the target's own column**
+  (`stacker.py:53`); only knapsack-selected blocks are overwritten.
+- **50 log-spaced capacities**, 1.0 -> 0.000110.
+- ⚠ **R = 1, and the SAME presampled draw is reused across all 50 capacities** —
+  `stacker.py:57` loads one `new_haplotypes.npy` from the shared starting-data path
+  inside every per-capacity run. Their published frontier is nested subsets of one
+  sample, not 50 independent releases. This confirms the suspicion recorded in
+  `docs/plan.md` and is the specific file:line that proves it.
+- ⚠ The published seed is **claimed to be in the repository and is not there.**
+- **Nothing in their suite tests two-target indistinguishability** — a tree-wide grep
+  for `decoy|two_target|indistinguish|total variation` returns zero hits. The
+  structural reason is in their own code: two inputs differing in an UNSELECTED block
+  have disjoint output supports.
+- Genome-wide figures: the attack and AF/LD. **chr21-only:** read mapping and the
+  Beagle attack. And `starting_data/` contains **chr21 only**, so the genome-wide gap
+  score cannot run as shipped — decision F's rebuild is a precondition, not a polish.
+
+### Two defects the audit found in OUR plan, both corrected in place
+
+1. **`docs/plan.md`'s Reporting contract carried a standing-constraint violation.** It
+   read *"The head-to-head aligns the arms on MEASURED empirical attack success
+   only."* Selecting the comparison point after inspecting attack outcomes is exactly
+   what standing constraint 6 forbids — the plan held the violation it warns about
+   everywhere else. **Corrected:** the arms align on `target_fidelity`, which is
+   computable with no attack run; empirical attack success is the OUTCOME, never the
+   alignment. Both full frontiers are still reported.
+2. **`A-EVL-headtohead`'s exit gate demanded two things model C cannot have.** It
+   required per-subject recomputation of *allele frequencies* and *block assignment*.
+   Model C has **neither** — no allele-frequency table, no blocks — so those clauses
+   could never have been met. Removed, with the reason recorded in the item.
+
+### The standing constraints were renumbered, and the stale references hunted
+
+Inserting the genome-wide `beta_v` rule as constraint 4 shifted the old constraints
+4-8 to 5-9. **15 stale references** across `docs/plan.md`, `docs/terms.md`,
+`src/mechanism/` and `scripts/` were corrected by line-targeted replacement with
+per-line verification of the expected text. `docs/memory.md` was deliberately NOT
+changed: its entries were accurate when written. The renumbering itself is recorded in
+the `tau` entry of `docs/terms.md`.
+
+### ⚠ OUTSTANDING — not done, do not assume otherwise
+
+- ✅ **DONE 2026-10-10 (chunk 0).** The 15.03% differ-rate. `docs/plan.md` quoted it as
+  ours; the exact artifact gives **14.8077%**. Corrected in place at `docs/plan.md`, and a
+  `[CORRECTION]` block added at the head of the 2026-10-03 entry covering all seven copies
+  there. The matched-capacity crossing (~0.17) needed NO change — it was already computed
+  against the exact 14.81%, so only the one plan.md line was out of step.
+- `docs/bugs.md` has no entry for the float32/accumulator hazards of M4.
+- No code has been written for Phase B. The work order is in `docs/plan.md`.
+
 ## 2026-10-08 (later still) — the directly comparable number, in both units
 
 **Dylan's question.** Our table shows ~74,000 changes. What is that comparable to in
@@ -618,6 +879,25 @@ estimator that was unstable, not the quantity.
 
 
 ## 2026-10-03 — `target_fidelity` as the comparable axis: our differ-rate measured
+
+[CORRECTION - 2026-10-10]: **every `15.03%` in this entry is a SINGLE-DRAW SAMPLING
+ESTIMATE and is superseded for quoting by the exact `14.8077%`.** Both are the same
+statistic on the same denominator — cells differing from the target, over 507,692
+target-known cells, HG00096 diploid chr21 — but 15.03% is 76,283 from one draw at seed
+1000, while 14.8077% is 75,177.401 computed exactly from the posterior marginals with
+zero Monte-Carlo error (`logs/A_exact_fidelity_HG00096.md`, 2026-10-03; `docs/data.md`
+records that the exact value supersedes every sampling estimate of this quantity). The
+sampled draw ran **1,106 cells high**, about 1.5% relative.
+**The entry's conclusions all survive the substitution**, which is why it is corrected
+here rather than rewritten: ours 14.81% against theirs 10.50-11.70% on a matched region
+is still about 1.3-1.4x; PanMixer's capacity dial still SPANS our fixed point; and the
+flatness in `tau` is confirmed, not weakened — the exact movement across the whole grid
+is **3.28 cells**, which no sampled table of this size could have resolved.
+⚠ The affected lines below are the two measured tables (which are honest records of what
+those draws gave, and are left verbatim) and four CLAIM lines that should be read at
+14.8077%: the matched-comparison sentence, the synthesis, the three-way share table, and
+the "superficially similar" sentence. The `capacity ~= 0.17` crossing quoted elsewhere was
+already computed against the exact 14.81% and needed no change.
 
 **Correction upstream.** The 2026-10-03 entry below this one first declared the
 altered-cell count non-comparable. Corrected in place: it is `target_fidelity`, the one
@@ -1684,12 +1964,21 @@ discarded has not been computed.
   total tilt between a perfectly-matching and a non-matching path is `exp(eta_tau)` however
   the path is partitioned. At tau = 0.5: per-position tilt 1.0000055 at T = 100,757 against
   1.0000016 at T = 340,824, total 1.7321 either way. Finer T does NOT spread the budget
-  thinner. ⚠ What it DOES cost is float32 headroom: the per-position tilt under C is only
-  **13.5x** the float32 resolution against 45.7x under blocks, so float64 stored alphas are
-  load-bearing. And the thin-budget problem is a property of **tau**, not of T.
-- **Never materialise `A`.** Li-Stephens `A = (1-s_t)*I + (s_t/K)*J` is rank-one plus
-  diagonal, so the forward step is O(K) from one scalar sum and the backward draw likewise.
-  A materialised `A` per position would be 340,824 x 88 x 88 x 8 B = **~21 TB**.
+  thinner.
+  [INCORRECT] - ⚠ What it DOES cost is float32 headroom: the per-position tilt under C is only **13.5x** the float32 resolution against 45.7x under blocks, so float64 stored alphas are load-bearing. And the thin-budget problem is a property of **tau**, not of T.
+  [CORRECTION - 2026-10-10]: the 13.5x is computed over the 340,824-record SITE AXIS, not
+  the chain. The chain is the denominator — `eta_tau * mean(beta_v) = eta_tau / T` — so at
+  T = 305,886 it is 0.549306/305,886 = 1.80e-06 and **15.1x**, not 13.5x. The 45.7x for a
+  block partition (T = 100,757) is correct. ⚠ **The conclusion is now stronger than this
+  bullet claims, not weaker:** under decision B (2026-10-08) `beta_v` sums to 1 genome-wide,
+  which drops the per-position tilt BELOW float32 eps, so float64 is not a 15x margin but
+  the only thing preventing a silently untilted draw. Recorded in `docs/bugs.md`.
+- [INCORRECT] - **Never materialise `A`.** Li-Stephens `A = (1-s_t)*I + (s_t/K)*J` is rank-one plus diagonal, so the forward step is O(K) from one scalar sum and the backward draw likewise. A materialised `A` per position would be 340,824 x 88 x 88 x 8 B = **~21 TB**.
+  [CORRECTION - 2026-10-10]: the arithmetic in that last sentence is wrong by 1000x.
+  340,824 x 88 x 88 x 8 B = 21,114,728,448 B = **~21.1 GB**, not 21 TB. The conclusion
+  (never materialise `A`) is unaffected, which is exactly why the slip survived six weeks —
+  a number supporting a correct conclusion is never checked. The same error stood in
+  `src/mechanism/ffbs.py` and `src/mechanism/hmm.py` and was fixed there 2026-10-09.
 
 **Provenance.** Workflows `wf_1dd6bfa5-5a8` (inputs, 10 agents) and `wf_d0195c3c-52d`
 (framing audit, 12 agents), both adversarially verified; `wf_785b6f66-755` applied the primer
@@ -1779,9 +2068,17 @@ distributions agreeing exactly is evidence the map is not a single-source artifa
 registered in `docs/data.md`; the SHAPEIT4 copy is the working file, being pinnable by
 commit SHA rather than served from a lab webserver.
 
-**Result 2 — 7.63% of our chain positions sit outside the map.** Map span is
-10,326,676 - 46,680,243 bp; our chr21 variants span 5,713,651 - 46,699,788. So **26,018
-variants (7.63%) fall below the map start** and 592 (0.17%) above. That region is the
+[INCORRECT] - **Result 2 — 7.63% of our chain positions sit outside the map.** Map span is 10,326,676 - 46,680,243 bp; our chr21 variants span 5,713,651 - 46,699,788. So **26,018 variants (7.63%) fall below the map start** and 592 (0.17%) above.
+[CORRECTION - 2026-10-10]: re-measured directly from `data/cohort/chr21/positions.npy`
+against the extracted map, the count below the map start on our 340,849-record build is
+**26,044**, not 26,018 — a difference of 26 records (0.1%), which does not move the 7.63%
+or any conclusion in this entry. The 592 above the map end and the variant span are both
+confirmed exactly. **26,018 is PanMixer's vg-1.36 340,824-record figure**, and its presence
+here is why two different totals for the cut circulated: 26,018 + 8,327 = 34,345 against
+our 26,044 + 8,327 = **34,371**, the latter being what the cohort build actually drops.
+The full measured split now lives in the `chain_span` and `map_coverage` entries of
+`docs/terms.md`. The in-span portion — 8,327 positions on the map's own zero-cM plateau,
+all at cM 0.584144 — is the part decision C does NOT reach. That region is the
 acrocentric p-arm and heterochromatin, where no recombination map exists for a real
 reason. Interpolation clamps, giving flat cM, so **296 multi-variant blocks there have
 P(mosaic) = 0 exactly** and can only ever be one donor copied verbatim. This is the hazard

@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-08
+**Last updated:** 2026-10-10
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -13,9 +13,18 @@ Read at session start. This file exists so a new session never has to grep
   branch started 2026-09-28 holding the build, with `scripts/ configs/ logs/` and a
   gitignored `data/` symlink to `/data/ds85/RanPanMixer/data`. Remote `origin` ->
   `https://github.com/dylan33smith/RanPanMixer`.
-- **Phase:** `A` — foundation. Goal: an end-to-end sampler provably correct on a
-  graph small enough to enumerate. ✅ **THAT GOAL IS MET (2026-09-30.)** A head-to-head
-  against PanMixer is an OPTION for the writeup, not a requirement of the design.
+- **Phase:** `B` — **THE TWO-ARM PAPER** (opened 2026-10-08). Phase A (foundation:
+  an end-to-end sampler provably correct on a graph small enough to enumerate)
+  **CLOSED 2026-09-30, goal met.**
+  - **Arm 1 — the PanMixer head-to-head.** The 44 HPRC cohort members as targets,
+    diploid, 22 autosomes, per-target leave-one-out at K = 86, running PanMixer's
+    own evaluations so the comparison is direct. **A REQUIRED paper section** — the
+    earlier wording, "an OPTION for the writeup, not a requirement of the design",
+    is superseded.
+  - **Arm 2 — the external target.** The work of Phase A, carried to genome scale,
+    with its own attacks and utility axes.
+  ⚠ **Every statement about the target must name its arm.** See `CLAUDE.md`
+  Project Core; conflating them is what the 2026-09-28 scope correction was about.
 - **PREPROCESSING IS BUILT AND HAS RUN (2026-09-29).** `src/` holds our own code —
   the first in this project that is not PanMixer's. The cohort stage and all ten
   target stages completed on chr21; 17 unit tests and 28 consistency checks on the
@@ -38,11 +47,11 @@ Read at session start. This file exists so a new session never has to grep
   **1,600**; the best possible at `tau` = 0.5 is **53**. **The question for Dylan and his PI
   is what the release is FOR** — whole-chromosome fidelity, which is unmeasurable at any
   feasible n, or regional fidelity, which is measurable this week. Pre-registration item
-  under constraint 5, so it must be settled BEFORE `A-LCK-preregister` and before any
+  under constraint 6, so it must be settled BEFORE `A-LCK-preregister` and before any
   evaluation. See R5.
 - ⚠ **DO NOT RUN THE EVALUATION FIRST.** At the current utility it would pass trivially and
   prove nothing: the release carries almost no target information, so `attacker_accuracy`
-  would sit at chance and two-target TV near 0 — which standing constraint 6 says is not
+  would sit at chance and two-target TV near 0 — which standing constraint 7 says is not
   evidence of anything. And `utility_retained` is **85.0% of `u_ceiling` at `tau` = 0 too**
   (0.6931 against 0.6932 at `tau` = 0.9), so quoting it as the mechanism's utility would be
   exactly the free lunch `target_fidelity` warns about — now measured on `u_path` ITSELF,
@@ -131,6 +140,67 @@ Read at session start. This file exists so a new session never has to grep
   its allele frequencies, support counts and scoring panel all include the target,
   because in its threat model the target is a cohort member.
 
+## THE DECISIONS OF 2026-10-08 — the scope change, settled by Dylan
+
+Nine decisions opened Phase B. They were taken after a seven-surface audit
+(71 agents) of what the change implies; the audit's residual list is below.
+**Decisions A-I are settled and are not to be re-litigated.**
+
+| | decision |
+|---|---|
+| **A** | Primary pre-registered endpoint = the **genome-wide** utility, with expectations reported **EXACTLY** (derivatives of `log Z_p` / state marginals, no sampling). A contiguous-window utility is a clearly-labelled **secondary** arm. |
+| **B** | `beta_v` sums to 1 **genome-wide over the 22 autosomes**; each chromosome takes a SHARE. Not per chromosome. This is what the claim rests on. |
+| **C** | Regions where the map gives **no cM at all** are no longer excluded — they are sampled under a **declared constant recombination rate**. ⚠ **Interior zero-cM plateaus inside the mapped span are NOT overridden** (see the register). Supersedes R2. |
+| **D** | **Autosomes only.** No chrX, no chrY. |
+| **E** | Arm 1 uses **per-target leave-one-out, K = 86**, removing BOTH of the target's haplotypes. Applied by **masking two rows in memory** at release time, not by materialising 44 cohort trees. |
+| **F** | PanMixer's starting data is **rebuilt on our GRCh38 build**. Both arms run on ONE consistent build — the thing their own release got wrong. |
+| **G** | **3 seeds on a single configuration** as a tilt diagnostic only, not expected in the paper. The paper's attack numbers rest on **R = 1 release per (target, `tau`)**, which is what constraint 5 requires. |
+| **H** | Arm 1 adopts **`utility_loss_panmixer` only** from PanMixer's utility suite. `af_loss`/`ld_loss` are not adopted — but as a **scope choice**, not because they are undefined for us. In Arm 1 they ARE defined, and `docs/terms.md` has been corrected accordingly. |
+| **I** | Arm 1's linkage attack scores "self" from the target's **own assembly-derived path** (defined for all 44), not its 1000G panel row (defined for only 39 of 44). PanMixer's panel-row semantics run as a labelled parity column. |
+
+### ⚠ STILL OPEN — do not write these as decided
+
+| | question | blocks |
+|---|---|---|
+| 1 | The declared rate's **numeric value**, and whether it is one genome-wide constant or 22 per-chromosome ones. ⚠ **Not answerable yet:** the map-coverage measurement this rests on does not exist in the repo. Measure first, declare second. | preprocessing rerun, pre-registration |
+| 2 | Whether **interior zero-cM plateaus** are eventually overridden too. Deferred deliberately: `docs/terms.md` states P(switch) = 0 there is CORRECT, and `tests/test_toy_enumeration.py` enforces it as a Theorem-1 **support** property. Overriding it reverses a tested position, and is the most rework-costly item on the board. | nothing yet |
+| 3 | The **`tau` grid.** Pinned only AFTER the genome-wide endpoint is re-measured exactly — see the work order. | pre-registration |
+| 4 | **Arm 2's `beta_v` normalising set** (R1 + R4): all chain positions, or the subset readable against a named public callset declared in advance. Arm 1 normalises over all chain positions on every branch. | pre-registration |
+| 5 | **R3** — `w_v = 1/support(v)` is inherited, not argued for. | pre-registration |
+| 6 | The **secondary window's** width, count, and whether it is ever DRAWN (expectation-only avoids the constraint-5 composition problem entirely). | the secondary arm only |
+| 7 | **Arm 2's attacker set and target count.** ⚠ The repo has **no implemented attacker of any kind**; `attacker_accuracy` names a module that does not exist. | every Arm 2 privacy number |
+
+## ⚠ PHASE B WORK ORDER — what must happen before the first number
+
+Ordered, and the order is load-bearing.
+
+1. **`B-THY-diploid-gate`** — a diploid, two-segment falsification gate. Every
+   gate in this project is HAPLOID and the diploid path is the only one ever run;
+   decision E makes Arm 1 diploid. **It is the cheapest blocking item on the
+   board** — reads nothing from disk, needs no rebuild, no download and no rate
+   decision — and it is a prerequisite of every Arm 1 number.
+2. **`B-DAT-map-coverage`** — per autosome: bp with no cM, bp in interior zero-cM
+   intervals, N-gap spans, and how much of each survives the `support > 0` filter.
+   Feeds decision C's value. Until this exists, the rate cannot be declared.
+3. **`B-EVL-exact-endpoint`** — re-measure the primary endpoint EXACTLY at
+   genome-wide scope. ⚠ Under decision B each chromosome holds a SHARE, so the
+   per-chromosome endpoint is far smaller than the chr21-normalised figure on
+   record. Pinning a `tau` grid before this is known is exactly what the old
+   `A-LCK-preregister` warning forbids.
+4. **`B-LCK-preregister`** — one dated file at `paper/prereg_<date>.md` covering
+   both arms. PLANNED; does not exist yet.
+5. **`B-IMP-genomewide`** — the genome-wide mechanism (W1-W14 below).
+6. **`B-DAT-rebuild`** — decision F's consistent GRCh38 rebuild, 22 autosomes.
+7. Releases, then attacks.
+
+**Needs no decision and reduces risk now:** harden the `log_c` accumulator
+(`math.fsum`/Kahan — the naive running-float form breaches the `log_z_p`
+tolerance only at genome scale, after passing every chr21 test); re-gate float64
+against genome scale (the per-position tilt falls BELOW float32 eps under a
+genome-wide `beta`, so a dtype downgrade would silently produce an untilted
+draw); delete the decompressed GFA after deconstruct; fix the dead scratchpad
+path in `scripts/churn_across_tau.py`.
+
 ## Headline result
 
 ### The mechanism, chr21, HG00096 — v1 diagnostic, 2026-09-30
@@ -145,7 +215,7 @@ unsettled.
 | `utility_retained` * | 0.6931 | 0.6931 | 0.6931 | 0.6931 | 0.6931 | **0.6932** |
 | `u_ceiling` * | 0.8155 | 0.8155 | 0.8155 | 0.8155 | 0.8155 | 0.8155 |
 | `utility_retained` / `u_ceiling`, at each `tau` | 85.0% | 85.0% | 85.0% | 85.0% | 85.0% | 85.0% |
-| `attacker_accuracy` * | n/a — no attacker implemented; pre-registration must fix the attacker set first, and a weak attacker would prove nothing (constraint 6) | — | — | — | — | — |
+| `attacker_accuracy` * | n/a — no attacker implemented; pre-registration must fix the attacker set first, and a weak attacker would prove nothing (constraint 7) | — | — | — | — | — |
 | `p_succ_bound` * | 0.5000 | 0.5250 | 0.5500 | 0.6250 | 0.7500 | 0.9500 |
 | `log_z_p` * | 0.0000 | 0.0348 | 0.0697 | 0.1774 | 0.3815 | 1.0226 |
 | `log_z_p` as a share of `eta_tau` | 0 | 69.5% | 69.5% | 69.5% | 69.5% | 69.5% |
@@ -292,21 +362,45 @@ No reported result has been reproduced.
 
 ## Reporting contract
 
+`CLAUDE.md` carries the invariant; this is the full checklist it points to.
+
 Two results are comparable only if their config stamps match on:
-**graph+cohort id · `tau` · utility id** — plus `loo_id` for comparison-arm runs only
-(our target is external; a genuine release holds out nobody).
+**graph+cohort id · arm · `tau` · utility id · `loo_id`**. `loo_id` is REQUIRED
+throughout Arm 1 (decision E makes per-target K = 86 the build for a whole paper
+section) and is literally `none` in Arm 2, where the target is external and a
+genuine release holds nobody out.
 
-Metrics are rows, configurations are columns. Every table carries a provenance
-line and is followed by one bullet per column, one bullet per row, and a prose
-synthesis. Every number in prose traces to a table cell. Emit tables from the
-scoring script; never hand-assemble one.
+1. Metrics are rows, configurations are columns. Report the full metric set every
+   time — `n/a` with a reason, never an omitted row.
+2. Every number carries its arm, its `tau`, its denominator and its `n`.
+3. Row labels are the exact `docs/terms.md` identifier; gate metrics marked `*`.
+4. Order rows: primary -> gates -> structure -> context -> demoted.
+5. Every table carries a provenance line and is followed by one bullet per column,
+   one per row, and a prose synthesis. Every number in prose traces to a cell.
+6. Emit tables from the scoring script; never hand-assemble one.
 
-The floor is `tau` = 0 (an untilted draw from `baseline_model`). The ceiling is the
-target's own path, `u_path` = 1. Both are columns, not prose asides.
+**Floor and ceiling are columns, not prose asides.** The floor is `tau` = 0, an
+untilted draw from `baseline_model`.
+⚠ **The ceiling is `u_ceiling` — per target, per `beta` scope, per `loo_id`, and
+below 1.** The earlier wording here, *"the ceiling is the target's own path,
+`u_path` = 1"*, was CORRECTED in `docs/terms.md` on 2026-09-30 and survived here
+as a stale copy; it holds only for a target with a call at every weighted
+position, which no real target has. Reporting `utility_retained` against an
+implicit 1 is what produced the original misreading. In Arm 1 the ceiling is a
+function of the leave-one-out, so it differs per target.
+⚠ **The two arms' ceilings are not comparable to each other** — a cohort member's
+alleles are largely carried by the other 86 haplotypes, an external target's are
+not. Compare within an arm, across mechanisms; never across arms.
 
 ⚠ **`eps_pmi` and `tau` are incomparable, and so are `capacity` and `tau`** (see
-`docs/terms.md`). The head-to-head aligns the arms on MEASURED empirical attack
-success only, and reports both frontiers.
+`docs/terms.md`). **The head-to-head aligns the arms on `target_fidelity`**, which
+is pre-registered as the matching axis because it is computable with no attack
+run. Empirical attack success is the OUTCOME, never the alignment.
+⚠ **CORRECTED 2026-10-08.** This section previously read *"aligns the arms on
+MEASURED empirical attack success only"*. That selects the comparison point after
+inspecting attack outcomes, which standing constraint 6 forbids — the plan itself
+carried the violation it warns about everywhere else. Both full frontiers are
+still reported.
 
 ## ⚠⚠ DEFERRED BY DECISION — REVISIT BEFORE ANY RESULT IS PUBLISHED ⚠⚠
 
@@ -322,12 +416,26 @@ the leverage, and the released path at the other 17% is a pure prior draw with n
 to the target at all.
 **The fix, when we take it:** normalise over `in_chain & readable` — max `u` = 1.000, nothing
 invented, and `readable.npy` is already emitted and verified target-independent.
-**⚠ The catch that makes this urgent rather than cosmetic:** per standing constraint 5 the
+**⚠ The catch that makes this urgent rather than cosmetic:** per standing constraint 6 the
 utility function must be pre-registered BEFORE any attack outcome is inspected. Changing the
 normaliser after seeing results is not available. **Decide before `A-LCK-preregister`.**
 **⚠ And it does not generalise as written** — see R4.
 
-### R2. `chain_span` stays at 12,968,320 < POS <= 46,680,243
+### R2. ✅ SUPERSEDED 2026-10-08 BY DECISION C — `chain_span` is no longer a cut
+
+**Settled.** Map-silent regions are no longer excluded: they are sampled under a
+**declared constant recombination rate**, so the coordinate cut that this item was
+carrying is retired. Two things survive it and must not be lost:
+- ⚠ **The rate's VALUE is not chosen**, and it cannot be until `B-DAT-map-coverage`
+  runs. Do not invent one. The reach to the acrocentric p-arms also means the
+  declared rate multiplies **fabricated base-pair distance** in GRCh38 placeholder
+  sequence; say so rather than letting it pass as a measurement.
+- ⚠ **Interior zero-cM plateaus inside the mapped span are NOT overridden.** That
+  is open question 2, deliberately deferred, and reversing it is the most
+  rework-costly item on the board.
+- The `support == 0` exclusion is unaffected and still cohort-only.
+
+**The original item, preserved:**
 
 **Carrying:** 89.74% of chr21; the p arm and 592 telomeric variants are not released at all.
 **The fix, when we take it:** nothing cheap. Every map that covers the p arm interpolates
@@ -459,7 +567,7 @@ utility are in tension, and the mechanism currently sits at the exact-sampling e
   release. See `docs/memory.md` 2026-09-30.
 - **Shrink the scope `tau` covers.** A `tau` per megabase rather than per chromosome
   raises every `beta_v` by the ratio of scopes — but that is k independent releases of
-  one genome and they COMPOSE, which standing constraint 4 forbids. It is the same scope
+  one genome and they COMPOSE, which standing constraint 5 forbids. It is the same scope
   algebra as the genome-wide question already recorded, pointed the other way, and it is
   not free.
 - **Accept it and say so.** The honest reading of the current configuration is that at
@@ -599,7 +707,7 @@ NOT, and they should be visible now rather than discovered later:
    chr21, which silently means "`tau` per chromosome". A genome-wide `tau` needs a
    genome-wide normaliser, so each chromosome gets a SHARE of the budget rather than all
    of it. Running 22 chromosomes each normalised to 1 would be 22 independent releases of
-   the same person and would compose — exactly what standing constraint 4 forbids. This is
+   the same person and would compose — exactly what standing constraint 5 forbids. This is
    the same scope algebra already recorded for per-block vs genome-wide: the product of
    the per-scope tilted samplers equals the global one provided the weights sum to 1
    ACROSS the whole scope. **Decide before any multi-chromosome run.**
@@ -962,8 +1070,16 @@ than what is pinned, not harder.
 `log_z_p` = sum of log `c_t`); an unnormalised forward pass underflows float64 after about
 **183 positions** and we need up to 340,824. Use **float64** for the stored alphas — under
 model C this is load-bearing, not a preference. float32 resolution is 1.19e-07 while the
-per-position tilt at tau = 0.5 is **1.61e-06 under C**, only **13.5x** the noise floor,
-against 5.45e-06 and **45.7x** under a block partition. Rounding would consume a meaningful
+per-position tilt at tau = 0.5 is **1.80e-06 under C**, only **15.1x** the noise floor,
+against 5.45e-06 and **45.7x** under a block partition.
+⚠ **CORRECTED 2026-10-10.** This read **1.61e-06** and **13.5x**, computed over the
+340,849-record SITE AXIS rather than the chain's T = 305,886. The chain is the
+denominator — `eta_tau * mean(beta_v) = eta_tau / T` — so the correct figures are
+0.549306 / 305,886 = 1.80e-06 and 15.1x. The old pair understated the tilt's headroom
+by 10%. ⚠ **And under decision B this margin goes the other way:** with `beta_v`
+summing to 1 genome-wide the per-position tilt falls BELOW float32 eps entirely, so
+float64 stops being load-bearing-by-10% and becomes the only thing preventing an
+untilted draw. See `docs/bugs.md`. Rounding would consume a meaningful
 fraction of the target's entire influence. Alpha storage is **240 MB** under C and **71 MB**
 under the model-B fallback, both at K = 88; a K = 86 head-to-head figure is ~2.3% smaller
 and must say so. ⚠ Break the chain at genuine discontinuities — outside `chain_span`, the
@@ -1136,7 +1252,18 @@ Ordered. Each item names what must pass before it starts and what closes it.
 - `new_haplotypes` for the comparison arm is NOT emitted yet; it was never part of this
   gate and belongs to `[A-EVL-headtohead]`.
 
-### [A-THY-diploid-gate] A diploid falsification gate — THE TOP PRIORITY
+### [B-THY-diploid-gate] A diploid, TWO-SEGMENT falsification gate — THE TOP PRIORITY
+
+⚠ **RE-SCOPED 2026-10-08.** Decision E makes Arm 1 diploid AND decision B makes it
+multi-chromosome with a per-chromosome budget share, so a diploid gate on a single
+chain with `beta` summing to 1 no longer covers the build. The gate needs **two toy
+segments with declared shares `w_1 + w_2 = 1`, both haplotypes** — the existing toy
+has 96 output paths, so the product support stays enumerable. It must also catch the
+genome-wide composition error: running each segment at the FULL `eta_tau` rather
+than its share, which is the same shape as the diploid defect below and which **no
+gate in the repo can currently detect.** Added to `[A-EVL-headtohead]`'s
+prerequisites, where it was missing. It is the cheapest blocking item on the
+board: it reads nothing from disk and needs no rebuild, download or rate decision.
 - **Why:** ⚠ **every falsification gate in this project is HAPLOID, and the diploid path is
   the only one that has ever been run.** All 18 releases of the first chr21 run carry
   `ploidy: 2`. Exact TV, `ratio_spread`, the sharp pair, the state-path joint, clause (f)
@@ -1183,7 +1310,7 @@ Ordered. Each item names what must pass before it starts and what closes it.
      because both the uniform initial distribution and the per-state switch probability
      `s_t` divided by K are both functions of K, so a duplicate would put twice the prior mass on one
      haplotype, and a different cohort or a shorter `chain_span` could produce one.
-  3. **Standing constraint 4 is unenforced.** No release cache, and `docs/data.md`'s
+  3. **Standing constraint 5 is unenforced.** No release cache, and `docs/data.md`'s
      "(target_id, tau, utility_id, seed) ... collisions must raise, never overwrite" exists
      in no code. `--seeds` is labelled an evaluation device but nothing structurally stops
      it being used as a release procedure.
@@ -1205,20 +1332,39 @@ Ordered. Each item names what must pass before it starts and what closes it.
 - **Why:** the proposal requires the utility function be chosen before any attack
   outcome is inspected; otherwise every later privacy claim is unfalsifiable.
 - **Prerequisite:** ✅ `A-THY-toy-enumeration` passing (2026-09-30).
-- ⚠⚠ **BLOCKED ON R5, AND THIS IS THE WHOLE POINT OF THE ITEM.** Measured 2026-09-30, the
-  released path is bit-identical from `tau` = 0 to `tau` = 0.9 under the current utility.
-  Pre-registering a `tau` grid over which the mechanism provably does not vary would
-  freeze in a result of zero and make it unfalsifiable in the wrong direction. R1, R3 and
-  R5 all land on `beta_v`, all three are pre-registration items under standing constraint
-  5, and R5 shows they are the same question: what does `beta_v` emphasise, and over what
-  scope does it sum to 1. **Settle R1/R3/R5 first; they cannot be revisited afterwards.**
-- **Exit gate:** a committed, dated file pinning the `tau` grid, the utility id,
-  the primary endpoint, the attacker set, and **which attack database** is used.
+- ✅ **UNBLOCKED 2026-10-08 by decisions A and B**, which settle R5's question: the
+  genome-wide utility is the PRIMARY endpoint, and expectations are reported EXACTLY
+  from the derivatives of `log Z_p` rather than estimated from draws. R1's scope
+  question survives for Arm 2 only (open question 4) and R3 survives untouched
+  (open question 5) — both are still pre-registration items that cannot be
+  revisited afterwards.
+  ⚠ **The sentence this block used to open with was RETRACTED on the day it was
+  written** — see the correction at R5 below. The released path is NOT bit-identical
+  across `tau`; 8 of 10 disjoint-stream draws move. The item's substance (do not
+  pre-register a grid the mechanism provably does not vary over) is unchanged and
+  rests on the exact derivative measurement instead.
+- ⚠ **NOW BLOCKED ON SEQUENCING, NOT ON A DECISION.** Decision B gives each
+  chromosome a SHARE of the budget, so the endpoint's movement is far smaller than
+  the chr21-normalised figure on record. `B-EVL-exact-endpoint` must run first, or
+  the grid is pinned in ignorance of whether the endpoint moves over it at all.
+- **Renamed `B-LCK-preregister`.** ONE dated file at `paper/prereg_<date>.md`
+  covering both arms (PLANNED — it does not exist yet).
+- **Exit gate:** a committed, dated file pinning, **per arm**: the `tau` grid, the
+  utility id and `beta` scope, the primary endpoint, the attacker set, **which
+  attack database**, and — per decision C — the declared recombination rate.
 
 ### [A-EVL-headtohead] The comparison on PanMixer's data
 - ✅ **FIRST STEP IDENTIFIED 2026-10-03, and it is cheap.** `target_fidelity` — the share
   of the target's called alleles the release alters — is computable on either arm's output
-  and is the axis to align on. Measured: ours is **15.03%** and FLAT from `tau` = 0 to 0.9;
+  and is the axis to align on. Measured: ours is **14.8077%** EXACTLY — 75,177.401 of
+  507,692 target-known cells, zero Monte-Carlo error — and effectively FLAT across the
+  whole `tau` grid (the exact movement from `tau` = 0 to 0.99 is **3.28 cells**).
+  ⚠ **CORRECTED 2026-10-10.** This read **15.03%**, which is 76,283/507,692 from a
+  SINGLE DRAW at seed 1000 — the same statistic on the same denominator, but sampled,
+  and it ran 1,106 cells high. `docs/data.md` records that the exact value supersedes
+  every sampling estimate of this quantity. The `capacity ~= 0.17` crossing below is
+  unaffected: the capacity sweep already used the exact 14.81%, so only this line was
+  out of step.
   PanMixer's is **10.50%** at capacity 0.1 and **16.41%** at capacity 0.5. **Their capacity
   dial spans our fixed point**, so a matched-fidelity comparison exists at **capacity ~= 0.17** (measured 2026-10-07 by sweeping all eight capacities; the earlier 0.45 interpolated across a FLAT region from only two points) — which is the alignment this item needs and did not previously have.
   ⚠ Three obstacles, all quantified in `docs/memory.md` 2026-10-03: 10.25% of their records
@@ -1227,16 +1373,31 @@ Ordered. Each item names what must pass before it starts and what closes it.
   records); and their obfuscated output was not kept, so their run must be repeated on OUR
   VCF.
 - **Why:** the direct comparison this project is for.
-- **Prerequisite:** `A-DAT-grch38-repin`, `A-LCK-preregister`.
-- **Exit gate:** for each subject, a `loo_cohort` with donor panel, allele
-  frequencies, support counts, site list and block assignment all recomputed
-  without the target — applied to BOTH arms, with PanMixer's as-published numbers
-  also reported so the cost of the correction is visible. Both arms emit
-  `new_haplotypes`; the shared evaluators run unchanged. R >= 10 seeds per
-  (subject, level) in both arms — PanMixer's published frontier rests on ONE
-  presampled draw reused across capacities. Attacks run PER operating point, never
-  pooled, because a frontier of k points is k correlated releases and our guarantee
-  is one-release-per-genome.
+- **Prerequisite:** `B-THY-diploid-gate`, `B-DAT-rebuild`, `B-LCK-preregister`.
+- **Exit gate — REWRITTEN 2026-10-08 for decisions E, G and H.** For each of the 44
+  subjects, a `loo_cohort` at K = 86 with the donor panel and support counts
+  recomputed without BOTH of the target's haplotypes, applied to BOTH mechanisms,
+  with PanMixer's as-published numbers also reported so the cost of the correction
+  is visible. Both emit `new_haplotypes`; the shared evaluators run unchanged.
+  **R = 1 release per (subject, operating point)** — the paper's `n` is the subject
+  count — plus **3 seeds at ONE declared configuration** as the tilt diagnostic,
+  labelled not-for-publication (decision G). The EXACT expectation is printed
+  beside every sampled mean, so the small R is a diagnostic and never the evidence.
+  Attacks run PER operating point, never pooled, because a frontier of k points is
+  k correlated releases and our guarantee is one-release-per-genome.
+  ⚠ **Three clauses of the original gate were false or unbuildable** and are
+  removed: *R >= 10 seeds per (subject, level)* (superseded by decision G, and it
+  demanded ~150x the compute Dylan has agreed to spend); and *allele frequencies*
+  and *block assignment* recomputed per subject — **model C has neither**, no
+  allele-frequency table and no blocks, so those two could never have been met.
+- **Utility axis (decision H):** `utility_loss_panmixer` only. `af_loss` and
+  `ld_loss` ARE defined in Arm 1 — the release set is cohort-shaped — but are not
+  adopted. That is a scope choice, not an impossibility, and `docs/terms.md` has
+  been corrected to say so.
+- **Attack axis (decision I):** "self" is scored from the target's own
+  assembly-derived path, defined for all 44. PanMixer's panel-row semantics —
+  defined for only the 39 members present in the 30x panel — run as a labelled
+  parity column.
 - **Must include:** a `target_fidelity` axis, or our `tau` = 0 point looks like a
   free lunch — a pure-prior draw is a real cohort haplotype and scores near-perfectly
   on every cohort-level utility metric while carrying zero target information.
