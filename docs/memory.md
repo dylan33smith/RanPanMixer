@@ -1056,6 +1056,47 @@ CPU across 32 threads, read as elapsed time. A whole chromosome from scratch is
 wall time — not 12 hours.
 
 
+### 10. The panel, and a gate that checks the reference build against our own graph
+
+**Complete.** 21 files fetched by `scripts/get_panel.sh`, sentinel 0, **zero failures
+and no leftover `.part` files**: 29.3 GB, **69,689,262 records**, **3,202 samples on
+every chromosome**, each with a `.tbi` and a `.sha256`. chr21 was already on disk as
+`1000g_30x_phased.vcf.gz` (1,002,753 records, 3,202 samples), so all 22 are covered.
+Verified by `scripts/verify_panel.py` into `logs/B_verify_panel.md`, 21 of 21 passing.
+
+⚠⚠ **THE BUILD CHECK USES NO CONSTANTS I TYPED.** Each panel VCF's `##contig` length is
+compared against the length OUR OWN `vg deconstruct` output declares for the same
+chromosome — two independent files on disk, each describing the assembly it was built
+on. That design was chosen deliberately over a table of GRCh38 lengths: a hand-copied
+constant is one more thing that can be wrong, and the thing actually worth asserting is
+not "the panel matches GRCh38" but **"the panel matches the graph we will compare it
+to."** A GRCh37 panel disagrees on every chromosome (chr1 249,250,621 against
+248,956,422) and nothing in the script would need to be correct for that to be caught.
+
+**Why this gate and not another.** A wrong-build panel does NOT fail loudly. It
+produces a LOW (POS, REF, ALT) match rate, and a low match rate reads as biology. That
+is decision F's whole hazard, measured: 0.30% of chr21 pangenome records match GRCh37
+Phase 3 against 75.88% for this panel — **252x**, attributable to the build alone. An
+unguarded pipeline would have produced a publishable-looking number.
+
+Truncation is caught by **SEEKING to the far end**, not by streaming, because a download
+cut short still opens, still indexes against its own partial content, and simply stops
+early — so the last reachable record is the tell. All 21 reach within 0.17% of their
+contig length; the shortfall is telomeric sequence carrying no variants.
+
+9 tests. ⚠ Deleting the build comparison fails exactly its two tests, so the gate is
+not decoration. ⚠ A missing reference is REPORTED as "cannot be checked" rather than
+passing — silently passing is how an unchecked panel becomes a verified one. ⚠ The
+sha256 sidecars are RECORDED but NOT re-verified; `--deep` re-reads 29 GB and was not
+run.
+
+⚠ **An operational note, not a bug.** Every `.tbi` was downloaded BEFORE its data file
+(the script fetches indexes first), so `bcftools` warned "index is older than the data
+file" on every call. The indexes ship with the release and their usability is proven by
+the seek check, so the mtimes were touched forward — the warning was noise that would
+have masked a real index problem.
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The

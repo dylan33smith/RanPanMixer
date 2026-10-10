@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-10
+**Last updated:** 2026-10-10 (chunk 6 complete: all 22 cohorts + the full panel, both gated)
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -38,6 +38,28 @@ Read at session start. This file exists so a new session never has to grep
   `[0, eta_tau]`, and `tau` = 0 reproduces `baseline_model` to 1e-15. 46 new tests, **87
   in the suite, all passing.** The O(TK) rank-one forward pass agrees with an O(TK^2)
   dense reference to **1.11e-16**.
+- ✅✅ **CHUNK 6 IS COMPLETE: ALL 22 AUTOSOMES AND THE FULL PANEL, BOTH GATED
+  (2026-10-10).** The cohort is **22,307,009 records / 22,306,704 chain positions**, with
+  only **305 positions excluded genome-wide** (0.0014%, all `support` == 0); driver exit 0,
+  verifier 22 of 22. The panel is **21 files / 29.3 GB / 69,689,262 records / 3,202 samples**
+  on every chromosome, plus chr21's pre-existing file, so all 22 are covered; verifier
+  21 of 21 with the **reference build checked against our own `deconstruct` output** rather
+  than against typed-in constants.
+  ⚠⚠ **THE HEADLINE IS THE DILUTION: `mean beta_v` per position is 4.4830e-08 genome-wide
+  against chr21-alone's 3.27e-06 — 73x smaller.** This is `B-THY-toy-genome`'s budget-dilution
+  effect measured on the real axis instead of projected, and **every chr21-scope per-position
+  utility figure in this file shrinks by that factor at genome scope.** It sharpens R5 rather
+  than resolving it: the whole-chromosome endpoint was already 1:900 against a single draw's
+  noise at chr21 scope.
+  ⚠ A publishable side finding: the declared rate spans **434x** across autosomes (chr21
+  7.81% to chr6 0.02%) and the top four are **four of the five acrocentrics**, whose p arms
+  the genetic map does not cover. It quantifies how much of each chromosome's transition
+  structure rests on a declared constant rather than a measured map.
+  ⚠ Two failures got us here, both mine and both archived in `docs/memory.md` section 9:
+  a commit that landed MID-RUN cost nine chromosomes and split the damage by process start
+  time, and the manifest was found to describe the CONFIG rather than the BUILD — it
+  relabelled chr21's 11-day-old coordinate-cut arrays as `chain_rule` = "declared_rate_fill".
+  Both are now gated in code.
 - ⚠⚠ **NEXT: THE UTILITY'S SCOPE. R5 is a live, quantified design choice, not a dead end**
   (reopened 2026-09-30). `Var_R(u)` is set by how many mosaic SEGMENTS the utility spans, so
   a CONTIGUOUS window of 1,000 positions gives **94.9x** the variance of 1,000 scattered
@@ -77,8 +99,12 @@ Read at session start. This file exists so a new session never has to grep
   missing matrix cells against 1,278,653 — vg 1.68 calls 89,395 more genotypes and
   emits **zero** bare-`.` GT fields where 1.36 emitted 237,594. **Every figure in
   these docs must now say which VCF it belongs to.** The table in `docs/memory.md`
-  2026-09-29 is the mapping. Derived on OUR build: T = **305,886**, dropped
-  **34,371** below the span and **592** above, **767,376** declared alleles.
+  2026-09-29 is the mapping. ⚠ **THE DERIVED FIGURES ARE SUPERSEDED BY DECISION C.**
+  Under the coordinate cut chr21 had T = 305,886, dropping 34,371 below the span and
+  592 above. **Under the declared-rate fill chr21's T is 340,848** — nothing is dropped
+  for want of a cM, and only ONE position leaves the chain (`support` == 0). The three
+  cM-source classes reconcile with the old cut exactly: 26,044 declared below the map
+  + 592 declared above it + 8,327 interpolated plateau = 34,963 = what the cut dropped.
 - **⚠ THE SCOPE CORRECTION OF 2026-09-28.** The v1 scope decision — *"maximise reuse
   of PanMixer, change exactly ONE thing"* — imported PanMixer's threat model, in
   which the target is a cohort member, into a design whose target is EXTERNAL to
@@ -612,6 +638,7 @@ segment count is set by the chromosome's genetic length, not by T.
 | B-THY-toy-genome | Demonstrate what the mechanism DOES, exactly, on a 2-chromosome toy genome | the tilt visible, and the sampler matching the enumeration | 2 chr, 7 `tau`, 40,000 draws | **THE TILT IS VISIBLE.** Shares 7/9 and 2/9 by decision J; mean `beta_v` 0.111 against chr21's 3.27e-06. TV(Q, R_D) reaches **0.3090**, `E_Q[u]` moves **0.4502 -> 0.6477** against chr21's 2.94e-06, `Var_Q(u)` 7.3e-02 against 4.05e-06. `ratio_spread` equals `exp(epsilon_tau)` to the last digit at every `tau`. Same `ffbs` path, no special case — **so it is budget dilution that makes the chr21 effect invisible, not the mechanism.** ⚠ A correlated-seed bug in the demo was caught by its own joint assertion: every marginal was right and only the joint was wrong | done | 2026-10-10 |
 | B-EVL-exact-endpoint | Re-measure the PRIMARY endpoint at a genome-wide share, since every figure on record used the whole budget on chr21 | monotone and exactly computable at the share that will be used | 3 shares x 7 `tau`, two independent routes | **MARGINALS ROUTE WORKS, DERIVATIVE ROUTE BREAKS.** Movement scales EXACTLY linearly in the share (5 s.f. at two shares); monotone at every share; 3.45e+09x float64 headroom at the smallest. ⚠⚠ But `Var_Q(u)` from the finite-difference second derivative goes **NEGATIVE** at chr21's genetic-length share and scatters over 5x at 1/22 — and every recorded `Var_Q(u)` came from that route. The pre-registered endpoint must name the marginals route; the derivative route survives only as a chr21-scale diagnostic. ⚠ New residual: the share ALLOCATION RULE is undecided and the candidates span 2.8x | done | 2026-10-10 |
 | B-DAT-map-coverage | Measure how much of each autosome the map speaks to, before the declared rate is chosen | the three classes reported separately, and chr21's split reconciling with the record | 22 autosomes, bp; chr21 positions | **MEASURED.** Map-silent **3.00%** of autosomal bp (86.2 Mb), **96% of it the five acrocentric p arms**; interior zero-cM **3.27%** (93.9 Mb), LARGER than the class the rate covers, chr9 alone 25.61 Mb. Autosomal mean mapped rate **1.2707 cM/Mb**, per-chromosome spread **1.84x**. chr21: 26,044 map-silent + 8,327 in-span plateau = 34,371, RECONCILES. ⚠⚠ **A per-chromosome rate is LESS defensible than a global one** — the acrocentrics' rates are the genome's highest and are measured entirely on the q arm, so they would extrapolate a hot q-arm rate onto heterochromatin. ⚠ N-gap policy BLOCKED: no reference assembly on disk | done | 2026-10-10 |
+| B-DAT-panel | Acquire the 1000G 30x panel for all 22 chromosomes and prove it is on OUR reference build | the build must be checked against our own deconstruct output, and a GRCh37 length must be refused | 21 chromosomes; 9 tests | **COMPLETE AND BUILD-VERIFIED.** 21 files, 29.3 GB, **69,689,262 records**, **3,202 samples on every chromosome**, zero failures, no leftover partials; plus chr21's pre-existing panel, so all 22 are covered. ⚠⚠ **The build check compares the panel's contig lengths against OUR OWN pangenome's**, not against constants I typed — a wrong-build panel produces a low match rate that reads as biology, which is exactly how decision F's hazard would present. All 21 verified. ⚠ Truncation is caught by SEEKING to the far end, because a cut-short download still opens and still indexes against its own partial content. Deleting the build comparison fails exactly its two tests. ⚠ Checksums are RECORDED but not re-verified (`--deep` re-reads 29 GB) | done | 2026-10-10 |
 | B-DAT-genomewide-build | Build all 22 autosomes on one consistent axis, and make a manifest unable to claim a rule its artifacts do not support | driver exit 0 over all 22, verifier exit 0, and chr21 reconciling with the superseded cut | 22 chromosomes; 8 checks each | **ALL 22 BUILT AND PASSING.** 22,307,009 records, **22,306,704 chain positions**, only **305 excluded genome-wide**. ⚠⚠ **`mean beta_v` = 4.4830e-08, 73x smaller than chr21-alone's 3.27e-06** — the dilution is now measured, not projected, and every chr21-scope per-position figure shrinks by it. Declared rate spans **434x**, top four are four of five acrocentrics. chr21 reconciles with the old cut **to the position** (26,044 + 592 declared + 8,327 interpolated = 34,963 = exactly what the cut dropped). ⚠ **The manifest described the CONFIG, not the BUILD** — chr21's 2026-09-29 arrays were relabelled `chain_rule` = "declared_rate_fill" because every resume sentinel was satisfied and only the manifest re-ran. Now the claim is CHECKED against `cm_source.npy`, whose absence the coordinate cut cannot fake; fired on the live case. ⚠ chr21's old tree moved to `DEPRECATED_chr21_coordinate_cut` — its LD blocks carried the OLD axis digest | done | 2026-10-10 |
 | B-FIX-resume-deconstruct | Make the expensive step resumable, and stop the verifier failing a correct chromosome | recovery must reproduce the originally recorded digest exactly, and a tie must not be reported | 3 real chromosomes; 14 tests | **BOTH FIXED, AND ONE WAS A FALSE POSITIVE OF MINE.** (1) `deconstruct` was missing from the resume map, so any late failure cost a whole chromosome rebuild (measured 437.9 s, ~2 CPU-hours); it is now resumable AND the skip branch repairs missing provenance rather than carrying the gap forward. chr10 recovered in **9 s** against a measured 437.9 s full rebuild, and the recomputed graph digest matches the originally recorded one **byte for byte on chr9, chr16 and chr19** — so the recovery is identical provenance, not an approximation. (2) ⚠ The verifier's position check demanded STRICT increase and failed chr9, which has one tied position where a parent bubble (`lv` 1) and a nested 1 bp deletion (`lv` 2) share a start. Nesting is routine at 10-18% of records per autosome, so the tie is legal output; the check now forbids only a DECREASE and reports ties as a column | done | 2026-10-10 |
 | B-FIX-deconstruct-prov | Stop the deconstruct step deleting the graph it is about to checksum | reinstating the original ordering must fail a named test | 6 tests, 3 fail on the reverted bug | **FIXED, AND THE CAUSE WAS MY OWN MID-RUN COMMIT.** `8d56346` inserted the GFA cleanup ABOVE the provenance call, so `src/store.py:sha256_file` was handed a path that had just been unlinked — after vg had spent 1-2 h. Six chromosomes lost (chr10-14, chr17), three more in flight. ⚠⚠ **THE COMMIT LANDED WHILE THE BUILD WAS RUNNING**, and each chromosome imports `vcf.py` in a fresh subprocess, so the split is by PROCESS START TIME: chr9's manifest is stamped 32 min AFTER the commit and is fine, while everything started after it failed. ⚠ No existing test could see it — they all passed a plain `.gfa`, so the unlink never fired. ⚠ And the traceback named the provenance call, not the cleanup three lines above. Recovery is cheap because vg writes the VCF BEFORE the crash: all 9 survived, and `src/cohort/vcf.py:attach_deconstruct_prov` plus `src/store.py:sha256_gz_plain` rebuild the sidecar without re-running vg, saving ~12 h | done | 2026-10-10 |
