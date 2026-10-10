@@ -477,6 +477,20 @@ Aliases:              "the beta scope", `scope` in code. Never "the window" bare
 ```
 
 ### beta_share  [utility] [method]
+
+⚠ **THE ALLOCATION RULE IS DECISION J (2026-10-10): `w_c = T_c / T_total`,
+by VARIANT COUNT.** Mean `beta_v` per position is then `w_c / T_c = 1 / T_total` on
+every chromosome, so this rule is what "normalise `beta_v` over the whole genome in
+one go" MEANS — the per-chromosome share is bookkeeping, not a second weighting.
+The rejected alternative, allocation by genetic length, would make a position's
+weight depend on which chromosome it sits on.
+⚠ `T_c` IS DEFINED ON THE FULL 88-HAPLOTYPE COHORT, fixed before any target is
+selected. Under Arm 1's leave-one-out, up to 5 chr21 positions of 305,886 (0.0016%)
+drop to `support == 0` and would otherwise make `w_c` weakly target-dependent —
+a standing-constraint-1 problem avoided by construction rather than by smallness.
+⚠ The shares therefore cannot be stated as 22 numbers until preprocessing has run,
+because `T_c` is an output of it. The pre-registration pins the RULE; a rule is
+re-derivable and falsifiable where 22 bare numbers are not. UNMEASURED: `T_total`.
 ```
 Is:                   The fraction of the ONE genome-wide beta_v budget that a single
                       autosome carries: sum of beta_v over that chromosome's positions,
