@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SRC = REPO / "src"
@@ -456,3 +457,71 @@ if __name__ == "__main__":
             print(f"  FAIL  {name}\n          {type(e).__name__}: {e}")
     print(f"\n{len(tests) - failed}/{len(tests)} passed")
     sys.exit(1 if failed else 0)
+
+
+# ---------------------------------------------------------------------------
+# B-DAT-map-coverage: the maps themselves, and the chr21 reconciliation
+#
+# ⚠ These guard the INPUT to decision C's declared rate. A silently truncated
+# extraction, or a map whose cM goes backwards, would produce a negative
+# `Delta_x` and a transition probability outside [0,1] -- and the first place
+# anyone would notice is a release, long after the cause.
+# ---------------------------------------------------------------------------
+
+def test_every_autosome_map_is_extracted_and_well_formed():
+    """All 22 autosomes, monotonic, inside their chromosome's length.
+
+    ⚠ And chrX must NOT be extracted: decision D is autosomes only, and an
+    extracted chrX is the kind of thing a `range(1, 24)` loop later picks up
+    without anyone deciding to.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "map_coverage", REPO / "scripts" / "map_coverage.py")
+    mc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mc)
+
+    missing = [c for c in range(1, 23)
+               if not (REPO / "external" / "genetic_maps" / f"chr{c}.b38.gmap").exists()]
+    assert not missing, f"autosome maps not extracted: {missing}"
+    assert not list((REPO / "external" / "genetic_maps").glob("chrX*.gmap")), (
+        "chrX is extracted; decision D is autosomes only")
+
+    for c in range(1, 23):
+        m = mc.measure(c)                     # read_map asserts monotonicity
+        assert m["markers"] > 10_000, f"chr{c}: only {m['markers']} markers"
+        assert m["map_last"] <= m["length_bp"]
+        assert m["mapped_bp"] > 0 and m["total_cM"] > 0
+        assert 0.5 < m["mean_rate_cM_per_Mb"] < 5.0, (
+            f"chr{c}: mean rate {m['mean_rate_cM_per_Mb']:.3f} cM/Mb is outside "
+            f"any plausible range for a human autosome")
+
+
+@pytest.mark.skipif(
+    not (REPO / "data" / "cohort" / "chr21" / "positions.npy").exists(),
+    reason="chr21 cohort stage has not run in this checkout")
+def test_the_chr21_map_silent_split_reconciles_with_the_record():
+    """26,044 map-silent + 8,327 in-span plateau == the recorded 34,371.
+
+    ⚠ THIS IS THE GATE THAT RESOLVED A CONTRADICTION, not a formality. Two totals
+    for the superseded cut were on record -- 34,371 and 34,345 -- because one
+    paired our 26,044 with 8,327 and the other paired PanMixer's 26,018 with the
+    same 8,327. If this stops reconciling, one of the three numbers has moved and
+    none of them may be quoted until it is resolved.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "map_coverage", REPO / "scripts" / "map_coverage.py")
+    mc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mc)
+
+    m = mc.measure(21)
+    v = mc.positions(21, m)
+    assert v is not None
+    assert v["below_map_start"] == 26_044, v["below_map_start"]
+    assert v["in_span_plateau"] == 8_327, v["in_span_plateau"]
+    assert v["above_map_end"] == 592, v["above_map_end"]
+    assert v["below_cut_total"] == 34_371, v["below_cut_total"]
+    assert v["split_reconciles"]
+    # every re-admitted position is usable, so none is filtered out downstream
+    assert v["in_span_plateau_support_gt0"] == v["in_span_plateau"]

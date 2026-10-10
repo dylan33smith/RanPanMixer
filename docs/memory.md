@@ -104,6 +104,98 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (chunk 3) — B-DAT-map-coverage: and a per-chromosome rate is WORSE than a global one
+
+**Goal.** Decision C samples the map-silent regions under a declared constant
+recombination rate, and the rate's value cannot be chosen because nothing had
+measured how much sequence the rule applies to. Measure it, per autosome, before
+declaring anything.
+
+**Method.** Extracted the 21 remaining autosome maps from the SHAPEIT4 archive
+already on disk (chrX deliberately NOT extracted — decision D).
+`scripts/map_coverage.py` reads each map, asserts strict position monotonicity and
+non-decreasing cM, and splits each chromosome into three classes that are reported
+separately and never added: MAPPED, MAP-SILENT (no cM at all — what the declared
+rate covers), and INTERIOR ZERO-cM (inside the span, where the map speaks and says
+zero — which decision C does NOT override). Position counts come from each
+chromosome's own `positions.npy`, so today only chr21 has them.
+
+### Autosomal totals — metrics are rows
+
+| metric | value | share of autosome |
+|---|---|---|
+| total length | 2,875.0 Mb | 100.00% |
+| mapped span | 2,788.8 Mb | 97.00% |
+| **map-silent (no cM at all)** | **86.2 Mb** | **3.00%** |
+| of which before the first marker | 84.2 Mb | 2.93% |
+| of which after the last marker | 2.0 Mb | 0.07% |
+| of which the five acrocentric p arms | 82.9 Mb | 2.88% |
+| **interior zero-cM (inside the span)** | **93.9 Mb** | **3.27%** |
+| total genetic length | 3,543.8 cM | — |
+| **autosomal mean mapped rate** | **1.2707 cM/Mb** | — |
+| per-chromosome rate, min / median / max | 1.110 / 1.311 / 2.046 cM/Mb | spread **1.84x** |
+
+**Provenance.** the 22 extracted autosome maps under `external/genetic_maps`, SHAPEIT4 b38
+(tarball sha256 `04f97acc...`) · GRCh38 primary assembly lengths, chr21's
+cross-checked against the 46,709,983 the project recorded from the HPRC VCF header
+· `scripts/map_coverage.py`, output at `logs/B_map_coverage.md` and `.json` ·
+measured 2026-10-10 · 3,543.8 cM total and 1.27 cM/Mb both sit in the textbook
+range, which is the only external sanity check available on this table.
+
+**chr21 position counts, and the reconciliation gate.** 340,849 records, 305,886
+in chain. Below the map start **26,044** (26,043 with support > 0); above the map
+end **592**; in-span zero-cM plateau **8,327**, all with support > 0.
+**26,044 + 8,327 = 34,371 — RECONCILES** with the recorded below-cut count. The
+script raises if it ever stops reconciling, and a test pins all four figures.
+
+**ROWS** · *map-silent at 3.00%* is the whole cost of the old exclusion rule, and
+**96% of it is the five acrocentric p arms** — chr13 18.45, chr14 19.03, chr15
+19.81, chr21 10.33, chr22 15.29 Mb. · *interior zero-cM at 3.27% is LARGER than
+the class decision C actually covers*, and chr9 alone is 25.61 Mb with chr16 at
+10.69 Mb. · *the rate spread is 1.84x*, so global-versus-per-chromosome is not a
+cosmetic choice.
+
+### ⚠⚠ THE FINDING: A PER-CHROMOSOME RATE IS LESS DEFENSIBLE, NOT MORE
+
+The earlier recommendation — use each chromosome's own mean mapped rate, because a
+locally derived number beats a global constant — is **wrong, and this measurement
+is what shows it.**
+
+The five acrocentrics have the **highest** mapped rates on the genome: chr22
+**2.046**, chr15 **1.727**, chr21 **1.711**, chr14 1.368, chr13 1.311 cM/Mb, every
+one above the 1.2707 autosomal mean. But an acrocentric's rate is measured
+**entirely on its q arm**, because the p arm IS the map-silent region being filled.
+So a per-chromosome rate would extrapolate an unusually HOT q-arm rate onto a p arm
+that is heterochromatin and rDNA — exactly where the biology says recombination is
+near zero, and where deCODE's pedigree map assigns **0.0 cM/Mb** to every 1 Mb bin
+from 0-13 Mb of chr21.
+
+**Per-chromosome is therefore worst precisely where the rate matters most:** on the
+five chromosomes that hold 96% of the sequence the rule applies to, it is both more
+wrong and wrong in the direction of inventing recombination. A global 1.2707 cM/Mb
+is lower for all five and is not derived from the one arm that is least like the
+region being filled. Neither is biologically right — the honest statement is that
+the declared rate is a stated modelling convention, not an estimate — but the
+global constant has the smaller defensible claim attached to it.
+
+⚠ **And both options remain conditional on the N-gap question, which is BLOCKED.**
+A constant cM/Mb multiplied by fabricated base pairs yields fabricated cM, and
+chr21's p arm is 25 contigs separated by fabricated N-gaps, 22 of them exactly
+50 kb. Measuring that needs the GRCh38 assembly's gap coordinates, and no FASTA,
+AGP or assembly report is on disk. Reported as blocked rather than skipped.
+
+**One correction made in passing.** My scratch version of this measurement reported
+chr21's total as 62.8 cM, which is the map's last cM VALUE. The genetic length of
+the mapped span is `cM[last] - cM[first]` = **62.2 cM**, because chr21's first
+marker sits at 0.584144 rather than 0. The rate denominator must be the span, so
+the committed script uses the difference; only chr21 and chr8/11/19-style maps with
+a non-zero first marker are affected.
+
+**Still open after this chunk, and now answerable:** the rate's VALUE and whether
+it is global or per-chromosome (open question 1 — this entry recommends global
+1.2707 cM/Mb), and whether the interior zero-cM plateaus are eventually overridden
+(open question 2 — now sized at 93.9 Mb genome-wide and 8,327 positions on chr21).
+
 ## 2026-10-10 (later still) — B-IMP-genomewide: the budget is one per genome, and three guards that did not guard
 
 **Hypothesis.** Decision B makes `beta_v` sum to 1 across the 22 autosomes with

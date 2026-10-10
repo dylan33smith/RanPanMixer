@@ -1077,10 +1077,20 @@ Is:                   How much of an autosome the genetic map actually speaks to
                       INTERIOR ZERO-cM bp and record count — inside the mapped span,
                       where the map speaks and says zero — which decision C does NOT
                       cover and which is reported separately so the two are never added.
-Computed by:          NOT MEASURED for 21 of 22 autosomes. No script computes it;
-                      `src/cohort/genmap.py` interpolates one chromosome against one map
-                      and asserts, and nothing tabulates coverage. `B-DAT-map-coverage`
-                      is the work item.
+Computed by:          ✅ `scripts/map_coverage.py` (2026-10-10), output at
+                      `logs/B_map_coverage.md`. MEASURED in base pairs for all 22
+                      autosomes: map-silent **3.00%** (86.2 Mb, 96% of it the five
+                      acrocentric p arms), interior zero-cM **3.27%** (93.9 Mb,
+                      chr9 alone 25.61 Mb), autosomal mean mapped rate **1.2707
+                      cM/Mb** with a 1.84x per-chromosome spread.
+                      ⚠ POSITION counts are chr21-only, because they need each
+                      chromosome's own deconstructed VCF: 26,044 below the map
+                      start, 8,327 on the in-span plateau, 592 above the map end.
+                      Base pairs are NOT positions and the rate acts per position,
+                      so the bp table must not be read as a substitute.
+                      ⚠ The N-GAP class is still BLOCKED: it needs the GRCh38
+                      assembly's gap coordinates and no FASTA, AGP or assembly
+                      report is on disk.
                       ✅ **chr21 IS measured, 2026-10-10, on our 340,849-record build:**
                       **26,044** records below the map's start (10,326,676), of which
                       26,043 have `support > 0`; **8,327** in [10,326,676, 12,968,320],
