@@ -82,8 +82,18 @@ class Forward:
 
     @property
     def log_norm(self) -> float:
-        """`sum_t log c_t`. ⚠ NOT `log_z_p` -- see point 4 in the module docstring."""
-        return float(self.log_c.sum())
+        """`sum_t log c_t`. ⚠ NOT `log_z_p` -- see point 4 in the module docstring.
+
+        ⚠ `math.fsum`, NOT `.sum()`, and not as a micro-optimisation. `log_z_p` is
+        a DIFFERENCE of two of these whose magnitude grows with T while the result
+        stays bounded by `eta_tau`, so the cancellation worsens with chromosome
+        length. numpy's pairwise summation holds the error near 1.5e-10 at genome
+        scale, but a sequential accumulation -- which is what someone reaches for
+        when the `(T,)` array looks like wasted memory -- reaches ~9.9e-05 against
+        a 1e-6 tolerance. `fsum` is exactly rounded, so the failure mode is closed
+        rather than merely unlikely, and it costs nothing here. See `docs/bugs.md`.
+        """
+        return float(math.fsum(self.log_c))
 
 
 def forward(hmm: CohortHMM, potentials: np.ndarray) -> Forward:
@@ -177,8 +187,19 @@ def baseline_log_norm(hmm: CohortHMM) -> float:
 
 
 def log_z_p(tilted: Forward, baseline_log_norm_: float, eta: float,
-            *, tol: float = 1e-6) -> float:
-    """`log Z_p`, range-asserted against `[0, eta_tau]`.
+            *, budget: float | None = None, tol: float = 1e-6) -> float:
+    """`log Z_p`, range-asserted against `[0, budget]`, which defaults to `eta_tau`.
+
+    ⚠ `budget` EXISTS BECAUSE THE DEFAULT IS ONLY RIGHT FOR A WHOLE-BUDGET CHAIN.
+    `Z_p = sum_y R_D(y) exp(eta * u)` reaches `e^eta` only if `u` can reach 1,
+    i.e. only if this chain's `beta` sums to 1. Under decision B a chromosome's
+    `beta` sums to its SHARE `w_c`, so its own `log Z` lives in
+    `[0, eta * w_c]` -- roughly `eta/22` genome-wide. Bracketing that against the
+    full `eta_tau` is a check that cannot fire, and the error it would wave
+    through is running every chromosome at the full budget: the 22x composition
+    violation of standing constraint 5. Callers pass
+    `budget = exponent * beta.sum()`, which is tight by construction and cannot
+    drift from the weights it is derived from.
 
     Theory pins it: `Z_p = sum_y R_D(y) exp(eta_tau u(p,y))` with `u` in [0,1], so
     `Z_p` in `[1, e^eta]`. If this leaves the bracket the sampler is wrong -- it is
@@ -194,10 +215,18 @@ def log_z_p(tilted: Forward, baseline_log_norm_: float, eta: float,
     that magnitude from a stale -1.2e4 lowers the error figure by the same ~20x.)
     A failure at 1e-6 is a real defect.
     """
+    cap = eta if budget is None else float(budget)
+    if cap < -tol:
+        raise ValueError(f"budget must be non-negative, got {cap!r}")
     lz = tilted.log_norm - baseline_log_norm_
-    if not (-tol <= lz <= eta + tol):
+    if not (-tol <= lz <= cap + tol):
+        # Keep the whole-budget wording verbatim when no share is in play: it is
+        # the form the existing regression test pins, and the only thing a share
+        # changes is the cap, so say so additively rather than rewriting.
+        where = ("[0, eta_tau]" if budget is None else
+                 f"[0, eta_tau * share] = [0, {cap!r}] (eta_tau = {eta!r})")
         raise AssertionError(
-            f"log_z_p = {lz!r} is outside [0, eta_tau] = [0, {eta!r}].\n"
+            f"log_z_p = {lz!r} is outside {where}.\n"
             f"  tilted sum_t log c_t   {tilted.log_norm!r}\n"
             f"  baseline sum_t log c_t {baseline_log_norm_!r}\n"
             f"The release distribution is not the one the theorem is about. Do "
@@ -349,12 +378,23 @@ class Release:
     u_ceiling: float
     ploidy: int = 1               # 2 = one diploid release, both haplotypes
     loo_id: str | None = None     # comparison arm only; None for a real release
+    chrom: str = ""               # which chromosome this PART of the release covers
+    share: float = 1.0            # its share of the one genome-wide budget
     released_at: str = field(default_factory=lambda: date.today().isoformat())
 
     @property
     def release_id(self) -> str:
-        return (f"{self.target_id}_tau{self.tau:g}_{self.utility_id}"
-                f"_seed{self.seed}".replace("/", "-").replace("=", ""))
+        """⚠ THE CHROMOSOME IS PART OF THE KEY, because without it all 22 parts of
+        one genome-wide release collapse to a single id -- and `docs/data.md` says
+        a collision must raise rather than overwrite, so 21 of the 22 would be
+        silently lost. Omitted when empty so every single-chromosome id on record
+        stays byte-identical.
+        """
+        stem = (f"{self.target_id}_tau{self.tau:g}_{self.utility_id}"
+                f"_seed{self.seed}")
+        if self.chrom:
+            stem += f"_{self.chrom}"
+        return stem.replace("/", "-").replace("=", "")
 
     def record(self) -> dict:
         """The quotable record. The released PATH is identified; the target is not.
@@ -374,6 +414,7 @@ class Release:
             "loo_id": self.loo_id, "seed": self.seed,
             "log_z_p": self.log_z_p, "u_achieved": self.u_achieved,
             "u_ceiling": self.u_ceiling, "ploidy": self.ploidy,
+            "chrom": self.chrom, "share": self.share,
             "released_at": self.released_at,
             "state_path_sha256": _digest(self.state_path),
             "released_path_sha256": _digest(self.released_path),
@@ -399,7 +440,10 @@ def _draw_one(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_1d: np.ndarra
     psi = utility.tilt_potentials(hmm.allowed, haplotypes_chain, target_1d, beta, eta,
                                   unit_spans=hmm.unit_spans)
     fwd = forward(hmm, psi)
-    lz = log_z_p(fwd, baseline_norm, eta)
+    # ⚠ The budget is this chain's OWN reach: `eta * sum(beta)`. With a
+    # genome-wide normaliser `sum(beta)` is the chromosome's share, so this
+    # is ~22x tighter than `eta` and is the only form that can fire.
+    lz = log_z_p(fwd, baseline_norm, eta, budget=eta * float(beta.sum()))
 
     z = backward_sample(hmm, fwd, np.random.default_rng(seed))
     released = expand_to_positions(hmm, haplotypes_chain, z)
@@ -502,9 +546,18 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
         # per haplotype (the SUM aggregator in disguise) was ACCEPTED at every tau
         # and returned a record whose published log_z_p violated its own stated
         # invariant. Measured at tau = 0.5: 0.763 against a bracket of [0, 0.549].
-        if not (-1e-6 <= lz <= eta + 1e-6):
+        # ⚠ AND BRACKET IT AGAINST THIS CHROMOSOME'S SHARE, not the whole budget.
+        # Each haplotype reaches eta/2 * share, so the diploid sum reaches
+        # eta * share -- which equals eta only in the single-chromosome case where
+        # share is 1. Under decision B a per-chromosome sum checked against the
+        # full eta_tau is ~22x too loose and would accept every chromosome running
+        # at the whole budget: standing constraint 5's composition violation, and
+        # the error `test_diploid_gate.py` exists to catch.
+        cap = eta * float(util.share)
+        if not (-1e-6 <= lz <= cap + 1e-6):
             raise AssertionError(
-                f"diploid log_z_p = {lz!r} is outside [0, eta_tau] = [0, {eta!r}] "
+                f"diploid log_z_p = {lz!r} is outside [0, eta_tau * share] = "
+                f"[0, {cap!r}] with eta_tau = {eta!r} and share = {util.share!r} "
                 f"(haplotype values {draws[0][2]!r} and {draws[1][2]!r}). The two "
                 f"chains must each run at eta_tau/2 so their sum lands in the "
                 f"bracket; running each at the full eta_tau doubles the effective "
@@ -521,6 +574,7 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
     return Release(
         target_id=target_id, tau=float(tau), eta_tau=eta,
         utility_id=utility_id(util), graph_id=graph_id, seed=int(seed),
+        chrom=util.chrom, share=float(util.share),
         state_path=z, released_path=released, log_z_p=lz,
         u_achieved=u, u_ceiling=ceiling, ploidy=ploidy, loo_id=loo_id)
 
@@ -533,4 +587,146 @@ def utility_id(util: utility.Utility) -> str:
     an open decision -- so a number that does not carry it cannot be compared to
     anything later.
     """
-    return f"indicator/w=inv_support/beta={util.scope}"
+    base = f"indicator/w=inv_support/beta={util.scope}"
+    # ⚠ The share belongs in the ID. A chromosome released at share 1 and the same
+    # chromosome released at its genome-wide share are DIFFERENT utility functions
+    # -- different weights, different ceiling, different reachable log_z -- and
+    # standing constraint 8 forbids comparing two utility functions. Omitted when
+    # it is 1 so every single-chromosome ID on record stays byte-identical.
+    if abs(util.share - 1.0) > 1e-12:
+        base += f"/share={util.share:.9g}"
+    if util.chrom:
+        base += f"/chrom={util.chrom}"
+    return base
+
+
+@dataclass(frozen=True)
+class GenomeRelease:
+    """One release of one genome, assembled from its per-chromosome parts.
+
+    ⚠ WHY THIS TYPE EXISTS AT ALL. Under decision B there is ONE `tau` and ONE
+    budget per person, spread across the 22 autosomes. Every invariant that makes
+    that a release rather than 22 releases is a statement about the WHOLE set:
+    `sum_c w_c == 1`, `sum_c log Z_c` in `[0, eta_tau]`, `sum_c u_c` in `[0,1]`,
+    and one `(target, tau, utility, seed)` across all of them. A per-chromosome
+    `Release` is individually well formed in all 22 cases where the budget has
+    been spent 22 times over, so nothing that sees one chromosome can detect it.
+    This is the object that can.
+
+    ⚠ It also makes the released OBJECT match the guaranteed one. `tau` bounds the
+    distinguishability of the whole released path; quoting a per-chromosome
+    `log_z_p` or `u_achieved` as "the release's" is a category error that the
+    reporting contract's arm/`tau`/denominator stamp would not catch.
+    """
+
+    parts: tuple[Release, ...]
+
+    def __post_init__(self) -> None:
+        if not self.parts:
+            raise ValueError("a genome release needs at least one chromosome")
+        first = self.parts[0]
+
+        # One private input, one privacy level, one utility family, one draw.
+        for field_name in ("target_id", "tau", "eta_tau", "seed", "ploidy",
+                           "loo_id", "graph_id"):
+            vals = {getattr(p, field_name) for p in self.parts}
+            if len(vals) != 1:
+                raise AssertionError(
+                    f"the parts of one genome release disagree on {field_name!r}: "
+                    f"{sorted(vals, key=repr)}. These are not parts of one "
+                    f"release -- they are separate releases, and separate "
+                    f"releases of one genome compose (standing constraint 5)."
+                )
+
+        # ⚠ The utility must be the same FAMILY but NOT the same id: each
+        # chromosome's id carries its own share and name, so identical ids across
+        # parts would mean the share was never applied.
+        stems = {p.utility_id.split("/share=")[0].split("/chrom=")[0]
+                 for p in self.parts}
+        if len(stems) != 1:
+            raise AssertionError(
+                f"the parts use different utility functions: {sorted(stems)}. "
+                f"Utility is comparable only at a matched utility id "
+                f"(standing constraint 8).")
+
+        chroms = [p.chrom for p in self.parts]
+        if len(self.parts) > 1:
+            if any(not c for c in chroms):
+                raise AssertionError(
+                    "a multi-chromosome release has a part with no `chrom`, so "
+                    "the duplicate check below cannot do its job")
+            if len(set(chroms)) != len(chroms):
+                dup = sorted({c for c in chroms if chroms.count(c) > 1})
+                raise AssertionError(
+                    f"chromosome(s) {dup} appear more than once. Their share "
+                    f"would be double counted, and the total could still look "
+                    f"right with another chromosome missing.")
+
+        total_share = math.fsum(p.share for p in self.parts)
+        if abs(total_share - 1.0) > 1e-9:
+            raise AssertionError(
+                f"the parts' shares sum to {total_share!r}, not 1, over "
+                f"{len(self.parts)} chromosomes: "
+                f"{[(p.chrom or '?', p.share) for p in self.parts]}.\n"
+                f"  A total of {len(self.parts)} means every chromosome was "
+                f"normalised to the whole budget, which is {len(self.parts)} "
+                f"independent releases of this person rather than one."
+            )
+
+        if not (-1e-6 <= self.log_z_p <= first.eta_tau + 1e-6):
+            raise AssertionError(
+                f"genome-wide log_z_p = {self.log_z_p!r} is outside "
+                f"[0, eta_tau] = [0, {first.eta_tau!r}]. Per-chromosome values: "
+                f"{[(p.chrom or '?', p.log_z_p) for p in self.parts]}."
+            )
+        if not (-1e-9 <= self.u_achieved <= 1.0 + 1e-9):
+            raise AssertionError(
+                f"genome-wide u_achieved = {self.u_achieved!r} is outside [0,1]; "
+                f"an unnormalised utility removes the bound (standing "
+                f"constraint 2)."
+            )
+
+    # `u` is the SUM over chromosomes, not the mean: each part's `u_c` is already
+    # scaled by its own share, so the parts add to at most 1. Averaging would
+    # divide the budget a second time and silently understate every release.
+    @property
+    def u_achieved(self) -> float:
+        return float(math.fsum(p.u_achieved for p in self.parts))
+
+    @property
+    def u_ceiling(self) -> float:
+        return float(math.fsum(p.u_ceiling for p in self.parts))
+
+    @property
+    def log_z_p(self) -> float:
+        return float(math.fsum(p.log_z_p for p in self.parts))
+
+    @property
+    def donor_switches(self) -> int:
+        return int(sum(int((np.diff(p.state_path, axis=0) != 0).sum())
+                       for p in self.parts))
+
+    @property
+    def release_id(self) -> str:
+        """No chromosome in it: this IS the release, and its parts are parts."""
+        p = self.parts[0]
+        return (f"{p.target_id}_tau{p.tau:g}_"
+                f"{p.utility_id.split('/share=')[0].split('/chrom=')[0]}"
+                f"_seed{p.seed}_genome").replace("/", "-").replace("=", "")
+
+    def record(self) -> dict:
+        p = self.parts[0]
+        return {
+            "release_id": self.release_id, "target_id": p.target_id,
+            "tau": p.tau, "eta_tau": p.eta_tau, "seed": p.seed,
+            "ploidy": p.ploidy, "loo_id": p.loo_id, "graph_id": p.graph_id,
+            "scope": "genome", "n_chromosomes": len(self.parts),
+            "chromosomes": [pp.chrom for pp in self.parts],
+            "shares": [pp.share for pp in self.parts],
+            "log_z_p": self.log_z_p, "u_achieved": self.u_achieved,
+            "u_ceiling": self.u_ceiling,
+            "donor_switches": self.donor_switches,
+            "T": int(sum(pp.state_path.shape[0] for pp in self.parts)),
+            "parts": [pp.release_id for pp in self.parts],
+            "released_at": p.released_at,
+        }

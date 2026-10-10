@@ -60,10 +60,12 @@ class Utility:
     runs under different scopes are different quantities wearing one name.
     """
 
-    beta: np.ndarray        # (T,) float64 over CHAIN positions, sums to 1
+    beta: np.ndarray        # (T,) float64 over CHAIN positions, sums to `share`
     scope: str
     n_scope: int            # positions the normaliser ran over
     n_chain: int            # chain positions in total
+    share: float = 1.0      # this chromosome's share of the ONE genome-wide budget
+    chrom: str = ""         # which chromosome, for the genome-level completeness check
 
     @property
     def T(self) -> int:
@@ -96,8 +98,17 @@ def support_weights(support: np.ndarray) -> np.ndarray:
 
 
 def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
-           readable: np.ndarray | None = None, scope: str = "chain") -> Utility:
-    """`beta_v` over the chain positions, summing to 1 across the chosen scope.
+           readable: np.ndarray | None = None, scope: str = "chain",
+           share: float = 1.0, chrom: str = "") -> Utility:
+    """`beta_v` over the chain positions, summing to `share` across the chosen scope.
+
+    ⚠ `share` IS THIS CHROMOSOME'S PORTION OF ONE GENOME-WIDE BUDGET (decision B,
+    standing constraint 4), and the default of 1.0 is the single-chromosome case
+    -- the whole budget on one chromosome. For a genome-wide release the caller
+    passes `share = w_c` with `sum_c w_c == 1`, and `assert_shares_complete`
+    checks that sum where it can be seen. Passing 1.0 per chromosome across 22
+    chromosomes is 22 independent releases of one person; nothing inside this
+    function can detect that, which is why the completeness check is separate.
 
     `support`, `in_chain` and `readable` are all over the FULL site axis; the
     returned `beta` is over chain positions, in chain order, so it lines up with
@@ -135,6 +146,11 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
     """
     if scope not in BETA_SCOPES:
         raise ValueError(f"scope must be one of {BETA_SCOPES}, not {scope!r}")
+    if not (0.0 < share <= 1.0):
+        raise ValueError(
+            f"share must be in (0, 1], got {share!r}. A share above 1 is more "
+            f"than the whole budget; a share of 0 is a chromosome with no weight, "
+            f"which should be left out of the release rather than given zero.")
     support = np.asarray(support)
     if in_chain is None:
         in_chain = np.ones(len(support), dtype=bool)
@@ -166,14 +182,59 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
         raise AssertionError(f"beta weights sum to {total!r}; cannot normalise")
     beta = beta / total
 
+    beta = beta * share
+
     s = beta.sum()
-    if abs(s - 1.0) > 1e-12:
-        raise AssertionError(f"sum beta_v = {s!r}, not 1. The calibration is void.")
+    if abs(s - share) > 1e-12:
+        raise AssertionError(
+            f"sum beta_v = {s!r}, not the declared share {share!r}. The "
+            f"calibration is void.")
     if (beta < 0).any():
         raise AssertionError("negative beta_v")
 
     return Utility(beta=beta, scope=scope, n_scope=int(keep.sum()),
-                   n_chain=int(in_chain.sum()))
+                   n_chain=int(in_chain.sum()), share=float(share), chrom=str(chrom))
+
+
+def assert_shares_complete(utils: "list[Utility]", *, tol: float = 1e-12) -> float:
+    """The genome-level half of standing constraint 4: `sum_c w_c == 1`.
+
+    ⚠ THIS CHECK CANNOT LIVE IN `beta_v`, and that is the whole reason it is a
+    separate function. Each chromosome's `Utility` is well formed in isolation --
+    its weights sum to its own declared share, exactly as asserted -- and a set of
+    22 of them summing to 22 is also made of 22 individually valid objects. Only
+    something that sees every chromosome at once can tell one release of a genome
+    from 22 independent releases of the same person, and the latter compose and
+    degrade the guarantee (standing constraint 5).
+
+    Returns the total, so a caller can stamp it.
+    """
+    if not utils:
+        raise ValueError("no utilities to check; a genome-wide release needs at least one")
+    seen: dict[str, int] = {}
+    for u in utils:
+        if u.chrom in seen:
+            raise AssertionError(
+                f"chromosome {u.chrom!r} appears twice in the budget. Its share "
+                f"would be counted twice and the genome total would still look "
+                f"right if another chromosome were missing.")
+        seen[u.chrom] = 1
+    if len(utils) > 1 and any(not u.chrom for u in utils):
+        raise AssertionError(
+            "a multi-chromosome budget has a Utility with no `chrom`, so the "
+            "duplicate check above cannot do its job. Name every chromosome.")
+    total = float(sum(u.share for u in utils))
+    if abs(total - 1.0) > tol:
+        raise AssertionError(
+            f"the per-chromosome shares sum to {total!r}, not 1, over "
+            f"{len(utils)} chromosomes: "
+            f"{[(u.chrom or '?', u.share) for u in utils]}.\n"
+            f"  `beta_v` sums to 1 over the whole scope `tau` covers -- the 22 "
+            f"autosomes TOGETHER -- and each chromosome takes a SHARE. A total of "
+            f"{len(utils)} means each chromosome was normalised to 1 "
+            f"independently, which is {len(utils)} releases of one genome."
+        )
+    return total
 
 
 def phi_v(donor_alleles: np.ndarray, target_allele: int) -> np.ndarray:

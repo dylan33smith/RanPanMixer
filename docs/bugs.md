@@ -442,6 +442,39 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
 
 ## Mechanism / sampler
 
+### A test that checks the same bound an assertion checks cannot detect the assertion being loosened
+
+- **[2026-10-10] 20 clauses passing, and 3 of 5 mutations of the new guards survived**
+  **[Symptom]** `tests/test_genomewide_budget.py` asserted that `log_z_p`, the
+  per-chromosome bracket and the genome-wide share total all landed in range, at
+  four `tau` values, and it included a clause named for the composition error. All
+  20 passed. Then: reverting the diploid bracket to the full `eta_tau`, dropping
+  the `budget` argument from `_draw_one`, and disabling `GenomeRelease`'s share
+  total — **all three passed every clause.**
+  **[Cause]** Two distinct failures, and the first is general.
+  1. **Loosening an assertion changes no value.** Every clause checked that the
+     computed quantities sit inside their bounds. A mutation that only widens a
+     bracket leaves every quantity exactly where it was, so the clause still
+     passes while the guard is silent. Verifying a guard needs a test that puts
+     the code in a state where the guard SHOULD fire.
+  2. **One guard was hidden behind another.** The natural input for "shares must
+     sum to 1" — two chromosomes each at share 1 — also doubles the total
+     `log Z`, so the genome-wide `log_z` bracket fires on the same input for a
+     different reason. "`GenomeRelease` raised" was being read as evidence about
+     the share check.
+  **[Proven fix]** Tests that assert the guard fires, each ISOLATED so exactly one
+  can: the share check tested with shares of 0.3 + 0.3 (every `log_z` comfortably
+  inside its bracket, only the total wrong); the `log_z` check tested with correct
+  shares and a mis-stamped `eta_tau`; the diploid bracket tested with a `Utility`
+  whose declared `share` understates its own weights. All five mutations now fire.
+  **[⚠ And one guard could only be covered by injection]** `_draw_one`'s bracket is
+  `log Z <= eta_tau * sum(beta)`, which on correct inputs is a THEOREM — no target
+  and no `tau` can push a correct forward pass past it, so no black-box test can
+  tell the tight bracket from the loose one. Its actual job is to catch a broken
+  forward pass, so the test breaks the forward pass: `log_norm` inflated by an
+  amount strictly between this chain's share and the whole budget. **A guard whose
+  precondition is a theorem has no input that exercises it; it must be injected.**
+
 ### A falsification gate that checks the reference against itself catches nothing
 
 - **[2026-10-10] 57 clauses passing, zero power against the two errors it was built for**

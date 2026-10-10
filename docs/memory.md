@@ -104,6 +104,108 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (later still) — B-IMP-genomewide: the budget is one per genome, and three guards that did not guard
+
+**Hypothesis.** Decision B makes `beta_v` sum to 1 across the 22 autosomes with
+each chromosome taking a SHARE. Until today `utility.beta_v` hard-asserted
+`sum beta == 1` over whatever positions it was handed, so "one `tau` per
+chromosome" was not the default — it was the only thing the code could express.
+Chunk 2 of the review-gated plan: make the share expressible, and make the error
+it newly permits detectable.
+
+**Method.** `share` and `chrom` on `Utility`, defaulting to 1.0 and "" so every
+existing path is untouched; `beta_v(..., share=, chrom=)`; a separate
+`utility.assert_shares_complete` for the genome-level total; `log_z_p` takes an
+explicit `budget` that `_draw_one` derives as `eta * sum(beta)`; the diploid
+bracket against `eta * share`; `math.fsum` on `log_c`; `chrom` and `share` on
+`Release` and in `release_id`; the share and chromosome stamped into
+`utility_id`; and `ffbs.GenomeRelease`, the aggregate that can see every
+chromosome at once. Gated by `tests/test_genomewide_budget.py`, 25 clauses.
+
+### Backward compatibility, on the real chr21 build
+
+| quantity | recomputed today | on record | agrees |
+|---|---|---|---|
+| `baseline_log_norm` | -584.8135040101492 | -584.8135 | ✓ 4 dp |
+| `u_ceiling`, diploid, share 1 | 0.8154554281774855 | 0.815455 | ✓ 6 dp |
+| `log_z_p` at `tau` = 0.5, share 1 | 0.381534 | 0.3815 | ✓ 4 dp |
+| `utility_id` at share 1 | `indicator/w=inv_support/beta=chain` | identical | ✓ byte |
+| `math.fsum(log_c)` vs `np.sum(log_c)` | differ by **1.137e-13** | — | below the 4th dp |
+
+**Provenance.** `data/cohort/chr21` · T = 305,886 · K = 88 · HG00096 diploid ·
+`indicator/w=inv_support/beta=chain` · `tau` 0 and 0.5, seed 1000 · 191 tests.
+
+**And the share arithmetic is exact, not approximate.** `beta` at share `w` is
+**bitwise** `w` times `beta` at share 1, the ceiling scales exactly, and at
+`tau` = 0.5 with `w = 0.0163` the ratio `log_z_p(w) / log_z_p(1)` is **0.01630**
+— exactly `w`.
+`log_z_p` as a fraction of its own cap is **69.46%** at share 1 and **69.46%** at
+share `w`, reproducing the 69.5% already on record for chr21. That identity is
+the first-order `log Z ~ eta_tau * E_R[u]`, and its invariance under the split is
+the strongest single piece of evidence that the share is plumbed correctly.
+
+### ⚠⚠ THE FINDING: THREE OF THE NEW GUARDS DID NOT GUARD
+
+The first version of `tests/test_genomewide_budget.py` had 20 clauses, all
+passing, including a clause asserting the composition error is caught. Then five
+mutations of the new machinery:
+
+| mutation | first round | after the fix |
+|---|---|---|
+| M4 diploid bracket reverted to the full `eta_tau` | **PASSED** | ✓ caught |
+| M5 `budget` dropped from `_draw_one` | **PASSED** | ✓ caught |
+| M6 `GenomeRelease` share total disabled | **PASSED** | ✓ caught |
+| M7 `GenomeRelease` genome `log_z` bracket disabled | not tried | ✓ caught |
+| M8 `beta` ignores `share` entirely | not tried | ✓ caught (5 failures, 12 errors) |
+
+**THE GENERAL LESSON, and it is not specific to this chunk:**
+
+> **Loosening an assertion cannot be detected by a test that independently checks
+> the same bound.**
+
+Every clause in the first round asserted that the VALUES land in range. M4, M5 and
+M6 only widen an assertion; they leave every computed value untouched. So the
+values were still in range, the tests still passed, and the guard that was
+supposed to catch a real defect had gone silent. Catching that needs tests that
+put the mechanism in a state where the bracket SHOULD fire and assert that it
+does — which is a different kind of test, and the project did not have one.
+
+**M6 had a second, sneakier problem: it was hidden behind another check.** The
+obvious way to test "shares must sum to 1" is two chromosomes each at share 1 —
+but that also doubles the total `log Z`, so the genome-wide `log_z` bracket fires
+on the same input for a different reason. "`GenomeRelease` raised" is not evidence
+that the share check works. Fixed by ISOLATING each assertion: the share test now
+uses shares of 0.3 + 0.3 = 0.6, where every `log_z` sits comfortably inside its
+bracket and the total is the only thing wrong; the `log_z` test uses shares that
+sum correctly and a mis-stamped `eta_tau`. Exactly one assertion can fire in each.
+
+**⚠ M5 needed the error INJECTED, and the reason generalises.** On correct inputs
+`log Z <= eta_tau * sum(beta)` is a THEOREM, so no choice of target or `tau` can
+push a correct forward pass past it — which means **no black-box test can
+distinguish the tight bracket from the loose one.** The bracket's real job is to
+catch a broken forward pass, so the test now breaks the forward pass: `log_norm`
+is inflated by an amount that sits strictly between this chain's share of the
+budget and the whole budget, which the tight bracket must refuse and the loose one
+would wave through. A guard whose precondition is a theorem can only be covered by
+injection; there is no input that exercises it.
+
+**SYNTHESIS.** The share is implemented, exactly backward compatible, and its
+arithmetic is verified against the recorded chr21 figures to the decimal places
+those were quoted at. The more useful output is the gate: five injected errors,
+all now caught, and three of them were NOT caught by a 20-clause suite that
+looked complete and included a clause named for the error it missed. This is the
+second time in two days that a passing suite turned out to have no power — the
+diploid gate's first version had the same shape — and both times the tell was the
+same: **the test and the thing it checks were too close together.** The chunk-1
+version compared a reference to itself; this one compared a bound to itself.
+
+⚠ **What chunk 2 does NOT do.** No driver, no per-chromosome manifests, no
+`derive_chain_span`, no `release` subcommand, and releases still bypass
+`store.save()` — so a genome-wide release remains unquotable as an artifact.
+Those are the remaining items of `B-IMP-genomewide` and are listed in the work
+order. The declared recombination rate is still unchosen and still blocks
+preprocessing.
+
 ## 2026-10-10 (later) — B-THY-diploid-gate: the falsifier now covers the path that runs
 
 **Hypothesis.** Every falsification clause in this project was HAPLOID and
