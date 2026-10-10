@@ -525,3 +525,45 @@ def test_the_chr21_map_silent_split_reconciles_with_the_record():
     assert v["split_reconciles"]
     # every re-admitted position is usable, so none is filtered out downstream
     assert v["in_span_plateau_support_gt0"] == v["in_span_plateau"]
+
+
+def test_the_declared_rate_equals_the_measured_autosomal_mean():
+    """Decision C's value is DERIVED, so it must stay derivable.
+
+    ⚠ The point is not that 1.2707 is written down twice. It is that the config's
+    number and the maps on disk cannot drift apart: editing the config to a
+    different rate without re-deriving it fires, and so does a map extraction that
+    changes the measurement. A declared constant that no longer matches its own
+    stated derivation is the worst of both worlds -- it looks measured and is not.
+    """
+    import importlib.util
+    import yaml
+    spec = importlib.util.spec_from_file_location(
+        "map_coverage", REPO / "scripts" / "map_coverage.py")
+    mc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mc)
+
+    cfg = yaml.safe_load((REPO / "configs" / "inputs.chr21.yaml").read_text())
+    dr = cfg["declared_rate"]
+    assert dr["scope"] == "genome", (
+        "the declared rate is ONE constant for all 22 autosomes (decision C, "
+        "settled 2026-10-10); a per-chromosome scope would extrapolate the "
+        "acrocentrics' q-arm rates onto their p arms")
+    assert dr["applies_to"] == "map_silent", (
+        "the rate covers positions with NO cM at all. The interior zero-cM "
+        "plateaus are open question 2 and must NOT be swept in by this key")
+
+    rows = [mc.measure(c) for c in range(1, 23)]
+    import math
+    total_cm = math.fsum(r["total_cM"] for r in rows)
+    mapped_mb = sum(r["mapped_bp"] for r in rows) / 1e6
+    derived = total_cm / mapped_mb
+    assert abs(derived - dr["cM_per_Mb"]) < 5e-5, (
+        f"the config declares {dr['cM_per_Mb']} cM/Mb but the 22 autosome maps "
+        f"now give {derived:.6f}. Either the value was edited without re-deriving "
+        f"it, or the maps changed. Re-run scripts/map_coverage.py and record why.")
+
+    assert "UNDECLARED AND BLOCKED" in dr["n_gap_policy"], (
+        "the N-gap policy is still undecided and the config must keep saying so: "
+        "a constant cM/Mb times fabricated base pairs yields fabricated cM, and "
+        "the implementation can only accumulate across gaps it cannot locate")

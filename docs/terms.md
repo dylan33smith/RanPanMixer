@@ -1023,15 +1023,36 @@ Is:                   The DECLARED CONSTANT RECOMBINATION RATE, in cM/Mb, used t
                       cut: those regions are now SAMPLED rather than excluded, so the
                       chain needs a `Delta_x` there, and a declared constant is the one
                       choice that does not pretend to be a measurement.
-                      ⚠ **ITS VALUE IS NOT YET CHOSEN, AND MUST NOT BE INVENTED.**
-                      Neither the number nor whether it is GLOBAL or PER-CHROMOSOME is
-                      settled. Both are genuinely open as of 2026-10-08. Any figure
-                      appearing for this quantity before Dylan sets it is fabricated.
-Computed by:          not computed — DECLARED, and pre-registered with tau, the utility
-                      function, the endpoints, the attacker set and the attack database
-                      under constraint 6. NOT YET IMPLEMENTED: nothing in
-                      src/cohort/genmap.py can assign a non-map cM, and
-                      configs/inputs.chr21.yaml has no field for a rate.
+                      ✅ **VALUE SETTLED 2026-10-10 (Dylan): ONE GLOBAL
+                      1.2707 cM/Mb** for all 22 autosomes. It is the autosomal mean
+                      MAPPED rate — 3,543.8 cM over 2,788.8 Mb of mapped span,
+                      measured by `scripts/map_coverage.py`.
+                      ⚠ **IT IS A DECLARED CONVENTION, NOT AN ESTIMATE OF THE REGION
+                      IT IS APPLIED TO.** It is used where the map is silent precisely
+                      because no map speaks there, and the biology points the other
+                      way: deCODE's pedigree map assigns 0.0 cM/Mb to every 1 Mb bin
+                      from 0-13 Mb of chr21. Report it as a declaration.
+                      ⚠ **WHY GLOBAL AND NOT PER-CHROMOSOME, which reversed the earlier
+                      recommendation.** 96% of the map-silent sequence is the five
+                      acrocentric p arms, and those five have the genome's HIGHEST
+                      mapped rates (chr22 2.046, chr15 1.727, chr21 1.711 cM/Mb, all
+                      above the mean). An acrocentric's rate is measured entirely on
+                      its q arm, because the p arm IS the region being filled — so a
+                      per-chromosome rate would extrapolate an unusually hot q-arm rate
+                      onto heterochromatin and rDNA, and would do it on exactly the
+                      chromosomes where the rule matters most. Spread 1.84x.
+Computed by:          DECLARED, in `configs/inputs.chr21.yaml` under `declared_rate`,
+                      and pre-registered with tau, the utility function, the endpoints,
+                      the attacker set and the attack database under constraint 6.
+                      ⚠ A test asserts the declared number still EQUALS the measured
+                      autosomal mean, so the config and the maps cannot drift apart —
+                      a declared constant that no longer matches its own stated
+                      derivation looks measured and is not.
+                      ⚠ STILL NOT IMPLEMENTED: nothing in `src/cohort/genmap.py` can
+                      assign a cM to a map-silent position — it interpolates with
+                      left=nan/right=nan and raises if a NaN survives, which is the
+                      invariant decision C makes false by design. That fill is
+                      preprocessing work, not part of the declaration.
 CHANGES MEANING WITH: the reach it is given and the distance it is applied to.
                       ⚠ IT APPLIES TO THE MAP-SILENT REGIONS ONLY. The INTERIOR
                       zero-cM map plateaus inside the mapped span are NOT overridden —
@@ -1044,6 +1065,15 @@ CHANGES MEANING WITH: the reach it is given and the distance it is applied to.
                       fictitious. A constant cM/Mb times a fabricated bp span
                       MANUFACTURES genetic distance. The declared policy must say what
                       happens at an N-gap before any rate is applied.
+                      ⚠⚠ **STILL UNDECLARED AND BLOCKED as of 2026-10-10**, and the
+                      settled 1.2707 does NOT settle it. It needs the GRCh38 assembly's
+                      gap coordinates and no FASTA, AGP or assembly report is on disk.
+                      ⚠ Until it is decided the implementation can only ACCUMULATE
+                      across the gaps, because it cannot locate them — a consequence of
+                      the missing input, not a choice, and it must be stated in any
+                      writeup. On chr21 that is 1.1 Mb of fabricated gap inside the
+                      10.33 Mb the rate applies to; the extent on the other 21
+                      autosomes is unmeasured.
                       ⚠ AND WITH THE MONOTONICITY IT IMPLIES: the declared-rate cM has
                       to be stitched to the mapped cM so cumulative cM stays
                       non-decreasing across the boundary in GRCh38 coordinates.

@@ -104,6 +104,104 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (chunk 4) — the rate is declared, and the derivative route to the primary endpoint BREAKS at genome scale
+
+**Goal.** Two things decision A and B leave hanging: declare the rate now that
+`B-DAT-map-coverage` has measured what it applies to, and re-measure the PRIMARY
+endpoint at a genome-wide share, because `docs/plan.md` forbids pre-registering a
+`tau` grid the endpoint provably does not vary over and every figure on record was
+measured with `beta` summing to 1 over chr21 alone.
+
+### 1. The declared rate — SETTLED
+
+**ONE GLOBAL 1.2707 cM/Mb** (Dylan, 2026-10-10), the autosomal mean mapped rate.
+Written to `configs/inputs.chr21.yaml` under `declared_rate`, with a test asserting
+the declared number still EQUALS the measured autosomal mean so the config and the
+maps cannot drift apart — a declared constant that no longer matches its own stated
+derivation looks measured and is not. Three mutations fire: editing the value
+without re-deriving it, flipping the scope to per-chromosome, and quietly widening
+`applies_to` to sweep in the interior plateaus.
+⚠ **The N-gap policy is NOT settled by this** and is now its own open row.
+
+### 2. The endpoint, exactly, at three candidate shares
+
+`scripts/exact_endpoint.py`, chr21, HG00096 diploid, 507,692 target-known cells.
+Two routes to the same quantity. Metrics are rows; the share is the column.
+
+| metric | share = 1 | share = 1/22 | share = 1.755% |
+|---|---|---|---|
+| **route 1 (marginals):** total E[differ] movement over the grid | **-3.276754 cells** | **-0.148943** | **-0.057513** |
+| monotone non-increasing in `tau` | ✓ | ✓ | ✓ |
+| relative movement vs float64 eps | 1.96e+11x | 8.92e+09x | **3.45e+09x** |
+| **route 2 (derivatives):** `Var_Q(u)` range across the grid | 4.028e-06 – 4.065e-06 | 4.366e-09 – 2.310e-08 | **-1.787e-08 – 1.874e-08** |
+| any `Var_Q(u)` non-positive | no | no | **YES** |
+
+**Provenance.** `logs/B_exact_endpoint.md` + `.json` · chr21/hprc-v1.0-pggb/K88/
+T305886 · `indicator/w=inv_support/beta=chain` · `tau` grid 0 / 0.05 / 0.10 / 0.25
+/ 0.50 / 0.90 / 0.99 · route 1 is `state_marginals` then `expected_mismatches`, a
+linear functional of the posterior with zero Monte-Carlo error; route 2 is central
+finite differences of `log Z_p` in `eta` at `h` = 0.05, one-sided at `tau` = 0
+because a central stencil there asks for a negative exponent · 2026-10-10.
+
+**COLUMNS** · *share = 1* is every figure on record, and route 2 reproduces the
+recorded `Var_Q(u)` = 4.046e-06. · *1/22* and *1.755%* are chr21's candidate
+genome-wide shares under a uniform and a genetic-length allocation.
+
+**ROWS** · *route 1's movement scales EXACTLY linearly in the share* —
+0.057513/3.276754 = 0.017551 against `w` = 0.0175518, and 0.148943/3.276754 =
+0.045454 against 1/22. Five significant figures at two independent shares. ·
+*monotonicity holds at every share*, which is the property the pre-registration
+actually needs. · *route 1 keeps 3.45e+09x of float64 headroom* at the smallest
+share, so the endpoint is comfortably computable. · *route 2's variance goes
+NEGATIVE*, which is not a precision wobble but a meaningless answer.
+
+### ⚠⚠ THE FINDING: THE PRE-REGISTERED ENDPOINT MUST NAME THE MARGINALS ROUTE
+
+Decision A says report expectations EXACTLY rather than from draws, and it does not
+say by which route. That looked like an implementation detail. It is not.
+
+Route 2's second difference is a cancellation: the numerator is of order
+`Var * h^2` while each `log Z_p` carries absolute error around 1e-13. Shrinking
+`beta` to a chromosome's share shrinks `Var` by the SQUARE of the share and leaves
+that error where it was, so the signal falls below the noise and the computed
+variance becomes arbitrary — **negative at chr21's genetic-length share, and
+scattered over a 5x range at 1/22.** Even at share 1 it carries about ±0.5%
+scatter across `tau` where the true value should move smoothly, so the recorded
+4.046e-06 was one draw of that noise rather than a stable figure.
+
+Route 1 has no differencing anywhere. It is a linear functional of the marginals,
+already cross-checked against the toy enumerator to 4.8e-15, and it stays monotone
+with billions of times the float64 headroom at every share tested.
+
+**So `B-LCK-preregister` must pin the endpoint as E[differ] via the marginals, and
+`Var_Q(u)` can no longer be quoted at genome-wide scope from the derivative route
+at all.** The cheap three-forward-pass route survives only as a chr21-scale
+diagnostic, and anything quoting it must say so.
+
+⚠ **AND THE GRID IS NOW UNBLOCKED.** The endpoint is monotone and exactly
+computable at every candidate share, which is what `docs/plan.md`'s warning
+required. The movement is small — chr21's contribution across the whole grid is
+0.058 to 0.149 cells against 507,692 target-known cells — but small and exactly
+known is a reportable result, whereas small and estimated from draws is not. That
+is decision A working as intended.
+
+### ⚠ A RESIDUAL NOBODY HAD NAMED: THE SHARE ALLOCATION RULE
+
+Decision B says each chromosome takes a share and that they sum to 1. **It does not
+say how the share is allocated**, and the three plausible rules give chr21
+1.624% (total bp), 1.755% (genetic length) or 4.545% (uniform) — a **2.8x spread**,
+which propagates linearly into every per-chromosome endpoint. It is a
+pre-registration item under constraint 6 and it is not on the open list. Allocating
+by genetic length is the one that makes the per-position tilt uniform across the
+genome, since `beta_v` is already per position and genetic length is what sets the
+mosaic segment count; uniform 1/22 would over-weight the small chromosomes by about
+3x. Not decided here.
+
+**Not done in this chunk:** the rate is declared but NOT implemented —
+`src/cohort/genmap.py` still interpolates with left=nan/right=nan and raises if a
+NaN survives, which is the invariant decision C makes false by design. That fill is
+preprocessing work.
+
 ## 2026-10-10 (chunk 3) — B-DAT-map-coverage: and a per-chromosome rate is WORSE than a global one
 
 **Goal.** Decision C samples the map-silent regions under a declared constant

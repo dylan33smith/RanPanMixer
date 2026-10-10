@@ -126,6 +126,53 @@ inputs:
 #   section generated from a template so a value can only diverge deliberately)
 #   is implementation work that has not been done.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# THE DECLARED CONSTANT RECOMBINATION RATE (decision C; value settled by Dylan
+# 2026-10-10 after B-DAT-map-coverage measured what it applies to).
+# ---------------------------------------------------------------------------
+declared_rate:
+  cM_per_Mb: 1.2707
+  scope: genome          # ONE constant for all 22 autosomes, NOT per chromosome
+  applies_to: map_silent # positions with NO cM at all: before the first marker
+                         # or after the last. NOT the interior zero-cM plateaus.
+  derivation: >
+    The autosomal mean MAPPED rate: 3,543.8 cM of genetic length over 2,788.8 Mb
+    of mapped span, measured across all 22 autosome maps by
+    scripts/map_coverage.py on 2026-10-10 (logs/B_map_coverage.md).
+  status: >
+    ⚠ A DECLARED MODELLING CONVENTION, NOT AN ESTIMATE. It is applied where the
+    map is silent precisely because no map speaks there; no measurement supports
+    1.2707 for those regions specifically, and the biology says the opposite --
+    deCODE's pedigree map assigns 0.0 cM/Mb to every 1 Mb bin from 0-13 Mb of
+    chr21. Report it as a declaration and never as a measurement of the region.
+  why_global_not_per_chromosome: >
+    A per-chromosome rate is LESS defensible, which the coverage measurement
+    reversed. 96% of the map-silent sequence is the five acrocentric p arms, and
+    those five chromosomes have the HIGHEST mapped rates on the genome (chr22
+    2.046, chr15 1.727, chr21 1.711 cM/Mb, all above the 1.2707 mean). An
+    acrocentric's rate is measured ENTIRELY on its q arm, because the p arm is
+    the region being filled -- so per-chromosome would extrapolate an unusually
+    hot q-arm rate onto heterochromatin and rDNA, and would do so on exactly the
+    chromosomes where the rule matters most. The per-chromosome spread is 1.84x.
+  privacy_relevance: >
+    NONE. The rate changes Delta_x, hence the switch mass, hence utility and
+    realism. R_D stays target-independent under any rate, so Theorem 1 is
+    untouched. This is a utility decision, not a privacy one.
+  n_gap_policy: >
+    ⚠⚠ UNDECLARED AND BLOCKED -- do not read the value above as settling it.
+    A constant cM/Mb multiplied by FABRICATED base pairs yields fabricated cM,
+    and GRCh38 chr21 5,010,000-10,814,560 is placeholder model sequence: 25
+    contigs separated by fabricated N-gaps, 22 of them exactly 50 kb, so 1.1 Mb
+    of the 10.33 Mb that the rate is about to be applied to on chr21 is gap
+    rather than sequence. Deciding this needs the assembly's gap coordinates and
+    no FASTA, AGP or assembly report is on disk. ⚠ Until it is decided the
+    implementation can only ACCUMULATE across the gaps, because it does not know
+    where they are -- that is a consequence of the missing input, NOT a choice,
+    and it must be stated in any writeup rather than left implicit.
+  unmeasured: >
+    The N-gap extent on the other 21 autosomes. chr21's 22x50 kb is the only
+    figure on record.
+
 chain_span:
   start: 12968320      # exclusive
   end:   46680243      # inclusive -- the genetic map's last marker
