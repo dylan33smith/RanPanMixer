@@ -196,10 +196,19 @@ Ordered, and the order is load-bearing.
    derivative route returns a NEGATIVE variance at a genome-wide share, so the
    pre-registration must pin the endpoint as E[differ] via the **marginals**, and
    `Var_Q(u)` may no longer be quoted at genome scope from derivatives.
-4. **`B-LCK-preregister`** — one dated file at `paper/prereg_<date>.md` covering
-   both arms. PLANNED; does not exist yet. ✅ The declared rate it must pin is
-   settled (1.2707 cM/Mb, global). ⚠ Still needs the `tau` grid, which waits on
-   step 3, and the N-gap policy, which is blocked.
+4. ⚠ **`B-LCK-preregister` — DRAFTED 2026-10-10, UNSIGNED.**
+   `paper/prereg_2026-10-10.md`. Settled and written in: the declared rate (1.2707
+   global, gaps skipped), the share allocation rule, the primary endpoint and the
+   route it must use, the attacker set with mandatory positive controls, the arm
+   guard, Arm 1's "self" source, and the framing (the toy is the correctness
+   demonstration; the headline rests on the proof plus genome-scale measurement).
+   ✅ **The secondary windowed-utility arm is DROPPED** — the toy genome
+   demonstration does its job without a second release of the same person, which
+   would have composed.
+   ⚠ **8 FIELDS REMAIN OPEN** and the file is not in force until all are filled.
+   The load-bearing one is **the minimum detectable advantage the experiment is
+   powered for**: the repository forecasts a chance-level null, and without a power
+   statement a null is not evidence (standing constraint 7).
 5. **`B-IMP-genomewide`** — the genome-wide mechanism (W1-W14 below).
 6. **`B-DAT-rebuild`** — decision F's consistent GRCh38 rebuild, 22 autosomes.
 7. Releases, then attacks.
