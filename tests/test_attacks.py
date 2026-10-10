@@ -245,3 +245,65 @@ def test_POSITIVE_CONTROL_the_attacker_wins_against_an_untilted_release(toy_pair
     assert acc == 1.0, (
         f"given each input's own most-favoured output, the attacker scores {acc!r} "
         f"rather than 1.0 — it cannot win even when the answer is handed to it")
+
+
+# ---------------------------------------------------------------------------
+# The pre-registration lock
+# ---------------------------------------------------------------------------
+
+def test_an_unsigned_prereg_blocks_an_attack(tmp_path):
+    """⚠ Constraint 6, enforced in code rather than remembered.
+
+    What the constraint guards against is the one failure a person cannot
+    self-police: having seen a result, you cannot PROVE you did not pick the
+    analysis to suit it. So the guard has to be something other than good
+    intentions.
+    """
+    (tmp_path / "prereg_2026-10-10.md").write_text(
+        "**Status: ⚠ ALL EIGHT FIELDS FILLED — AWAITING SIGNATURE.**\n")
+    with pytest.raises(RuntimeError, match="NOT SIGNED"):
+        A.require_signed_prereg(str(tmp_path))
+
+
+def test_the_refusal_names_what_is_unfilled(tmp_path):
+    """The useful response to the refusal is to go and fill the fields, so it has
+    to say which ones are missing."""
+    (tmp_path / "prereg_x.md").write_text(
+        "**Status: DRAFT**\n\n[OPEN] the tau grid\n\n- [ ] 1. something\n- [ ] 2. else\n")
+    with pytest.raises(RuntimeError) as e:
+        A.require_signed_prereg(str(tmp_path))
+    msg = str(e.value)
+    assert "[OPEN] marker" in msg and "unchecked checklist item" in msg
+    assert "deliberate act" in msg
+
+
+def test_a_signed_prereg_allows_it_and_hands_back_its_identity(tmp_path):
+    """A result must be stampable with the exact pre-registration it ran under.
+    Two experiments under different pre-registrations are not comparable, and the
+    stamp is how anyone finds that out."""
+    (tmp_path / "prereg_2026-10-10.md").write_text(
+        "**Status: SIGNED** git_rev `deadbee`\n\n- [x] 1. done\n")
+    name, rev = A.require_signed_prereg(str(tmp_path))
+    assert name == "prereg_2026-10-10.md" and rev == "deadbee"
+
+
+def test_a_missing_prereg_is_refused_too(tmp_path):
+    """No file at all must not read as 'nothing to check'."""
+    with pytest.raises(RuntimeError, match="no pre-registration found"):
+        A.require_signed_prereg(str(tmp_path))
+
+
+def test_the_real_prereg_currently_blocks_attacks():
+    """⚠ A LIVE CHECK ON THIS REPOSITORY, not a fixture. The pre-registration is
+    awaiting signature as of 2026-10-10, so the lock must be holding. When it is
+    signed this test's expectation flips, and that flip should be a deliberate edit
+    made in the signing commit -- not something discovered later.
+    """
+    try:
+        name, rev = A.require_signed_prereg()
+    except RuntimeError as e:
+        assert "NOT SIGNED" in str(e) or "no pre-registration" in str(e)
+        return
+    raise AssertionError(
+        f"{name} now reads as SIGNED (git_rev {rev!r}). If that was intended, update "
+        f"this test in the same commit that signed it.")
