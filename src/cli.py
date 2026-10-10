@@ -83,10 +83,30 @@ def cohort_main(argv=None) -> int:
         elif step == "support":
             summary[step] = support.build(out)
         elif step == "genmap":
-            span = cfg["chain_span"]
-            summary[step] = genmap.build(out / "positions.npy",
-                                         Path(cfg["inputs"]["genetic_map"]["path"]), out,
-                                         start=span["start"], end=span["end"])
+            # ⚠ TWO MODES, and which one runs is decided by the config, not by a
+            # flag, so a chromosome cannot be built half one way and half the other.
+            # With a `declared_rate` block (decision C) the map-silent positions are
+            # FILLED over gap-free base pairs and there is no coordinate cut. Without
+            # one, the old cut applies -- that path exists only because the chr21
+            # artifacts on disk were built with it and are superseded, not deleted.
+            rate_cfg = cfg.get("declared_rate")
+            gmap = Path(cfg["inputs"]["genetic_map"]["path"])
+            if rate_cfg is not None:
+                gaps = rate_cfg.get("gap_table")
+                if not gaps:
+                    raise SystemExit(
+                        "config has a declared_rate but no declared_rate.gap_table. "
+                        "Applying a rate without the gap table accumulates distance "
+                        "across placeholder base pairs, which is exactly what the "
+                        "table was acquired to prevent.")
+                summary[step] = genmap.build(
+                    out / "positions.npy", gmap, out,
+                    gaps_path=Path(gaps),
+                    declared_rate=float(rate_cfg["cM_per_Mb"]))
+            else:
+                span = cfg["chain_span"]
+                summary[step] = genmap.build(out / "positions.npy", gmap, out,
+                                             start=span["start"], end=span["end"])
         elif step == "manifest":
             summary[step] = _manifest(out, cfg, a.chrom)
         print(json.dumps(summary.get(step, {}), indent=2)[:1200])

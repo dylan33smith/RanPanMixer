@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import re
+
 import numpy as np
 
 import store
@@ -56,9 +58,18 @@ def interpolate(positions: np.ndarray, gmap_path: Path) -> np.ndarray:
                      left=np.nan, right=np.nan)
 
 
-def chain_mask(positions: np.ndarray, cm: np.ndarray, start: int, end: int,
+def chain_mask(positions: np.ndarray, cm: np.ndarray, start: int | None = None,
+               end: int | None = None,
                support: np.ndarray | None = None) -> np.ndarray:
-    """The chain_span mask, asserting no NaN survives inside it.
+    """Which positions are in the chain, asserting no NaN survives among them.
+
+    ⚠ `start` and `end` ARE NOW OPTIONAL, AND LEAVING THEM OUT IS THE POST-DECISION-C
+    BEHAVIOUR. The coordinate cut was a way of excluding the positions no genetic
+    map reaches; decision C includes them under a declared rate instead, so there
+    is nothing left for a cut to do. With both omitted, the only exclusion is
+    `support == 0`, which is a property of the cohort and not of the map.
+    Passing a span still works, and is how the pre-decision-C chr21 artifacts were
+    built -- they are superseded, not deleted.
 
     `start` is exclusive and `end` inclusive, matching configs/inputs.chr21.yaml.
     The assertion is the payoff for interpolating with NaN: it makes "every chain
@@ -73,26 +84,82 @@ def chain_mask(positions: np.ndarray, cm: np.ndarray, start: int, end: int,
     the chain and give it a finite weight it cannot ever earn. The exclusion is a
     function of the cohort alone, so it is target-independent.
     """
-    mask = (positions > start) & (positions <= end)
+    mask = np.ones(len(positions), dtype=bool)
+    if start is not None:
+        mask &= positions > start
+    if end is not None:
+        mask &= positions <= end
     if support is not None:
         mask &= support > 0
     bad = mask & ~np.isfinite(cm)
     if bad.any():
         i = np.flatnonzero(bad)
         raise ValueError(
-            f"{bad.sum()} positions inside chain_span have no interpolated cM "
-            f"(first at row {i[0]}, pos {positions[i[0]]}). The span and the map "
-            f"disagree -- fix the span, do not clamp."
+            f"{bad.sum()} chain positions have no cM (first at row {i[0]}, pos "
+            f"{positions[i[0]]}). Under decision C the map-silent positions are "
+            f"FILLED by `fill_map_silent` with the declared rate, not excluded -- "
+            f"so this means the fill was not applied. Do not clamp, and do not "
+            f"re-introduce a coordinate cut."
         )
     return mask
 
 
+def _chrom_of(gmap_path: Path) -> str:
+    """`chr7` from `.../chr7.b38.gmap`. The gap table keys on this exact spelling.
+
+    ⚠ Derived from the map's filename rather than passed in, so the gap table and
+    the genetic map cannot disagree about which chromosome is being built -- a
+    mismatch there would subtract one chromosome's gaps from another's distances
+    and nothing downstream would notice.
+    """
+    name = Path(gmap_path).name
+    m = re.match(r"(chr[0-9XYMT]+)\.", name)
+    if not m:
+        raise ValueError(
+            f"cannot read a chromosome name from {name!r}; expected something like "
+            f"'chr7.b38.gmap' so the gap table can be keyed on it")
+    return m.group(1)
+
+
 def build(positions_npy: Path, gmap_path: Path, outdir: Path,
-          *, start: int, end: int) -> dict:
-    """Emit genetic_pos.npy and in_chain.npy."""
+          *, start: int | None = None, end: int | None = None,
+          gaps_path: Path | None = None,
+          declared_rate: float | None = None) -> dict:
+    """Emit `genetic_pos.npy`, `in_chain.npy`, and (post-decision-C) `cm_source.npy`.
+
+    TWO MODES, and the second is the current one.
+
+    **Decision C (pass `gaps_path` and `declared_rate`, omit the span).** Positions
+    the genetic map does not reach are FILLED from the declared constant rate over
+    gap-free base pairs, and the chain covers the whole assembled chromosome less
+    only `support == 0`. `cm_source.npy` records, per position, whether its cM came
+    from the map or from the declared rate, so any release can report what share of
+    its chain ran on a declared distance.
+
+    **Pre-decision-C (pass `start` and `end`).** The coordinate cut, which excluded
+    the map-silent positions instead of filling them. Retained because the chr21
+    artifacts on disk were built this way and are superseded rather than deleted;
+    it must not be used for a new build.
+    """
     outdir = Path(outdir)
     positions = np.load(positions_npy)
     cm = interpolate(positions, gmap_path)
+
+    source = None
+    if (gaps_path is None) != (declared_rate is None):
+        raise ValueError(
+            "pass `gaps_path` AND `declared_rate` together or neither. A rate with "
+            "no gap table would accumulate distance across placeholder base pairs, "
+            "which is the thing the gap table was acquired to prevent.")
+    if declared_rate is not None:
+        if start is not None or end is not None:
+            raise ValueError(
+                "a coordinate cut and the declared-rate fill are alternatives, not "
+                "a pair. Decision C replaces the cut; passing both would fill the "
+                "map-silent positions and then throw them away.")
+        gaps = read_gaps(Path(gaps_path), _chrom_of(gmap_path))
+        cm, source = fill_map_silent(positions, cm, gaps, declared_rate)
+
     sup_path = Path(outdir) / "support.npy"
     support = np.load(sup_path) if sup_path.exists() else None
     mask = chain_mask(positions, cm, start, end, support)
@@ -103,7 +170,10 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
         store.check_axis(sup_path, digest)   # the guard must actually be invoked
     inputs = {"positions": meta["sha256"], "gmap": store.sha256_file(gmap_path)}
     params = {"chain_span_start_exclusive": start, "chain_span_end_inclusive": end,
-              "interp": "numpy.interp, left=nan right=nan", "provisional": True,
+              "interp": "numpy.interp, left=nan right=nan",
+              "provisional": declared_rate is None,
+              "declared_rate_cM_per_Mb": declared_rate,
+              "gap_spans_skipped": gaps_path is not None,
               "excludes_zero_support": support is not None}
 
     store.save(outdir / "genetic_pos.npy", cm, inputs=inputs, params=params,
@@ -111,18 +181,31 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
                note="cM per site; NaN outside the map span, by design")
     store.save(outdir / "in_chain.npy", mask, inputs=inputs, params=params,
                axis_digest=digest,
-               note="the chain_span MASK over the full axis. PROVISIONAL: moving the "
-                    "cut rewrites this one array and nothing else.")
+               note="the chain MASK over the full axis. Under decision C the only "
+                    "exclusion is support == 0; a coordinate cut is superseded.")
+    if source is not None:
+        store.save(outdir / "cm_source.npy", source, inputs=inputs, params=params,
+                   axis_digest=digest,
+                   note="0 = cM from the genetic map, 1 = from the declared constant "
+                        "rate. Saved so a release can report the share of its chain "
+                        "running on a declared rather than a measured distance.")
 
     inside = cm[mask]
     d = np.diff(inside)
     return {
         "n_sites": int(len(positions)),
         "T": int(mask.sum()),
-        "excluded_zero_support": int(((positions > start) & (positions <= end)
-                                     & (support == 0)).sum()) if support is not None else None,
-        "dropped_below": int((positions <= start).sum()),
-        "dropped_above": int((positions > end).sum()),
+        # ⚠ Reported against the span ACTUALLY applied. Under decision C there is
+        # no span, so "dropped" is 0 by construction rather than unmeasured, and
+        # the exclusion count is the whole-axis support == 0 count.
+        "excluded_zero_support": (int((support == 0).sum()) if start is None and end is None
+                                  else int(((positions > start) & (positions <= end)
+                                            & (support == 0)).sum())) if support is not None else None,
+        "dropped_below": 0 if start is None else int((positions <= start).sum()),
+        "dropped_above": 0 if end is None else int((positions > end).sum()),
+        "declared_rate_positions": int((source == 1).sum()) if source is not None else None,
+        "declared_rate_positions_in_chain": (int((source[mask] == 1).sum())
+                                             if source is not None else None),
         "cm_span": [float(inside.min()), float(inside.max())] if mask.any() else None,
         "zero_distance_steps_inside": int((d == 0).sum()),
         "max_step_cm": float(d.max()) if len(d) else None,
@@ -239,3 +322,74 @@ def declared_cm(lo: np.ndarray, hi: np.ndarray, gaps: np.ndarray,
     if not (0.0 < rate_cm_per_mb < 100.0):
         raise ValueError(f"implausible declared rate {rate_cm_per_mb!r} cM/Mb")
     return gap_free_span(lo, hi, gaps) / 1e6 * float(rate_cm_per_mb)
+
+
+def fill_map_silent(positions: np.ndarray, cm: np.ndarray, gaps: np.ndarray,
+                    rate_cm_per_mb: float) -> tuple[np.ndarray, np.ndarray]:
+    """Give the map-silent positions a cM from the declared rate.
+
+    Returns `(cm_filled, source)` where `source` is 0 where the cM came from the
+    genetic map and 1 where it came from the declared rate. The source array is
+    saved beside the cM, so every release can report what share of its chain ran
+    on a declared rather than a measured distance.
+
+    ⚠ WHY A NaN IS THE RIGHT INPUT HERE. `interpolate` returns NaN outside the
+    map's marker span deliberately, rather than clamping. A clamp gives thousands
+    of positions one identical cM, which makes the switch probability zero and
+    emits a donor's real haplotype verbatim; a NaN is loud. Decision C does not
+    change that -- it changes what we DO with the loud signal. The NaN still marks
+    exactly the positions no map speaks to, and this function is the only place
+    allowed to replace one.
+
+    Only the two ENDS can be NaN: `numpy.interp` interpolates everywhere between
+    the first and last marker, so a long marker-free stretch inside the span gets
+    a linear interpolation rather than a NaN. Those interior stretches are a
+    separate question (the interior zero-cM plateaus) and decision C does not
+    touch them.
+    """
+    cm = np.asarray(cm, dtype=np.float64).copy()
+    positions = np.asarray(positions, dtype=np.int64)
+    if cm.shape != positions.shape:
+        raise ValueError(f"cm is {cm.shape}, positions {positions.shape}")
+    finite = np.isfinite(cm)
+    if not finite.any():
+        raise ValueError(
+            "no position has a mapped cM at all, so there is no anchor to measure "
+            "the declared distance FROM. The map and this chromosome disagree.")
+
+    source = np.where(finite, 0, 1).astype(np.int8)
+    idx = np.flatnonzero(finite)
+    lo_i, hi_i = int(idx[0]), int(idx[-1])
+
+    # ⚠ Interior NaNs would break the two-sided fill below, so refuse rather than
+    # guess. They cannot arise from numpy.interp and would mean the cM came from
+    # somewhere else.
+    if not finite[lo_i:hi_i + 1].all():
+        n = int((~finite[lo_i:hi_i + 1]).sum())
+        raise ValueError(
+            f"{n} positions between the first and last mapped position have no cM. "
+            f"numpy.interp cannot produce that, so this cM array did not come from "
+            f"`interpolate` and the fill's assumptions do not hold.")
+
+    below = np.arange(len(cm)) < lo_i
+    above = np.arange(len(cm)) > hi_i
+    if below.any():
+        back = declared_cm(positions[below], np.full(below.sum(), positions[lo_i]),
+                           gaps, rate_cm_per_mb)
+        cm[below] = cm[lo_i] - back
+    if above.any():
+        fwd = declared_cm(np.full(above.sum(), positions[hi_i]), positions[above],
+                          gaps, rate_cm_per_mb)
+        cm[above] = cm[hi_i] + fwd
+
+    if not np.isfinite(cm).all():
+        raise AssertionError("a NaN survived the declared-rate fill")
+    d = np.diff(cm)
+    if (d < -1e-12).any():
+        i = int(np.flatnonzero(d < -1e-12)[0])
+        raise AssertionError(
+            f"cM goes BACKWARDS at row {i} (pos {positions[i]} -> "
+            f"{positions[i + 1]}: {cm[i]!r} -> {cm[i + 1]!r}). A negative genetic "
+            f"distance makes the switch probability leave [0,1]. The positions are "
+            f"probably not sorted, or two positions are equal.")
+    return cm, source

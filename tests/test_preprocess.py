@@ -567,3 +567,90 @@ def test_the_declared_rate_equals_the_measured_autosomal_mean():
         "the N-gap policy is still undecided and the config must keep saying so: "
         "a constant cM/Mb times fabricated base pairs yields fabricated cM, and "
         "the implementation can only accumulate across gaps it cannot locate")
+
+
+# ---------------------------------------------------------------------------
+# Decision C: the declared-rate fill, and the retirement of the coordinate cut
+# ---------------------------------------------------------------------------
+
+def _tiny_gaps():
+    return np.array([[1_000, 2_000]], dtype=np.int64)
+
+
+def test_the_fill_replaces_every_nan_and_records_where_it_came_from():
+    """A map-silent position gets a cM, and the array says so.
+
+    The source array is not decoration: every release has to be able to report
+    what share of its chain ran on a DECLARED rather than a measured distance,
+    and recomputing that later means re-deriving the map span.
+    """
+    from cohort import genmap as G
+    pos = np.array([100, 500, 3_000, 5_000, 9_000], dtype=np.int64)
+    cm = np.array([np.nan, np.nan, 1.0, 2.0, np.nan])
+    filled, src = G.fill_map_silent(pos, cm, _tiny_gaps(), 1.2707)
+    assert np.isfinite(filled).all()
+    assert src.tolist() == [1, 1, 0, 0, 1], src.tolist()
+    assert filled[2] == 1.0 and filled[3] == 2.0, "a mapped cM was overwritten"
+    assert (np.diff(filled) >= -1e-12).all(), "cM went backwards"
+
+
+def test_the_fill_skips_gap_base_pairs():
+    """THE POINT OF THE GAP TABLE, checked directly.
+
+    Two positions straddling a 1 kb gap must be given LESS genetic distance than
+    their raw separation implies, because the base pairs inside a gap are
+    placeholders standing in for an unknown amount of missing sequence.
+    """
+    from cohort import genmap as G
+    pos = np.array([500, 3_000], dtype=np.int64)       # 2,500 bp apart, 1,000 in gap
+    cm = np.array([np.nan, 1.0])
+    filled, _ = G.fill_map_silent(pos, cm, _tiny_gaps(), 1.2707)
+    gap_free = (2_500 - 1_000) / 1e6 * 1.2707
+    accumulated = 2_500 / 1e6 * 1.2707
+    assert abs((1.0 - filled[0]) - gap_free) < 1e-15
+    assert abs((1.0 - filled[0]) - accumulated) > 1e-9, (
+        "the fill accumulated straight through the gap, which manufactures "
+        "genetic distance out of placeholder base pairs")
+
+
+def test_an_interior_nan_is_refused_rather_than_guessed():
+    """`numpy.interp` cannot produce one, so it means the cM came from elsewhere
+    and this function's two-sided fill does not apply."""
+    from cohort import genmap as G
+    pos = np.array([100, 500, 900, 1_300], dtype=np.int64)
+    cm = np.array([1.0, np.nan, 3.0, 4.0])             # a hole in the middle
+    with pytest.raises(ValueError, match="between the first and last mapped"):
+        G.fill_map_silent(pos, cm, _tiny_gaps(), 1.2707)
+
+
+def test_a_chromosome_with_no_mapped_position_is_refused():
+    """With nothing mapped there is no anchor to measure a declared distance FROM,
+    so a silent zero-everywhere result is the wrong answer."""
+    from cohort import genmap as G
+    pos = np.array([100, 500], dtype=np.int64)
+    with pytest.raises(ValueError, match="no anchor"):
+        G.fill_map_silent(pos, np.array([np.nan, np.nan]), _tiny_gaps(), 1.2707)
+
+
+def test_the_coordinate_cut_is_optional_and_support_is_the_only_exclusion():
+    """Decision C retires the cut. Omitting the span must include everything the
+    cohort can actually emit, and nothing else."""
+    from cohort import genmap as G
+    pos = np.array([100, 500, 900], dtype=np.int64)
+    cm = np.array([0.0, 1.0, 2.0])
+    sup = np.array([5, 0, 7], dtype=np.int32)
+    m = G.chain_mask(pos, cm, support=sup)
+    assert m.tolist() == [True, False, True], "support == 0 must be the only exclusion"
+    # and a span still works, which is how the superseded chr21 artifacts were built
+    m2 = G.chain_mask(pos, cm, start=200, end=900, support=sup)
+    assert m2.tolist() == [False, False, True]
+
+
+def test_an_unfilled_nan_in_the_chain_still_raises_and_says_what_to_do():
+    """The no-NaN invariant survives decision C; what changed is the remedy. The
+    message must point at the fill, not at a coordinate cut, or the next person
+    re-introduces the cut."""
+    from cohort import genmap as G
+    pos = np.array([100, 500], dtype=np.int64)
+    with pytest.raises(ValueError, match="fill_map_silent"):
+        G.chain_mask(pos, np.array([np.nan, 1.0]))

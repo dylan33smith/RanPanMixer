@@ -132,6 +132,7 @@ inputs:
 # ---------------------------------------------------------------------------
 declared_rate:
   cM_per_Mb: 1.2707
+  gap_table: data/raw/ucsc_gap/gap.txt.gz   # required whenever cM_per_Mb is set
   scope: genome          # ONE constant for all 22 autosomes, NOT per chromosome
   applies_to: map_silent # positions with NO cM at all: before the first marker
                          # or after the last. NOT the interior zero-cM plateaus.
