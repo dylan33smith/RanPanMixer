@@ -104,6 +104,103 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (later) — B-THY-diploid-gate: the falsifier now covers the path that runs
+
+**Hypothesis.** Every falsification clause in this project was HAPLOID and
+single-chromosome, while the diploid path was the only one ever run and decision E
+makes Arm 1 diploid across 22 autosomes under one genome-wide budget. If that gap
+mattered, injecting a real calibration error into the diploid code path would pass
+the existing suite. Chunk 1 of the review-gated plan.
+
+**Method.** Added the diploid and multi-segment reference primitives `exact.py` did
+not have (`Factor`, `composite_release`, `composite_utility`,
+`assert_log_z_bracket`) plus a two-segment toy fixture (`toy.toy_segments`,
+`toy.segment_shares`). Then `tests/test_diploid_gate.py`, 64 clauses in five groups:
+diploid on the 96-output toy (product support 9,216); two segments haploid,
+**EXHAUSTIVE** over all 32 composite inputs and all 1,024 ordered pairs; diploid x
+two segments (four chains, the Arm 1 shape); three mutations; and the clauses tying
+the reference to `ffbs`. Then mutation-tested by editing the real modules, running
+the gate, and reverting — each revert verified byte-identical with `cmp`.
+
+**The algebra the gate encodes.** A release is a product of independent chains, one
+per (haplotype, chromosome). Each factor is tilted at `eta_tau / ploidy` with a
+`beta` summing to that chromosome's SHARE `w_c`, so `u` stays in [0,1] and `log Z`
+in [0, `eta_tau`] however many chains there are. **One invariant catches both
+composition errors and is therefore asserted rather than documented:
+`sum over all factors of beta.sum() == ploidy`.**
+
+### Which clauses fire under which injected error
+
+Clauses are rows; the injected error is the column. ✓ = fired, — = did not.
+
+| clause | unmutated | M1 full `eta` per haplotype | M2 `beta` per chromosome | M3 `epsilon_tau` for `eta_tau` |
+|---|---|---|---|---|
+| budget invariant (`sum beta == ploidy`) * | — | ✓ | **✓** | — |
+| composite `u` in [0,1] * | — | ✓ | **✓** | — |
+| `log_z` bracket on the TOTAL * | — | ✓ at `tau` = 0.9 only | ✓ | — |
+| per-segment `log_z_c <= eta_tau * w_c` | — | n/a | ✓ | — |
+| exact TV <= `tau` * | — | — | — | — |
+| `ratio_spread <= exp(epsilon_tau)` * | — | ✓ | — | **✓** |
+| the sharp pair SATURATES the bound * | — | ✓ | — | ✓ |
+| **`ffbs` diploid `log_z_p` == exact composite** * | — | **✓ 5 of 6 `tau`** | n/a | **✓ 5 of 6 `tau`** |
+| **`ffbs` diploid marginals == exact single chain** * | — | **✓** | n/a | **✓** |
+
+**Provenance.** `tests/test_diploid_gate.py` · toy K=4 T=7 (96 output paths) and
+segments K=3 T=3 / K=3 T=2 with declared shares (0.7, 0.3) · `tau` grid
+0 / 0.05 / 0.10 / 0.25 / 0.50 / 0.90 · constructed extremal pairs plus a seeded
+sample, seed 20261010, 400 pairs · M1 and M3 injected into `src/mechanism/ffbs.py`,
+M2 into `src/mechanism/exact.py` · 64 clauses, 166 tests in the suite, all passing.
+
+**COLUMNS** · *unmutated* fires nothing, which is the only column where that is the
+right answer. · *M1* is the SUM aggregator in disguise — the defect that was accepted
+at every `tau` before a diploid bracket existed. · *M2* is the genome-wide error:
+normalising `beta` to 1 per chromosome, which turns one release into `n_chrom`
+releases of one person. · *M3* is the one-character `epsilon_tau`/`eta_tau` slip.
+
+**ROWS** · *budget invariant* and *composite u* are the only clauses that see M2 at
+all, and both were verified to have power by disabling each in turn — disabling
+either breaks the M2 test, disabling both also breaks M1 at four of five `tau`. ·
+*exact TV fires on nothing*, which reproduces the project's existing finding at
+diploid scale: TV reaches only a fraction of `tau`, so it cannot detect a mis-scaled
+exponent and must never be the headline clause. · *the two `ffbs` rows are the ones
+that caught M1 and M3*, and that is the finding below.
+
+**SYNTHESIS — AND THE THING I ALMOST SHIPPED.** The first version of this gate
+checked `exact.py` against itself and nothing else. It passed all 57 clauses, and
+**it would have caught neither M1 nor M3**, because both live in `ffbs.py` and
+nothing in the gate read `ffbs.py`. A reference implementation agreeing with its own
+gate is two unverified things agreeing. The clauses that give this gate its power are
+the two that tie the reference to the mechanism, and the stronger of them needs no
+draws at all: **`log_z_p` is deterministic**, so comparing it between `ffbs.release`
+and `exact.composite_release` pins the exponent, the per-haplotype factorisation and
+the baseline subtraction to 1e-12 with zero Monte-Carlo error. The sampled-marginal
+clause is the complement — it checks that the DRAW follows the factorisation, not
+merely that the normaliser does, and it is what a shared RNG stream between
+haplotypes would fail.
+
+⚠ **Three honest limits on what this gate covers.**
+1. **At `tau` = 0 every mutation is undetectable**, because `eta_tau` = 0 makes the
+   halved and the full exponent identical. That is correct, not a hole, and the
+   mutation clauses exclude `tau` = 0 rather than claiming coverage there.
+2. **The `log_z` bracket alone catches M1 only at `tau` = 0.9.** Below that the
+   doubled exponent stays inside [0, `eta_tau`] and the bracket is silent — the same
+   shape as the recorded haploid result that a doubled exponent passes clause (b)
+   everywhere and clause (c) below `tau` = 0.5. The layered detectors are load-bearing.
+3. **M2 cannot yet be injected into the mechanism**, because the genome-wide share
+   does not exist in `utility.beta_v` — its assertion still hard-demands `sum == 1`.
+   So M2 is caught at the REFERENCE level only, and the gate is forward-looking: it
+   will bite when chunk 2 implements the share. That ordering is deliberate and
+   matches how the haploid toy gate was built before the sampler it checks.
+
+**One real fix found on the way.** `toy_segments`'s own fixture check rejected my
+first segment B: the invariant "some donor is another donor minus a cell" was written
+as "some donor is DONOR 0 minus a cell", and B3 is B2 minus a cell. The narrow version
+would pass a fixture whose only collapsing pair sat elsewhere, so the collapse that
+makes TV a statement about OUTPUT paths rather than state paths would go untested.
+Generalised to any ordered pair. ⚠ **`toy_cohort` has the same narrow check** and is
+left alone for now — it happens to be satisfied by donor 0 on that fixture, so
+widening it is a no-op today, but it is the same latent weakness.
+
 ## 2026-10-10 — CHUNK 0: the known-wrong facts landed, and one of them was a real measurement
 
 **Goal.** Clear the stale and wrong facts out of the authority documents before any Phase B

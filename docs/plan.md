@@ -174,11 +174,13 @@ Nine decisions opened Phase B. They were taken after a seven-surface audit
 
 Ordered, and the order is load-bearing.
 
-1. **`B-THY-diploid-gate`** — a diploid, two-segment falsification gate. Every
-   gate in this project is HAPLOID and the diploid path is the only one ever run;
-   decision E makes Arm 1 diploid. **It is the cheapest blocking item on the
-   board** — reads nothing from disk, needs no rebuild, no download and no rate
-   decision — and it is a prerequisite of every Arm 1 number.
+1. ✅ **`B-THY-diploid-gate` — DONE 2026-10-10.** `tests/test_diploid_gate.py`,
+   64 clauses, mutation-tested against the real `ffbs.py` with each revert verified
+   byte-identical. The budget invariant `sum beta == ploidy` is the clause that
+   catches the genome-wide composition error, and **it is forward-looking**:
+   `utility.beta_v` still hard-demands `sum == 1`, so the error cannot yet be
+   injected into the mechanism. The gate will bite when step 5 implements the
+   share — which is the point of building it first.
 2. **`B-DAT-map-coverage`** — per autosome: bp with no cM, bp in interior zero-cM
    intervals, N-gap spans, and how much of each survives the `support > 0` filter.
    Feeds decision C's value. Until this exists, the rate cannot be declared.
@@ -587,6 +589,8 @@ segment count is set by the chromosome's genetic length, not by T.
 
 | ID | Intervention | Endpoint | n | Result | Verdict | memory |
 |---|---|---|---|---|---|---|
+| B-THY-diploid-gate | Falsify the DIPLOID and multi-segment release, which every prior gate missed | injected calibration errors must fire a named clause at every `tau` | 64 clauses, 3 mutations, 6 `tau`; two-segment sweep EXHAUSTIVE over 1,024 pairs | **BUILT AND HAS POWER.** The composite primitives `exact.py` lacked, plus one invariant that catches both composition errors: `sum beta == ploidy`. ⚠ The first version checked `exact.py` against itself, passed 57 clauses and would have caught NEITHER doubled-exponent mutation — both live in `ffbs.py`. The clauses with the power are the two tying reference to mechanism, and the strong one needs no draws: `log_z_p` is deterministic. ⚠ TV fires on nothing; the bracket alone catches a doubled exponent only at `tau` = 0.9 | done | 2026-10-10 |
+| B-FIX-chunk0-stale-facts | Clear wrong facts from the authority docs before phase B code reads them | each distinctive stale number greps clean; historical copies carry a correction pair | 5 files of live text, 4 figures | **4 corrections + 1 new measurement.** 1.61e-06/13.5x used the site axis not the chain (-> 1.80e-06/15.1x); 21 TB is 21.1 GB, wrong by 1000x in 5 places; 15.03% is one draw, exact is 14.8077%. ⚠ The contract's correction-format check matched only column 0, so it had skipped every correction written inside a bullet — strengthened, and it immediately caught 3 | done | 2026-10-10 |
 | A-EVL-churn-across-tau | Does raising `tau` move a few positions or reshuffle many? | the mismatch SET, not just its size, at a fixed seed | 2 models, 7 `tau`, 3 seeds, common axis | **Both, and still tiny.** At `tau`=0.99 model C moves 40.7 positions to net −12.7 and model B 84.7 to net +23.3 — about 3x more movement than the net. Below `tau`=0.25 model C's churn is EXACTLY ZERO. ⚠ The changes CLUSTER: 12 of C's 23 and 51 of B's 64 fall in one 400-variant window, because a flip swaps a whole donor segment. Sampled nets are noise; exact is −3.30 (C) and −4.72 (B) | done | 2026-10-08 |
 | A-IMP-model-b | Build the LD-block chain so switching happens only between blocks | model C reproduced exactly by identity blocks; blocks from a panel that excludes the target | chr21, 8 capacities swept on the other arm | **BUILT.** 59,472 units, `expected_switches` 3,394.1 against 3,532 predicted independently; floor 14.5699% vs C's 14.8077%, slope −1.7738 vs −1.2381 — model B is a MILD contiguity lever, 1.43x, against 16x from re-scoping the utility. Cost: 1,222 positions dropped, 1,212-variant verbatim donor runs. ⚠ One bug, caught only by the prediction: transitions were start-to-start, not inter-unit gaps | done | 2026-10-07 |
 | A-EVL-capacity-sweep | Does PanMixer have a knob, and what does it reach? | its reachable `target_fidelity` range | 8 capacities, HG00438, seed 123 | **YES — `capacity`, and it SATURATES.** 1.20% at 0.01 rising to **16.41% at 0.2-0.3**, then four settings byte-identical. Our 14.81% is reached at **capacity ~= 0.17**, correcting the 0.45 interpolated from two points | done | 2026-10-07 |

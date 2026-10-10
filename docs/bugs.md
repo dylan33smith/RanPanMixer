@@ -442,6 +442,47 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
 
 ## Mechanism / sampler
 
+### A falsification gate that checks the reference against itself catches nothing
+
+- **[2026-10-10] 57 clauses passing, zero power against the two errors it was built for**
+  **[Symptom]** `tests/test_diploid_gate.py` in its first form enumerated the exact
+  diploid and multi-segment release distributions and checked TV, `ratio_spread`,
+  the `log_z` bracket and the budget invariant across a `tau` grid. All 57 clauses
+  passed. Injecting the full `eta_tau` per haplotype instead of half into
+  `src/mechanism/ffbs.py` — the defect the gate was commissioned for — **still
+  passed all 57.** Same for `epsilon_tau` in place of `eta_tau`.
+  **[Cause]** Every clause compared `exact.py` to `exact.py`. Both mutations live in
+  `ffbs.py`, and nothing in the gate imported `ffbs.py`. A reference implementation
+  agreeing with its own gate is two unverified things agreeing — the same defect this
+  file records upstream, where PanMixer's shape assertion compares two expressions
+  that are equal by construction and can never fire.
+  **[Proven fix]** Two clauses that tie the reference to the mechanism, and the
+  stronger needs no sampling: **`log_z_p` is deterministic**, so comparing
+  `ffbs.release(..., ploidy=2).log_z_p` against `exact.composite_release` pins the
+  exponent, the per-haplotype factorisation and the baseline subtraction to 1e-12
+  with zero Monte-Carlo error. Verified: with those clauses in place, both mutations
+  fire at 5 of 6 `tau`. The sampled-marginal clause is the complement — it checks the
+  DRAW follows the factorisation, which is what a shared RNG stream would break.
+  **[How to recognise it elsewhere]** Ask of any new gate: *which module does it
+  import, and is the thing I am afraid of in that module?* If the answer is only the
+  reference, the gate is decoration whatever its clause count.
+
+### A fixture invariant written against donor 0 instead of any pair
+
+- **[2026-10-10] "some donor is another donor minus a cell" checked only donor 0**
+  **[Symptom]** `toy.toy_segments` rejected a valid fixture: segment B's third donor
+  is the SECOND donor minus a cell, not the first. The check as written would also
+  do the reverse and worse — silently PASS a fixture whose only collapsing pair sat
+  between two non-zero donors, leaving the output-path collapse untested.
+  **[Cause]** The invariant is a property of the donor SET (two state paths emit one
+  output path), but it was expressed as a property of donor 0. The collapse is what
+  makes TV a statement about OUTPUT paths rather than state paths, so losing it would
+  make the headline clause answer a question nobody asked.
+  **[Proven fix]** Quantify over all ordered pairs. ⚠ **`toy.toy_cohort` carries the
+  same narrow check** and is currently satisfied by donor 0, so widening it is a
+  no-op today — but it is the identical latent weakness and should be widened when
+  that fixture is next touched.
+
 ### ⚠ LATENT AT GENOME SCALE ONLY: a running-float `log_c` accumulator breaches the `log_z_p` tolerance
 
 - **[2026-10-09] Found by arithmetic, before the code was written. NOT yet a bug in

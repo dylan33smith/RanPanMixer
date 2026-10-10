@@ -282,3 +282,146 @@ def enumerate_state_posterior(haplotypes: np.ndarray, genetic_pos: np.ndarray,
     if s <= 0:
         raise ValueError("the potentials annihilate every state path")
     return out / s
+
+
+# ---------------------------------------------------------------------------
+# COMPOSITE RELEASES: diploid, multi-segment, and both at once
+#
+# ⚠ WHY THIS EXISTS. Until 2026-10-09 every falsification clause in this project
+# was HAPLOID and single-chromosome, while the diploid path was the only one ever
+# run -- all 18 releases of the first chr21 run carry `ploidy: 2`. There was no
+# diploid primitive here at all, so the gate could not be applied to the code
+# path that actually executes. That is missing REFERENCE CODE, not a missing
+# assertion, and it is what this block supplies.
+#
+# THE ALGEBRA, because getting it wrong is the error the gate exists to catch.
+# A release is made of INDEPENDENT chains -- one per (haplotype, chromosome)
+# pair. The utility is the MEAN over haplotypes of a SUM over chromosomes:
+#
+#     u(p, y) = (1 / ploidy) * sum_h sum_c u_{h,c}
+#
+# where `u_{h,c}` is that factor's own weighted indicator and its `beta` sums to
+# that chromosome's SHARE `w_c` of the one global budget (standing constraint 4,
+# with sum_c w_c = 1). Then
+#
+#     Q(y) prop. prod_{h,c} R_D(y_{h,c}) * exp((eta_tau / ploidy) * u_{h,c})
+#
+# so each factor is tilted at `eta_tau / ploidy` with its own share-weighted
+# beta, and `log Z` is the SUM of the factors' own normalisers. Two bounds follow
+# and both are gates: `u` stays in [0,1], and `log Z` stays in [0, eta_tau].
+#
+# ⚠ ONE INVARIANT CATCHES BOTH COMPOSITION ERRORS, which is why it is asserted
+# rather than documented: `sum over all factors of beta.sum() == ploidy`.
+#   - Running each HAPLOTYPE at the full `eta_tau` instead of half doubles the
+#     exponent, so `log Z` reaches 2 * eta_tau. This is the defect that was
+#     ACCEPTED at every `tau` before the diploid bracket was added.
+#   - Normalising `beta` to 1 within each CHROMOSOME instead of to `w_c` makes
+#     the betas sum to `ploidy * n_chrom`, drives `u` to `n_chrom`, and turns one
+#     release into `n_chrom` independent releases of the same person -- which
+#     standing constraint 5 forbids. NO GATE IN THE REPO COULD DETECT THIS
+#     before 2026-10-10.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Factor:
+    """One independent chain of a composite release.
+
+    `beta` sums to this factor's SHARE of the single global budget, NOT to 1.
+    A factor whose beta sums to 1 is only correct for a haploid, single-chromosome
+    release -- the degenerate case where share = 1 and ploidy = 1.
+    """
+
+    base: ExactBaseline
+    target: np.ndarray       # the private input restricted to this factor
+    beta: np.ndarray         # weights; sums to this factor's share
+    label: str = ""
+
+    @property
+    def share(self) -> float:
+        return float(self.beta.sum())
+
+
+def composite_release(factors: "list[Factor]", eta: float, *, ploidy: int
+                      ) -> tuple[np.ndarray, float, np.ndarray]:
+    """`Q` over the PRODUCT support, `log Z`, and the per-factor `u` ranges.
+
+    Returns `(Q_joint, log_z_total, shares)`. `Q_joint` is flattened in
+    `itertools.product` order over the factors' supports, so `tv` and
+    `ratio_spread` apply to it UNCHANGED -- the distance functions are not new
+    code, which matters because new distance code checked by a new gate would be
+    two unverified things agreeing.
+
+    ⚠ The budget invariant is asserted here, at the only place that can see every
+    factor at once. A per-factor check cannot catch it: each factor in isolation
+    looks perfectly well formed.
+    """
+    if ploidy < 1:
+        raise ValueError(f"ploidy must be >= 1, got {ploidy}")
+    if not factors:
+        raise ValueError("a release needs at least one factor")
+
+    total_beta = sum(f.share for f in factors)
+    if abs(total_beta - ploidy) > 1e-9:
+        raise AssertionError(
+            f"the factors' beta weights sum to {total_beta!r}, not ploidy = "
+            f"{ploidy}. Each haplotype's weights must sum to 1 ACROSS its "
+            f"chromosomes, so the total over {len(factors)} factors is the "
+            f"ploidy. Shares seen: "
+            f"{[(f.label or i, f.share) for i, f in enumerate(factors)]}.\n"
+            f"  If each chromosome was normalised to 1 independently, this is "
+            f"{len(factors)} independent releases of one genome, which compose "
+            f"and degrade the guarantee (standing constraint 5)."
+        )
+
+    exponent = eta / ploidy
+    per_factor: list[np.ndarray] = []
+    log_z_total = 0.0
+    for f in factors:
+        u = utility_vector(f.base, f.target, f.beta)
+        q, log_z = release_distribution(f.base, u, exponent)
+        per_factor.append(q)
+        log_z_total += log_z
+
+    joint = per_factor[0]
+    for q in per_factor[1:]:
+        joint = np.outer(joint, q).ravel()
+    return joint, float(log_z_total), np.array([f.share for f in factors])
+
+
+def composite_utility(factors: "list[Factor]", *, ploidy: int) -> np.ndarray:
+    """`u(p, y)` over the product support: the mean over haplotypes of the sum
+    over chromosomes, assembled factor by factor.
+
+    Kept separate from `composite_release` so the [0,1] bound can be checked on
+    the composite utility itself, which is the quantity standing constraint 2 is
+    about. `release_distribution` only ever sees one factor's `u`, which is in
+    [0, share] and therefore passes its own bound even when the composite does
+    not.
+    """
+    per_factor = [utility_vector(f.base, f.target, f.beta) for f in factors]
+    acc = per_factor[0]
+    for u in per_factor[1:]:
+        acc = np.add.outer(acc, u).ravel()
+    return acc / ploidy
+
+
+def assert_log_z_bracket(log_z: float, eta: float, *, tol: float = 1e-9,
+                         what: str = "log_z_p") -> None:
+    """`log Z` in [0, eta_tau], for a composite release of any shape.
+
+    ⚠ The bracket is on the TOTAL, never on a factor. A per-factor bracket is
+    about `eta_tau / ploidy * w_c` and is roughly `ploidy * n_chrom` times
+    tighter, so checking factors against the full `eta_tau` is a bracket that
+    cannot fire -- the exact shape of the defect this module was written for.
+    """
+    if not (-tol <= log_z <= eta + tol):
+        raise AssertionError(
+            f"{what} = {log_z!r} is outside [0, eta_tau] = [0, {eta!r}].\n"
+            f"  Z_p = sum_y R_D(y) exp(eta_tau * u(p,y)) with u in [0,1], so Z_p "
+            f"is in [1, e^eta_tau] and its log is in [0, eta_tau] by definition. "
+            f"A violation means the exponent applied is not the one calibrated "
+            f"to tau -- most likely the full eta_tau where eta_tau/ploidy "
+            f"belongs, or a beta normalised per chromosome rather than to its "
+            f"share."
+        )

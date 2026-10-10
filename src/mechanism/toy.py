@@ -205,3 +205,118 @@ def toy_inputs(toy: Toy, *, kind: str = "called") -> np.ndarray:
     else:
         raise ValueError(f"kind must be 'called' or 'all', not {kind!r}")
     return np.array(list(itertools.product(*per_pos)), dtype=np.int16)
+
+
+# ---------------------------------------------------------------------------
+# A TWO-SEGMENT FIXTURE, for the genome-wide budget composition gate.
+#
+# ⚠ WHY A SECOND, SMALLER FIXTURE. The main toy has 96 output paths, which makes
+# a DIPLOID product support of 9,216 -- fine. But a diploid TWO-SEGMENT release
+# has four independent chains, and 96^4 is 85 million, which is neither
+# enumerable nor necessary. What the composition gate has to exercise is the
+# BUDGET ALGEBRA across segments, not the richness of any one chain, so the
+# segments here are deliberately tiny: the whole four-factor product support is
+# small enough to enumerate exactly, and the input space is small enough to sweep
+# EXHAUSTIVELY in the haploid case rather than sampled.
+#
+# These two stand in for two chromosomes. They are separate chains because the
+# chain cannot cross a chromosome boundary, which is also why a composite release
+# is a product and not one long chain.
+# ---------------------------------------------------------------------------
+
+_SEG_A_HAPLOTYPES = np.array(
+    [[0, 1, 0],     # A1
+     [1, 0, 1],     # A2 -- differs from A1 everywhere, so sharp_pair works here
+     [0, -1, 0]],   # A3 -- A1 minus a cell, so two state paths collapse to one output
+    dtype=np.int16)
+_SEG_A_POSITIONS = np.array([1_000, 1_200, 1_400], dtype=np.int64)
+_SEG_A_GENETIC_POS = np.array([0.0, 0.00002, 0.00002], dtype=np.float64)
+_SEG_A_N_ALLELES = np.array([2, 2, 2], dtype=np.int32)
+
+_SEG_B_HAPLOTYPES = np.array(
+    [[0, 1],        # B1
+     [1, 0],        # B2 -- differs from B1 everywhere
+     [1, -1]],      # B3 -- a missing cell here too
+    dtype=np.int16)
+_SEG_B_POSITIONS = np.array([2_000, 900_000], dtype=np.int64)
+_SEG_B_GENETIC_POS = np.array([0.0, 0.5], dtype=np.float64)
+_SEG_B_N_ALLELES = np.array([2, 2], dtype=np.int32)
+
+
+def toy_segments() -> tuple[Toy, Toy]:
+    """Two small independent segments, with their invariants checked here.
+
+    Returns `(A, B)`. A carries a ZERO-DISTANCE step, so forced-stay is exercised
+    inside a segment; B's two positions are 0.5 cM apart, which drives switching
+    to near-uniform, so the wide end of the transition model is exercised too.
+    Both carry a missing donor cell (RENORMALISE) and a donor that is another
+    donor minus a cell (output collision).
+
+    ⚠ The checks are here, not in a test, for the same reason `toy_cohort`'s are:
+    a fixture that has quietly stopped exercising a feature still reports green,
+    and a green composition gate on two degenerate segments would be worse than
+    no gate, because it would be cited as evidence.
+    """
+    a = Toy(haplotypes=_SEG_A_HAPLOTYPES.copy(), positions=_SEG_A_POSITIONS.copy(),
+            genetic_pos=_SEG_A_GENETIC_POS.copy(), n_alleles=_SEG_A_N_ALLELES.copy())
+    b = Toy(haplotypes=_SEG_B_HAPLOTYPES.copy(), positions=_SEG_B_POSITIONS.copy(),
+            genetic_pos=_SEG_B_GENETIC_POS.copy(), n_alleles=_SEG_B_N_ALLELES.copy())
+
+    for name, t in (("A", a), ("B", b)):
+        if not np.all(np.diff(t.positions) > 0):
+            raise ValueError(f"segment {name}: positions are not strictly increasing")
+        if not np.all(np.diff(t.genetic_pos) >= 0):
+            raise ValueError(f"segment {name}: cM is not monotonic non-decreasing")
+        if (t.support == 0).any():
+            raise ValueError(f"segment {name}: a position has support 0")
+        if not (t.haplotypes == -1).any():
+            raise ValueError(f"segment {name}: no missing donor allele; RENORMALISE untested")
+        if not (t.haplotypes[0] != t.haplotypes[1]).all():
+            raise ValueError(
+                f"segment {name}: donors 0 and 1 no longer differ everywhere, so the "
+                f"saturating input pair is blunted and the gate stops being sharp")
+        # ⚠ ANY ordered pair, not just a pair involving donor 0. The collapse this
+        # guards is "two state paths emit one output path", which is a property of
+        # the donor SET; checking only against donor 0 would pass a fixture whose
+        # only collapsing pair sat elsewhere -- and did, on the first draft of
+        # segment B, where B3 is B2 minus a cell rather than B1 minus a cell.
+        twin = [(i, j) for i in range(t.K) for j in range(t.K) if i != j
+                if ((t.haplotypes[j] == t.haplotypes[i]) | (t.haplotypes[j] == -1)).all()
+                and (t.haplotypes[j] == -1).any()]
+        if not twin:
+            raise ValueError(
+                f"segment {name}: no donor is another minus a cell, so no two state "
+                f"paths collapse to one output path and TV is effectively measured "
+                f"over state paths")
+
+    if not (np.diff(a.genetic_pos) == 0).any():
+        raise ValueError("segment A lost its zero-distance step; forced-stay untested")
+    d = np.diff(b.genetic_pos)
+    if not (d * 10_000.0 * 1.26 / b.K > 10.0).any():
+        raise ValueError(
+            "segment B's step is no longer wide enough to drive switching to uniform; "
+            "the wide end of the transition model is untested across segments")
+    if a.T == b.T:
+        raise ValueError(
+            "the two segments have equal length, so a bug that silently used one "
+            "segment's shape for the other would not be caught")
+    return a, b
+
+
+def segment_shares() -> np.ndarray:
+    """The declared per-segment budget shares `w_c`, summing to 1.
+
+    ⚠ DELIBERATELY UNEQUAL and deliberately NOT the position-count ratio. Under
+    standing constraint 4 the share is a declared quantity, not a derived one, and
+    a gate run at w = (0.5, 0.5) would pass for an implementation that silently
+    used `1 / n_chrom` -- the most plausible wrong implementation there is. These
+    values are also not `T_c / sum(T)` (which would be 0.6, 0.4 here), so an
+    implementation that derived the share from chain length instead of reading the
+    declaration also fails.
+    """
+    w = np.array([0.7, 0.3], dtype=np.float64)
+    if abs(w.sum() - 1.0) > 1e-12:
+        raise ValueError(f"segment shares sum to {w.sum()!r}, not 1")
+    if w[0] == w[1]:
+        raise ValueError("shares are equal; a hard-coded 1/n_chrom would pass")
+    return w
