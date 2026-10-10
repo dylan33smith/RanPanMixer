@@ -165,7 +165,7 @@ Nine decisions opened Phase B. They were taken after a seven-surface audit
 |---|---|---|
 | 1 | ✅ **SETTLED 2026-10-10 (Dylan): ONE GLOBAL 1.2707 cM/Mb**, the autosomal mean mapped rate (3,543.8 cM over 2,788.8 Mb). Declared in `configs/inputs.chr21.yaml` under `declared_rate`, with a test asserting it stays equal to the measured value so the config and the maps cannot drift apart. Global rather than per-chromosome because the measurement reversed the earlier recommendation: the five acrocentrics hold 96% of the map-silent sequence and have the genome's highest mapped rates, measured entirely on their q arms. ⚠ A DECLARATION, not an estimate of the region it applies to. | — |
 | 2 | Whether **interior zero-cM plateaus** are eventually overridden too. Deferred deliberately: `docs/terms.md` states P(switch) = 0 there is CORRECT, and `tests/test_toy_enumeration.py` enforces it as a Theorem-1 **support** property. Overriding it reverses a tested position, and is the most rework-costly item on the board. ✅ **NOW SIZED** (2026-10-10): **93.9 Mb / 3.27%** of autosomal bp, LARGER than the class the declared rate covers; chr9 alone 25.61 Mb, chr16 10.69 Mb; and **8,327 chr21 positions**, all with `support > 0`. | nothing yet |
-| 2b | ⚠⚠ **The N-GAP POLICY, still undeclared and BLOCKED.** The settled rate does NOT settle it: a constant cM/Mb times fabricated base pairs yields fabricated cM, and chr21's p arm holds 1.1 Mb of fabricated N-gap inside the 10.33 Mb the rate applies to. Needs the GRCh38 assembly's gap coordinates — no FASTA, AGP or assembly report is on disk. ⚠ Until decided the implementation can only ACCUMULATE across gaps it cannot locate; that is a consequence of the missing input, not a choice, and belongs in the writeup. | preprocessing, and the honesty of the p-arm cM |
+| 2b | ⚠ **The N-GAP POLICY — UNDECLARED, no longer blocked.** The gap table is acquired (`data/raw/ucsc_gap/gap.txt.gz`, 12 KB). ✅ **MEASURED: 79.8% of the map-silent sequence is gap** (68.8 of 86.2 Mb), so accumulating the declared rate across it asserts 109.5 cM of which **87.4 cM sits on placeholder bp** — 2.5% of the autosomal genetic length invented from spacers. ✅ **And NO variant of ours falls inside any gap** (chr21: 0 of 340,849), so gaps hold nothing and skipping their spans changes **no position's chain membership** — it only fixes `Delta_x` between variants that straddle one, dropping the map-silent distance 109.5 -> 22.1 cM. Recommendation: SKIP gap spans. ⚠ Dylan's call; it is a pre-registration item. | preprocessing |
 | 2c | ✅ **SETTLED 2026-10-10 as decision J** — `beta_share` is allocated by variant count, `T_c / T_total`, with `T_c` on the full 88-haplotype cohort. Supersedes the genetic-length recommendation made the same day, which was wrong: it would have made a position's weight depend on which chromosome it sat on. | — |
 | 3 | The **`tau` grid.** Pinned only AFTER the genome-wide endpoint is re-measured exactly — see the work order. | pre-registration |
 | 4 | **Arm 2's `beta_v` normalising set** (R1 + R4): all chain positions, or the subset readable against a named public callset declared in advance. Arm 1 normalises over all chain positions on every branch. | pre-registration |
@@ -1418,7 +1418,43 @@ board: it reads nothing from disk and needs no rebuild, download or rate decisio
   free lunch — a pure-prior draw is a real cohort haplotype and scores near-perfectly
   on every cohort-level utility metric while carrying zero target information.
 
-### [A-ATK-matched-pair] The discriminating experiment
+### [B-ATK-lrt-arm2] The Arm 2 attacker — RE-FILED 2026-10-10
+
+⚠ **IT WAS BLOCKED ON A DEPENDENCY IT DOES NOT HAVE.** Filed as
+`[A-ATK-matched-pair]` with prerequisite "`A-EVL-headtohead` plumbing" — the Arm 1
+`new_haplotypes` emitter — which the Arm 2 likelihood-ratio attacker does not
+consume at all. Arm 2 has no leave-one-out, no K = 86 panel and no PanMixer
+evaluator in the loop, so a whole paper section was waiting on the other arm for no
+reason. **Prerequisite: none.**
+
+✅ **THE ATTACKER DOES NOT HAVE TO BE FOUND IN THE LITERATURE.** The proposal
+specifies no attacker — seven pages of theory, no evaluation section, the word
+"adversar" does not appear — but its algebra hands over the provably optimal one.
+With `Q^tau_p(y) = R_D(y) exp(eta_tau u(p,y)) / Z_p`, the Neyman-Pearson statistic
+between two input paths is `eta_tau [u(p,y) - u(q,y)] - [log Z_p - log Z_q]`, with
+`R_D` cancelling. Its advantage EQUALS `TV(Q_p, Q_q)` — the quantity Theorem 1
+bounds — so no attack can beat it. Ingredients all exist: `calibration.eta_tau`,
+`utility.u_of_output`, `ffbs.log_z_p`, `toy.sharp_pair`.
+
+⚠⚠ **THE BINDING RISK IS POWER, NOT STRENGTH.** Even the optimal attacker returns a
+null at any feasible `n` (R5: signal-to-noise about 1:900). A null without a power
+statement is what standing constraint 7 forbids calling evidence; a null WITH one is
+the privacy evidence. So every attacker needs a POSITIVE CONTROL — a stated
+condition under which it must demonstrably SUCCEED — and the pre-registration must
+pin the minimum detectable advantage the experiment is powered for.
+
+⚠⚠ **THE STANDARD GENOMIC ATTACKS ARE MIS-SPECIFIED AGAINST THIS RELEASE, AND ONE
+INVERTS.** The release contains NONE of the target's own alleles: every released
+allele is some cohort donor's, and the only target-dependent quantity in the object
+is the tilt. So a database-search linkage attack has no correct answer in Arm 2 (the
+target is outside the database by construction, which makes 0% the experimental
+design rather than privacy), and a membership attack INVERTS — the release is a
+donor mosaic, so a high match fraction identifies DONORS, not the target.
+**An Arm 1 attacker carried into Arm 2 unexamined would produce a number that looks
+like a privacy result.** Homer/Sankararaman assume a pool the target contributed to;
+the Beacon LRT assumes a presence oracle; we publish neither.
+
+### [A-ATK-matched-pair] The discriminating experiment — SUPERSEDED by the above
 - **Why:** the only measurement where the two guarantees differ BY CONSTRUCTION.
   PanMixer releases unselected blocks verbatim, so two inputs differing in an
   unselected block have disjoint output supports — TV = 1. Ours bounds every pair.

@@ -164,10 +164,23 @@ declared_rate:
     and GRCh38 chr21 5,010,000-10,814,560 is placeholder model sequence: 25
     contigs separated by fabricated N-gaps, 22 of them exactly 50 kb, so 1.1 Mb
     of the 10.33 Mb that the rate is about to be applied to on chr21 is gap
-    rather than sequence. Deciding this needs the assembly's gap coordinates and
-    no FASTA, AGP or assembly report is on disk. ⚠ Until it is decided the
-    implementation can only ACCUMULATE across the gaps, because it does not know
-    where they are -- that is a consequence of the missing input, NOT a choice,
+    rather than sequence. ✅ THE GAP COORDINATES ARE NOW ACQUIRED:
+    data/raw/ucsc_gap/gap.txt.gz, the hg38 gap table, 12,368 B, 829 typed records.
+    ⚠ CORRECTION 2026-10-10: this said "no FASTA, AGP or assembly report is on
+    disk", which was WRONG -- external/PanMixer/starting_data/references/ holds
+    chr21.fa and a full GRCh38 FASTA. The true statement was that none is staged
+    in OUR tree, and CLAUDE.md forbids src/, configs/ and tests/ from reading
+    inside PanMixer's tree. The gap table is the better artifact regardless:
+    12 KB against 3.26 GB, and it gives typed gap records directly rather than
+    requiring a scan for N-runs.
+    ✅ MEASURED: 79.8% of the autosomal map-silent sequence is gap (68.8 of
+    86.2 Mb), so accumulating the declared rate across it would assert 109.5 cM of
+    which 87.4 cM sits on placeholder bp. And NO variant of ours falls inside any
+    gap (chr21: 0 of 340,849), so skipping gap spans changes no position's chain
+    membership and drops the map-silent distance from 109.5 cM to 22.1 cM.
+    ⚠ THE POLICY IS STILL UNDECLARED. Until it is decided the
+    implementation can only ACCUMULATE across the gaps -- that is now a pending
+    decision rather than a missing input,
     and it must be stated in any writeup rather than left implicit.
   unmeasured: >
     The N-gap extent on the other 21 autosomes. chr21's 22x50 kb is the only

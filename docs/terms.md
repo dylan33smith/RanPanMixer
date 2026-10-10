@@ -1081,7 +1081,18 @@ CHANGES MEANING WITH: the reach it is given and the distance it is applied to.
                       happens at an N-gap before any rate is applied.
                       ⚠⚠ **STILL UNDECLARED AND BLOCKED as of 2026-10-10**, and the
                       settled 1.2707 does NOT settle it. It needs the GRCh38 assembly's
-                      gap coordinates and no FASTA, AGP or assembly report is on disk.
+                      gap coordinates. ✅ ACQUIRED 2026-10-10 as
+                      `data/raw/ucsc_gap/gap.txt.gz`, so this is no longer BLOCKED —
+                      only undeclared. ⚠ CORRECTION: this read "no FASTA, AGP or
+                      assembly report is on disk", which was false; PanMixer's tree
+                      holds a full GRCh38 FASTA. The true statement was "none staged in
+                      OUR tree", and reading inside that tree is forbidden.
+                      ✅ MEASURED: **79.8% of the map-silent sequence is gap** (68.8 of
+                      86.2 Mb), so accumulating the rate across it asserts 109.5 cM of
+                      which **87.4 cM is on placeholder bp**. **No variant of ours is
+                      inside any gap** (chr21: 0 of 340,849), so skipping gap spans
+                      changes NO position's chain membership and drops the map-silent
+                      distance to 22.1 cM.
                       ⚠ Until it is decided the implementation can only ACCUMULATE
                       across the gaps, because it cannot locate them — a consequence of
                       the missing input, not a choice, and it must be stated in any

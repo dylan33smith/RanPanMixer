@@ -104,6 +104,125 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (later) — the gaps are empty, and the Arm 2 attacker was in our own algebra all along
+
+**Two questions from Dylan, both answered by measurement rather than argument.**
+
+### A. The N-gap question — the gaps hold nothing
+
+**Method.** Acquired the hg38 gap table (`data/raw/ucsc_gap/gap.txt.gz`, 12,368 B,
+sha256 `c466135b...`, 829 typed records from UCSC goldenPath) and intersected it with
+each autosome's map-silent region and with chr21's own variant positions.
+
+| metric | value |
+|---|---|
+| autosomal map-silent sequence | 86.2 Mb |
+| of which assembly GAP | **68.8 Mb (79.8%)** |
+| of which real sequence | 17.4 Mb |
+| declared-rate distance if accumulated through gaps | 109.5 cM |
+| of that, sitting on placeholder bp | **87.4 cM (79.8%)** |
+| declared-rate distance if gap spans are SKIPPED | **22.1 cM** |
+| chr21 records inside ANY hg38 gap | **0 of 340,849** |
+| chr21 map-silent records inside a gap | **0 of 26,636** |
+
+**Provenance.** UCSC hg38 `gap.txt.gz` · the 22 extracted autosome maps ·
+`data/cohort/chr21/positions.npy` · 2026-10-10. The five `short_arm` records are
+exactly the acrocentric p arms: chr13 and chr14 at 10 kb–16 Mb, chr15 to 17 Mb,
+chr21 to 5.01 Mb, chr22 to 10.51 Mb.
+
+**RESULT, and it answers the question as asked.** The gaps are **pure placeholders
+containing no variants of ours.** Their only effect on this project is to inflate
+base-pair distance between variants that straddle them. **So skipping gap spans is a
+clean correction: no position enters or leaves the chain, no support count moves, and
+the only thing that changes is `Delta_x` across a gap — which is precisely the
+quantity that was wrong.** It is a 5x reduction in declared distance at zero
+structural cost. 87.4 cM is 2.5% of the autosomal genetic length, so accumulating
+through is not a rounding question.
+⚠ Policy still UNDECLARED and Dylan's call; recommendation is to skip.
+
+**What PanMixer does with gaps: nothing, and genome-wide.** Its transition is
+`d = (pos_2 - pos_1)/1e6 * Ne * r` (`obfuscate.py:93,100`) — a position difference
+times a flat constant, with **no genetic map at all**. So it accumulates straight
+through every gap on every chromosome, not merely in map-silent regions. The same
+defect, unaddressed, and wider than ours.
+
+⚠ **AND A CORRECTION TO MY OWN CLAIM OF EARLIER TODAY.** I wrote in three places that
+"no FASTA, AGP or assembly report is on disk". **That was wrong** — the `find` behind
+it used `-maxdepth 3` and the file sits at depth 4:
+`external/PanMixer/starting_data/references/` holds `chr21.fa` and a full 3.26 GB
+GRCh38 FASTA. The TRUE statement was "none staged in OUR tree", and `CLAUDE.md`
+forbids `src/`, `configs/` and `tests/` from reading inside PanMixer's tree. The
+conclusion is unchanged and the gap table is the better artifact anyway — 12 KB
+against 3.26 GB, typed gap records instead of an N-run scan, and no tree violation —
+but the stated reason was false and is corrected in `configs/inputs.chr21.yaml` and
+`docs/terms.md`.
+
+### B. The Arm 2 attacker — the proposal specifies none, and we do not need the literature
+
+**Method.** A four-source sweep (the proposal PDF, our six docs, PanMixer's
+implemented attacks, and the external literature) with an adversarial synthesis.
+
+**The proposal specifies NO attacker.** Seven pages of theory — no results section,
+no evaluation section, no test statistic, no attack database. The string "adversar"
+does not appear at all; "attack" appears four times, three as a knowledge assumption
+and once as the discipline rule that the utility be chosen before inspecting attack
+outcomes — which presupposes outcomes while naming nothing that produces them.
+
+✅ **BUT ITS ALGEBRA HANDS OVER THE PROVABLY OPTIMAL ATTACKER IN ONE LINE.** With
+`Q^tau_p(y) = R_D(y) exp(eta_tau u(p,y)) / Z_p`, the Neyman-Pearson statistic
+between two input paths is
+
+    Lambda(y) = eta_tau [u(p,y) - u(q,y)] - [log Z_p - log Z_q]
+
+with `R_D` cancelling. By Neyman-Pearson its advantage **EQUALS** `TV(Q_p, Q_q)` —
+exactly the quantity Theorem 1 bounds — so no attack in any literature can beat it
+for a given pair. Every ingredient is already written: `calibration.eta_tau`,
+`utility.u_of_output`, `ffbs.log_z_p`, `exact.tv`, `toy.sharp_pair`.
+
+**This is a position the DP-auditing literature does not have.** There the trade-off
+function is unknown and must be approximated by heuristic attacks, which is why "is
+my attacker strong enough" is an open problem. Here it is closed-form, so our
+attacker provably attains the optimum — and that is the whole answer to "maybe your
+attacker was weak". ⚠ It is only available if the PRE-REGISTERED attacker is the
+exact likelihood ratio rather than a heuristic.
+
+⚠⚠ **SO STRENGTH IS NOT THE RISK. POWER IS.** Even the provably optimal attacker
+returns a null at any feasible `n` — R5's measured signal-to-noise is about 1:900,
+and constraint 5 permits R = 1. `docs/plan.md` already forecasts this null. A null
+without a power statement is what constraint 7 forbids calling evidence; a null WITH
+one is the privacy evidence. Every attacker therefore needs a POSITIVE CONTROL: a
+stated condition under which it must demonstrably SUCCEED. The repo already has the
+template — `tests/test_toy_enumeration.py` runs the doubled-exponent mutation and
+records which gates fire.
+
+⚠⚠ **AND THE STANDARD GENOMIC ATTACKS ARE MIS-SPECIFIED AGAINST THIS RELEASE
+OBJECT.** The release contains **none of the target's own alleles** — every released
+allele is some cohort donor's, and the only target-dependent quantity in the whole
+object is the tilt. Consequences, each a trap:
+- **Database-search linkage has no correct answer in Arm 2.** The target is outside
+  the attack database by construction, so a 0% link rate is the experimental design,
+  not privacy.
+- **Membership inference INVERTS.** The release is a donor mosaic, so it matches
+  cohort members well — which identifies DONORS, not the target. A high match
+  fraction is evidence about the public cohort, not about our guarantee.
+- Homer 2008 and Sankararaman 2009 assume a pool allele-frequency vector the target
+  contributed to; the Beacon LRT assumes a presence oracle. We publish neither.
+**An Arm 1 attacker carried into Arm 2 unexamined would produce a number that looks
+like a privacy result.** That is the single most important thing in this entry.
+
+**What the literature IS needed for:** the DP-auditing methodology for reporting a
+null (distinguishing experiments with Clopper-Pearson bounds; the one-run variant
+under R = 1), and external credibility — running the field's own attacks and showing
+them mis-specified for a stated structural reason rather than skipped.
+⚠ UNVERIFIED: the Nasr / Steinke / Carlini citations behind that recipe were not
+re-read in this pass and must be checked against the originals before they go into
+text. The N-ary bound `P_succ <= 1/N + tau` appears nowhere in the proposal or our
+docs and is unproved — stay at N = 2 so nothing depends on it.
+
+**Re-filed** `[A-ATK-matched-pair]` as `[B-ATK-lrt-arm2]` with **no prerequisite**:
+its old prerequisite was Arm 1's `new_haplotypes` plumbing, which the Arm 2 attacker
+does not consume, so a whole paper section was blocked on the other arm for no reason.
+
 ## 2026-10-10 (chunk 4) — the rate is declared, and the derivative route to the primary endpoint BREAKS at genome scale
 
 **Goal.** Two things decision A and B leave hanging: declare the rate now that
