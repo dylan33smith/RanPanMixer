@@ -104,6 +104,129 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-10 (chunk 6, part 1) — the fill decision C needed, parallelism by default, and a lock
+
+⚠ **PARTIAL ENTRY.** The 22-chromosome build and the panel download were still
+running when this was written. Everything below is settled; the per-chromosome results
+table is NOT here and must be added when the build completes.
+
+### 1. The fix that was blocking every chromosome
+
+The pipeline treated "no genetic distance here" as a fatal error: `interpolate` returns
+NaN outside the map's marker span, and the build then raised if any NaN survived.
+Correct under the old plan, which EXCLUDED those positions. **Decision C includes them,
+so every chromosome would have failed to build.**
+
+`genmap.fill_map_silent` replaces each NaN with a distance measured from the nearest
+mapped position over **gap-free** base pairs, and emits `cm_source.npy` recording per
+position whether its cM came from the map or the declared rate — so any release can
+report what share of its chain ran on a declared rather than a measured distance,
+without re-deriving the map span later.
+
+⚠ **The NaN is still the right input, and that is the subtle part.** A clamp gives
+thousands of positions one identical cM, which drives the switch probability to zero
+and emits a donor's real haplotype verbatim. A NaN is loud. Decision C does not change
+that; it changes what we DO with the loud signal, and this is the only function
+permitted to replace one.
+
+`chain_mask`'s coordinate cut became OPTIONAL, and omitting it is now the normal path.
+The cut existed to exclude what the map could not reach; with those positions filled
+there is nothing left for it to do, so the only exclusion is `support == 0` — a
+property of the cohort rather than of the map.
+
+**Measured on chr21:** the chain goes from **305,886 to 340,848** positions (+11.4%),
+with exactly **one** position excluded and that for having no called donor at all. All
+26,636 map-silent positions filled; 26,635 survive into the chain, **7.8%** of it. cM
+span -3.689 to 62.811, **no negative steps**, 9,384 zero-distance steps (2.75%) which
+are the interior plateaus decision C deliberately leaves alone.
+**And on chr19:** T = **549,359**, only **0.6%** on the declared rate — consistent with
+chr21 being acrocentric and chr19 not, so the declared rate's influence is concentrated
+in the five acrocentrics rather than spread evenly.
+
+⚠ **chr19 is the SHORTER chromosome and has 60% MORE chain positions than chr21.**
+Chain length tracks graph complexity, not sequence length. That matters for decision J,
+where the budget share is allocated by variant count: the shares will not look
+proportional to chromosome size, and that is the rule working rather than failing.
+
+Three mutations fire: accumulating through gaps instead of skipping, leaving the NaNs,
+and a source array that always claims "mapped".
+
+### 2. ⚠⚠ PARALLELISM IS NOW THE DEFAULT, because I had been costing work wrong
+
+Dylan, 2026-10-10: "make sure that any future runs will be parallelized when they
+can be." I had been quoting SERIAL times for embarrassingly parallel work on a
+48-core, 251 GB machine. **The 3,500-release attack experiment I costed at 9 hours is
+about 12 minutes.** This is not a tidiness point: a wrong cost estimate changes which
+experiments look affordable, so it changes the design. The `tau` = 0.05 field-6
+analysis was distorted by exactly this.
+
+`src/runner.py` is the reusable piece. ⚠ **The bound is MEMORY, not cores**, which is
+why it is a helper and not `Pool(cpu_count())`: a chr21 forward pass holds a 215 MB
+alpha array, a release needs three, `state_marginals` five, and on chr1 each is five
+times bigger. A pool sized by cores swaps or gets killed. `plan_workers` reports WHICH
+constraint bound, so an over-tight estimate reads as "MEMORY-bound" instead of as
+mysterious slowness. For the real workloads: chr21 releases 46 workers (core-bound),
+chr1 releases 37 (memory-bound).
+
+`run_jobs` RAISES on any failed job rather than returning a short list — a parallel map
+that drops a failure yields a result set that looks complete, which is the same failure
+this project already has a shell-fan-out rule about.
+
+`scripts/build_all_cohorts.py` bin-packs the chromosomes largest-first from a MEASURED
+cost — **22.3 MB of RSS per MB of gzipped GFA**, from chr21's observed 9.48 GB peak —
+so each batch fits the budget and runs at its own width: 4-5 wide for the big
+chromosomes, 9-10 for the small, four batches. A fixed fan-out would either waste the
+machine or kill it.
+
+### 3. ⚠ FOUR BUGS THE ONE-CHROMOSOME PROBE CAUGHT
+
+I ran chr19 alone before committing to 22. Each of these would have failed the whole
+run partway through:
+1. `prep-cohort` is not on PATH — the package was never pip-installed. The driver now
+   invokes the module with `PYTHONPATH`.
+2. The CLI needs its positional `step` argument.
+3. A chromosome whose own RSS estimate exceeds the budget was being DROPPED rather
+   than given a batch of its own.
+4. ⚠ **The manifest step read `chain_span` unconditionally**, and decision C removed
+   it — so **every chromosome** would have died at the final step with 11 of 13
+   artifacts already written. The manifest now records which rule built the
+   chromosome (`declared_rate_fill` or `coordinate_cut`) rather than assuming.
+
+**The lesson is the probe, not the bugs.** Four failures, each costing one minute to
+find, that between them would have wasted hours and left a tree that looks built. A
+single cheap instance before a long fan-out is worth more than reading the code again.
+
+### 4. The pre-registration is a LOCK now, not a rule
+
+Nothing stopped an attack running against an unsigned draft. `attacks.require_signed_prereg`
+refuses unless a signed pre-registration exists and returns its name and `git_rev`, so a
+result can be stamped with the exact pre-registration it ran under.
+
+⚠ **Why this had to be code.** What constraint 6 guards against is the one failure a
+person cannot self-police: having seen a result, you cannot PROVE you did not choose
+the analysis to suit it. Good intentions are not evidence. The check is deliberately
+crude — a `SIGNED` status line, no `[OPEN]` markers, no unchecked items — because a
+cleverer parse is a second place for the format to drift.
+One test checks THIS repository live rather than a fixture, so when the file is signed
+that expectation flips and the flip must be a deliberate edit in the signing commit.
+
+### 5. Two false alarms of my own, recorded because they are the dangerous kind
+
+- I reported "6 chromosomes built" when **2** were built. The count was of
+  DIRECTORIES, which are created the instant a chromosome starts. "Started" and
+  "built" are exactly the distinction that makes a half-finished genome look whole.
+  The monitor now counts finished manifests.
+- I twice reported a checksum MISMATCH on chr21's graph. Both were `grep -m1` picking
+  the first `sha256` line in the config rather than the graph block's. Parsing the
+  YAML showed they match (`85222d4f...`). ⚠ A mismatch reported from a sloppy
+  comparison is worse than no check: it invites someone to overwrite a good file.
+
+### Still open after this part
+
+The per-chromosome build results; the panel for 21 chromosomes (3 MB/s parallel, ETA
+~2 h, against 11 h serial before parallelising); genome-wide target preprocessing; and
+routing releases through `store.save` so a genome-wide release is a quotable artifact.
+
 ## 2026-10-10 (chunk 4, continued) — gaps skipped, the arm guard built, and the tilt made visible
 
 Three things Dylan asked for, and two defects found while building them.
