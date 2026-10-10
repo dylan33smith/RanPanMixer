@@ -126,7 +126,15 @@ def _manifest(out: Path, cfg: dict, chrom: str) -> dict:
     digests = {v.get("axis_digest") for v in arts.values() if v.get("axis_digest")}
     man = {
         "chrom": chrom,
-        "chain_span": cfg["chain_span"],
+        # ⚠ ONE OF THESE, NEVER BOTH, and the manifest records which rule actually
+        # built this chromosome rather than assuming. Under decision C there is no
+        # coordinate cut -- the map-silent positions are filled from the declared
+        # rate -- so a manifest demanding `chain_span` would fail on every
+        # chromosome built the current way, which is what it did on chr19.
+        "chain_span": cfg.get("chain_span"),
+        "declared_rate": cfg.get("declared_rate"),
+        "chain_rule": ("declared_rate_fill" if cfg.get("declared_rate")
+                       else "coordinate_cut" if cfg.get("chain_span") else None),
         "tools": cfg.get("tools", {}),
         "artifacts": arts,
         "axis_digests_seen": sorted(digests),
