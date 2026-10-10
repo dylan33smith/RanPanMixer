@@ -32,6 +32,27 @@ def sha256_file(path: str | Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def sha256_gz_plain(path: str | Path, chunk: int = 1 << 20) -> str:
+    """Digest of a gzip file's DECOMPRESSED bytes, streamed, never written to disk.
+
+    ⚠ WHY THIS EXISTS. `deconstruct` records the digest of the GFA that vg actually
+    read, which is the decompressed copy -- and that copy is DELETED after the run
+    because it costs 4-9 GB per chromosome. So a resumed build has the digest's
+    subject gone. gzip decompression is deterministic, so the digest is recoverable
+    from the .gz alone: this streams it at about a GB a second and writes nothing.
+    It is what makes a crashed deconstruct resumable WITHOUT re-running vg, and it
+    keeps the recorded field identical to the one the first 11 chromosomes carry --
+    a provenance field that changes meaning halfway through a genome is worse than
+    one that is missing.
+    """
+    import gzip as _gzip
+    h = hashlib.sha256()
+    with _gzip.open(path, "rb") as fh:
+        while block := fh.read(chunk):
+            h.update(block)
+    return h.hexdigest()
+
+
 def _repo_root(start: Path) -> Path | None:
     """Walk up until a .git is found. Counting `parents[n]` is brittle: the first
     version used parents[2] from src/store.py, which lands OUTSIDE the repo, so

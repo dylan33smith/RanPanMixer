@@ -953,3 +953,45 @@ which was mostly a DIFFERENT set.
   **[Proven fix]** `check()` returns immediately on any length disagreement, and
   `test_length_mismatch_returns_before_positional_checks` pins that the report is
   the ONLY problem returned, so a later check cannot creep back in front of it.
+
+- **[Symptom]** `FileNotFoundError: data/temp/chrN/chrN.hprc-v1.0-pggb.gfa` raised
+  from `store.sha256_file`, AFTER `vg deconstruct` had already run for one to two
+  hours. Six chromosomes (chr10, chr11, chr12, chr13, chr14, chr17) lost in one
+  batch; chr15, chr21 and chr22 were in flight and hit the same wall.
+  **[Cause]** `src/cohort/vcf.py:deconstruct` unlinked the decompressed GFA and then
+  passed the SAME PATH to `store.sha256_file` three lines later, inside
+  `store.attach_prov`. Introduced by commit `8d56346`, whose purpose was unrelated
+  (reclaiming 4-9 GB per chromosome); the cleanup was inserted above the provenance
+  call rather than below it.
+  **[Why the suite could not see it]** Every pre-existing test passed a PLAIN
+  `.gfa`, so `decompressed_here` was False, the unlink never fired, and the ordering
+  was unreachable. The failure needs the `.gz` path AND real provenance AND the
+  cleanup, together. ⚠ And the traceback named `store.sha256_file`, so it read as a
+  provenance bug when the cause was three lines above in cleanup code added for a
+  different reason.
+  **[Why it hit mid-run]** ⚠⚠ **THE COMMIT LANDED WHILE THE 22-CHROMOSOME BUILD WAS
+  RUNNING.** Each chromosome runs in a fresh subprocess that imports `vcf.py` at
+  launch, so chromosomes whose process STARTED before 15:37 ran the old code and
+  succeeded — chr9's manifest is timestamped 16:09, 32 minutes AFTER the commit, and
+  it is fine — while every chromosome started after it failed. The split is by
+  process start time, not by wall clock, which is why 11 chromosomes succeeded and
+  the next 9 did not.
+  **[Proven fix]** `gfa_digest = store.sha256_file(gfa)` is taken BEFORE the unlink
+  and the stored value is passed to `attach_prov`. `tests/test_deconstruct_prov.py`
+  asserts the order by its observable consequence — a sidecar carrying the digest of
+  the decompressed bytes — rather than by "no exception raised"; reinstating the
+  original ordering fails 3 of its 6 tests. A control test asserts the cleanup still
+  happens, so the ordering test cannot pass trivially on a function that never
+  deletes.
+  **[Recovery, and why it is cheap]** vg writes the VCF BEFORE the crash, so all
+  nine VCFs survived complete (543 MB - 2.15 GB each). Re-running vg to recover a
+  small JSON sidecar would cost 1-2 h per chromosome, so
+  `vcf.attach_deconstruct_prov` attaches the sidecar to an existing VCF without
+  invoking vg, recomputing the GFA digest with `store.sha256_gz_plain` — which
+  streams the `.gz`'s decompressed bytes and writes nothing, since gzip
+  decompression is deterministic. It REFUSES to overwrite an existing sidecar (real
+  provenance must not be silently replaced by a reconstruction) and stamps
+  `prov_recovered_after_crash: true` so a reconstructed sidecar says so.
+  **[Severity]** Loud, not silent — `run_jobs` raises and the driver exits non-zero,
+  which is the one thing that went right. But it cost 9 chromosomes' worth of
+  scheduling and would have cost ~12 h of vg time without the recovery path.

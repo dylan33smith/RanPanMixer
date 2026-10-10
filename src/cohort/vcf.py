@@ -102,6 +102,15 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
     _run([str(resolved), "deconstruct", "-P", ref_prefix, "-a", "-t", str(threads), str(gfa)],
          stdout_path=out_vcf)
 
+    # ⚠⚠ THE GFA DIGEST IS TAKEN BEFORE THE FILE IS DELETED, AND THE ORDER IS THE
+    # WHOLE POINT. An earlier version of this function unlinked the decompressed
+    # copy first and then passed the same path to `sha256_file` three lines later,
+    # which raises FileNotFoundError AFTER vg has already done 1-2 hours of work.
+    # Six chromosomes failed that way on 2026-10-10 (chr10-14, chr17) and the
+    # traceback named `store.sha256_file`, not the unlink, so the cause read as a
+    # provenance bug rather than an ordering one. Digest first, delete second.
+    gfa_digest = store.sha256_file(gfa)
+
     # ⚠ DELETE THE DECOMPRESSED COPY. It is 4-9 GB per chromosome and is
     # regenerable from the .gz in seconds, so caching it costs about 86 GB across
     # 22 autosomes to save nothing that matters. The earlier code kept it
@@ -117,12 +126,61 @@ def deconstruct(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
     out = {"vcf": str(out_vcf), "gfa_used": str(gfa),
            "sha256": store.sha256_file(out_vcf), "vg": vginfo}
     # close the lineage: GFA + vg -> deconstruct.vcf had no sidecar at all
-    store.attach_prov(out_vcf, inputs={"gfa": store.sha256_file(gfa), "vg": vginfo["sha256"]},
+    store.attach_prov(out_vcf, inputs={"gfa": gfa_digest, "vg": vginfo["sha256"]},
                       params={"ref_prefix": ref_prefix, "threads": threads,
                               "vg_path": vginfo["path"], "vg_version": vginfo["version"]},
                       note="vg deconstruct output. The vg VERSION is load-bearing: it "
                            "determines ALT allele ordering and so every allele index.")
     return out
+
+
+def attach_deconstruct_prov(gfa: Path, out_vcf: Path, *, ref_prefix: str = "grch38",
+                            threads: int = 32, vg: Path | None = None,
+                            cfg: dict | None = None) -> dict:
+    """Give an ALREADY-WRITTEN deconstruct VCF the provenance sidecar it is missing.
+
+    ⚠ WHY A SEPARATE ENTRY POINT AND NOT A FLAG ON `deconstruct`. vg writes the VCF
+    and the sidecar is attached afterwards, so a crash between the two leaves a
+    COMPLETE, CORRECT VCF with no provenance -- and this project treats an artifact
+    without provenance as not quotable, so the VCF is unusable while being perfectly
+    good. Re-running vg to recover a 32-byte JSON file costs one to two hours per
+    chromosome. This recovers it in about a minute by streaming the .gz.
+
+    ⚠ IT REFUSES TO OVERWRITE an existing sidecar. A sidecar that is already there
+    was written by the run that produced the VCF, and silently replacing it with one
+    assembled afterwards would turn real provenance into a reconstruction while
+    looking identical.
+    """
+    out_vcf = Path(out_vcf)
+    gfa = Path(gfa)
+    prov = out_vcf.with_name(out_vcf.name + store.PROV_SUFFIX)
+    if not out_vcf.exists() or out_vcf.stat().st_size == 0:
+        raise FileNotFoundError(
+            f"{out_vcf} does not exist or is empty, so there is nothing to attach "
+            f"provenance to. Run deconstruct instead.")
+    if prov.exists():
+        raise FileExistsError(
+            f"{prov} already exists and was written by the run that produced the "
+            f"VCF. Refusing to replace real provenance with a reconstruction.")
+    vginfo = verify_vg(resolve_vg(cfg, vg), cfg)
+    # ⚠ The digest must be of the DECOMPRESSED bytes, to match the field the
+    # chromosomes built before the crash carry. Streamed from the .gz, never staged.
+    gfa_digest = (store.sha256_gz_plain(gfa) if gfa.suffix == ".gz"
+                  else store.sha256_file(gfa))
+    store.attach_prov(out_vcf, inputs={"gfa": gfa_digest, "vg": vginfo["sha256"]},
+                      params={"ref_prefix": ref_prefix, "threads": threads,
+                              "vg_path": vginfo["path"], "vg_version": vginfo["version"],
+                              "prov_recovered_after_crash": True},
+                      note="vg deconstruct output. The vg VERSION is load-bearing: it "
+                           "determines ALT allele ordering and so every allele index. "
+                           "⚠ This sidecar was attached AFTER the fact, by "
+                           "attach_deconstruct_prov, because the run that wrote the VCF "
+                           "crashed between writing it and recording it. The VCF bytes "
+                           "are vg's own output and unmodified; the GFA digest was "
+                           "recomputed from the .gz, whose decompression is "
+                           "deterministic.")
+    return {"vcf": str(out_vcf), "sha256": store.sha256_file(out_vcf),
+            "gfa": gfa_digest, "vg": vginfo, "recovered": True}
 
 
 def drop_chm13(in_vcf: Path, out_vcf: Path, *, drop: str = "chm13") -> dict:
