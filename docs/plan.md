@@ -196,6 +196,43 @@ Nine decisions opened Phase B. They were taken after a seven-surface audit
 | **J** | The **`beta_share` allocation rule** (proposed by Dylan, 2026-10-10): a chromosome's share is its **variant count** over the genome-wide total, `T_c / T_total`. This is definitional rather than merely defensible — it makes mean `beta_v` per position `1/T_total` on EVERY chromosome, i.e. it is exactly what "normalise `beta_v` over the whole genome in one go" means, with the per-chromosome share as bookkeeping rather than a second reweighting. ⚠ `T_c` is defined on the FULL 88-haplotype cohort, fixed before any target is selected, so Arm 1's leave-one-out cannot move it: under LOO up to 5 chr21 positions of 305,886 (0.0016%) would drop to support 0, which would otherwise make `beta_share` weakly target-dependent. ⚠ Consequence: the shares cannot be written as 22 numbers until preprocessing runs, so the pre-registration pins the RULE. |
 | **I** | Arm 1's linkage attack scores "self" from the target's **own assembly-derived path** (defined for all 44), not its 1000G panel row (defined for only 39 of 44). PanMixer's panel-row semantics run as a labelled parity column. |
 
+### ✅ DECISION L (Dylan, 2026-10-11) — the exact KL is its OWN quantity, not an A2 substitute
+
+**The question.** `scripts/exact_kl.py` computes `kl_exact` exactly and derives
+`acc_ceiling` from it by Pinsker. Was that a substitution for pre-registered attacker
+**A2**, which says "exact enumeration of TV and `ratio_spread` over all admissible input
+pairs"?
+
+**The answer: no, and A2's own positive control says so.** It reads "already passes" —
+A2 was written as the TOY check, where all 2,304 supported paths can be enumerated, and
+it stays satisfied there. At chr21 scale the support cannot be enumerated at all, so
+nothing replaces A2. `kl_exact` and `acc_ceiling` are new names for new quantities
+(`docs/terms.md`), reported alongside the pre-registered attackers rather than in place
+of one.
+
+⚠ **Why introducing it after the signature is not selective reporting.** It is
+DETERMINISTIC given the model and the input pair — exactly one value, nothing to choose
+among after seeing an outcome. A measured attacker's accuracy does not have that
+property, which is why A1 had to be pre-registered and this does not. **No addendum is
+required**, and this entry is the dated record of the decision.
+
+⚠⚠ **PINSKER IS LOOSE AND THAT MUST BE SAID EVERY TIME.** `TV <= sqrt(KL/2)` is an
+inequality, so the true ceiling is closer to 0.5 than `acc_ceiling` prints. The
+looseness runs in the direction that FLATTERS US, which is why the script prints the
+caveat on every run and `docs/terms.md` repeats it in both entries.
+
+**What each piece now carries, which is the real gain:** A1 is a measured attacker at
+chance (a LOWER bound on distinguishability, constraint 7); A2 is exact enumeration on
+the toy, where it is possible; `kl_exact` / `acc_ceiling` is a theory ceiling at genome
+scale covering attackers nobody has written. Three different kinds of evidence rather
+than one stretched to cover all three.
+
+⚠ A new GATE comes with it: `acc_ceiling` must not exceed `p_succ_bound`. If the
+computed ceiling is looser than what Theorem 1 promises, the COMPUTATION is wrong — and
+it is the computation to suspect, not the theorem.
+
+---
+
 ### ✅ DECISION K (Dylan, 2026-10-10) — the untraversable blocks are EXCLUDED
 
 **Was a blocker; resolved the same day.** The forward pass raised on the rebuilt chr21

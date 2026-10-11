@@ -2259,6 +2259,86 @@ Aliases:              "MDE", "minimum detectable effect" — acceptable in prose
                       was measured; it is the resolution floor of the instrument.
 ```
 
+### kl_exact  [privacy] [theory] [evaluation]
+```
+Is:                   KL(Q_p || Q_q) between the release distributions induced by two
+                      input paths, computed EXACTLY with zero Monte-Carlo error.
+                      ⚠⚠ IT IS A THEORY QUANTITY, NOT AN ATTACK OUTCOME, and decision L
+                      (Dylan, 2026-10-11) makes that explicit. It is NOT a substitute
+                      for the pre-registered attacker A2 and must never be reported as
+                      one: A2 is exact ENUMERATION of TV over all admissible input
+                      pairs, whose positive control already reads "already passes",
+                      which is the toy check it was written to be. A2 stays satisfied by
+                      the toy; this is its own named quantity at genome scale.
+                      ⚠ Reporting it is not selective reporting, and the reason is
+                      worth stating: it is DETERMINISTIC given the model and the input
+                      pair, so there is exactly one value and nothing to choose among
+                      after seeing an outcome. That is what makes it safe to introduce
+                      after the pre-registration was signed; an attacker's measured
+                      accuracy would not be.
+Computed by:          scripts/exact_kl.py. Both E_{Q_p}[u_p] and E_{Q_p}[u_q] are LINEAR
+                      functionals of Q_p's posterior state marginals
+                      (ffbs.state_marginals), so each is one pass with no sampling and
+                      no differencing, and log Z comes from ffbs.log_z_p.
+                      ⚠ WHY IT EXISTS AT ALL: sampling cannot resolve this quantity.
+                      MEASURED 2026-10-11, chr21, tau = 0.25, D1_extremal: sd(Lambda)
+                      per draw is 6.15e-04 against a true value of 1.784e-07, so
+                      resolving E[Lambda] by sampling needs n ~ 1.2e7 draws. The
+                      pre-registered 250 trials per cell are five orders of magnitude
+                      short. This route takes 54 s for all ten targets.
+                      ⚠ VALIDATED against brute-force enumeration on the toy at four
+                      tau values (tests/test_exact_kl.py), which is the only thing that
+                      can check it: at chr21 scale the support cannot be enumerated.
+                      That validation caught a real bug -- state_marginals takes
+                      (hmm, fwd, potentials) and the first version passed (hmm, psi,
+                      fwd), which does not raise because the shapes are compatible.
+CHANGES MEANING WITH: the input PAIR, the arm, tau and the cohort. ⚠ KL is NOT
+                      symmetric: KL(Q_p||Q_q) != KL(Q_q||Q_p). Always say which
+                      direction, and the direction that matters here is from the
+                      TARGET's release distribution, because that is the one the
+                      attacker observes.
+Valid vs:             the same pair, arm, tau and cohort.
+Status:               PRIMARY for the Arm 2 privacy statement at genome scale.
+                      MEASURED 2026-10-11, chr21, tau = 0.25, D1_extremal: +1.784e-07
+                      for HG00096, and POSITIVE for all ten targets (1.38e-07 to
+                      1.80e-07). ⚠ KL >= 0 is a theorem, so a negative value falsifies
+                      the computation, not the mechanism.
+Aliases:              none. ⚠ NOT "the TV" and NOT "A2" — see `acc_ceiling` for what it
+                      licenses, and A2 for what it is not.
+```
+
+### acc_ceiling  [privacy] [theory] [evaluation] [gate]
+```
+Is:                   The largest accuracy ANY equal-prior binary attacker can achieve
+                      against a given input pair, derived from `kl_exact`:
+                          acc_ceiling = (1 + sqrt(kl_exact / 2)) / 2
+                      via Pinsker's inequality TV <= sqrt(KL/2) and the Neyman-Pearson
+                      identity that optimal accuracy = (1 + TV)/2.
+                      ⚠⚠ IT IS STRICTLY STRONGER THAN A MEASURED ATTACK, and that is
+                      the point: it covers attackers nobody has written, whereas
+                      `attacker_accuracy` is one implemented attacker's result and is
+                      only a LOWER bound on distinguishability (constraint 7).
+                      ⚠⚠ AND IT IS LOOSE, WHICH MUST BE SAID EVERY TIME. Pinsker is an
+                      inequality, not an identity, so the TRUE ceiling is closer to 0.5
+                      than this number. Quoting it without that caveat overstates how
+                      tight our knowledge is -- and the looseness runs in the direction
+                      that flatters us, which is why it is stated rather than implied.
+Computed by:          scripts/exact_kl.py, printed as its own row beside
+                      `p_succ_bound`.
+CHANGES MEANING WITH: everything `kl_exact` changes with. ⚠ Compare it to
+                      `p_succ_bound` and nothing else: `p_succ_bound` = (1 + tau)/2 is
+                      what the THEOREM promises, `acc_ceiling` is what this cohort and
+                      this pair actually permit, and the gap between them is the honest
+                      measure of how much slack the bound has at genome scale.
+Valid vs:             the same pair, arm, tau and cohort.
+Status:               PRIMARY, and a GATE: `acc_ceiling` must not exceed
+                      `p_succ_bound`. If it does, either the computation or Theorem 1
+                      is wrong, and the computation is the one to suspect.
+Aliases:              "the Pinsker ceiling" is acceptable in prose. ⚠ NEVER "the
+                      attacker accuracy" — that name belongs to a measured quantity
+                      and means close to the opposite thing.
+```
+
 ### attacker_accuracy  [attack] [evaluation] [gate]
 ```
 Is:                   The empirical success rate of an IMPLEMENTED binary attacker

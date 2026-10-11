@@ -18,15 +18,23 @@ accuracy is `(1 + TV)/2`. So an exact KL gives an exact UPPER BOUND on what ANY 
 can achieve -- a strictly stronger statement than "we measured one attacker at chance",
 because it covers attackers nobody has written.
 
-⚠⚠ A METHOD QUESTION FOR DYLAN, FLAGGED RATHER THAN DECIDED. The pre-registration's A2
-says "exact enumeration of TV and `ratio_spread`". Enumeration is feasible only on the
-toy (2,304 supported paths); on chr21 the support is astronomically large, so TV cannot
-be enumerated and this script bounds it via Pinsker from an exactly-computed KL instead.
-That is a DIFFERENT METHOD from the pre-registered wording. ⚠ And it is in the
-FLATTERING direction -- a tighter ceiling on the attacker makes our privacy look better
--- which is exactly the kind of substitution constraint 6 exists to stop happening
-quietly. It needs an addendum or a signed decision before any number from here is
-quoted in the paper.
+✅ DECISION L (Dylan, 2026-10-11): THIS IS ITS OWN NAMED QUANTITY, NOT A SUBSTITUTE FOR
+A2. The pre-registration's A2 is "exact enumeration of TV and `ratio_spread` over all
+admissible input pairs", and its positive control reads "already passes" -- so A2 was
+written as the TOY check, where all 2,304 supported paths can be enumerated, and it
+stays satisfied there. On chr21 the support cannot be enumerated at all, so nothing here
+replaces A2; `kl_exact` and `acc_ceiling` are new names for new quantities
+(`docs/terms.md`).
+
+⚠ WHY INTRODUCING IT AFTER SIGNING IS NOT SELECTIVE REPORTING. It is DETERMINISTIC given
+the model and the input pair: there is exactly one value, so there is nothing to choose
+among after seeing an outcome. A measured attacker's accuracy would not have that
+property, which is why A1 had to be pre-registered and this does not.
+
+⚠⚠ BUT PINSKER IS LOOSE, AND THAT MUST BE SAID EVERY TIME. TV <= sqrt(KL/2) is an
+inequality, so the TRUE ceiling is closer to 0.5 than the number printed here. The
+looseness runs in the direction that FLATTERS US, which is exactly why it is stated
+rather than left implicit.
 
     python scripts/exact_kl.py --taus 0.25 --targets 2
 """
@@ -146,9 +154,13 @@ def main(argv=None) -> int:
     # ⚠ FIRST, BEFORE ANYTHING IS COMPUTED. Same lock as the sampled attack.
     prereg, rev = A.require_signed_prereg()
     print(f"running under {prereg} (git_rev {rev or 'unrecorded'})")
-    print("⚠ METHOD NOT COVERED BY A2's WORDING: A2 says 'exact enumeration of TV', "
-          "which is infeasible on chr21. This bounds TV by Pinsker from an exactly "
-          "computed KL. Needs an addendum before publication — see the module docstring.\n")
+    print("✅ decision L (2026-10-11): `kl_exact` and `acc_ceiling` are their OWN named "
+          "quantities, NOT a substitute for A2. A2 is exact enumeration over all "
+          "admissible input pairs — the TOY check, where it already passes — and it is "
+          "not computable at chr21 scale.")
+    print("⚠ Pinsker is an INEQUALITY: the true ceiling is closer to 0.5 than the "
+          "`acc_ceiling` row below. Quote the row WITH this caveat; the looseness runs "
+          "in the direction that flatters us.\n")
 
     st = load()
     tids = sorted(st["paths"])[: a.targets]
@@ -172,18 +184,32 @@ def main(argv=None) -> int:
           f"n = {len(tids)} targets, ZERO Monte-Carlo error.\n")
     print("| metric | " + " | ".join(f"{t:g}" for t in a.taus) + " |")
     print("|" + "---|" * (len(a.taus) + 1))
-    for name, key, fmt in (("exact `KL` (max over targets)", "kl", "{:.3e}"),
-                           ("`TV` upper bound (Pinsker)", "tv_upper", "{:.3e}"),
-                           ("attacker ceiling (1+TV)/2 *", "acc_upper", "{:.6f}"),
+    # ⚠ Row labels are the exact `docs/terms.md` identifiers, gates marked `*`, per
+    # the reporting contract. A prose synonym here is what the contract test catches.
+    for name, key, fmt in (("`kl_exact` (max over targets)", "kl", "{:.3e}"),
+                           ("`tv_pinsker` upper bound", "tv_upper", "{:.3e}"),
+                           ("`acc_ceiling` *", "acc_upper", "{:.6f}"),
                            ("`p_succ_bound` *", "p_succ_bound", "{:.4f}")):
         cells = []
         for tau in a.taus:
             vals = [r[key] for r in out if abs(r["tau"] - tau) < 1e-12]
             cells.append(fmt.format(max(vals)))
         print(f"| {name} | " + " | ".join(cells) + " |")
-    print("\n⚠ The ceiling row is what the theorem bounds, computed exactly rather than "
-          "sampled. ⚠ It is an UPPER bound on every attacker, including unwritten ones, "
-          "which is strictly stronger than one measured attacker's accuracy.")
+    # ⚠ THE GATE. `acc_ceiling` must not exceed `p_succ_bound`: the first is what this
+    # cohort and pair actually permit, the second is what Theorem 1 promises. If the
+    # computed ceiling is LOOSER than the theorem, the computation is wrong -- and it
+    # is the computation to suspect, not the theorem.
+    bad = [(r["target"], r["tau"], r["acc_upper"], r["p_succ_bound"]) for r in out
+           if r["acc_upper"] > r["p_succ_bound"] + 1e-12]
+    print("\n⚠ The `acc_ceiling` row is what the theorem bounds, computed exactly "
+          "rather than sampled, and it is an UPPER bound on EVERY attacker including "
+          "unwritten ones — strictly stronger than one measured attacker's accuracy.")
+    if bad:
+        print(f"\n⚠⚠ {len(bad)} cell(s) where `acc_ceiling` EXCEEDS `p_succ_bound`. "
+              f"That is impossible if both are computed correctly, and the "
+              f"COMPUTATION is what to suspect:")
+        for tgt, tau, a_, b_ in bad[:5]:
+            print(f"    {tgt} at tau={tau}: {a_:.6f} > {b_:.4f}")
     print("⚠ Pinsker is not tight; the true TV is smaller, so the real ceiling is "
           "closer to 0.5 than shown.")
     if a.json:
@@ -191,9 +217,10 @@ def main(argv=None) -> int:
             {"prereg": prereg, "git_rev": rev, "chrom": CHROM,
              "T": int(st["ic"].sum()), "K": int(st["hap"].shape[0]),
              "method": "exact KL via state marginals; TV bounded by Pinsker",
-             "a2_wording_is_enumeration": True, "results": out}, indent=2) + "\n")
+             "substitutes_for_a2": False,
+             "decision": "L (2026-10-11): own named quantity, not an A2 substitute", "results": out}, indent=2) + "\n")
         print(f"\nJSON -> {a.json}")
-    return 0
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":

@@ -1420,6 +1420,48 @@ pre-registered design rather than changing it — `delta` = 0.0556 assumed 250 i
 trials and clustering had cut the effective n to about 67 (`delta` ~ 0.107).
 
 
+### 15. [CHUNK 7] Decision L — three kinds of evidence instead of one stretched three ways
+
+**Dylan, 2026-10-11:** the exact KL is its own named quantity, NOT a substitute for the
+pre-registered attacker A2.
+
+**What settled it was A2's own positive control**, which reads *"already passes: the
+constructed pair saturates `exp(epsilon_tau)` exactly, and the doubled exponent fails it
+at every `tau`"*. A2 is "exact enumeration of TV and `ratio_spread` over all admissible
+input pairs" — on the toy's 2,304 supported paths that is a finite computation and it
+already passed; at chr21 scale it is not a slow computation but an impossible one. So
+A2 was never going to produce a genome-scale number, and treating `exact_kl.py` as its
+replacement MISREAD what had been pre-registered.
+
+⚠ I had framed this to Dylan as a "method substitution in the flattering direction
+needing an addendum". That was the wrong frame, and reading A2's control line is what
+corrected it. The lesson is narrow and useful: **a pre-registered item's POSITIVE
+CONTROL tells you what scale it was written for.** "Already passes" means a check that
+was satisfied when written, which cannot be a pending genome-scale measurement.
+
+**Why introducing a new reported quantity after signing is safe here, stated so it is
+not re-litigated:** `kl_exact` is DETERMINISTIC given the model and the input pair.
+There is exactly one value, so there is nothing to select among after seeing an outcome.
+That is the property that makes post-hoc reporting dangerous for a measured attacker and
+harmless for a derived bound — and it is why A1 had to be pre-registered and this did
+not. No addendum; the decision register entry is the dated record.
+
+⚠⚠ **The caveat that travels with every quotation of it:** Pinsker is an inequality, so
+the true ceiling is CLOSER TO 0.5 than `acc_ceiling` prints. The looseness flatters us,
+which is precisely why it is printed on every run rather than left to a footnote.
+
+**The structural gain.** Each piece of evidence now carries what it can actually
+support: A1 a measured attacker at chance, which constraint 7 says is only a LOWER bound
+on distinguishability; A2 exact enumeration where enumeration is possible; `acc_ceiling`
+a theory ceiling at genome scale covering attackers nobody has written. ⚠ The previous
+plan had A1's 250-trial null carrying the whole Arm 2 privacy claim, and sampling
+provably cannot resolve the quantity that claim rests on (n ~ 1.2e7 needed).
+
+**A new gate came with it:** `acc_ceiling <= p_succ_bound`. If the computed ceiling is
+looser than Theorem 1's promise, the computation is wrong — and the computation is what
+to suspect.
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The
