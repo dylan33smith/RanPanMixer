@@ -151,14 +151,53 @@ def test_decreasing_cm_is_caught(tree: Path) -> None:
     assert any("cM decreases" in b for b in _check(tree)), _check(tree)
 
 
-def test_usable_position_dropped_from_chain_is_caught(tree: Path) -> None:
-    """Decision C retired the coordinate cut, so `in_chain` must be exactly
-    `support > 0`; any other exclusion is an accidentally reintroduced span."""
+def test_an_arbitrary_usable_position_dropped_from_chain_is_caught(tree: Path) -> None:
+    """The chain has exactly TWO exclusions (decisions C and K). A single usable
+    position removed is neither `support == 0` nor an untraversable block, so it is a
+    third rule creeping in."""
     d = tree / f"chr{CHROM}"
     ic = np.load(d / "in_chain.npy")
     ic[np.flatnonzero(ic)[300]] = 0
     np.save(d / "in_chain.npy", ic)
-    assert any("not exactly (support > 0)" in b for b in _check(tree)), _check(tree)
+    assert any("NOT the untraversable blocks" in b for b in _check(tree)), _check(tree)
+
+
+def test_an_unusable_position_added_to_the_chain_is_caught(tree: Path) -> None:
+    """support == 0 means no donor has a called allele, so the sampler has nothing to
+    emit and RENORMALISE has an empty pool."""
+    d = tree / f"chr{CHROM}"
+    ic = np.load(d / "in_chain.npy")
+    sup = np.load(d / "support.npy")
+    zero = np.flatnonzero(sup == 0)
+    if not len(zero):
+        pytest.skip(f"chr{CHROM} has no support == 0 position to re-add")
+    ic[zero[0]] = 1
+    np.save(d / "in_chain.npy", ic)
+    assert any("are IN the chain" in b for b in _check(tree)), _check(tree)
+
+
+def test_an_untraversable_block_left_in_the_chain_is_caught(tree: Path) -> None:
+    """⚠ THE OTHER DIRECTION, and the one that matters after decision K: a chain that
+    was never rebuilt still contains the blocks no donor spans, and the forward pass
+    will raise at RELEASE time rather than here. Recomputed from the data, so this
+    fails whether the mask was written wrong or simply not written again."""
+    import sys as _sys
+    _sys.path.insert(0, str(REPO / "src"))
+    from cohort import genmap as _G
+
+    d = tree / f"chr{CHROM}"
+    sup = np.load(d / "support.npy")
+    cm = np.load(d / "genetic_pos.npy")
+    allowed = np.asarray(np.load(d / "haplotypes.npy", mmap_mode="r")) != -1
+    usable = sup > 0
+    sites = np.flatnonzero(usable)
+    blocks = _G.untraversable_blocks(cm[sites], allowed[:, sites])
+    if not blocks:
+        pytest.skip(f"chr{CHROM} has no untraversable block to re-add")
+    # put the pre-decision-K chain back: support-only
+    np.save(d / "in_chain.npy", usable)
+    bad = _check(tree)
+    assert any("kept that it would drop" in b for b in bad), bad
 
 
 def test_interior_declared_rate_position_is_caught(tree: Path) -> None:

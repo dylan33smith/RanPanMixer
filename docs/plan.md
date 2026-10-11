@@ -39,14 +39,19 @@ Read at session start. This file exists so a new session never has to grep
   in the suite, all passing.** The O(TK) rank-one forward pass agrees with an O(TK^2)
   dense reference to **1.11e-16**.
 - ✅✅ **CHUNK 6 IS COMPLETE: ALL 22 AUTOSOMES AND THE FULL PANEL, BOTH GATED
-  (2026-10-10).** The cohort is **22,307,009 records / 22,306,704 chain positions**, with
-  only **305 positions excluded genome-wide** (0.0014%, all `support` == 0); driver exit 0,
-  verifier 22 of 22. The panel is **21 files / 29.3 GB / 69,689,262 records / 3,202 samples**
+  (2026-10-10).** The cohort is **22,307,009 records / 22,134,562 chain positions**;
+  driver exit 0, verifier 22 of 22. **TWO exclusions, both target-independent:** 305
+  positions with `support` == 0 (0.0014%), and **172,142 positions in 20 untraversable
+  blocks** (0.772%) under decision K. ⚠ **[CORRECTION - 2026-10-10]** this read
+  "22,306,704 chain positions, with only 305 positions excluded genome-wide" before
+  decision K, which was the figure the first genome-wide build produced and which the
+  forward pass could not actually release from. The panel is **21 files / 29.3 GB / 69,689,262 records / 3,202 samples**
   on every chromosome, plus chr21's pre-existing file, so all 22 are covered; verifier
   21 of 21 with the **reference build checked against our own `deconstruct` output** rather
   than against typed-in constants.
-  ⚠⚠ **THE HEADLINE IS THE DILUTION: `mean beta_v` per position is 4.4830e-08 genome-wide
-  against chr21-alone's 3.27e-06 — 73x smaller.** This is `B-THY-toy-genome`'s budget-dilution
+  ⚠⚠ **THE HEADLINE IS THE DILUTION: `mean beta_v` per position is 4.5178e-08 genome-wide
+  against chr21-alone's 3.27e-06 — 72x smaller.** (4.4830e-08 before decision K, which
+  removed 0.772% of the chain and so raised the per-position budget by 0.778%.) This is `B-THY-toy-genome`'s budget-dilution
   effect measured on the real axis instead of projected, and **every chr21-scope per-position
   utility figure in this file shrinks by that factor at genome scope.** It sharpens R5 rather
   than resolving it: the whole-chromosome endpoint was already 1:900 against a single draw's
@@ -191,32 +196,36 @@ Nine decisions opened Phase B. They were taken after a seven-surface audit
 | **J** | The **`beta_share` allocation rule** (proposed by Dylan, 2026-10-10): a chromosome's share is its **variant count** over the genome-wide total, `T_c / T_total`. This is definitional rather than merely defensible — it makes mean `beta_v` per position `1/T_total` on EVERY chromosome, i.e. it is exactly what "normalise `beta_v` over the whole genome in one go" means, with the per-chromosome share as bookkeeping rather than a second reweighting. ⚠ `T_c` is defined on the FULL 88-haplotype cohort, fixed before any target is selected, so Arm 1's leave-one-out cannot move it: under LOO up to 5 chr21 positions of 305,886 (0.0016%) would drop to support 0, which would otherwise make `beta_share` weakly target-dependent. ⚠ Consequence: the shares cannot be written as 22 numbers until preprocessing runs, so the pre-registration pins the RULE. |
 | **I** | Arm 1's linkage attack scores "self" from the target's **own assembly-derived path** (defined for all 44), not its 1000G panel row (defined for only 39 of 44). PanMixer's panel-row semantics run as a labelled parity column. |
 
-### ⚠⚠ BLOCKER — THE INTERIOR ZERO-cM PLATEAUS, FORCED 2026-10-10
+### ✅ DECISION K (Dylan, 2026-10-10) — the untraversable blocks are EXCLUDED
 
-**Nothing can be released genome-wide until this is decided.** The forward pass raises
-on the rebuilt chr21 at position 10,543,014: with ZERO genetic distance between two
-chain positions the transition is the IDENTITY, so a donor that becomes unavailable has
-nowhere to go, and when all surviving mass sat on those donors the path dead-ends.
+**Was a blocker; resolved the same day.** The forward pass raised on the rebuilt chr21
+at position 10,543,014: with ZERO genetic distance between two chain positions the
+transition is exactly the identity, so a donor that becomes unavailable has nowhere to
+go, and when all surviving mass sat on those donors the path dead-ends.
 
-⚠ The model is right and the data is awkward. `docs/terms.md` already says P(switch) = 0
-on a plateau is CORRECT; what is new is that retiring the coordinate cut admitted the
-plateau positions BELOW chr21's old span, which **decision C never covered** — its scope
-was map-SILENT regions, and it is clean there (every zero-cM step carries `cm_source` = 0,
-an interpolated cM, not a declared-rate one).
+**THE RULE.** A maximal run of chain positions with zero genetic distance between
+neighbours is a block inside which no path can switch donors. If no single cohort donor
+has a called allele at EVERY position in the block, no path traverses it, and **the
+whole block leaves the chain.** It reads only the genetic map and `support(v)`, both
+functions of `D`, so it is fixed before any target is opened and standing constraint 1
+is untouched.
 
-**Measured, all 22 autosomes: 357,918 zero-cM steps, 9,971 with a shrinking donor set,
-worst drop 87 of 88 donors.** chr9 is worst (3,366), then chr20 (962), then chr1 (639).
-chr21 has 397, of which **395 are outside the old cut** — which is why every chr21
-release to date worked and this one does not.
+**MEASURED, all 22 autosomes: 20 blocks, 172,142 positions, 0.772% of the chain.**
+14 of the 20 overlap a centromere. chr9 loses the most (74,292 positions, 7.15% of its
+chain), then chr20 (18,360, 3.58%) and chr21 (8,327, 2.44%); chr10, chr14 and chr22 lose
+nothing. Of 52,870 zero-distance runs genome-wide only these 20 are untraversable — the
+other 52,850 are traversed by at least one donor and are kept, emitted as verbatim donor
+runs exactly as `docs/terms.md` says they should be.
 
-| option | what it does | cost |
-|---|---|---|
-| **A — extend the declared rate to the plateaus** | every step gets a positive distance, so switching is always possible | changes the transition model on 93.9 Mb autosome-wide; contradicts the recorded reasoning that P(switch) = 0 there is CORRECT |
-| **B — exclude positions that would dead-end** | a named, target-INDEPENDENT exclusion on top of `support(v) == 0` | a third exclusion rule, and the denominator changes again |
-| **C — floor the distance at a tiny epsilon** | cheapest to implement | ⚠ changes the model SILENTLY and makes the plateau indistinguishable from a real tiny distance — recommend against |
+⚠ **THE WHOLE BLOCK GOES, NOT THE MINIMUM NEEDED.** The cheaper alternative — keep the
+sub-run the best-covering donor spans, which would have retained about 96% of these
+positions — was REJECTED: in that sub-run a single donor is forced, so the mechanism has
+no choice at all there, and those positions would enter the denominator of every
+per-position utility figure while carrying no variability.
 
-⚠ All three are target-independent (they read only the map and `support(v)`), so none
-voids Theorem 1. The choice is about which model we are willing to defend in the paper.
+**Consequences, all propagated 2026-10-10:** genome-wide T is **22,134,562**, `mean
+beta_v` is **4.5178e-08** (up 0.778%), and because decision J allocates `beta_share` by
+variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2.83%.
 
 ---
 
@@ -301,8 +310,9 @@ a finding came through, and they are not extended. Ask "which work-order item" i
    that does not exist is worse than no cross-reference: it reads as though the work
    is specified somewhere.
 6. ✅ **`B-DAT-rebuild` — DONE 2026-10-10.** Decision F's consistent GRCh38 rebuild,
-   all 22 autosomes on one axis: 22,307,009 records, 22,306,704 chain positions, 305
-   excluded genome-wide, driver exit 0 and verifier 22 of 22.
+   all 22 autosomes on one axis: 22,307,009 records, **22,134,562** chain positions,
+   driver exit 0 and verifier 22 of 22. ⚠ The chain figure is post-decision-K; the
+   build itself produced 22,306,704 and decision K then removed 172,142.
    ⚠ **NAMING DRIFT, MINE, 2026-10-10:** I logged this as `B-DAT-genomewide-build`
    when `B-DAT-rebuild` already named it here. `CLAUDE.md` forbids inventing a synonym
    for something already named, and two names for one work item is how a ledger stops
@@ -709,6 +719,7 @@ segment count is set by the chromosome's genetic length, not by T.
 | B-THY-toy-genome | Demonstrate what the mechanism DOES, exactly, on a 2-chromosome toy genome | the tilt visible, and the sampler matching the enumeration | 2 chr, 7 `tau`, 40,000 draws | **THE TILT IS VISIBLE.** Shares 7/9 and 2/9 by decision J; mean `beta_v` 0.111 against chr21's 3.27e-06. TV(Q, R_D) reaches **0.3090**, `E_Q[u]` moves **0.4502 -> 0.6477** against chr21's 2.94e-06, `Var_Q(u)` 7.3e-02 against 4.05e-06. `ratio_spread` equals `exp(epsilon_tau)` to the last digit at every `tau`. Same `ffbs` path, no special case — **so it is budget dilution that makes the chr21 effect invisible, not the mechanism.** ⚠ A correlated-seed bug in the demo was caught by its own joint assertion: every marginal was right and only the joint was wrong | done | 2026-10-10 |
 | B-EVL-exact-endpoint | Re-measure the PRIMARY endpoint at a genome-wide share, since every figure on record used the whole budget on chr21 | monotone and exactly computable at the share that will be used | 3 shares x 7 `tau`, two independent routes | **MARGINALS ROUTE WORKS, DERIVATIVE ROUTE BREAKS.** Movement scales EXACTLY linearly in the share (5 s.f. at two shares); monotone at every share; 3.45e+09x float64 headroom at the smallest. ⚠⚠ But `Var_Q(u)` from the finite-difference second derivative goes **NEGATIVE** at chr21's genetic-length share and scatters over 5x at 1/22 — and every recorded `Var_Q(u)` came from that route. The pre-registered endpoint must name the marginals route; the derivative route survives only as a chr21-scale diagnostic. ⚠ New residual: the share ALLOCATION RULE is undecided and the candidates span 2.8x | done | 2026-10-10 |
 | B-DAT-map-coverage | Measure how much of each autosome the map speaks to, before the declared rate is chosen | the three classes reported separately, and chr21's split reconciling with the record | 22 autosomes, bp; chr21 positions | **MEASURED.** Map-silent **3.00%** of autosomal bp (86.2 Mb), **96% of it the five acrocentric p arms**; interior zero-cM **3.27%** (93.9 Mb), LARGER than the class the rate covers, chr9 alone 25.61 Mb. Autosomal mean mapped rate **1.2707 cM/Mb**, per-chromosome spread **1.84x**. chr21: 26,044 map-silent + 8,327 in-span plateau = 34,371, RECONCILES. ⚠⚠ **A per-chromosome rate is LESS defensible than a global one** — the acrocentrics' rates are the genome's highest and are measured entirely on the q arm, so they would extrapolate a hot q-arm rate onto heterochromatin. ⚠ N-gap policy BLOCKED: no reference assembly on disk | done | 2026-10-10 |
+| B-FIX-untraversable | Clear the blocker: make the rebuilt chain releasable | the release must RUN, and the rule must be recomputable independently of the code that applied it | 20 blocks; 15 tests; 3 mutations | **DECISION K, AND THE RELEASE NOW RUNS.** chr21 at T = 332,521, baseline log_norm -879.4501, 9.1 s per diploid draw. Of **52,870** zero-distance runs genome-wide only **20** are untraversable — **172,142 positions, 0.772%**, 14 of 20 overlapping a centromere. ⚠ Not a pairwise property: every adjacent pair can share a donor while no donor spans the run, and THREE donors are the minimum to construct that case. ⚠ Propagated: T 22,306,704 -> **22,134,562**, `mean beta_v` -> **4.5178e-08**, and every `beta_share` moved (chr9 -6.43%). ⚠⚠ Two holes in my own checks, both found by the opposite-direction test: the verifier asserted `in_chain` was exactly `support > 0`, and its replacement only recomputed the blocks when something was ALREADY excluded — so a chain never rebuilt PASSED, the one case it exists for | done | 2026-10-10 |
 | B-IMP-release-writer | Make a release quotable: route it through the provenance chokepoint, and refuse every wrong write | removing any gate must fail its own test, and the path must work end-to-end on real data | 20 tests; 7 mutations | **BUILT, GATED, AND IT CLOSES ITEM 5's LAST RESIDUAL.** `src/releases.py`. 7 of 7 gates fire when removed, control clean; verified end-to-end on real chr21 arrays with the axis digest, `src/store.py:git_rev` and five input digests reaching every sidecar. ⚠ The gate worth having: **genome scope is checked against the 22-autosome set**, because a `GenomeRelease` of one chromosome with share 1.0 satisfies every in-memory check — shares sum to 1, no duplicates, both bounds hold — so nothing before the write could tell it from a release of a genome. ⚠ My own fixture was caught by `GenomeRelease` doing its job: a flat per-chromosome `log_z_p` over 22 parts summed to 1.05 against an `eta_tau` of 0.1003. ⚠⚠ **AND RUNNING IT FOUND A BLOCKER**: the rebuilt chr21 dead-ends the forward pass on an interior zero-cM plateau, 9,971 such steps genome-wide. Item 7 is blocked on that decision, not on this | done | 2026-10-10 |
 | B-LCK-preregister | Freeze `tau`, the utility, the endpoints, the attacker set, the attack database and the decoy design before any outcome is inspected | the lock must OPEN, and reverting the signature must fail a named test | 8 fields; 4 mutations | ✅ **SIGNED 2026-10-10** (Dylan), `src/store.py:git_rev` b5a220f122ca. All eight fields filled, zero `[OPEN]` markers, eight ticked boxes; `attacks.require_signed_prereg` now returns rather than raises. The live lock test's expectation FLIPPED in the signing commit, which is what its own docstring demanded. ⚠⚠ **FIELD 6 WAS REOPENED AND RE-CLOSED THE SAME DAY**: the drafted design drew only from `Q_p`, so it could not measure the equal-prior quantity `p_succ_bound` bounds — it would have reported a VIOLATION with the theorem intact. Re-closed BALANCED at 25 draws/target per `tau` per hypothesis, `delta` unchanged at 0.056 (the balanced estimator is more precise per observation), 7,000 releases, ~18.3 h. ⚠ Signing would also have frozen three stale copies of the superseded 300-draw design, including two ADJACENT TICKED BOXES pinning 300 and 50 | done | 2026-10-10 |
 | B-FIX-tau-definition-audit | Audit every statement of the `tau` guarantee against the proposal's abstract, after Dylan found the introduction defining it differently | each finding must survive two independent adversarial refutations | 6 sources, 36 candidates, 78 agents | **20 CONFIRMED, AND ONE WAS A LIVE FALSE-POSITIVE RISK ON A PRIVACY CLAIM.** ✅ The DEFINITION is fine: the abstract says TV <= `tau` and attacker <= (1+`tau`)/2, `docs/terms.md` matches it, and no file states the loose form. ⚠ The proposal's INTRODUCTION is wrong as written — "distinguished with the probability of no more than `tau`" is impossible for `tau` < 0.5, since a coin gets 0.5; it means ADVANTAGE, which equals TV. Needs a one-line fix before submission. ⚠⚠ `scripts/arm2_attack.py` compared a ONE-SIDED rate to a bound that only covers the balanced quantity — it would have reported a violation with the theorem intact. ⚠⚠ The pre-registration's field 6 is REOPENED: the pinned design draws only from `Q_p` and so cannot measure what it is compared to. ⚠ Three stale copies of the superseded 300-draw design, including TWO ADJACENT TICKED BOXES in the signature checklist pinning 300 and 50. ⚠ 12 stale doc claims, and the contract's absence-marker skip had no converse — a known hole recorded 2026-10-08 and left open | done | 2026-10-10 |

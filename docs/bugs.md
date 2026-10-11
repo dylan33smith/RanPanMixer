@@ -1117,8 +1117,16 @@ which was mostly a DIFFERENT set.
   962. ⚠ A step only RAISES when the surviving mass is entirely on the vanishing
   donors, so 9,971 is an upper bound on the failures, not a count of them — but one is
   enough to stop a chromosome.
-  **[Status]** ⚠ **OPEN — needs Dylan's decision.** It is the "interior zero-cM
-  plateau" question `docs/terms.md` recorded as DEFERRED, now forced by the rebuild.
+  **[Status]** ✅ **RESOLVED the same day as DECISION K (Dylan, 2026-10-10):** the whole
+  block leaves the chain. 20 blocks, 172,142 positions, 0.772% of the chain; the release
+  then ran. `src/cohort/genmap.py:untraversable_blocks` implements it,
+  `tests/test_untraversable.py` has 15 tests and three mutations are caught, and
+  `scripts/verify_cohorts.py` recomputes the blocks INDEPENDENTLY so a chain that was
+  never rebuilt fails there rather than at release time.
+  ⚠ Two holes in my own checks surfaced doing it, both found by the opposite-direction
+  test: the verifier asserted `in_chain` was exactly `support > 0` (falsified by K), and
+  its replacement only recomputed the blocks when something was ALREADY excluded — so a
+  chain never rebuilt skipped the branch and passed, which is the one case it exists for.
   Any fix must stay target-independent (standing constraint 1); all three candidates
   are, since they depend only on the map and on support(v).
   **[Severity]** Loud, not silent — it raises rather than returning a path, which is

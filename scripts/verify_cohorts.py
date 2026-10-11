@@ -111,15 +111,47 @@ def check(c: int, root: Path = None) -> list[str]:
     if (dd < -1e-12).any():
         bad.append(f"chr{c}: cM decreases at {int((dd < -1e-12).sum())} chain steps")
 
-    # 5. the chain excludes exactly the support == 0 positions and nothing else.
-    #    Decision C retired the coordinate cut, so any OTHER exclusion is a bug or an
+    # 5. THE CHAIN HAS EXACTLY TWO EXCLUSIONS, and both are recomputed here from the
+    #    data rather than trusted. Decision C retired the coordinate cut; decision K
+    #    adds the untraversable blocks. Any THIRD exclusion is a bug or an
     #    accidentally reintroduced span.
-    expect = sup > 0
-    if not np.array_equal(ic, expect):
-        extra = int((expect & ~ic).sum())
-        bad.append(f"chr{c}: in_chain is not exactly (support > 0) -- "
-                   f"{extra} usable positions excluded, "
-                   f"{int((ic & ~expect).sum())} unusable included")
+    #
+    #    ⚠ The second half is recomputed INDEPENDENTLY of the code that wrote the
+    #    mask, which is what gives this check power in both directions: it catches an
+    #    arbitrary extra exclusion AND a block that should have been dropped and was
+    #    not. Comparing the mask to the manifest's own record of what it dropped would
+    #    only confirm the writer agrees with itself.
+    usable = sup > 0
+    if (ic & ~usable).any():
+        bad.append(f"chr{c}: {int((ic & ~usable).sum())} position(s) with support == 0 "
+                   f"are IN the chain -- the sampler has nothing to emit there")
+    excluded_usable = usable & ~ic
+    # ⚠⚠ RECOMPUTED UNCONDITIONALLY, and the first version of this check got that
+    # wrong: it only recomputed when something was ALREADY excluded, so a chain that
+    # was never rebuilt after decision K -- exactly `in_chain == (support > 0)`, with
+    # nothing excluded -- skipped the branch entirely and passed. That is the single
+    # case this check exists for, and the forward pass would then raise at RELEASE
+    # time instead. Found by the test for the opposite direction, which is why both
+    # directions are tested.
+    if True:
+        import sys as _sys
+        _sys.path.insert(0, str(REPO / "src"))
+        from cohort import genmap as _G
+        allowed = np.asarray(np.load(d / "haplotypes.npy", mmap_mode="r")) != -1
+        # the blocks decision K would drop from the support-only chain
+        sites = np.flatnonzero(usable)
+        blocks = _G.untraversable_blocks(cm[sites], allowed[:, sites])
+        should_drop = np.zeros_like(ic)
+        for a, b in blocks:
+            should_drop[sites[a:b + 1]] = True
+        if not np.array_equal(excluded_usable, should_drop):
+            over = int((excluded_usable & ~should_drop).sum())
+            under = int((should_drop & ~excluded_usable).sum())
+            bad.append(
+                f"chr{c}: the usable positions excluded from the chain are NOT the "
+                f"untraversable blocks -- {over} excluded that decision K would keep, "
+                f"{under} kept that it would drop. A third exclusion rule has crept "
+                f"in, or the chain was not rebuilt after decision K.")
 
     # 6. cm_source marks declared-rate positions, and they are only at the ENDS.
     #    numpy.interp cannot leave an interior gap, so an interior declared-rate

@@ -121,6 +121,91 @@ def _chrom_of(gmap_path: Path) -> str:
     return m.group(1)
 
 
+def zero_distance_blocks(cm_chain: np.ndarray) -> list[tuple[int, int]]:
+    """Maximal runs of chain positions with ZERO genetic distance between neighbours.
+
+    Returned as inclusive (start, end) index pairs INTO THE CHAIN, not the site axis.
+
+    ⚠ WHY A RUN AND NOT A PAIR. The transition is `A_t = (1 - s_t) I + (s_t / K) J`
+    and `s_t` is exactly 0 when `Delta_x` is 0, so `A_t` is exactly the identity. A
+    whole RUN of such steps is therefore one block inside which no path can switch
+    donors at all, and the donors able to traverse it are the INTERSECTION of the
+    allowed set over every position in the run -- not over neighbouring pairs. Looking
+    at pairs would miss a donor that drops out three positions later.
+    """
+    if cm_chain.size < 2:
+        return []
+    idx = np.flatnonzero(np.diff(cm_chain) == 0)
+    if idx.size == 0:
+        return []
+    brk = np.flatnonzero(np.diff(idx) != 1)
+    starts = np.r_[idx[0], idx[brk + 1]]
+    # a zero STEP at t spans positions t and t+1, hence the +1 on the end
+    ends = np.r_[idx[brk], idx[-1]] + 1
+    return [(int(a), int(b)) for a, b in zip(starts, ends)]
+
+
+def untraversable_blocks(cm_chain: np.ndarray,
+                         allowed_chain: np.ndarray) -> list[tuple[int, int]]:
+    """The zero-distance runs NO cohort donor spans, so no path gets through them.
+
+    ⚠ THIS IS A PROPERTY OF THE MAP AND THE COHORT, NEVER OF THE TARGET -- it reads
+    only `cm` and `allowed`, both functions of `D` and the genetic map. That is what
+    keeps it inside standing constraint 1: a target-dependent exclusion would void
+    Theorem 1, and this one is fixed before any target is opened.
+    """
+    out = []
+    for a, b in zero_distance_blocks(cm_chain):
+        if not allowed_chain[:, a:b + 1].all(axis=1).any():
+            out.append((a, b))
+    return out
+
+
+def drop_untraversable(mask: np.ndarray, cm: np.ndarray, allowed: np.ndarray,
+                       positions: np.ndarray) -> tuple[np.ndarray, dict]:
+    """Remove the chain blocks the copying model has no path through (decision K).
+
+    ⚠⚠ WHY THIS EXISTS. Decision C retired the coordinate cut, which admitted the
+    INTERIOR zero-cM plateaus that the cut had been removing as a side effect --
+    positions the map reaches but assigns no recombination to. Inside such a plateau
+    no switch is possible, so if no single donor has a called allele across the whole
+    plateau the forward pass dead-ends: measured 2026-10-10, the rebuilt chr21 raised
+    "zero total mass" at position 10,543,014, and 20 blocks genome-wide are
+    untraversable. Decision K (Dylan, 2026-10-10) excludes them.
+
+    ⚠ The exclusion is of the WHOLE block, not of the minimum needed to make it
+    traversable. The cheaper alternative -- keep the sub-run the best-covering donor
+    spans, which would retain about 96% of these positions -- was rejected because
+    those positions are ones where the mechanism has NO CHOICE: a single donor is
+    forced, so they would enter the denominator of every per-position utility figure
+    while carrying no variability at all. 14 of the 20 blocks overlap a centromere.
+
+    ⚠ NO ITERATION IS NEEDED and the reason is worth stating: `cm` is non-decreasing
+    and each block is MAXIMAL, so the positions flanking a dropped block satisfy
+    `cm[before] < cm[block] < cm[after]` strictly. Their new adjacency therefore
+    carries POSITIVE distance and cannot be a new zero-distance step. The caller
+    asserts the refined chain has none left anyway, because an argument is not a check.
+    """
+    mask = np.asarray(mask, dtype=bool).copy()
+    sites = np.flatnonzero(mask)
+    blocks = untraversable_blocks(cm[sites], allowed[:, sites])
+    dropped = 0
+    for a, b in blocks:
+        mask[sites[a:b + 1]] = False
+        dropped += b - a + 1
+    # ⚠ the bp SPAN of each block is recorded, not just its size. These are the
+    # regions a reader will want to locate -- 14 of the 20 overlap a centromere --
+    # and a count alone cannot be checked against an assembly.
+    info = {
+        "untraversable_blocks_dropped": len(blocks),
+        "positions_dropped": int(dropped),
+        "blocks": [{"pos_start": int(positions[sites[a]]),
+                    "pos_end": int(positions[sites[b]]),
+                    "n_positions": b - a + 1} for a, b in blocks],
+    }
+    return mask, info
+
+
 def build(positions_npy: Path, gmap_path: Path, outdir: Path,
           *, start: int | None = None, end: int | None = None,
           gaps_path: Path | None = None,
@@ -164,6 +249,33 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
     support = np.load(sup_path) if sup_path.exists() else None
     mask = chain_mask(positions, cm, start, end, support)
 
+    # ⚠⚠ DECISION K (Dylan, 2026-10-10): drop the blocks no donor spans. Applied ONLY
+    # in decision-C mode, deliberately -- the coordinate-cut path is retained so the
+    # superseded chr21 artifacts stay byte-reproducible, and adding an exclusion to it
+    # would silently change what those recorded numbers mean.
+    traversal = None
+    if declared_rate is not None:
+        hap_path = Path(outdir) / "haplotypes.npy"
+        if not hap_path.exists():
+            raise FileNotFoundError(
+                f"{hap_path} is needed to decide the chain: a zero-genetic-distance "
+                f"block that NO donor spans has no path through it, and only the "
+                f"allowed matrix knows which those are (decision K). Run the `arrays` "
+                f"step first; an in_chain written without this check produces a "
+                f"chromosome whose forward pass raises at release time.")
+        allowed = np.asarray(np.load(hap_path, mmap_mode="r")) != -1
+        mask, traversal = drop_untraversable(mask, cm, allowed, positions)
+        # ⚠ AN ARGUMENT IS NOT A CHECK. Dropping a maximal block cannot create a new
+        # zero-distance step (cm is non-decreasing and the block was maximal, so the
+        # flanking positions are strictly separated), but assert it rather than
+        # trusting the reasoning -- this is the invariant the release depends on.
+        left = untraversable_blocks(cm[mask], allowed[:, mask])
+        if left:
+            raise AssertionError(
+                f"{len(left)} untraversable block(s) remain after the drop: {left[:3]}. "
+                f"The one-pass argument (a maximal block's neighbours are strictly "
+                f"separated in cM) does not hold here, so the rule needs iterating.")
+
     meta = store.load_prov(positions_npy)
     digest = meta.get("axis_digest")
     if support is not None and digest:
@@ -174,15 +286,20 @@ def build(positions_npy: Path, gmap_path: Path, outdir: Path,
               "provisional": declared_rate is None,
               "declared_rate_cM_per_Mb": declared_rate,
               "gap_spans_skipped": gaps_path is not None,
-              "excludes_zero_support": support is not None}
+              "excludes_zero_support": support is not None,
+              # decision K, recorded per chromosome so a release can report it
+              "untraversable_blocks": traversal}
 
     store.save(outdir / "genetic_pos.npy", cm, inputs=inputs, params=params,
                axis_digest=digest,
                note="cM per site; NaN outside the map span, by design")
     store.save(outdir / "in_chain.npy", mask, inputs=inputs, params=params,
                axis_digest=digest,
-               note="the chain MASK over the full axis. Under decision C the only "
-                    "exclusion is support == 0; a coordinate cut is superseded.")
+               note="the chain MASK over the full axis. Under decisions C and K the "
+                    "exclusions are TWO, both target-independent: support == 0, where "
+                    "no donor has a called allele at all; and a maximal "
+                    "zero-genetic-distance block that no single donor spans, which the "
+                    "copying model has no path through. A coordinate cut is superseded.")
     if source is not None:
         store.save(outdir / "cm_source.npy", source, inputs=inputs, params=params,
                    axis_digest=digest,

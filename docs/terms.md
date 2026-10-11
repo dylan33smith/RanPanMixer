@@ -1196,6 +1196,98 @@ Aliases:              "the VCF" is ambiguous; this is the 45-sample
                       is `cohort44.vcf.gz`, from a separate step.
 ```
 
+### in_chain  [dataset] [implementation]
+```
+Is:                   The CHAIN MASK: a bool over the full site axis saying which
+                      positions the sampler actually runs over. `T` is its sum, and
+                      **every denominator in this project is a count of chain
+                      positions**, so a change here moves every rate, share and
+                      fidelity figure at once.
+                      ⚠ EXACTLY TWO EXCLUSIONS, and both are target-INDEPENDENT:
+                      (1) support(v) == 0 — no donor has a called allele, so the
+                          sampler has nothing to emit and RENORMALISE has an empty pool.
+                      (2) an `untraversable_block` (decision K) — a maximal
+                          zero-genetic-distance run that no single donor spans, which
+                          the copying model has no path through.
+                      ⚠ A THIRD exclusion is a defect. The coordinate cut
+                      (`chain_span`) was the third and is SUPERSEDED by decision C.
+Computed by:          src/cohort/genmap.py:chain_mask then :drop_untraversable, both
+                      inside genmap.build, stored as data/cohort/chrN/in_chain.npy as a
+                      MASK over the full axis — never as a row filter, so the site axis
+                      stays the join key.
+                      ⚠ scripts/verify_cohorts.py RECOMPUTES both exclusions from the
+                      data rather than reading the manifest's own account of them, which
+                      is what lets it catch a chain that was never rebuilt.
+CHANGES MEANING WITH: the cohort D, the genetic map, AND THE ARM. ⚠ Under ARM 1
+                      LEAVE-ONE-OUT both of the target's haplotypes leave the panel, so
+                      support(v) drops by up to 2, positions the target alone carried
+                      fall to 0 and LEAVE the chain, and an intersection that was
+                      non-empty can empty. Arm 1's chain is therefore PER TARGET. Never
+                      reuse arm 2's mask for an arm 1 release, and never compare a
+                      denominator across arms (standing constraint 8).
+Valid vs:             the same cohort, map, arm and leave-one-out status.
+Status:               PRIMARY. MEASURED 2026-10-10, genome-wide: 22,307,009 records ->
+                      **22,134,562** chain positions, excluding 305 for support == 0
+                      (0.0014%) and 172,142 in 20 untraversable blocks (0.772%).
+Aliases:              "the chain", "T" (its sum). ⚠ `T_blocks` is the MODEL-B unit count
+                      and a different quantity; do not use "T" for both in one table.
+```
+
+### untraversable_block  [dataset] [method] [implementation]
+```
+Is:                   A maximal run of chain positions with ZERO genetic distance
+                      between neighbours that NO single cohort donor spans. Decision K
+                      (Dylan, 2026-10-10) EXCLUDES the whole block from the chain.
+                      Why no path gets through: the transition is
+                      A_t = (1 - s_t) I + (s_t / K) J and s_t is exactly 0 when
+                      Delta_x is 0, so A_t is exactly the identity and no switch is
+                      possible anywhere inside the run. The donors able to traverse it
+                      are therefore the INTERSECTION of `allowed` over EVERY position in
+                      the run. Empty intersection -> the forward pass dead-ends with
+                      zero total mass.
+                      ⚠⚠ IT IS NOT A PAIRWISE PROPERTY. Every adjacent pair in a run can
+                      share a donor while no donor spans the whole run, so a pairwise
+                      check passes and the release still dies. Three donors are the
+                      minimum needed to construct that case.
+                      ⚠ The model is not wrong here: P(switch) = 0 on a zero-cM plateau
+                      is CORRECT (see `chain_span`). It is the DATA that makes the state
+                      space disconnected.
+Computed by:          src/cohort/genmap.py:untraversable_blocks, applied by
+                      genmap.build in decision-C mode only, recorded per chromosome in
+                      the manifest as `untraversable_blocks` with each block's bp span.
+                      ⚠ scripts/verify_cohorts.py recomputes them INDEPENDENTLY of the
+                      code that wrote the mask, which is what gives that check power in
+                      both directions -- an extra exclusion AND a block that should have
+                      been dropped and was not.
+                      ⚠ NO ITERATION: cm is non-decreasing and each block is maximal, so
+                      a dropped block's neighbours are strictly separated and cannot form
+                      a new zero-distance step. genmap.build asserts it anyway.
+CHANGES MEANING WITH: the genetic map and the cohort D. ⚠ NEVER with the target -- it
+                      reads only cm and `allowed`, which is what keeps it inside standing
+                      constraint 1; a target-dependent exclusion would void Theorem 1.
+                      Asserted from the function signatures in
+                      tests/test_untraversable.py.
+                      ⚠ IT WOULD CHANGE UNDER ARM 1 LEAVE-ONE-OUT, because removing a
+                      target's two haplotypes can empty an intersection that was
+                      non-empty. Arm 1's chain is therefore per-target, like its
+                      support(v) and its beta_v -- do not reuse arm 2's mask there.
+Valid vs:             the same cohort, the same map, and the same arm.
+Status:               PRIMARY — it is one of the chain's TWO exclusions and every
+                      denominator in the project counts chain positions.
+                      MEASURED 2026-10-10: of 52,870 zero-distance runs genome-wide only
+                      **20** are untraversable, **172,142 positions, 0.772% of the
+                      chain**; 14 of the 20 overlap a centromere. chr9 loses 7.15% of its
+                      chain, chr20 3.58%, chr21 2.44%; chr10, chr14 and chr22 lose none.
+                      ⚠ THE WHOLE BLOCK GOES, not the minimum needed. The best-covering
+                      donor spans 72-100% of each block, so keeping its sub-run would
+                      retain about 96% of these positions -- rejected, because a single
+                      donor is FORCED there and those positions would enter every
+                      per-position denominator while carrying no variability.
+Aliases:              "the centromeric plateaus" — ⚠ APPROXIMATE and not a synonym: 14
+                      of 20 overlap a centromere, 6 do not (chr1 twice, chr6, chr13,
+                      chr15). "dead-end block" is acceptable in prose.
+```
+
 ### declared_rate  [dataset] [method]
 ```
 Is:                   The DECLARED CONSTANT RECOMBINATION RATE, in cM/Mb, used to give

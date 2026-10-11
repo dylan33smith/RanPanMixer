@@ -975,7 +975,14 @@ historical copy carries an `[INCORRECT]`/`[CORRECTION]` pair rather than an over
 | 20 | 512,838 | 512,837 | 172 (0.03%) | 0 |
 | 21 | 340,849 | 340,848 | 26,635 (7.81%) | 0 |
 | 22 | 345,415 | 345,409 | 4,806 (1.39%) | 0 |
-| **total** | **22,307,009** | **22,306,704** | **82,807 (0.371%)** | **2** |
+| **total** | **22,307,009** | **22,306,704** ⚠ PRE-DECISION-K, now 22,134,562 | **82,807 (0.371%)** | **2** |
+
+⚠ **[CORRECTION - 2026-10-10, decision K]** every chain figure in this section and the
+table above is PRE-DECISION-K. Genome-wide T is **22,134,562**, not 22,306,704: decision
+K removed 20 untraversable blocks totalling **172,142 positions** (0.772%) because the
+forward pass cannot traverse them. `mean beta_v` is **4.5178e-08**, not 4.4830e-08. The
+figures below are retained because they are what the build produced and what the
+reconciliation with the old coordinate cut was computed against.
 
 **Genome-wide.** 22,307,009 records, **22,306,704 chain positions**, and only **305
 positions excluded in the whole genome** (0.0014%, all of them `support` == 0). The
@@ -1195,6 +1202,71 @@ about another — a line-wide escape swallowed exactly that and the gate stayed 
 a verified mutation, which is decoration by this project's own standard. And the escape
 is keyed to the ABSENCE MARKER's position, not the path's, since the path is only what
 the claim is about and usually appears earlier on the row.
+
+
+### 12. Decision K — the blocks no donor spans leave the chain
+
+**Found by RUNNING the release, not by a test.** 307 tests pass and none of them walks a
+real genome-scale chain, so the dead end only appeared when `scripts/run_mechanism_chr21.py`
+was pointed at the rebuilt chr21 and raised "zero total mass" at position 10,543,014.
+
+**THE MECHANISM.** The transition is `A_t = (1 - s_t) I + (s_t / K) J`, and `s_t` is
+exactly 0 when `Delta_x` is 0, so `A_t` is exactly the identity. A maximal RUN of such
+steps is therefore one block inside which no path can switch donors, and the donors able
+to traverse it are the INTERSECTION of `allowed` over every position in the run. If that
+intersection is empty, no path gets through and the forward pass dead-ends. ⚠ The model
+is right and the data is awkward: `docs/terms.md` already said P(switch) = 0 on a plateau
+is CORRECT.
+
+⚠⚠ **IT IS NOT A PAIRWISE PROPERTY, and that is the part a careless implementation gets
+wrong.** Every adjacent pair in a run can share a donor while no donor spans the whole
+run; a pairwise check passes and the forward pass still dies. The test for this needs
+THREE donors — with two, any fixture where no donor spans a 3-position run also breaks
+one of its pairs, which is what my first version of that test got wrong.
+
+**WHY IT APPEARED NOW.** Decision C's scope was map-SILENT regions and it is clean there:
+every one of chr21's 9,384 zero-distance steps carries `cm_source` = 0, an INTERPOLATED
+cM. What broke it is that retiring the coordinate cut also admitted the INTERIOR zero-cM
+plateaus below chr21's old span — positions the map reaches but assigns no recombination
+to — which nothing had ever decided to include. 395 of chr21's 397 dangerous steps are
+exactly those, and the old build had 2, which is why every chr21 release to date worked.
+
+**THE SHAPE OF IT, measured on all 22 autosomes.** Of **52,870** zero-distance runs,
+only **20** are untraversable — about one per chromosome, and each is that chromosome's
+LONGEST run. chr21's is **8,327** positions, exactly the in-span plateau count already on
+record. **14 of the 20 overlap a centromere.** Total **172,142 positions, 0.772% of the
+chain**; chr9 loses 74,292 (7.15%), chr20 18,360 (3.58%), and chr10, chr14 and chr22 lose
+nothing.
+
+**THE RULE (decision K, Dylan).** The whole block leaves the chain. ⚠ Not the minimum
+needed: the best-covering donor spans 72–100% of each block, so keeping its sub-run would
+have retained about 96% of these positions — and REJECTED, because in that sub-run a
+single donor is FORCED, so the mechanism has no choice at all and those positions would
+enter the denominator of every per-position utility figure while carrying no variability.
+⚠ The rule reads only the genetic map and `support(v)`, both functions of `D`, so it is
+fixed before any target is opened and standing constraint 1 is untouched — asserted from
+the function signatures, not just argued.
+
+**NO ITERATION IS NEEDED, and the argument is checked rather than trusted.** `cm` is
+non-decreasing and each block is maximal, so the positions flanking a dropped block are
+strictly separated and their new adjacency carries positive distance. `genmap.build`
+asserts afterwards that no untraversable block remains, because an argument is not a
+check.
+
+**CONSEQUENCES, all propagated.** Genome-wide T **22,306,704 -> 22,134,562**; `mean
+beta_v` **4.4830e-08 -> 4.5178e-08** (+0.778%); and because decision J allocates
+`beta_share` by variant count, every chromosome's share moved — chr9 by **-6.43%**,
+chr20 by -2.83%. The release then ran: chr21 at T = 332,521, baseline log_norm
+-879.4501, 9.1 s per diploid draw.
+
+⚠ **TWO HOLES IN MY OWN CHECKS, both found by writing the opposite-direction test.**
+The cohort verifier's chain check asserted `in_chain` was exactly `support > 0`, which
+decision K falsifies — and when I rewrote it, it only recomputed the blocks when
+something was ALREADY excluded. So a chain never rebuilt after decision K — exactly
+`in_chain == (support > 0)`, nothing excluded — skipped the branch and PASSED, which is
+the single case the check exists for. It now recomputes unconditionally. The lesson is
+the familiar one in a new place: the test for the direction you did not think about is
+the one that finds the hole.
 
 
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
