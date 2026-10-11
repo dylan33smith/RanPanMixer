@@ -947,7 +947,7 @@ privacy cost, not merely a utility one.
 **Gate.** 102 tests pass. Every distinctive stale number greps clean in live text, and each
 historical copy carries an `[INCORRECT]`/`[CORRECTION]` pair rather than an overwrite.
 
-### 9. The 22-chromosome build: the table, and the two failures behind it
+### 9. [CHUNK 6a] The 22-chromosome build: the table, and the two failures behind it
 
 **Emitted by `scripts/verify_cohorts.py` into `logs/B_verify_cohorts.md`, never hand-assembled.** Driver exit 0, "all 22 chromosome(s) built and complete"; verifier exit 0, 22 of 22 passing every check. `K_states` = 88 on every chromosome.
 
@@ -1063,7 +1063,7 @@ CPU across 32 threads, read as elapsed time. A whole chromosome from scratch is
 wall time — not 12 hours.
 
 
-### 10. The panel, and a gate that checks the reference build against our own graph
+### 10. [CHUNK 6b] The panel, and a gate that checks the reference build against our graph
 
 **Complete.** 21 files fetched by `scripts/get_panel.sh`, sentinel 0, **zero failures
 and no leftover `.part` files**: 29.3 GB, **69,689,262 records**, **3,202 samples on
@@ -1104,7 +1104,7 @@ the seek check, so the mtimes were touched forward — the warning was noise tha
 have masked a real index problem.
 
 
-### 11. The pre-registration is SIGNED — and what the day's audit changed before it was
+### 11. [CHUNK 7] The pre-registration is SIGNED — and what the day's audit changed first
 
 ✅ **SIGNED 2026-10-10 by Dylan.** `git_rev` b5a220f122ca89f88d80805a3b19d8bc22546451, which is HEAD at the moment of
 signing and therefore the PARENT of the signing commit. Recorded that way on purpose: a
@@ -1204,7 +1204,7 @@ is keyed to the ABSENCE MARKER's position, not the path's, since the path is onl
 the claim is about and usually appears earlier on the row.
 
 
-### 12. Decision K — the blocks no donor spans leave the chain
+### 12. [CHUNK 8] Decision K — the blocks no donor spans leave the chain
 
 **Found by RUNNING the release, not by a test.** 307 tests pass and none of them walks a
 real genome-scale chain, so the dead end only appeared when `scripts/run_mechanism_chr21.py`

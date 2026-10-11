@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-10 (chunk 6 complete: all 22 cohorts + the full panel, both gated)
+**Last updated:** 2026-10-11 (chunk 6 is **3 of 4**: cohorts, panel and the release writer are done, genome-wide TARGET preprocessing is not. Chunks 7 and 8 ran out of order because an audit finding and a blocker forced them.)
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -243,17 +243,58 @@ variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2
 | 6 | ✅ **DROPPED 2026-10-10.** The **secondary window** is not pursued: the pre-registration section 0 drops the contiguous-window second arm. | — |
 | 7 | ✅ **CLOSED 2026-10-10.** **Arm 2's attacker set** is pinned (A1-A4, each with a mandatory positive control) and the **target count** is all 10 — chr21 for the powered attack, genome-wide for exact utility. ⚠ **[CORRECTION - 2026-10-10]** This row said the repo has "no implemented attacker of any kind" and that `attacker_accuracy` "names a module that does not exist": `src/attacks.py` was built 2026-10-10 with the Neyman-Pearson optimal statistic, the exact ceiling, a BALANCED `src/attacks.py:empirical_accuracy`, the arm guard and the pre-registration lock, with `tests/test_attacks.py` over it. | — |
 
+## ⚠ THE CHUNK MAP — the review-gated plan, and where we are
+
+Reconstructed and verified against `docs/memory.md`'s archive headers and the ledger on
+2026-10-11. One chunk = one review gate: nothing downstream starts until the chunk is
+reviewed, which is the whole point of the structure.
+
+| chunk | what it covered | state |
+|---|---|---|
+| 0 | Clear the known-wrong facts out of the authority docs before phase B code reads them | ✅ done |
+| 1 | `B-THY-diploid-gate` — a diploid, two-segment falsification gate | ✅ done |
+| 2 | `B-IMP-genomewide` — make `beta_v` sum to 1 genome-wide with a per-chromosome share | ✅ done |
+| 3 | `B-DAT-map-coverage` — how much of each autosome the genetic map speaks to | ✅ done |
+| 4 | The declared rate settled; the exact endpoint at genome shares; gaps skipped; the arm guard; the toy genome | ✅ done |
+| 5 | The pre-registration's eight fields, decided one at a time with Dylan | ✅ done. ⚠ Never archived under a chunk label in `docs/memory.md` — the first place the labelling broke |
+| 6 | **Genome-scale data, and releases that can be quoted.** (a) the 22-autosome cohort build (b) the 1000G 30x panel (c) **genome-wide TARGET preprocessing** (d) releases routed through provenance | ⚠ **3 of 4.** (a) ✅ (b) ✅ (d) ✅ — **(c) is NOT done: all 10 targets exist on chr21 ONLY** |
+| 7 | The `tau`-definition audit and the pre-registration SIGNATURE | ✅ done. ⚠ UNPLANNED — forced by Dylan reading the proposal's introduction. It found a live false-positive risk on a privacy claim and three contradictions that signing would have frozen |
+| 8 | The release writer, and **decision K** | ✅ done. ⚠ UNPLANNED — forced by a blocker that appeared only when a release was actually RUN |
+| 9 | **Genome-wide target preprocessing** — chunk 6's open deliverable, promoted to its own chunk because it now gates chunks 11-13 | ⬜ **NEXT** |
+| 10 | The **Arm 2 attack run** — balanced, 25 draws per `tau` per hypothesis, 7,000 releases, ~18.3 h on chr21 | ⬜ independent of 9 |
+| 11 | **Arm 1 leave-one-out releases** — 44 cohort members, diploid, 22 autosomes | ⬜ ⚠ see the risk below |
+| 12 | The **PanMixer head-to-head** — their evaluations on our build, so the comparison is direct | ⬜ |
+| 13 | The **writeup** — two sections, one per arm | ⬜ |
+
+⚠ **CHUNKS 7 AND 8 RAN OUT OF ORDER, and that is the structure working rather than
+failing.** Neither was planned. Chunk 7 began with a question about one sentence in the
+proposal's introduction and ended by reopening a pre-registration field; chunk 8 began by
+running a release and hitting a dead end no test could see. A plan that cannot absorb
+those is a plan that would have shipped them.
+
+⚠⚠ **A RISK DECISION K CREATED FOR CHUNK 11, recorded now so it is not discovered then.**
+Arm 1 removes BOTH of the target's haplotypes from the donor panel, which lowers
+`support(v)` and can EMPTY a zero-distance block's donor intersection that was non-empty
+for arm 2. So **arm 1's chain is per-target**: 44 chains, 44 `T` values, 44 `beta_share`
+allocations, and the `untraversable_block` set recomputed per target. Reusing arm 2's mask
+there would reintroduce exactly the dead end decision K removed. See `in_chain` and
+`untraversable_block` in `docs/terms.md`.
+
+---
+
 ## ⚠ PHASE B WORK ORDER — what must happen before the first number
 
 Ordered, and the order is load-bearing.
 
-⚠ **THIS LIST, NOT THE CHUNK NUMBERS, IS THE LIVE PLAN (noted 2026-10-10).** The
-review-gated "chunks" Dylan asked for ran 0 through 6 and then stopped being
-maintained: chunk 5 was never archived under a chunk label at all, and the
-pre-registration audit and signing of 2026-10-10 carry no chunk number. Two numbering
-systems where one is stale is worse than one system, so the chunk labels are now
-HISTORICAL — they stay in `docs/memory.md` headers, where they record which review gate
-a finding came through, and they are not extended. Ask "which work-order item" instead.
+⚠ **THE CHUNK MAP ABOVE IS THE LIVE PLAN (reinstated 2026-10-11 at Dylan's request).**
+This work order is the ORDERING CONSTRAINT inside it, not a second plan — every item here
+belongs to a chunk, and the chunk is what carries the review gate.
+⚠ **[CORRECTION - 2026-10-11]** A note here said the chunk labels were "now HISTORICAL
+... and they are not extended", reasoning that two numbering systems where one is stale is
+worse than one. That was the wrong fix for a real problem: the labels HAD gone stale —
+chunk 5 was never archived under one, and the 2026-10-10 audit and signing carried no
+number — but the answer is to maintain them, not to retire the frame Dylan asked for.
+They are maintained again and the gaps are filled in the map above.
 
 1. ✅ **`B-THY-diploid-gate` — DONE 2026-10-10.** `tests/test_diploid_gate.py`,
    64 clauses, mutation-tested against the real `ffbs.py` with each revert verified
