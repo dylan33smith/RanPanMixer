@@ -375,3 +375,49 @@ def test_one_sided_rate_can_exceed_the_bound_without_violating_it() -> None:
             f"tau={tau}: the BALANCED accuracy {bal:.4f} must respect the bound "
             f"{bound:.4f}; if it does not, the constructed example is wrong, not the "
             f"theorem")
+
+
+# ---------------------------------------------------------------------------
+# ⚠ THE ADDENDUM MUST NOT BE ABLE TO IMPERSONATE THE PRE-REGISTRATION.
+# `require_signed_prereg` globs `prereg_*.md` and returns the FIRST signed, clean
+# match. A second file matching that pattern could therefore become the document an
+# experiment stamps itself with -- if the original were renamed, unsigned or deleted,
+# the lock would silently fall through to the addendum and report it as the
+# pre-registration. So the addendum is deliberately NOT named `prereg_*`.
+# ---------------------------------------------------------------------------
+
+def test_the_lock_resolves_to_the_prereg_not_an_addendum() -> None:
+    name, rev = A.require_signed_prereg()
+    assert name == "prereg_2026-10-10.md", (
+        f"the lock resolved to {name!r}. Only the pre-registration itself may be the "
+        f"document a result is stamped with; an addendum records what changed after "
+        f"it was signed and is not a substitute for it.")
+    assert rev
+
+
+def test_no_addendum_matches_the_prereg_glob() -> None:
+    """⚠ Structural, not behavioural: it fails the moment someone adds
+    `prereg_addendum_*.md`, which would be inside the glob and could shadow the real
+    file depending on sort order."""
+    papers = sorted((Path(__file__).resolve().parents[1] / "paper").glob("prereg_*.md"))
+    assert [p.name for p in papers] == ["prereg_2026-10-10.md"], (
+        f"more than one file matches the prereg glob: {[p.name for p in papers]}. "
+        f"Name addenda `addendum_<date>_<slug>.md` so they cannot shadow it.")
+
+
+def test_the_decision_k_addendum_exists_and_is_signed() -> None:
+    """Decision K post-dates the signature and changed the released object, so the
+    record of that must exist and must itself be signed -- an unsigned addendum would
+    leave the signed file's description of the chain standing uncorrected."""
+    f = (Path(__file__).resolve().parents[1] / "paper"
+         / "addendum_2026-10-11_decision_K.md")
+    assert f.exists(), "the decision-K addendum is missing"
+    text = f.read_text()
+    assert "Status: SIGNED" in text
+    assert "[OPEN]" not in text
+    # the figures it exists to correct
+    for n in ("22,134,562", "172,142", "4.5178e-08"):
+        assert n in text, f"the addendum does not state {n}"
+    assert "NOT NAMED" in text, (
+        "the addendum must say WHY it is not named prereg_*, or the next person will "
+        "name theirs that way")

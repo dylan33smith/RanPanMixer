@@ -296,8 +296,13 @@ positions left the chain, so `T` and every `beta_share` moved. Two consequences:
 section 7 item 6 of the signed file says the interior zero-cM plateaus are "emitted as
 verbatim donor runs", which is now only partly true — 20 blocks of them are EXCLUDED;
 and `beta_v`'s normalising set, a pre-registered field, has different contents under the
-same name (`chain`). ⚠ The file must NOT be edited (constraint 6: superseded, never
-edited), so this needs a dated ADDENDUM or a new pre-registration. **Dylan's call.**
+same name (`chain`). ✅ **RESOLVED 2026-10-11 (Dylan): a dated ADDENDUM**, `paper/addendum_2026-10-11_decision_K.md`,
+SIGNED, with the signed pre-registration left untouched. It states both corrections and
+records that the frozen fields — `tau` grid, attacker set, endpoints, attack database,
+decoy design, `delta` — are unaffected and that no attack outcome had been inspected.
+⚠ It is deliberately NOT named `prereg_*.md`, because `require_signed_prereg` globs that
+pattern and an addendum must never be able to become the document a result is stamped
+with. Three tests pin that.
 
 ---
 
