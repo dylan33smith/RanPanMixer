@@ -224,7 +224,11 @@ def _one_trial(job: tuple) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--draws", type=int, default=50)
+    # ⚠ 25 IS THE PRE-REGISTERED VALUE (field 6, signed 2026-10-10): 25 draws per
+    # `tau` PER HYPOTHESIS, balanced. A different default here would silently run
+    # an unregistered design, and the whole point of the lock above is that the
+    # design cannot drift after signing.
+    ap.add_argument("--draws", type=int, default=25)
     ap.add_argument("--targets", type=int, default=10)
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))

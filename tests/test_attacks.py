@@ -293,20 +293,40 @@ def test_a_missing_prereg_is_refused_too(tmp_path):
         A.require_signed_prereg(str(tmp_path))
 
 
-def test_the_real_prereg_currently_blocks_attacks():
-    """⚠ A LIVE CHECK ON THIS REPOSITORY, not a fixture. The pre-registration is
-    awaiting signature as of 2026-10-10, so the lock must be holding. When it is
-    signed this test's expectation flips, and that flip should be a deliberate edit
-    made in the signing commit -- not something discovered later.
+def test_the_real_prereg_is_signed_and_opens_the_lock():
+    """⚠ A LIVE CHECK ON THIS REPOSITORY, not a fixture. ✅ THE EXPECTATION FLIPPED ON
+    2026-10-10, in the signing commit, which is what the previous version of this test
+    demanded: it asserted the lock was HOLDING and said "when it is signed this test's
+    expectation flips, and that flip should be a deliberate edit made in the signing
+    commit -- not something discovered later." This is that edit.
+
+    What it now guards is the opposite failure, and it is the one that matters from
+    here: a signed pre-registration being silently UNSIGNED, reverted, renamed or
+    emptied, which would let an attack run against a design nobody committed to. The
+    `git_rev` is asserted non-empty because a signature with no code state attached
+    cannot tell anyone WHAT was pre-registered.
     """
-    try:
-        name, rev = A.require_signed_prereg()
-    except RuntimeError as e:
-        assert "NOT SIGNED" in str(e) or "no pre-registration" in str(e)
-        return
-    raise AssertionError(
-        f"{name} now reads as SIGNED (git_rev {rev!r}). If that was intended, update "
-        f"this test in the same commit that signed it.")
+    name, rev = A.require_signed_prereg()          # must NOT raise
+    assert name == "prereg_2026-10-10.md", name
+    assert rev and len(rev) >= 7 and all(c in "0123456789abcdef" for c in rev), (
+        f"the signature records no usable git_rev ({rev!r}); a result stamped with a "
+        f"pre-registration that names no code state is not traceable")
+
+
+def test_the_signed_prereg_has_no_open_fields_left():
+    """⚠ Belt and braces on the lock's own crudeness. `require_signed_prereg` refuses
+    on any `[OPEN]` marker or unticked box, so this asserts the file genuinely has
+    none rather than trusting that the refusal logic is the only reader. All eight
+    checklist items must be ticked -- seven filled plus field 6, reopened and re-closed
+    on 2026-10-10 at the balanced 25-draw design.
+    """
+    text = (Path(__file__).resolve().parents[1] / "paper" / "prereg_2026-10-10.md").read_text()
+    assert "[OPEN]" not in text
+    assert "\n- [ ] " not in text
+    assert text.count("\n- [x] ") == 8, (
+        f"expected all 8 checklist items ticked, found {text.count(chr(10) + '- [x] ')}")
+    assert "25 draws" in text and "7,000 releases" in text, (
+        "the signed design must state the pinned draw count and release total")
 
 
 # ---------------------------------------------------------------------------

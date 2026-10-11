@@ -116,12 +116,12 @@ def main(argv=None) -> int:
         # written, and this block exists precisely because the contract forbids an
         # omitted row -- so the reason going stale defeats its only purpose.
         "attacker_accuracy":
-            "n/a -- the pre-registration is UNSIGNED and its field 6 is OPEN. The "
-            "attacker IS built (src/attacks.py: the Neyman-Pearson optimal statistic, "
-            "a balanced empirical_accuracy, the arm guard) and the attacker set IS "
-            "pinned (prereg section 4, A1-A4 with mandatory positive controls). "
-            "Constraint 6 blocks the run until signed; and a weak attacker would "
-            "prove nothing anyway (constraint 7).",
+            "n/a -- NOT YET RUN. The pre-registration is SIGNED (2026-10-10) and the "
+            "lock is open; the attacker is built (src/attacks.py) and the set pinned "
+            "(A1-A4 with mandatory positive controls). What is missing is the "
+            "balanced 25-draw execution, ~18.3 h on chr21. ⚠ And a weak attacker "
+            "would prove nothing anyway (constraint 7), which is why every attack "
+            "carries a positive control.",
         "two_target_indistinguishability":
             "n/a at this scale -- plug-in TV over a support of this size is biased "
             "UPWARD and cannot falsify anything. Exact at K=4, T=7 in "

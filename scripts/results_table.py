@@ -189,9 +189,9 @@ add("`ratio_spread` on the constructed sharp pair *", f(toy_sharp_spread, 6), NA
 # was reopened because the pinned design was one-sided. "No attacker implemented" would
 # now be false, and this is the one place the reporting contract requires a reason
 # rather than an omitted row -- so a stale reason is the whole cost.
-add("`attacker_accuracy` *", f"{NA} — pre-registration UNSIGNED", f"{NA} — same", gate=True,
-    note="attacker built (src/attacks.py) and the set pinned (A1-A4); blocked on the "
-         "SIGNATURE and on field 6, reopened 2026-10-10 — constraint 6")
+add("`attacker_accuracy` *", f"{NA} — not yet RUN", f"{NA} — same", gate=True,
+    note="pre-registration SIGNED 2026-10-10, attacker built (src/attacks.py), set "
+         "pinned (A1-A4); the balanced 25-draw run has not been executed yet")
 add("`p_succ_bound` *", f(C.p_succ_bound(TAU)), f(C.p_succ_bound(TAU)), gate=True,
     note=f"equal-prior bound at tau={TAU}")
 add("`target_fidelity` *", f"{NA} — no graph-representability ceiling for a synthetic cohort",

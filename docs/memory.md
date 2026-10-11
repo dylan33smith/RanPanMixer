@@ -1097,6 +1097,106 @@ the seek check, so the mtimes were touched forward — the warning was noise tha
 have masked a real index problem.
 
 
+### 11. The pre-registration is SIGNED — and what the day's audit changed before it was
+
+✅ **SIGNED 2026-10-10 by Dylan.** `git_rev` b5a220f122ca89f88d80805a3b19d8bc22546451, which is HEAD at the moment of
+signing and therefore the PARENT of the signing commit. Recorded that way on purpose: a
+file cannot contain its own commit's hash, and the fact worth keeping is WHICH CODE was
+pre-registered, not which commit wrote the word SIGNED.
+
+**From this date the `tau` grid, the utility function, the endpoints, the attacker set,
+the attack database and the decoy design are FROZEN** under standing constraint 6. A
+change means a NEW dated file; this one is superseded, never edited.
+
+#### ⚠⚠ It was nearly signed with a design that could not measure its own claim
+
+Dylan read the proposal's INTRODUCTION — "the output distributions induced by any two
+input paths can be distinguished with the probability of no more than a pre-specified
+privacy parameter tau" — and asked whether that matches how we use `tau`. It does not,
+and the question was worth far more than its answer.
+
+**The definition itself was fine.** The ABSTRACT is precise (TV <= `tau`; no binary
+attacker exceeding (1+`tau`)/2), `docs/terms.md` matched it, and no file in the repo
+stated the loose form. The introduction is WRONG AS WRITTEN rather than merely loose:
+read literally it claims P(attacker succeeds) <= `tau`, which is impossible for any
+`tau` < 0.5 because an attacker who ignores the release and flips a coin already gets
+0.5, and it contradicts the abstract one paragraph above. The missing word is
+ADVANTAGE: advantage = 2(accuracy - 1/2) = TV, so `tau` bounds the attacker's edge over
+a coin, not its success rate. ⚠ A one-line fix is needed in the paper before submission.
+
+**But the audit it prompted found a live false-positive risk on a privacy claim.**
+`scripts/arm2_attack.py` drew every release from `Q_p`, computed the ONE-SIDED rate
+`P_p(Lambda > 0)`, and compared it to `p_succ_bound` — which bounds only the equal-prior
+quantity. From `TPR <= TV + FPR`, a theorem-respecting attacker with FPR 0.5 reaches
+`TPR = tau + 0.5`, exceeding (1+`tau`)/2 at every `tau` > 0; an attacker that always
+answers "p" scores **1.0** one-sided while sitting at exactly chance balanced. **The
+check would have reported a privacy violation with the theorem intact**, and the code's
+own comment said such a measurement "falsifies the implementation" — so the next action
+would have been hunting a bug that does not exist.
+
+⚠ **THE ROOT CAUSE IS THE GENERALISABLE PART: `src/attacks.py` already had a CORRECT
+balanced `empirical_accuracy`, and the script reimplemented it inline, wrongly.** A
+statistic defined twice drifts, and the error lives in the second copy — invisible,
+because the first is right and tested. 265 tests passed over it.
+
+#### The design that was signed, and why 25
+
+The fix needs a draw from `Q_q` as well. The balanced estimator is MORE precise per
+observation — `delta` = 0.879/sqrt(n) against the one-sided 1.243/sqrt(n), and that
+derivation reproduces the recorded 1.243 constant EXACTLY, which is what validated it —
+so matching the committed `delta` took FEWER draws, not more:
+
+| design | draws/target | `delta` | releases | hours |
+|---|---|---|---|---|
+| the one-sided design, as drafted | 50 | 0.0556 | 3,500 | 9.1 — ⚠ INVALID |
+| **balanced, signed** | **25** | **0.0556** | **7,000** | **18.3** |
+| balanced, same draws | 50 | 0.0393 | 14,000 | 36.6 |
+| balanced, cost matched | 12 | 0.0803 | 3,360 | 8.8 |
+
+25 was chosen because `delta` is UNCHANGED, so every claim already written about what
+the experiment licenses (`tau` >= 0.25) stands verbatim, and the cost doubles rather
+than quadruples. The 12-draw option would have moved `delta` to 0.080, which no longer
+resolves below the bound at `tau` = 0.25 and would have quietly narrowed the claim.
+
+#### Three contradictions that signing would have frozen
+
+All three were stale copies of the superseded 300-draw design, left behind when the 7x
+cost error was corrected: the draws-per-target row, the section 6 fixed parameters
+(which reproduced BOTH halves of the error), and — worst — **two ADJACENT TICKED BOXES
+in the signature checklist, item 4 pinning 300 and item 6 pinning 50.** ⚠ A correction
+that does not reach every copy has not landed, and a checklist is the last place a
+contradiction survives unnoticed, because ticked boxes are read as settled.
+
+#### Two typesetting defects in the proposal, verified at glyph level
+
+Theorem 1's likelihood-ratio display and the proof's first step each lack a `<= e`
+before a superscript, leaving an exponent with no base. Verified by comparing glyph
+counts on structurally identical lines: the proof's first line carries three `<=` and
+zero `e`, while a line four below it carries four `<=` and two `e`. One LaTeX slip,
+twice. ⚠ The MATHEMATICS is unaffected — the following line uses the correct
+`1 <= Z_p <= e^(eta_tau)` and tanh(arctanh(`tau`)) = `tau` checks out.
+
+#### And the gate that let twelve stale claims through
+
+The docs contract skips any line carrying an absence marker, on the reasoning that such
+a line is honestly declaring a gap. It had NO CONVERSE: nothing verified a declared gap
+was still a gap, so a line could claim a file was unbuilt forever and the suite would
+agree by looking away. ⚠⚠ **THIS HOLE WAS RECORDED IN `docs/terms.md` ON 2026-10-08 AND
+LEFT OPEN** — "the row survived only because the contract test's _ABSENT_MARKERS skips
+any line containing PLANNED" — and it then swallowed four more claims in the same file.
+A known blind spot left open is worse than an unknown one, because the record makes it
+look handled.
+
+Two converse checks now exist, both mutation-tested with clean controls. ⚠ Getting them
+right took two corrections of my own, and both are worth remembering: the escape for
+corrected text had to become POSITIONAL, because a `docs/data.md` row runs to thousands
+of characters and can carry a [CORRECTION] about one claim while making a stale claim
+about another — a line-wide escape swallowed exactly that and the gate stayed SILENT on
+a verified mutation, which is decoration by this project's own standard. And the escape
+is keyed to the ABSENCE MARKER's position, not the path's, since the path is only what
+the claim is about and usually appears earlier on the row.
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The

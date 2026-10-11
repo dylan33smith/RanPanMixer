@@ -77,12 +77,16 @@ Computed by:          not computed — CHOSEN, and pre-registered before any att
                       tau = 0.05 to 0.25 is the ONLY range claimed as an operating
                       setting; tau = 0.50 is reported as context, not claimed; tau =
                       0.90 and 0.99 are BOUND-CHECKING ONLY.
-                      ⚠⚠ BUT THE FILE IS NOT IN FORCE. Its status line must read
-                      SIGNED with a git_rev, and as of 2026-10-10 FIELD 6 IS [OPEN]
-                      AGAIN — the attack design it pinned was one-sided and could not
-                      measure the quantity p_succ_bound bounds. So the grid is written
-                      but not frozen, no attack may run against it, and
-                      attacks.require_signed_prereg refuses until both are fixed.
+                      ✅ AND THE FILE IS IN FORCE: SIGNED 2026-10-10 by Dylan,
+                      git_rev b5a220f122ca. The grid is FROZEN under constraint 6 — it
+                      does not change because a result is disappointing; a change
+                      means a NEW dated file and this one is never edited.
+                      ⚠ Field 6 was reopened and re-closed on 2026-10-10: the attack
+                      design it had pinned was ONE-SIDED, drawing only from Q_p, and
+                      so could not measure the equal-prior quantity p_succ_bound
+                      bounds at all. Re-closed at the BALANCED 25-draw design, delta
+                      unchanged at 0.056 because averaging two arms is more precise
+                      per observation.
                       [INCORRECT] - The superseded text said the grid "IS NOT PINNED
                       (2026-10-08)" and that the pre-registration "does not exist
                       yet"; it was unblocked by B-EVL-exact-endpoint on 2026-10-10.
@@ -2123,6 +2127,44 @@ Status:               DIAGNOSTIC — demoted from PRIMARY by decision A, 2026-10
 Aliases:              "utility". Never quoted bare without its tau, its denominator, its
                       arm or its u_ceiling. ⚠ Not `target_fidelity`, which is a DIFFER
                       rate in the opposite direction.
+```
+
+### delta  [attack] [evaluation] [gate]
+```
+Is:                   The MINIMUM DETECTABLE ADVANTAGE: the smallest excess over chance
+                      that the pre-registered attack experiment could distinguish from
+                      chance at one-sided 95% with 80% power. It is a property of the
+                      EXPERIMENT's size, not of the mechanism, and it is what makes a
+                      null statement quantitative instead of an absence.
+                      ⚠⚠ WITHOUT IT A NULL IS NOT EVIDENCE (standing constraint 7). An
+                      attacker measured at chance says "accuracy < 0.5 + delta", and
+                      that sentence is only worth something when delta is stated.
+                      ✅ PINNED at delta = 0.056 (prereg field 6, signed 2026-10-10).
+Computed by:          the design, in closed form. For the BALANCED estimator this
+                      project signed, delta = 0.879 / sqrt(n) with n trials PER ARM; for
+                      a one-sided rate it is 1.243 / sqrt(n). Both come from
+                      (z_0.95 + z_0.80) * sd, with sd = 0.354/sqrt(n) balanced against
+                      0.5/sqrt(n) one-sided, because averaging two arms halves the
+                      variance. At n = 250 per arm, delta = 0.0556.
+                      ⚠ The balanced form is MORE precise per observation, which is why
+                      the corrected design needed 25 draws per target rather than 50 to
+                      hold delta fixed. That is also how the formula was validated: the
+                      one-sided branch reproduces the 1.243 constant already on record.
+CHANGES MEANING WITH: the number of trials, and WHICH ESTIMATOR they feed. ⚠ A delta
+                      quoted for a one-sided rate does NOT apply to a balanced accuracy
+                      and vice versa — the constants differ by 1.41x.
+Valid vs:             the same estimator and the same n. ⚠ NEVER compare a delta across
+                      arms or tau values; it is a property of the experiment at one
+                      configuration.
+Status:               PRIMARY — pre-registered, and every null must be reported with it.
+                      ⚠ IT DOES NOT COVER THE WHOLE tau GRID, and saying so is required:
+                      at tau = 0.05 the bound permits 0.525 while the experiment can
+                      only state "< 0.556", so the PROOF carries tau <= 0.10 and the
+                      EXPERIMENT carries tau >= 0.25. Reporting a uniform null across
+                      all seven points as seven pieces of evidence would overstate it.
+Aliases:              "MDE", "minimum detectable effect" — acceptable in prose, but the
+                      row label is `delta`. ⚠ NOT a p-value and NOT an effect size that
+                      was measured; it is the resolution floor of the instrument.
 ```
 
 ### attacker_accuracy  [attack] [evaluation] [gate]
