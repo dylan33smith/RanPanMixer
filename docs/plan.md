@@ -272,7 +272,7 @@ One chunk = one review gate: nothing downstream starts until the chunk is review
 | 5 | **The pre-registration**: eight fields decided with Dylan, audited, and SIGNED 2026-10-10 | ✅ done |
 | 6 | **Genome-scale data, and releases that can be quoted.** (a) 22-autosome cohort build (b) 1000G 30x panel (c) **genome-wide TARGET preprocessing** (d) releases through provenance, which forced decision K | ⚠ **3 of 4 — (c) is open: all 10 targets exist on chr21 ONLY** |
 | 7 | **The Arm 2 attack run** — balanced, 25 draws per `tau` per hypothesis, 7,000 releases, ~18.3 h on chr21 | ⬜ unblocked; independent of 6(c) |
-| 8 | **Arm 1 leave-one-out releases** — 44 cohort members, diploid, 22 autosomes, K = 86 | ⬜ needs 6(c) ⚠ and see the risk below |
+| 8 | **Arm 1 leave-one-out releases** — 44 cohort members, diploid, 22 autosomes, K = 86 | ⬜ needs 6(c). ✅ **ALIGNMENT CONFIRMED 2026-10-11**: PanMixer obfuscates ONE individual per experiment, independently, against the ORIGINAL panel, and already does leave-one-out (`hmm.py:42-43`) — so our design matches theirs and is NOT order-dependent. ⚠ One difference to declare: their LOO applies at sampling but not at PMI block scoring (`hmm.py:122` uses all 88 haplotypes). ⚠ And see the per-target chain risk below |
 | 9 | **The PanMixer head-to-head** — their own evaluations on our build, so the comparison is direct | ⬜ needs 8 |
 | 10 | **The writeup** — two sections, one per arm | ⬜ |
 

@@ -1269,6 +1269,69 @@ the familiar one in a new place: the test for the direction you did not think ab
 the one that finds the hole.
 
 
+### 13. [CHUNK 8, groundwork] PanMixer's evaluation shape, read from its code — and our LOO ALIGNS
+
+Dylan asked three questions that decide whether Arm 1 is a like-for-like comparison.
+Answered by reading the published code at `external/PanMixer`, 103 agents, every claim
+verified against the cited lines. ⚠ `find` must be given `-L`; the tree is a symlink and
+plain `find` returns nothing, which is the same trap that cost two false findings earlier.
+
+**Q1 — one individual, or all? ONE AT A TIME, INDEPENDENTLY.** The unit of work is one
+`(subject, capacity)` ROW. `tools/common/experiment_starter.py:57-60` writes `data.csv` as
+the cross product of the subjects file and the capacity file, and each row becomes an
+independent SLURM array task over `(row_id, chromosome)`. The shipped default is 4
+subjects x 3 capacities = 12 rows; the full subjects file holds the 44.
+
+⚠ **AND THE EVALUATION SWAPS EXACTLY ONE PERSON INTO AN OTHERWISE-TRUE COHORT.**
+`af_loss.py:163-164`: `new_pangenome = original_haplotypes.copy()` then
+`new_pangenome[subject_index] = interested_variants` — BOTH haplotypes of exactly one
+individual replaced, the other 43 left at their true values. So "obfuscating the whole
+graph" is not what is measured; 44 single-individual experiments are.
+
+**Q2 — are the metrics about AF distributions? ONE OF FOUR IS, and Dylan's instinct was
+right about it.** The default pipeline (`run_main.py:40-43`) runs four downstream
+measurements:
+
+| metric | what it computes | file |
+|---|---|---|
+| `af_loss` | **L1 change in cohort allele frequency per variant**, `abs(af_orig - af_new)` summed and divided by the count, reported overall AND stratified by global MAF bins | `utility_in/af_loss.py:119`, `:172-177`, strata at `:13-40` |
+| `ld_loss` | L1 change in **r^2 over SNP pairs**, `np.nansum(np.abs(master_r2 - other_r2))` | `utility_in/ld_loss.py:119` |
+| `diploid_gap_score` | privacy: the target's self-score MINUS its best 1000G attack-database match | `privacy/diploid_gap_score.py:281-287` |
+| `MIA_privacy` | membership inference: allele/genotype match counts against self AND against the other 43 | `privacy/MIA_privacy.py:31-51`, `:80-100` |
+
+✅ **Our `af_loss` entry in `docs/terms.md` already described this correctly**, including
+the subtle part — that Arm 1 REPLACES one of the 44 columns so the row count is 44 on both
+sides and the ~1/45 frequency shift does not arise. Nothing needed correcting.
+
+**Q3 — THE SHARP ONE: is the result order-dependent? NO, AND OUR LOO ALIGNS.** The panel
+each donor is obfuscated against is **(a) the original unobfuscated cohort**, not a
+partially-obfuscated one. Every reference to `pangenome.npy` under `tools/` is a READ
+(`optimizer.py:163`; `stacker.py:44,47,50`; `convert_2_vcf.py:110`; `af_loss.py:146`;
+`ld_loss.py:130`; `MIA_privacy.py:67`; `diploid_gap_score.py:163` with `mmap_mode='r'`),
+the file is never rewritten, and each row writes only into its own
+`exp_N/data/chr{c}/{row_id}/`. `optimize` is submitted with NO dependency at all
+(`run_main.py:76` `clear_dependency()`), so the rows run in PARALLEL from one immutable
+input. Independent jobs reading the same input is order-independence by construction.
+
+⚠⚠ **AND PANMIXER ALREADY DOES LEAVE-ONE-OUT.** `starting_data/scripts/src/hmm.py:42-43`
+builds each target's HMM reference panel by DELETING that target from the original
+pangenome. So our Arm 1 LOO is not a departure from their method — it matches it.
+
+⚠ **ONE DIFFERENCE TO DECIDE DELIBERATELY, stated neutrally.** Their leave-one-out is
+applied at the SAMPLING step but not at the block-SCORING step: the forward algorithm
+used to score blocks for PMI uses the full 44-donor / 88-haplotype matrix INCLUDING the
+target (`hmm.py:122`, called from `get_support_and_pmi.py:91-92` and `obfuscate.py:250-251`),
+while the donor panel sampled from is the leave-one-out slice (`hmm.py:42-43`). This is a
+design choice in service of THEIR objective, which is donor protection, not ours; it is
+not a defect and we make no claim about it. But Arm 1 must decide whether to match it or
+to apply LOO at both steps, and SAY WHICH — the two give different numbers and the
+comparison is only direct if the choice is declared.
+
+⚠ A second difference worth recording: blocks that are single-SNP or carry <= 1 anchor SNP
+are drawn independently per site from a precomputed allele-frequency table rather than
+from the donor panel at all (`obfuscate.py:264-271`, `get_support_and_pmi.py:159-179`).
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The
