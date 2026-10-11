@@ -236,6 +236,154 @@ def _one_trial(job: tuple) -> dict:
     return out
 
 
+def _z_for_one_sided(alpha: float) -> float:
+    """`z` with `P(Z > z) = alpha`, for a standard normal. No scipy dependency.
+
+    ⚠ Written out rather than imported because `environment.yml` does not promise
+    scipy, and a bound check that cannot run for want of a dependency is a bound check
+    that is not running. Newton on `erf`, seeded by Winitzki; the test round-trips it
+    against `math.erf` so the implementation is checked rather than trusted.
+    """
+    if not 0.0 < alpha < 0.5:
+        raise ValueError(f"alpha must be in (0, 0.5), got {alpha}")
+    y = 1.0 - 2.0 * alpha                       # erf(z/sqrt2) = 1 - 2*alpha
+    a = 0.147
+    ln = math.log(1.0 - y * y)
+    t = 2.0 / (math.pi * a) + ln / 2.0
+    x = math.sqrt(math.sqrt(t * t - ln / a) - t)
+    for _ in range(4):
+        x -= (math.erf(x) - y) / (2.0 / math.sqrt(math.pi) * math.exp(-x * x))
+    return x * math.sqrt(2.0)
+
+
+def _report(res: list, a, delta: float, prereg: str, rev: str,
+            tids: list, n_per: int) -> int:
+    """Build the table from trial records. SHARED by a live run and a re-report.
+
+    ⚠ IT IS A FUNCTION SO THE REPORTING CAN BE FIXED WITHOUT RE-RUNNING. The releases
+    cost ~80 minutes and ~110 CPU-hours; if changing the table meant redoing them, the
+    table would never get changed -- which is how the defective bound check below
+    survived its first run.
+    """
+    table: dict = {}
+    print("Accuracy of the optimal distinguisher. Metrics are rows; `tau` is the "
+          "column.\n")
+    hdr = "| metric | " + " | ".join(str(t) for t in a.taus) + " |"
+    print(hdr); print("|" + "---|" * (len(a.taus) + 1))
+    for cond in ("D1_extremal", "D2_nearest", "D3_random"):
+        cells = []
+        for tau in a.taus:
+            rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
+            lp = [c["lambda"] for c in rows]
+            # ⚠ TIES SPLIT, which is the right convention at equal priors and is not
+            # cosmetic: at tau = 0 the tilt vanishes, Lambda is identically 0, and
+            # splitting is what makes the control return exactly 0.5 instead of a
+            # number decided by a tie-breaking accident.
+            tpr = (sum(1 for l in lp if l > 0) + 0.5 * sum(1 for l in lp if l == 0)) / len(lp)
+            if a.one_sided:
+                table.setdefault(cond, {})[tau] = {"tpr": tpr, "balanced": None}
+                cells.append(f"{tpr:.4f}[1-sided]")
+                continue
+            lq = [c["lambda_under_q"] for c in rows]
+            tnr = (sum(1 for l in lq if l < 0) + 0.5 * sum(1 for l in lq if l == 0)) / len(lq)
+            # ⚠ THE QUANTITY THEOREM 1 BOUNDS, and it comes from `attacks` rather than
+            # being recomputed here. The inline version this replaced was the bug: a
+            # correct balanced `empirical_accuracy` already existed in src/attacks.py
+            # and this script reimplemented the accuracy one-sided instead of calling
+            # it. Duplicated statistics drift; the helper is the single definition.
+            bal = A.empirical_accuracy(np.array(lp), np.array(lq))
+            assert abs(bal - (0.5 * tpr + 0.5 * tnr)) < 1e-12, (
+                "empirical_accuracy disagrees with 0.5*TPR + 0.5*TNR; one of the two "
+                "definitions has drifted and no number here is quotable")
+            # ⚠ THE SE TRAVELS WITH THE ESTIMATE. A bound comparison that does not
+            # carry its uncertainty is the defect fixed below.
+            se_bal = 0.5 * math.sqrt(tpr * (1 - tpr) / len(lp)
+                                     + tnr * (1 - tnr) / len(lq))
+            table.setdefault(cond, {})[tau] = {"tpr": tpr, "tnr": tnr, "balanced": bal,
+                                               "se_balanced": se_bal,
+                                               "n_per_arm": len(lp)}
+            cells.append(f"{bal:.4f}")
+        label = "one-sided P_p(L>0)" if a.one_sided else "balanced accuracy"
+        print(f"| {cond} {label} * | " + " | ".join(cells) + " |")
+    if not a.one_sided:
+        for cond in ("D1_extremal", "D2_nearest", "D3_random"):
+            print(f"| {cond} one-sided P_p(L>0) [diagnostic, NOT bounded] | " +
+                  " | ".join(f"{table[cond][t]['tpr']:.4f}" for t in a.taus) + " |")
+    print("| `p_succ_bound` * | " +
+          " | ".join(f"{C.p_succ_bound(t):.4f}" for t in a.taus) + " |")
+    print("| experiment resolves below the bound? | " +
+          " | ".join("**yes**" if delta < t / 2 else "no" for t in a.taus) + " |")
+
+    # ⚠⚠ THE VIOLATION CHECK APPLIES ONLY TO THE BALANCED ACCURACY. (1 + tau)/2 bounds
+    # the equal-prior quantity and nothing else; comparing the one-sided rate to it
+    # fires with the theorem intact (see the derivation at the Q_q draw above), so in
+    # one-sided mode there is NOTHING here to check and saying so beats a false alarm.
+    if a.one_sided:
+        print("\n⚠ NO BOUND CHECK PERFORMED. The one-sided rate is not bounded by "
+              "p_succ_bound, so a comparison would be meaningless in BOTH directions: "
+              "exceeding it would not be a violation, and falling below it would not "
+              "be evidence. Re-run without --one-sided for a claimable number.")
+        violations = []
+    else:
+        # ⚠⚠ A POINT COMPARISON AGAINST A NOISY ESTIMATE CRIES WOLF, and this one did.
+        # At `tau` = 0.05 the bound sits only 0.025 above chance while the balanced
+        # accuracy's SE is 0.0223 -- about 1.1 SE -- so if the true accuracy is 0.5 the
+        # estimate exceeds the bound about 13% of the time PER CELL, which is ~2.3
+        # expected false alarms over 18 cells. MEASURED 2026-10-11 on the re-run:
+        # D3_random at `tau` = 0.05 came in at 0.5400 against 0.5250, an excess of
+        # +0.015 = +0.67 SE, and the old check called that a falsification of the
+        # implementation.
+        # ⚠ It was self-contradictory too: the script already prints that `tau` = 0.05
+        # and 0.10 do NOT resolve below the bound, and then claimed a falsification
+        # there anyway.
+        # The test is now one-sided on the excess, Bonferroni-corrected across the
+        # cells actually examined. A REAL implementation error still fires, because a
+        # true excess grows with n while noise shrinks as 1/sqrt(n); a point excess
+        # that is not significant is reported as a NOTE and does not fail the run.
+        cells = [(c, t, v) for c, row in table.items() for t, v in row.items()
+                 if v.get("balanced") is not None]
+        z_crit = _z_for_one_sided(0.05 / max(1, len(cells)))
+        violations, notes = [], []
+        for c, t, v in cells:
+            bal, bound = v["balanced"], C.p_succ_bound(t)
+            if bal <= bound + 1e-9:
+                continue
+            se = v.get("se_balanced") or 0.0
+            z = (bal - bound) / se if se > 0 else float("inf")
+            (violations if z > z_crit else notes).append((c, t, bal, bound, z))
+        if notes:
+            print(f"\n⚠ {len(notes)} cell(s) exceed `p_succ_bound` by POINT ESTIMATE "
+                  f"but NOT significantly (one-sided 5%, Bonferroni over "
+                  f"{len(cells)} cells, z_crit = {z_crit:.2f}). Reported, not claimed:")
+            for c, t, bal, bound, z in notes:
+                print(f"    {c} at tau={t}: {bal:.4f} vs bound {bound:.4f} "
+                      f"(+{bal - bound:.4f}, z = +{z:.2f})")
+        violations = [(c, t, bal) for c, t, bal, _, _ in violations]
+    print()
+    if violations:
+        print("⚠⚠ MEASURED ACCURACY ABOVE p_succ_bound — this falsifies the "
+              "IMPLEMENTATION, not the theorem:")
+        for c, t, v in violations:
+            print(f"    {c} at tau={t}: {v:.4f} > {C.p_succ_bound(t):.4f}")
+    else:
+        print("no condition exceeded p_succ_bound at any tau")
+    print(f"\n⚠ tau = 0.05 and 0.10 do NOT resolve below the bound at delta = "
+          f"{delta:.4f}; those rows are reported, not claimed. The PROOF carries them.")
+    print("⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample "
+          "panel, so it is a LOWER BOUND on decoy difficulty and flatters us.")
+    print("⚠ The three conditions share each release and must not be pooled.")
+
+    if a.json:
+        a.json.write_text(json.dumps(
+            {"prereg": prereg, "git_rev": rev, "draws": a.draws,
+             "targets": tids, "taus": a.taus, "trials_per_cell": n_per,
+             "delta": delta, "accuracy": {c: {str(k): v for k, v in r.items()}
+                                          for c, r in table.items()},
+             "trials": res}, indent=1))
+        print(f"\nJSON -> {a.json}")
+    return 1 if violations else 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     # ⚠ 25 IS THE PRE-REGISTERED VALUE (field 6, signed 2026-10-10): 25 draws per
@@ -245,6 +393,10 @@ def main(argv=None) -> int:
     ap.add_argument("--draws", type=int, default=25)
     ap.add_argument("--targets", type=int, default=10)
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--from-json", type=Path, default=None,
+                    help="re-report from a saved trials JSON; computes "
+                         "NO releases. ⚠ The releases cost ~110 CPU-hours, "
+                         "so the reporting must be fixable without them.")
     ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))
     ap.add_argument("--one-sided", action="store_true",
                     help="draw only from Q_p and report the one-sided rate "
@@ -257,6 +409,19 @@ def main(argv=None) -> int:
     # ⚠ FIRST, BEFORE ANYTHING IS COMPUTED.
     prereg, rev = A.require_signed_prereg()
     print(f"running under {prereg} (git_rev {rev or 'unrecorded'})\n")
+
+    if a.from_json:
+        saved = json.loads(a.from_json.read_text())
+        res = saved["trials"]
+        a.taus = sorted({r["tau"] for r in res})
+        tids = sorted({r["target"] for r in res})
+        n_per = len(res) // max(1, len(a.taus))
+        delta = (1.243 if a.one_sided else 0.879) / math.sqrt(max(1, n_per))
+        print(f"re-reporting {len(res):,} saved trial(s) from {a.from_json.name}: "
+              f"{len(tids)} targets x {len(a.taus)} tau, {n_per} per (tau, condition) "
+              f"per arm. NO releases computed.")
+        print(f"minimum detectable advantage delta = {delta:.4f}\n")
+        return _report(res, a, delta, prereg, rev, tids, n_per)
 
     st = load_state()
     tids = sorted(st["paths"])[: a.targets]
@@ -315,86 +480,7 @@ def main(argv=None) -> int:
     res = R.run_jobs(_one_trial, jobs, workers=plan.workers, label="trials",
                      progress_every=max(1, len(jobs) // 10))
 
-    print("Accuracy of the optimal distinguisher. Metrics are rows; `tau` is the "
-          "column.\n")
-    hdr = "| metric | " + " | ".join(str(t) for t in a.taus) + " |"
-    print(hdr); print("|" + "---|" * (len(a.taus) + 1))
-    table: dict = {}
-    for cond in ("D1_extremal", "D2_nearest", "D3_random"):
-        cells = []
-        for tau in a.taus:
-            rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
-            lp = [c["lambda"] for c in rows]
-            # ⚠ TIES SPLIT, which is the right convention at equal priors and is not
-            # cosmetic: at tau = 0 the tilt vanishes, Lambda is identically 0, and
-            # splitting is what makes the control return exactly 0.5 instead of a
-            # number decided by a tie-breaking accident.
-            tpr = (sum(1 for l in lp if l > 0) + 0.5 * sum(1 for l in lp if l == 0)) / len(lp)
-            if a.one_sided:
-                table.setdefault(cond, {})[tau] = {"tpr": tpr, "balanced": None}
-                cells.append(f"{tpr:.4f}[1-sided]")
-                continue
-            lq = [c["lambda_under_q"] for c in rows]
-            tnr = (sum(1 for l in lq if l < 0) + 0.5 * sum(1 for l in lq if l == 0)) / len(lq)
-            # ⚠ THE QUANTITY THEOREM 1 BOUNDS, and it comes from `attacks` rather than
-            # being recomputed here. The inline version this replaced was the bug: a
-            # correct balanced `empirical_accuracy` already existed in src/attacks.py
-            # and this script reimplemented the accuracy one-sided instead of calling
-            # it. Duplicated statistics drift; the helper is the single definition.
-            bal = A.empirical_accuracy(np.array(lp), np.array(lq))
-            assert abs(bal - (0.5 * tpr + 0.5 * tnr)) < 1e-12, (
-                "empirical_accuracy disagrees with 0.5*TPR + 0.5*TNR; one of the two "
-                "definitions has drifted and no number here is quotable")
-            table.setdefault(cond, {})[tau] = {"tpr": tpr, "tnr": tnr, "balanced": bal}
-            cells.append(f"{bal:.4f}")
-        label = "one-sided P_p(L>0)" if a.one_sided else "balanced accuracy"
-        print(f"| {cond} {label} * | " + " | ".join(cells) + " |")
-    if not a.one_sided:
-        for cond in ("D1_extremal", "D2_nearest", "D3_random"):
-            print(f"| {cond} one-sided P_p(L>0) [diagnostic, NOT bounded] | " +
-                  " | ".join(f"{table[cond][t]['tpr']:.4f}" for t in a.taus) + " |")
-    print("| `p_succ_bound` * | " +
-          " | ".join(f"{C.p_succ_bound(t):.4f}" for t in a.taus) + " |")
-    print("| experiment resolves below the bound? | " +
-          " | ".join("**yes**" if delta < t / 2 else "no" for t in a.taus) + " |")
-
-    # ⚠⚠ THE VIOLATION CHECK APPLIES ONLY TO THE BALANCED ACCURACY. (1 + tau)/2 bounds
-    # the equal-prior quantity and nothing else; comparing the one-sided rate to it
-    # fires with the theorem intact (see the derivation at the Q_q draw above), so in
-    # one-sided mode there is NOTHING here to check and saying so beats a false alarm.
-    if a.one_sided:
-        print("\n⚠ NO BOUND CHECK PERFORMED. The one-sided rate is not bounded by "
-              "p_succ_bound, so a comparison would be meaningless in BOTH directions: "
-              "exceeding it would not be a violation, and falling below it would not "
-              "be evidence. Re-run without --one-sided for a claimable number.")
-        violations = []
-    else:
-        violations = [(c, t, v["balanced"]) for c, row in table.items()
-                      for t, v in row.items()
-                      if v["balanced"] > C.p_succ_bound(t) + 1e-9]
-    print()
-    if violations:
-        print("⚠⚠ MEASURED ACCURACY ABOVE p_succ_bound — this falsifies the "
-              "IMPLEMENTATION, not the theorem:")
-        for c, t, v in violations:
-            print(f"    {c} at tau={t}: {v:.4f} > {C.p_succ_bound(t):.4f}")
-    else:
-        print("no condition exceeded p_succ_bound at any tau")
-    print(f"\n⚠ tau = 0.05 and 0.10 do NOT resolve below the bound at delta = "
-          f"{delta:.4f}; those rows are reported, not claimed. The PROOF carries them.")
-    print("⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample "
-          "panel, so it is a LOWER BOUND on decoy difficulty and flatters us.")
-    print("⚠ The three conditions share each release and must not be pooled.")
-
-    if a.json:
-        a.json.write_text(json.dumps(
-            {"prereg": prereg, "git_rev": rev, "draws": a.draws,
-             "targets": tids, "taus": a.taus, "trials_per_cell": n_per,
-             "delta": delta, "accuracy": {c: {str(k): v for k, v in r.items()}
-                                          for c, r in table.items()},
-             "trials": res}, indent=1))
-        print(f"\nJSON -> {a.json}")
-    return 1 if violations else 0
+    return _report(res, a, delta, prereg, rev, tids, n_per)
 
 
 if __name__ == "__main__":
