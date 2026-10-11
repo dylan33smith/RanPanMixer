@@ -38,6 +38,7 @@ experiment. Those rows are still reported, labelled as not resolving below the b
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -61,6 +62,9 @@ from mechanism import ffbs, hmm, utility  # noqa: E402
 TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 CHROM = "chr21"
 DECOY_SEED = 20261010
+# the release-stream base; the per-cell seed is a SeedSequence over
+# (SEED_BASE, target index, tau index, draw index) -- see main().
+SEED_BASE = 50_000
 
 _STATE: dict = {}
 
@@ -155,7 +159,17 @@ def _one_trial(job: tuple) -> dict:
     st = load_state()
     eta = C.eta_tau(tau)
     p = st["paths"][target_id]
-    rng = np.random.default_rng([DECOY_SEED, hash(target_id) % (1 << 31)])
+    # ⚠⚠ NOT `hash(target_id)`. Python's str hash is randomised per interpreter by
+    # PYTHONHASHSEED, so the decoy choice was NOT REPRODUCIBLE -- measured,
+    # hash('HG00096') % 2**31 returned 1730677557, 783898805 and 1043054338 on three
+    # invocations of the same binary. The recorded run is self-consistent only because
+    # `fork` inherits the parent's hash seed; a re-run picks a DIFFERENT D3 decoy, so
+    # that cell could never have been reproduced from its recorded seed. A
+    # pre-registered experiment whose decoy set is not reproducible is not
+    # pre-registered in the sense constraint 6 means.
+    # sha256 is stable across interpreters, machines and versions.
+    stable = int.from_bytes(hashlib.sha256(target_id.encode()).digest()[:4], "big")
+    rng = np.random.default_rng([DECOY_SEED, stable])
     decoys = pick_decoys(target_id, st, rng)
 
     rel = ffbs.release(st["model"], st["hap"], p, st["util"], tau, seed=seed,
@@ -246,7 +260,28 @@ def main(argv=None) -> int:
 
     st = load_state()
     tids = sorted(st["paths"])[: a.targets]
-    jobs = [(t, tau, 50_000 + i, a.one_sided) for tau in a.taus for t in tids
+    # ⚠⚠ THE SEED MUST DEPEND ON THE WHOLE CELL. The previous form was
+    #     (t, tau, 50_000 + i, ...)
+    # which derives the seed from the DRAW INDEX ALONE, so all 10 targets and all 7
+    # `tau` reused seeds 50000..50024. With a per-position tilt of
+    # eta * mean(beta) = 0.2554 / 332,521 = 7.7e-07 the tilt cannot move the draw, so
+    # the released path was BIT-IDENTICAL across tau at a fixed seed -- MEASURED:
+    # u_p = 0.588012460 at tau = 0, 0.05 AND 0.25, to nine digits. The seven tau
+    # columns were ONE experiment reported seven times, the ten targets were
+    # near-replicates (cross-target correlation +0.305 at fixed seed), and the naive
+    # standard error was about 2x too narrow.
+    # ⚠⚠ THIS IS THE THIRD OCCURRENCE OF A TWICE-DOCUMENTED FAILURE. `docs/bugs.md`
+    # has "A headline finding measured under common random numbers" (2026-09-30), and
+    # `docs/memory.md` records seed reuse across chromosomes correlating two
+    # chromosomes of one release. Read those before touching this line.
+    # The fix: a SeedSequence over the full key, so every (target, tau, draw) cell
+    # draws from a provably disjoint stream while staying reproducible from the key.
+    def _cell_seed(ti: int, taui: int, i: int) -> int:
+        return int(np.random.SeedSequence([SEED_BASE, ti, taui, i]).generate_state(1)[0])
+
+    jobs = [(t, tau, _cell_seed(ti, taui, i), a.one_sided)
+            for taui, tau in enumerate(a.taus)
+            for ti, t in enumerate(tids)
             for i in range(a.draws)]
     n_per = len(tids) * a.draws
     # ⚠⚠ THE CONSTANT DEPENDS ON THE ESTIMATOR, and using the wrong one misstates

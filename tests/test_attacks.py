@@ -421,3 +421,111 @@ def test_the_decision_k_addendum_exists_and_is_signed() -> None:
     assert "NOT NAMED" in text, (
         "the addendum must say WHY it is not named prereg_*, or the next person will "
         "name theirs that way")
+
+
+# ---------------------------------------------------------------------------
+# ⚠⚠ COMMON RANDOM NUMBERS, THE THIRD OCCURRENCE. `docs/bugs.md` carries "A headline
+# finding measured under common random numbers" (2026-09-30) and `docs/memory.md`
+# records seed reuse correlating two chromosomes of one release. The Arm 2 attack
+# then derived its seed from the DRAW INDEX ALONE, so all 10 targets and all 7 `tau`
+# reused 25 seeds. With a per-position tilt of 7.7e-07 the released path was
+# bit-identical across `tau` at a fixed seed, the seven `tau` columns were one
+# experiment reported seven times, and the naive standard error was ~2x too narrow.
+#
+# These tests exist so a fourth occurrence fails here rather than in a result table.
+# ---------------------------------------------------------------------------
+
+def _code_only(path: Path) -> str:
+    """Source with COMMENTS AND DOCSTRINGS STRIPPED, for structural assertions.
+
+    ⚠ Needed because the comments explaining a fix QUOTE the defective code they
+    replaced -- which is exactly what you want in a comment and exactly what breaks a
+    naive substring check. The first version of the two tests below failed on the
+    very comments documenting the fix. `tokenize` drops comment tokens properly
+    rather than guessing where a `#` is a comment and where it is inside a string.
+    """
+    import io
+    import tokenize
+    out = []
+    prev_type = None
+    for tok in tokenize.generate_tokens(io.StringIO(path.read_text()).readline):
+        if tok.type == tokenize.COMMENT:
+            continue
+        # a bare STRING on its own logical line is a docstring
+        if tok.type == tokenize.STRING and prev_type in (tokenize.INDENT,
+                                                         tokenize.NEWLINE,
+                                                         tokenize.NL, None):
+            prev_type = tok.type
+            continue
+        out.append(tok.string)
+        if tok.type not in (tokenize.NL, tokenize.NEWLINE):
+            prev_type = tok.type
+    # ⚠ WHITESPACE-FREE, and the needles below must be too. Joining tokens with
+    # spaces turns `f(a, b)` into `f ( a , b )`, so a natural-looking substring
+    # check fails on correct code -- which is what the first two versions of these
+    # tests did. Normalising both sides removes the whole question.
+    return "".join("".join(out).split())
+
+
+def test_the_cell_seed_differs_across_target_tau_and_draw() -> None:
+    """Every (target, tau, draw) cell must draw from its own stream."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "arm2", Path(__file__).resolve().parents[1] / "scripts" / "arm2_attack.py")
+    # the derivation is a closure inside main(), so reproduce it exactly here and
+    # pin the PROPERTY rather than the implementation
+    import numpy as _np
+
+    def cell(ti, taui, i, base=50_000):
+        return int(_np.random.SeedSequence([base, ti, taui, i]).generate_state(1)[0])
+
+    seeds = {cell(ti, taui, i)
+             for ti in range(10) for taui in range(7) for i in range(25)}
+    assert len(seeds) == 10 * 7 * 25, (
+        f"{10*7*25 - len(seeds)} seed collision(s) across the grid. A collision means "
+        f"two cells share a draw, which is the common-random-numbers failure this "
+        f"test exists for.")
+    # and it must be REPRODUCIBLE from the key
+    assert cell(3, 4, 5) == cell(3, 4, 5)
+    # changing ANY component must change the stream
+    assert cell(3, 4, 5) != cell(4, 4, 5)
+    assert cell(3, 4, 5) != cell(3, 5, 5)
+    assert cell(3, 4, 5) != cell(3, 4, 6)
+
+
+def test_the_attack_does_not_seed_from_the_draw_index_alone() -> None:
+    """⚠ STRUCTURAL. The defect was literally `50_000 + i` in the job list. This
+    fails if anyone reintroduces a seed that ignores the target or the tau."""
+    src = _code_only(Path(__file__).resolve().parents[1] / "scripts" / "arm2_attack.py")
+    assert "50_000+i" not in src, (
+        "the job list seeds from the draw index alone again -- all targets and all "
+        "tau would share 25 streams (common random numbers, third occurrence)")
+    assert "_cell_seed(ti,taui,i)" in src, (
+        "the per-cell seed derivation is gone; the seed must depend on the target "
+        "index, the tau index AND the draw index")
+
+
+def test_decoy_selection_uses_a_stable_hash() -> None:
+    """⚠ Python's str `hash` is randomised per interpreter by PYTHONHASHSEED, so a
+    decoy chosen through it cannot be reproduced from the recorded seed -- measured,
+    three invocations gave 1730677557, 783898805 and 1043054338 for 'HG00096'. A
+    pre-registered experiment whose decoy set is irreproducible is not
+    pre-registered in the sense standing constraint 6 means."""
+    src = _code_only(Path(__file__).resolve().parents[1] / "scripts" / "arm2_attack.py")
+    assert "hash(target_id)" not in src, (
+        "decoy selection is back on Python's randomised str hash")
+    assert "hashlib.sha256(target_id.encode())" in src, (
+        "decoy selection must derive from a hash that is stable across interpreters")
+
+
+def test_a_stable_hash_really_is_stable_across_processes() -> None:
+    """Not a tautology: it runs a FRESH interpreter twice and compares, which is the
+    only way to catch a per-process randomised hash."""
+    import subprocess
+    import sys as _sys
+    prog = ("import hashlib;"
+            "print(int.from_bytes(hashlib.sha256(b'HG00096').digest()[:4],'big'))")
+    outs = {subprocess.run([_sys.executable, "-I", "-c", prog],
+                           capture_output=True, text=True).stdout.strip()
+            for _ in range(3)}
+    assert len(outs) == 1, f"the 'stable' hash varied across processes: {outs}"
