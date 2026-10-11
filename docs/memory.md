@@ -1104,7 +1104,7 @@ the seek check, so the mtimes were touched forward — the warning was noise tha
 have masked a real index problem.
 
 
-### 11. [CHUNK 7] The pre-registration is SIGNED — and what the day's audit changed first
+### 11. [CHUNK 5, completion] The pre-registration is SIGNED — and what the audit changed first
 
 ✅ **SIGNED 2026-10-10 by Dylan.** `git_rev` b5a220f122ca89f88d80805a3b19d8bc22546451, which is HEAD at the moment of
 signing and therefore the PARENT of the signing commit. Recorded that way on purpose: a
@@ -1204,7 +1204,7 @@ is keyed to the ABSENCE MARKER's position, not the path's, since the path is onl
 the claim is about and usually appears earlier on the row.
 
 
-### 12. [CHUNK 8] Decision K — the blocks no donor spans leave the chain
+### 12. [CHUNK 6d] Decision K — the blocks no donor spans leave the chain
 
 **Found by RUNNING the release, not by a test.** 307 tests pass and none of them walks a
 real genome-scale chain, so the dead end only appeared when `scripts/run_mechanism_chr21.py`

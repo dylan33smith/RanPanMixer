@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-11 (chunk 6 is **3 of 4**: cohorts, panel and the release writer are done, genome-wide TARGET preprocessing is not. Chunks 7 and 8 ran out of order because an audit finding and a blocker forced them.)
+**Last updated:** 2026-10-11 (chunk 5 SIGNED; chunk 6 is **3 of 4** — cohorts, panel and the release writer done, genome-wide TARGET preprocessing open. Next: chunk 7, the Arm 2 attack run.)
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -245,40 +245,59 @@ variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2
 
 ## ⚠ THE CHUNK MAP — the review-gated plan, and where we are
 
-Reconstructed and verified against `docs/memory.md`'s archive headers and the ledger on
-2026-10-11. One chunk = one review gate: nothing downstream starts until the chunk is
-reviewed, which is the whole point of the structure.
+⚠ **[CORRECTION - 2026-10-11] THERE ARE TEN WORKING CHUNKS, 1 through 10, plus chunk 0
+as pre-work. An earlier version of this map had THIRTEEN, which I invented.** The error
+was treating two stretches of forced work as NEW chunks and renumbering the planned ones
+behind them. They were not new chunks — they were work INSIDE chunks 5 and 6:
 
-| chunk | what it covered | state |
+- the `tau`-definition audit and the pre-registration SIGNATURE are **chunk 5's
+  completion**, not a chunk 7. Chunk 5 was "decide the pre-registration's eight fields";
+  signing it is what finishes that, and the audit reopened and re-closed field 6.
+- the release writer and **decision K** are **chunk 6(d)**, not a chunk 8. Chunk 6
+  always included "route releases through provenance"; decision K was forced by actually
+  running it.
+
+Renumbering the planned work is the worse half of the mistake: it moved the Arm 2 attack
+from chunk 7 to chunk 10 in a document people read to know what is next.
+
+One chunk = one review gate: nothing downstream starts until the chunk is reviewed.
+
+| chunk | what it covers | state |
 |---|---|---|
-| 0 | Clear the known-wrong facts out of the authority docs before phase B code reads them | ✅ done |
+| 0 | Pre-work: clear the known-wrong facts out of the authority docs before phase B code reads them | ✅ done |
 | 1 | `B-THY-diploid-gate` — a diploid, two-segment falsification gate | ✅ done |
-| 2 | `B-IMP-genomewide` — make `beta_v` sum to 1 genome-wide with a per-chromosome share | ✅ done |
+| 2 | `B-IMP-genomewide` — `beta_v` sums to 1 genome-wide, per-chromosome share | ✅ done |
 | 3 | `B-DAT-map-coverage` — how much of each autosome the genetic map speaks to | ✅ done |
 | 4 | The declared rate settled; the exact endpoint at genome shares; gaps skipped; the arm guard; the toy genome | ✅ done |
-| 5 | The pre-registration's eight fields, decided one at a time with Dylan | ✅ done. ⚠ Never archived under a chunk label in `docs/memory.md` — the first place the labelling broke |
-| 6 | **Genome-scale data, and releases that can be quoted.** (a) the 22-autosome cohort build (b) the 1000G 30x panel (c) **genome-wide TARGET preprocessing** (d) releases routed through provenance | ⚠ **3 of 4.** (a) ✅ (b) ✅ (d) ✅ — **(c) is NOT done: all 10 targets exist on chr21 ONLY** |
-| 7 | The `tau`-definition audit and the pre-registration SIGNATURE | ✅ done. ⚠ UNPLANNED — forced by Dylan reading the proposal's introduction. It found a live false-positive risk on a privacy claim and three contradictions that signing would have frozen |
-| 8 | The release writer, and **decision K** | ✅ done. ⚠ UNPLANNED — forced by a blocker that appeared only when a release was actually RUN |
-| 9 | **Genome-wide target preprocessing** — chunk 6's open deliverable, promoted to its own chunk because it now gates chunks 11-13 | ⬜ **NEXT** |
-| 10 | The **Arm 2 attack run** — balanced, 25 draws per `tau` per hypothesis, 7,000 releases, ~18.3 h on chr21 | ⬜ independent of 9 |
-| 11 | **Arm 1 leave-one-out releases** — 44 cohort members, diploid, 22 autosomes | ⬜ ⚠ see the risk below |
-| 12 | The **PanMixer head-to-head** — their evaluations on our build, so the comparison is direct | ⬜ |
-| 13 | The **writeup** — two sections, one per arm | ⬜ |
+| 5 | **The pre-registration**: eight fields decided with Dylan, audited, and SIGNED 2026-10-10 | ✅ done |
+| 6 | **Genome-scale data, and releases that can be quoted.** (a) 22-autosome cohort build (b) 1000G 30x panel (c) **genome-wide TARGET preprocessing** (d) releases through provenance, which forced decision K | ⚠ **3 of 4 — (c) is open: all 10 targets exist on chr21 ONLY** |
+| 7 | **The Arm 2 attack run** — balanced, 25 draws per `tau` per hypothesis, 7,000 releases, ~18.3 h on chr21 | ⬜ unblocked; independent of 6(c) |
+| 8 | **Arm 1 leave-one-out releases** — 44 cohort members, diploid, 22 autosomes, K = 86 | ⬜ needs 6(c) ⚠ and see the risk below |
+| 9 | **The PanMixer head-to-head** — their own evaluations on our build, so the comparison is direct | ⬜ needs 8 |
+| 10 | **The writeup** — two sections, one per arm | ⬜ |
 
-⚠ **CHUNKS 7 AND 8 RAN OUT OF ORDER, and that is the structure working rather than
-failing.** Neither was planned. Chunk 7 began with a question about one sentence in the
-proposal's introduction and ended by reopening a pre-registration field; chunk 8 began by
+⚠ **TWO STRETCHES OF WORK IN CHUNKS 5 AND 6 WERE UNPLANNED, and that is the structure
+working rather than failing.** The audit began with a question about one sentence in the
+proposal's introduction and ended by reopening a signed-off field; decision K began by
 running a release and hitting a dead end no test could see. A plan that cannot absorb
 those is a plan that would have shipped them.
 
-⚠⚠ **A RISK DECISION K CREATED FOR CHUNK 11, recorded now so it is not discovered then.**
+⚠⚠ **A RISK DECISION K CREATED FOR CHUNK 8, recorded now so it is not discovered then.**
 Arm 1 removes BOTH of the target's haplotypes from the donor panel, which lowers
 `support(v)` and can EMPTY a zero-distance block's donor intersection that was non-empty
 for arm 2. So **arm 1's chain is per-target**: 44 chains, 44 `T` values, 44 `beta_share`
-allocations, and the `untraversable_block` set recomputed per target. Reusing arm 2's mask
-there would reintroduce exactly the dead end decision K removed. See `in_chain` and
+allocations, and the `untraversable_block` set recomputed per target. Reusing arm 2's
+mask there would reintroduce exactly the dead end decision K removed. See `in_chain` and
 `untraversable_block` in `docs/terms.md`.
+
+⚠⚠ **AND AN OPEN QUESTION ABOUT THE SIGNED PRE-REGISTRATION, raised 2026-10-11.**
+Decision K (21:59) POST-DATES the signature, and it changed the released object: 172,142
+positions left the chain, so `T` and every `beta_share` moved. Two consequences:
+section 7 item 6 of the signed file says the interior zero-cM plateaus are "emitted as
+verbatim donor runs", which is now only partly true — 20 blocks of them are EXCLUDED;
+and `beta_v`'s normalising set, a pre-registered field, has different contents under the
+same name (`chain`). ⚠ The file must NOT be edited (constraint 6: superseded, never
+edited), so this needs a dated ADDENDUM or a new pre-registration. **Dylan's call.**
 
 ---
 
