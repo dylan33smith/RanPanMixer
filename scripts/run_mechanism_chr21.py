@@ -33,6 +33,8 @@ from mechanism import calibration as C   # noqa: E402
 from mechanism import ffbs as F          # noqa: E402
 from mechanism import hmm as H           # noqa: E402
 from mechanism import utility as U       # noqa: E402
+import releases as RS                    # noqa: E402
+import store                             # noqa: E402
 
 TAU_GRID = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90)
 
@@ -51,6 +53,16 @@ def main(argv=None) -> int:
                    choices=list(U.BETA_SCOPES),
                    help="deferred decision R1; stamped on every number")
     p.add_argument("--out", type=Path, default=None)
+    # ⚠ PERSISTING IS OPT-IN, and the default is NOT to, on purpose. This
+    # script is a DIAGNOSTIC sweep -- several seeds per `tau`, labelled
+    # not-for-publication by the pre-registration -- and writing every draw
+    # into data/releases would fill the release tree with objects that may
+    # not be quoted as releases of a person (standing constraint 5). With
+    # the flag, each draw is written WITH provenance and the sweep is
+    # recorded as a sweep; without it, nothing is quotable and the script
+    # says so rather than leaving the reader to assume.
+    p.add_argument("--persist", action="store_true",
+                   help="write each release to data/releases with provenance")
     a = p.parse_args(argv)
 
     cohort = a.root / "cohort" / a.chrom
@@ -60,6 +72,24 @@ def main(argv=None) -> int:
     in_chain = np.load(cohort / "in_chain.npy")
     support = np.load(cohort / "support.npy")
     hap = np.load(cohort / "haplotypes.npy")[:, in_chain]
+
+    # ⚠ READ FROM THE SIDECARS, not recomputed. These are what make a stale release
+    # detectable: if the cohort is rebuilt, a release's recorded inputs stop matching
+    # and the mismatch is findable. The axis digest is the stronger one -- it is what
+    # lets a reader REFUSE to join this release to a different build's site axis.
+    cohort_inputs, axis_digest = {}, ""
+    if a.persist:
+        for name in ("haplotypes.npy", "positions.npy", "support.npy",
+                     "in_chain.npy", "genetic_pos.npy"):
+            prov = store.load_prov(cohort / name)
+            cohort_inputs[name] = prov["sha256"]
+            if prov.get("axis_digest"):
+                axis_digest = prov["axis_digest"]
+        if not axis_digest:
+            raise SystemExit(
+                f"no axis_digest on any artifact in {cohort}. A release indexed by an "
+                f"axis nobody can identify cannot be joined to anything safely; "
+                f"rebuild the cohort through src/cli.py rather than persisting this.")
     readable = (np.load(tdir / "readable.npy")
                 if (tdir / "readable.npy").exists() else None)
     util = U.beta_v(support, in_chain=in_chain, readable=readable,
@@ -87,6 +117,20 @@ def main(argv=None) -> int:
                           baseline_norm=baseline)
             rec = r.record()
             rec["seconds"] = round(time.time() - t0, 2)
+            if a.persist:
+                # ⚠ THE RELEASE GOES TO DISK THROUGH THE CHOKEPOINT, never a bare
+                # json.dumps -- which is what this script used to do, leaving the
+                # first release on record with no sidecar, no git_rev and no axis
+                # digest. arm2 because HG00096 is a panel sample external to the
+                # HPRC cohort, so there is nothing to hold out.
+                d = RS.save_release(r, arm="arm2", axis_digest=axis_digest,
+                                    inputs=cohort_inputs, root=a.root / "releases")
+                # ⚠ relative only when it IS relative. `--root` may point outside
+                # the repo (a staged tree, a scratch copy), and relative_to raises
+                # rather than falling back -- which turned a successful write into
+                # a traceback AFTER the release was already on disk.
+                rec["persisted_to"] = str(
+                    d.relative_to(REPO) if d.is_relative_to(REPO) else d)
             releases.append(rec)
             draws.append(r)
 
@@ -184,9 +228,25 @@ def main(argv=None) -> int:
     if a.out:
         a.out.parent.mkdir(parents=True, exist_ok=True)
         a.out.write_text(text + "\n")
-        (a.out.parent / (a.out.stem + ".releases.json")).write_text(
-            json.dumps(releases, indent=2) + "\n")
-        print(f"\nwrote {a.out} and {a.out.stem}.releases.json")
+        agg = a.out.parent / (a.out.stem + ".releases.json")
+        if a.persist:
+            store.save(agg, releases, inputs=cohort_inputs,
+                       params={"arm": "arm2", "target": a.target, "chrom": a.chrom,
+                               "taus": list(a.taus), "seeds": a.seeds,
+                               "beta_scope": a.beta_scope,
+                               "scope": "chromosome",
+                               "is_a_sweep_not_a_release": a.seeds > 1},
+                       axis_digest=axis_digest,
+                       note="per-draw records of a DIAGNOSTIC sweep. Several seeds per "
+                            "`tau` is an evaluation device, never a release procedure "
+                            "(standing constraint 5); each draw's own directory under "
+                            "data/releases carries its provenance.")
+        else:
+            agg.write_text(json.dumps(releases, indent=2) + "\n")
+        print(f"\nwrote {a.out} and {agg.name}"
+              + ("" if a.persist else "  ⚠ NOT PERSISTED: no provenance sidecar and "
+                                      "nothing under data/releases, so NOTHING here is "
+                                      "quotable. Re-run with --persist."))
     return 0
 
 

@@ -1092,3 +1092,35 @@ which was mostly a DIFFERENT set.
   correction rule reads: the marker introduces the superseded text it quotes. ⚠ The
   escape is keyed to the ABSENCE MARKER's position, not the path's — the path is merely
   what the claim is about and usually appears earlier on the row.
+
+- **[Symptom]** ⚠⚠ **BLOCKER, FOUND 2026-10-10 BY ACTUALLY RUNNING THE RELEASE.** The
+  forward pass raises on the REBUILT chr21: "chain position 29210 (pos 10,543,014) has
+  zero total mass: every state reachable from position 29209 is excluded there."
+  Nothing can be released genome-wide until it is settled.
+  **[Cause]** NOT a code defect. Where two chain positions have ZERO genetic distance
+  the transition is the IDENTITY, so a donor that becomes unavailable at the next
+  position has nowhere to go; when all surviving mass sat on the donors that disappear,
+  the total is zero and the path genuinely dead-ends. The model is internally
+  consistent — `docs/terms.md` already states P(switch) = 0 on a zero-cM plateau is
+  CORRECT. It is the DATA that makes the state space disconnected there.
+  **[Why it is new]** ⚠ These are the **interior zero-cM plateaus, which decision C
+  never addressed.** Decision C's scope was map-SILENT regions, and it is clean there:
+  all 9,384 of chr21's zero-cM steps carry `cm_source` = 0, i.e. an INTERPOLATED cM
+  from the map, not a declared-rate one. But retiring the coordinate cut also admitted
+  the plateau positions BELOW the old span's lower bound, which nothing ever decided to
+  include — chr21 has 397 zero-cM steps with a shrinking donor set and **395 of them
+  are outside the old cut, all below its lower bound**. The old build had only 2 such
+  steps inside its span, which is why every chr21 release to date worked.
+  **[Scale — measured, all 22 autosomes]** **357,918 zero-cM steps genome-wide, 9,971
+  of them with a shrinking donor set**, worst single drop **87 of 88 donors**. It is not
+  a chr21 quirk and not an acrocentric quirk: chr9 is the worst at 3,366 and chr20 has
+  962. ⚠ A step only RAISES when the surviving mass is entirely on the vanishing
+  donors, so 9,971 is an upper bound on the failures, not a count of them — but one is
+  enough to stop a chromosome.
+  **[Status]** ⚠ **OPEN — needs Dylan's decision.** It is the "interior zero-cM
+  plateau" question `docs/terms.md` recorded as DEFERRED, now forced by the rebuild.
+  Any fix must stay target-independent (standing constraint 1); all three candidates
+  are, since they depend only on the map and on support(v).
+  **[Severity]** Loud, not silent — it raises rather than returning a path, which is
+  the one thing that went right. ⚠ Found only by RUNNING the release end-to-end; 290
+  tests pass and none of them touches a real genome-scale chain.
