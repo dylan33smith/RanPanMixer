@@ -249,7 +249,16 @@ def main(argv=None) -> int:
     jobs = [(t, tau, 50_000 + i, a.one_sided) for tau in a.taus for t in tids
             for i in range(a.draws)]
     n_per = len(tids) * a.draws
-    delta = 1.243 / math.sqrt(n_per)
+    # ⚠⚠ THE CONSTANT DEPENDS ON THE ESTIMATOR, and using the wrong one misstates
+    # what the experiment can conclude. For a ONE-SIDED Bernoulli rate at p ~ 0.5 the
+    # minimum detectable advantage is 1.243/sqrt(n); for the BALANCED accuracy this
+    # design actually computes it is 0.879/sqrt(n), because averaging two independent
+    # arms halves the variance. The pre-registration pins delta = 0.056 from the
+    # BALANCED form at n = 250 per arm (0.879/sqrt(250) = 0.0556); the one-sided form
+    # would give 0.0786 and would understate the experiment's resolution by 1.41x.
+    # ⚠ The one-sided branch is kept because --one-sided still reports that rate, and
+    # a delta quoted for one estimator does not apply to the other.
+    delta = (1.243 if a.one_sided else 0.879) / math.sqrt(n_per)
 
     plan = R.plan_workers(R.array_bytes(st["model"].T, st["model"].K, n_arrays=4),
                           n_jobs=len(jobs))
@@ -263,8 +272,9 @@ def main(argv=None) -> int:
     if a.one_sided:
         print("⚠ ONE-SIDED MODE: reports P_p(Lambda>0) only. This is NOT comparable "
               "to p_succ_bound and no privacy claim may rest on it.")
-    print(f"{n_per} trials per (tau, condition) -> minimum detectable advantage "
-          f"delta = {delta:.4f}")
+    print(f"{n_per} trials per (tau, condition) per ARM -> minimum detectable "
+          f"advantage delta = {delta:.4f} "
+          f"({'one-sided 1.243' if a.one_sided else 'BALANCED 0.879'}/sqrt(n))")
     print(f"{plan}\n")
 
     res = R.run_jobs(_one_trial, jobs, workers=plan.workers, label="trials",
