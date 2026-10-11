@@ -1132,3 +1132,72 @@ which was mostly a DIFFERENT set.
   **[Severity]** Loud, not silent — it raises rather than returning a path, which is
   the one thing that went right. ⚠ Found only by RUNNING the release end-to-end; 290
   tests pass and none of them touches a real genome-scale chain.
+
+### Common random numbers, THE THIRD OCCURRENCE — and I diagnosed it backwards first
+- **[2026-10-11] The Arm 2 attack reused 25 seeds across all 70 (target, `tau`) cells**
+  **[Symptom]** `E_p[Lambda]` came out at **-1.46e-04, z = -3.81**, where theory
+  requires `E_p[Lambda] = KL(Q_p||Q_q) >= 0`. All ten targets negative. I reported it
+  as an implementation defect and stopped the chunk.
+  **[Cause]** NOT an implementation defect. `scripts/arm2_attack.py` built its job list
+  as `(t, tau, 50_000 + i, ...)`, seeding from the DRAW INDEX ALONE, so all 10 targets
+  and all 7 `tau` reused seeds 50000..50024. With a per-position tilt of
+  `eta * mean(beta)` = 0.2554 / 332,521 = **7.7e-07** the tilt cannot move the draw:
+  **the released path is BIT-IDENTICAL at `tau` = 0, 0.05 and 0.25**, `u_p` agreeing to
+  nine digits. The seven `tau` columns were ONE experiment reported seven times, the
+  ten targets were near-replicates (cross-target correlation **+0.305**), and the three
+  decoy conditions share each `Q_p` release (pairwise **+0.57 to +0.63**).
+  Under clustered standard errors — analytic, bootstrap and a t-test on seed means, all
+  agreeing — z goes from **-3.81 to -1.99** (p = 0.058). There was no anomaly.
+  **[What the implementation actually does]** ✅ The exact, sampling-free route gives
+  `E_Q[Lambda]` = **+1.784e-07** for HG00096 and POSITIVE for all ten, equal to KL as
+  theory requires. The sampler is unbiased: 3,320 fresh draws sit at **z = -0.16**
+  against that exact value, and the shift needed to produce the reported mean is
+  **15.0 SE** away. `log_z_p` is bit-equal to the recorded value. Instrument validated
+  four ways, including against the repo's own enumerator to 1e-16.
+  **[⚠⚠ THIS IS THE THIRD OCCURRENCE OF A TWICE-DOCUMENTED FAILURE]** The entry "A
+  headline finding measured under common random numbers" (2026-09-30) describes the
+  same mechanism, and `docs/memory.md` records seed reuse correlating two chromosomes
+  of one release. I wrote the script that reproduced it AFTER both were logged. The
+  lesson that did not transfer is not "watch for seed reuse" — it is that **a tilt of
+  1e-06 per position means ANY two runs sharing a seed are the same draw**, so seed
+  structure is the FIRST thing to check whenever this mechanism's outputs look alike or
+  move together.
+  **[⚠ AND I DIAGNOSED IT BACKWARDS]** Three claims of mine were wrong, and the middle
+  one actively misdirected the search:
+    1. "These numbers can't be right" — the (1+`tau`)/2 floor bounds the TRUE optimal
+       accuracy, not a 250-sample estimate of it. Estimator confused with estimand,
+       for the second time in one session.
+    2. "The bias is EXACTLY first order in `eta`, which rules out variance terms" — an
+       ARTEFACT presented as a fingerprint. The sampled `(u_p - u_q)` is literally one
+       number at every `tau` and `(log Z_p - log Z_q)/eta` is constant to 8 figures, so
+       their ratio is `tau`-independent BY CONSTRUCTION. It ruled out nothing, and I
+       used it to narrow the hypothesis space.
+    3. "Ten of ten negative is 1-in-1024" — void. Their z-values have sd **0.643**, not
+       the 1.0 of ten independent tests; per seed the negative count runs 4/10 to 10/10
+       and the mean flips sign.
+  **[Proven fix]** A `SeedSequence` over `(base, target index, tau index, draw index)`,
+  giving 1,750 distinct streams over the 1,750 cells, verified distinct. ⚠ This
+  RESTORES the pre-registered design rather than changing it: `delta` = 0.0556 assumed
+  250 independent trials per cell and clustering had cut the effective n to about 67
+  (`delta` ~ 0.107). Four tests; both defects caught on reintroduction.
+  **[Severity]** The null was the right answer for the wrong reason, and the error
+  flattered us — the bias pushed the attacker BELOW chance. ⚠ And no sample size would
+  have fixed the diagnostic I chose: `sd(Lambda)` per draw is 6.15e-04 against a true
+  value of 1.78e-07, so resolving `E[Lambda]` by sampling needs n ~ 1.2e7. The exact
+  marginals route gives it for free, and A2 already pre-registers an exact route.
+
+- **[2026-10-11] Decoy selection was not reproducible: Python's `hash()` is salted**
+  **[Symptom]** None visible. The recorded run looked internally consistent.
+  **[Cause]** `rng = np.random.default_rng([DECOY_SEED, hash(target_id) % (1 << 31)])`.
+  `PYTHONHASHSEED` randomises `str.__hash__` per interpreter. MEASURED:
+  `hash('HG00096') % 2**31` returned **1730677557, 783898805, 1043054338** on three
+  invocations of the same binary. The run was self-consistent only because `fork`
+  inherits the parent's hash seed, so every worker agreed with its parent — and a
+  re-run picks a different D3 decoy.
+  **[Severity]** ⚠ A pre-registered experiment whose decoy set cannot be reproduced
+  from its recorded seed is not pre-registered in the sense standing constraint 6
+  means. The cell was irreproducible while looking fully determined.
+  **[Proven fix]** `hashlib.sha256(target_id.encode())`, stable across interpreters,
+  machines and versions. ⚠ The test SPAWNS THREE FRESH INTERPRETERS and compares,
+  rather than asserting stability in-process — an in-process check cannot detect a
+  per-process salt, which is exactly why this survived.

@@ -1332,6 +1332,94 @@ are drawn independently per site from a precomputed allele-frequency table rathe
 from the donor panel at all (`obfuscate.py:264-271`, `get_support_and_pmi.py:159-179`).
 
 
+### 14. [CHUNK 7] The Arm 2 attack ran, and its first result was invalid for a documented reason
+
+**The run completed**: 1,750 trials, 7,000 releases, 46 workers, ~80 min wall and
+~110 CPU-hours — ⚠ against the pre-registration's **18.3 CPU-hours**, which counted
+only the 4 releases per trial and omitted the **6 forward passes** that compute
+`log Z_q` for the three decoy conditions, each over a (T x K) potentials array of
+234 MB. A **6.0x** underestimate, and mine.
+
+**Every condition came back at chance** — 0.45 to 0.50 against bounds of 0.525 to
+0.995, nothing exceeding its bound at any `tau`. That is the forecast outcome. ⚠ But
+it was the right answer for the wrong reason, and the result is ARCHIVED as
+`logs/B_arm2_attack.CRN_INVALID.*` rather than quoted.
+
+#### ⚠⚠ COMMON RANDOM NUMBERS, FOR THE THIRD TIME, IN A SCRIPT I WROTE AFTER THE FIRST TWO WERE LOGGED
+
+The job list seeded from the draw index alone, so all 10 targets and all 7 `tau` shared
+seeds 50000..50024. The per-position tilt is **7.7e-07**, far too small to move a draw:
+**the released path is BIT-IDENTICAL at `tau` = 0, 0.05 and 0.25.** So the seven `tau`
+columns were one experiment reported seven times, the ten targets were near-replicates
+(+0.305), and the three decoy conditions share each release (+0.57 to +0.63). Clustered
+standard errors move z from **-3.81 to -1.99**, p = 0.058 — no anomaly at all.
+
+`docs/bugs.md` already carried "A headline finding measured under common random
+numbers" (2026-09-30); this ledger already carried seed reuse correlating two
+chromosomes of one release. **Two warnings, both written down, neither transferred.**
+
+⚠ The transferable lesson is NOT "watch for seed reuse". It is that **at a tilt of
+1e-06 per position, any two runs sharing a seed ARE the same draw** — so seed structure
+is the first thing to check whenever this mechanism's outputs look alike or move
+together. That is a property of THIS mechanism's weakness, not of RNG hygiene in
+general, which is why the generic lesson failed to fire.
+
+#### ⚠ AND I DIAGNOSED IT BACKWARDS BEFORE DIAGNOSING IT RIGHT
+
+Three of my claims were wrong, and the middle one actively misdirected a five-agent
+investigation:
+
+1. **"These numbers can't be right."** The (1+`tau`)/2 floor bounds the TRUE optimal
+   accuracy, not a 250-sample estimate. Estimator confused with estimand — the SECOND
+   time in one session, an hour after writing the memory about exactly that.
+2. **"The bias is EXACTLY first order in `eta`, so variance terms are ruled out."** An
+   artefact dressed as a fingerprint. With identical draws across `tau`, `(u_p - u_q)`
+   is one number and `(log Z_p - log Z_q)/eta` is constant to 8 figures, so the ratio
+   is `tau`-independent by construction. I then used it to NARROW the search.
+3. **"Ten of ten negative is 1-in-1024."** Void — their z-values have sd 0.643, not
+   1.0, and per seed the negative count runs 4/10 to 10/10 with the mean flipping sign.
+
+**What the implementation actually does, exactly.** Every figure here is chr21,
+D1_extremal, T = 332,521 chain positions, K = 88:
+
+| quantity | value |
+|---|---|
+| exact `E_Q[Lambda]`, HG00096, `tau` = 0.25 | **+1.784e-07** (= KL, so >= 0 as required) |
+| exact `E_Q[Lambda]`, all ten targets, `tau` = 0.25 | all POSITIVE, 1.38e-07 to 1.80e-07 |
+| sampler vs that exact value, `tau` = 0.25, n = 3,320 | **z = -0.16** |
+| shift needed to produce the reported mean, `tau` = 0.25 | **15.0 SE** away |
+| `log_z_p` vs the recorded figure, `tau` = 0.25 | bit-equal |
+
+The instrument was validated four ways, including against this repo's own O(K^T)
+enumerator to **1e-16**. The instrument was validated four ways, including against this
+repo's own O(K^T) enumerator to **1e-16**.
+
+#### A reproducibility defect found in passing, and it is the worse one
+
+Decoy selection ran through Python's `hash()`, which `PYTHONHASHSEED` salts per
+interpreter: `hash('HG00096') % 2**31` gave **1730677557, 783898805, 1043054338** on
+three invocations. The run was self-consistent only because `fork` inherits the hash
+seed. ⚠ **A pre-registered experiment whose decoy set cannot be reproduced from its
+recorded seed is not pre-registered in the sense constraint 6 means** — and it looked
+fully determined. Fixed to sha256, with a test that SPAWNS FRESH INTERPRETERS, because
+an in-process check cannot detect a per-process salt.
+
+#### The silver lining, and it is a real one
+
+⚠ **No sample size would have resolved the diagnostic I chose.** `sd(Lambda)` per draw
+is 6.15e-04 against a true value of 1.78e-07 — resolving `E[Lambda]` by sampling needs
+n ~ **1.2e7**. But the exact marginals route gives it with ZERO Monte-Carlo error in 54
+seconds for all ten targets, and **A2 already pre-registers an exact enumeration
+route**. So the headline privacy number should be computed EXACTLY rather than sampled,
+which is a far stronger statement than any 250-trial null. The sampled attack (A1) still
+runs because it is pre-registered, but it is no longer what carries the claim.
+
+**Re-run launched** with a `SeedSequence` over (base, target index, `tau` index, draw
+index): 1,750 distinct streams over 1,750 cells, verified distinct. ⚠ That RESTORES the
+pre-registered design rather than changing it — `delta` = 0.0556 assumed 250 independent
+trials and clustering had cut the effective n to about 67 (`delta` ~ 0.107).
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The
