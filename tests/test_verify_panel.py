@@ -125,3 +125,71 @@ def test_mixed_sample_sets_fail_the_run(V, monkeypatch, capsys) -> None:
     rc = V.main(["--chroms", "1", "2"])
     assert rc == 1
     assert "do NOT share one sample set" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# ⚠⚠ THE CHECK THAT EVERY OTHER CHECK MISSED. On 2026-10-11 chr10 arrived with a CRC32
+# mismatch in the bgzf block at offset 393,732,438. It passed the index check, the
+# record count, the sample set, the reference-build comparison AND the truncation seek
+# -- because the corruption is mid-file and a seek to the last 3 Mb never touches it.
+#
+# ⚠ The sha256 check passed too, and that is the deeper point: `get_panel.sh` computes
+# the sidecar FROM the downloaded bytes, so it matches whatever arrived. A checksum you
+# compute yourself after download verifies STORAGE, not TRANSFER. Only a structural
+# check -- every bgzf block's own CRC -- can fail on its own terms.
+# ---------------------------------------------------------------------------
+
+def test_bgzf_integrity_is_checked_under_deep(V) -> None:
+    """⚠ Structural: `--deep` must run `bgzip -t`, not only hash the file. Hashing
+    against our own post-download sidecar cannot detect a corrupt transfer."""
+    src = (REPO / "scripts" / "verify_panel.py").read_text()
+    assert '"bgzip", "-t"' in src, (
+        "--deep does not run `bgzip -t`. Without it a mid-file CRC failure passes "
+        "every check in this script, which is how chr10 reached the pipeline.")
+    assert "verifies STORAGE, not TRANSFER" in src, (
+        "the reason the sha256 is insufficient must stay written down, or the next "
+        "person will treat the checksum as transfer verification again")
+
+
+def test_a_corrupt_bgzf_file_is_detected(tmp_path: Path) -> None:
+    """⚠ THE POWER TEST, on a file corrupted the same way chr10 was: a byte flipped in
+    the middle of a bgzf member, leaving length and structure intact."""
+    import gzip
+    import subprocess
+    good = tmp_path / "good.vcf.gz"
+    # a real multi-block bgzf file via bgzip, so the CRCs are genuine
+    payload = b"".join(b"chr1\t%d\t.\tA\tG\t.\t.\t.\n" % i for i in range(60000))
+    raw = tmp_path / "x.vcf"
+    raw.write_bytes(b"##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+                    + payload)
+    subprocess.run(["bgzip", "-c", str(raw)], stdout=good.open("wb"), check=True)
+    assert subprocess.run(["bgzip", "-t", str(good)]).returncode == 0, "control failed"
+
+    bad = tmp_path / "bad.vcf.gz"
+    data = bytearray(good.read_bytes())
+    mid = len(data) // 2
+    data[mid] ^= 0xFF                      # flip one byte, mid-file
+    bad.write_bytes(bytes(data))
+    assert subprocess.run(["bgzip", "-t", str(bad)],
+                          capture_output=True).returncode != 0, (
+        "bgzip -t did not detect a flipped mid-file byte, so it cannot be relied on "
+        "as the transfer check")
+    # ⚠ AND THE POINT: a sha256 of the corrupt file is perfectly self-consistent
+    import hashlib
+    h = hashlib.sha256(bad.read_bytes()).hexdigest()
+    sidecar = tmp_path / "bad.vcf.gz.sha256"
+    sidecar.write_text(h + "\n")           # exactly what get_panel.sh used to do
+    assert hashlib.sha256(bad.read_bytes()).hexdigest() == sidecar.read_text().strip(), (
+        "this assertion is the finding: hashing a corrupt download produces a sidecar "
+        "that matches it, so the checksum can never reveal the corruption")
+
+
+def test_the_fetcher_verifies_before_accepting(V) -> None:
+    """A corrupt `.part` must be DISCARDED, not renamed into place and not resumed --
+    `curl -C -` would see a complete file and skip it forever."""
+    src = (REPO / "scripts" / "get_panel.sh").read_text()
+    assert "bgzip -t" in src, "get_panel.sh accepts a download without testing it"
+    i, j = src.index("bgzip -t"), src.index('mv "$f.part" "$f"')
+    assert i < j, "the integrity test must run BEFORE the file is moved into place"
+    assert 'rm -f "$f.part"' in src, (
+        "a failed .part must be removed, or curl -C - will resume a corrupt file")

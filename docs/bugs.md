@@ -1201,3 +1201,44 @@ which was mostly a DIFFERENT set.
   machines and versions. ⚠ The test SPAWNS THREE FRESH INTERPRETERS and compares,
   rather than asserting stability in-process — an in-process check cannot detect a
   per-process salt, which is exactly why this survived.
+
+### A checksum computed from the download verifies STORAGE, not TRANSFER
+- **[2026-10-11] chr10's panel arrived corrupt, and every check we had passed it**
+  **[Symptom]** Ten of 220 target-preprocessing jobs failed, all on chr10, all with
+  `bcftools view exited 9`. The real message was `[E::bgzf_uncompress] CRC32 checksum
+  mismatch`, in the block at offset **393,732,438** of a 1,493,904,721-byte file.
+  **[Cause]** A corrupt TRANSFER. `scripts/get_panel.sh` did
+  `curl ... -o "$f.part" && mv "$f.part" "$f" && sha256sum "$f" > "$f.sha256"`, so the
+  sidecar was computed FROM the downloaded bytes. ⚠⚠ **It therefore matches whatever
+  arrived.** VERIFIED on the corrupt file: recorded and actual sha256 are
+  `3b54d73d6a2b...` and `3b54d73d6a2b...` — identical. A self-computed checksum detects
+  later bit-rot ON DISK; it cannot detect a bad download.
+  **[Why every other check passed]** The corruption is MID-FILE, and
+  `scripts/verify_panel.py` deliberately avoided reading whole files: the index was
+  intact, the record count right (3,495,473), the sample set right (3,202), the
+  reference-build comparison against our own pangenome passed, and the truncation test
+  SEEKS to the last 3 Mb — which never touches the middle. It reported chr10 sound.
+  ⚠ And I had told Dylan `--deep` "would have caught this". It would NOT: `--deep`
+  compared the file to that same self-referential sidecar.
+  **[Proven fix, in two places]** Every bgzf block carries its own CRC, so
+  decompressing the whole file is a check that can FAIL ON ITS OWN TERMS rather than
+  against a reference derived from the same bytes.
+    * `scripts/get_panel.sh` runs `bgzip -t` on the `.part` BEFORE renaming it into
+      place and DISCARDS a failed one. ⚠ Discarding matters: `curl -C -` resumes from
+      the existing size, so a complete-but-corrupt file would be skipped forever.
+    * `scripts/verify_panel.py --deep` runs `bgzip -t`; the sha256 check is kept but
+      relabelled for what it can actually prove — that the bytes have not changed
+      SINCE we recorded them.
+  **[Swept]** All 22 panels tested with `bgzip -t`: **only chr10 corrupt, 21 pass.**
+  **[Severity]** ⚠ It failed LOUDLY three steps downstream instead of at fetch time,
+  which cost 10 of 220 jobs rather than a silent wrong answer — `bcftools` refuses to
+  read a bad block rather than returning partial data. But the same corruption in a
+  file read by something more forgiving would have produced a short result with no
+  error at all. ⚠ The general lesson is the one in the title, and it generalises past
+  downloads: a verification derived from the artifact it verifies proves only internal
+  consistency. ⚠ It also sharpens the cohort-build cleanup rule recorded earlier --
+  `store.sha256_file` sidecars across this project share the property, and are
+  similarly storage checks rather than provenance checks about upstream content.
+  **[Tests]** 12 in `tests/test_verify_panel.py`, including one that corrupts a real
+  bgzf file by flipping a single mid-file byte and then asserts that its freshly
+  computed sha256 MATCHES — the finding written as an assertion rather than prose.

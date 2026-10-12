@@ -31,6 +31,19 @@ fetch_one () {
   [ -s "$f" ] && return 0
   local url="$B/${STEM}.chr${c}.${SUF}${ext}"
   if curl -sSfL -C - --retry 5 --retry-delay 5 -o "$f.part" "$url"; then
+    # ⚠⚠ VERIFY THE TRANSFER BEFORE ACCEPTING IT. Every bgzf block carries a CRC, so
+    # `bgzip -t` detects a corrupt download; the sha256 below CANNOT, because it is
+    # computed FROM the downloaded bytes and so matches whatever arrived. MEASURED
+    # 2026-10-11: chr10 arrived with a CRC32 mismatch mid-file, its sha256 sidecar
+    # matched perfectly, the .tbi was intact, the record count was right, and the
+    # failure only surfaced three pipeline steps later when ten extraction jobs died.
+    # ⚠ A corrupt .part is DISCARDED rather than resumed: `curl -C -` would see a
+    # complete file and skip it forever.
+    if [ -z "$ext" ] && ! bgzip -t "$f.part" 2>/dev/null; then
+      echo "FAILED chr$c  BGZF INTEGRITY: corrupt transfer, discarding $(stat -c %s "$f.part") B"
+      rm -f "$f.part"
+      return 1
+    fi
     mv "$f.part" "$f"
     [ -z "$ext" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"
     echo "ok chr$c$ext  $(stat -c %s "$f") B"

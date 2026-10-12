@@ -140,7 +140,28 @@ def check(c: int, *, deep: bool = False) -> tuple[list[str], dict]:
     #    different panel, and a per-chromosome sample set is not one cohort.
     info["samples"] = len(_sh(["bcftools", "query", "-l", str(f)]).split())
 
+    # 6. ⚠⚠ BGZF BLOCK INTEGRITY, and this is the check that actually matters.
+    #    MEASURED 2026-10-11: chr10 arrived with a CRC32 mismatch in the block at
+    #    offset 393,732,438, and EVERY OTHER CHECK IN THIS SCRIPT PASSED IT --
+    #    the index was intact, the record count was right, the sample set was right,
+    #    and the seek to the last 3 Mb returned a record at 99.99% of the contig,
+    #    because the corruption sits in the MIDDLE and a seek never touches it.
+    #    ⚠ The sha256 check below would ALSO have passed, and that is the deeper
+    #    lesson: `scripts/get_panel.sh` computes the sidecar FROM the downloaded
+    #    file, so it hashes whatever arrived. It detects later bit-rot on disk; it
+    #    cannot detect a bad transfer. A checksum you compute yourself after download
+    #    verifies STORAGE, not TRANSFER.
+    #    Every bgzf block carries its own CRC, so decompressing the whole file is a
+    #    check that can fail on its own terms rather than against a reference we
+    #    derived from the same bytes. It costs a full read, which is why it is
+    #    `--deep`, but it is the ONLY thing here that would have caught chr10.
     if deep:
+        r = subprocess.run(["bgzip", "-t", str(f)], capture_output=True, text=True)
+        if r.returncode != 0:
+            bad.append(f"chr{c}: BGZF INTEGRITY FAILURE -- "
+                       f"{(r.stderr or r.stdout).strip().splitlines()[-1][:160]}")
+        # the sha256 is still checked, but for what it can actually prove: that the
+        # bytes on disk have not changed SINCE we recorded them.
         import hashlib
         h = hashlib.sha256()
         with open(f, "rb") as fh:
@@ -148,8 +169,9 @@ def check(c: int, *, deep: bool = False) -> tuple[list[str], dict]:
                 h.update(block)
         want = Path(str(f) + ".sha256").read_text().split()[0]
         if h.hexdigest() != want:
-            bad.append(f"chr{c}: sha256 MISMATCH -- recorded {want[:16]}..., "
-                       f"file hashes to {h.hexdigest()[:16]}...")
+            bad.append(f"chr{c}: sha256 MISMATCH vs the recorded sidecar -- the file "
+                       f"CHANGED ON DISK since download (recorded {want[:16]}..., "
+                       f"now {h.hexdigest()[:16]}...)")
     return bad, info
 
 
@@ -157,7 +179,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--chroms", type=int, nargs="+", default=CHROMS)
     ap.add_argument("--deep", action="store_true",
-                    help="re-read all 29 GB and verify every sha256 (slow)")
+                    help="read every byte: BGZF block CRCs (catches a corrupt "
+                         "transfer, which nothing else here can) plus the sha256 "
+                         "against the recorded sidecar (catches on-disk change)")
     a = ap.parse_args(argv)
 
     problems, rows = [], []
@@ -195,7 +219,9 @@ def main(argv=None) -> int:
           f"{sorted(samples)[0] if len(samples) == 1 else '?'} samples")
     print(f"reference build checked against our own deconstruct output on "
           f"{sum(1 for r in rows if r.get('length'))} chromosome(s)"
-          + ("" if a.deep else "; checksums NOT re-verified (use --deep)"))
+          + ("" if a.deep else "; ⚠ BGZF INTEGRITY NOT CHECKED — pass --deep. "
+                            "A mid-file CRC failure passes every other check here, "
+                            "which is how chr10 reached the pipeline on 2026-10-11"))
     if problems:
         print("\nPROBLEMS — do not quote a number from this panel:")
         for p in problems:
