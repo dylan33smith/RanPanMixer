@@ -937,6 +937,30 @@ which was mostly a DIFFERENT set.
   caught before it reached an artifact. The previous three were found in the results.
   **[Found by]** Asking what `seed` keys, before launching a 308-release sweep.
 
+### A parallel run's wall clock extrapolated from an isolated measurement
+- **[2026-10-12] 2.5 h predicted, 8.7 h actual, on a 24-worker sweep**
+  **[Symptom]** I timed ONE genome-wide release alone on an idle machine at 12.3 min,
+  multiplied by the 308 cells, divided by 24 workers, and told Dylan ~2.5 h. Measured at
+  51.7 min the workers were all on chr3 — 19.8% of one target — implying **8.7 h**, wrong
+  by ~3.5x.
+  **[Cause]** The isolated measurement had 48 cores and the full memory bandwidth to
+  itself. These are O(T*K) streaming passes over GB-sized arrays, so with 24 workers the
+  bottleneck is MEMORY BANDWIDTH, not cores: each worker ran **4.1x slower** than in
+  isolation, giving ~6x aggregate throughput and about **25% parallel efficiency**.
+  Adding workers cannot fix a bandwidth cap.
+  **[Proven fix]** No code fix — an estimation rule. **Time a parallel run from the
+  parallel run**, not from an isolated sample: per-worker speed under contention is the
+  only number that extrapolates. ⚠ And instrument long runs so progress is observable:
+  this one wrote nothing for its first 4.4 h because each target saved all 7 `tau` at the
+  end, so the only way to locate the workers was reading `/proc/<pid>/maps` for which
+  chromosome each had mapped. `scripts/arm1_release.py` now prints per-chromosome.
+  **[Severity]** No wrong number was published, but it drove a planning decision: at the
+  true cost, computing the releases and the primary endpoint in SEPARATE passes was
+  ~17.4 h against ~11.5 h sharing one forward pass. The correction is what surfaced the
+  saving.
+  **[Found by]** Asking where the workers actually were, instead of trusting that 0/44
+  after 51 min matched the prediction.
+
 ### A normalisation gate whose tolerance is computed from the thing it checks
 - **[2026-10-12] `sum beta_v` was unchecked on the whole release path**
   **[Symptom]** A hand-built `beta` summing to 2.0 runs the entire release path with no

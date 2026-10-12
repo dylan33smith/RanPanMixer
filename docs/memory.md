@@ -104,6 +104,54 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-12 (later) — B-IMP-exact-out: the sweep is 8.7 h not 2.5 h, and the endpoint now rides along
+
+**What I got wrong.** I timed one genome-wide arm 1 release ALONE at 12.3 min, scaled it
+by 308 cells over 24 workers, and told Dylan ~2.5 h. At 51.7 min elapsed the sweep had
+written 0 of 308 cells, which I first read as "on schedule". It was not: reading
+`/proc/<pid>/maps` showed all 24 workers on **chr3**, 19.8% of one target, implying
+**4.4 h per target and 8.7 h total** — out by ~3.5x.
+
+**Why.** The isolated measurement had 48 idle cores and all the memory bandwidth. These
+are O(T*K) streaming passes over GB-sized arrays, so under 24-way contention each worker
+ran **4.1x slower**: ~6x aggregate throughput, about **25% parallel efficiency**. A
+bandwidth cap does not yield to more workers. The rule: time a parallel run FROM the
+parallel run.
+
+**What the correction bought.** At the true cost the plan was wrong, not just the ETA. A
+release is `psi -> forward -> backward_sample`; the pre-registered primary endpoint is
+`psi -> forward -> state_marginals`. Run as separate passes they recompute `psi` and
+`forward` twice — **~17.4 h against ~11.5 h combined**. Dylan chose to discard the 52
+minutes spent and relaunch combined; nothing was lost, since no cell is written until a
+target finishes all 7 `tau`.
+
+**The implementation, and the gate's power MEASURED rather than asserted.** `release()`
+takes an optional `exact_out` dict — an out-parameter, so no return type changes and no
+existing caller is touched — and `_draw_one` fills it from the forward messages it already
+holds. The gate is that asking for the exact values must not change the release.
+`backward_sample` builds a FRESH `default_rng(seed)`, so nothing before it can perturb the
+draw except by corrupting `fwd` itself; I mutation-tested exactly that. Reversing
+`fwd.alpha` along the state axis is caught at 3 of 3 `tau`. Scaling one element of
+`fwd.alpha[0]` by 1e-6 and renormalising is **NOT** caught, because inverse-CDF sampling
+absorbs a perturbation that small. So the gate has power against STRUCTURAL corruption of
+the forward messages and none against float noise, and the test docstring says so. ⚠ My
+first mutation attempt was invalid — `fwd` is a `Forward` object, not an array — and my
+second was too weak; I only learned the gate's scope by making it strong enough to fail.
+
+**Validated inert before relaunching.** A regression pilot at the same target, `tau` and
+seed as the pre-refactor run: every genome-record field identical and all 22 `state_path`
+and `released_path` arrays bit-identical. Combined cost 16.2 min against 12.3 release-only,
+a 1.32x factor matching the predicted 1.33x.
+
+**A free consistency check fell out.** On that cell the exact `e_q_u` of 0.8163177 lands
+1.8e-04 from the same release's single-draw `u_achieved` of 0.8161385 — the sampled
+diagnostic and the exact endpoint agreeing without a separate run.
+
+**First arm 1 endpoint values** (HG00438, `tau` = 0.5, ARM 1, K = 86, 22 autosomes,
+n = 1): `target_fidelity` **0.160166** over 43,958,219 called cells, `e_differ`
+7,040,616.6, `u_ceiling` 0.9727066, `e_q_u_over_ceiling` 0.8392230. ⚠ A DIFFER rate, so
+lower is more faithful; and not comparable to arm 2's, which has a different ceiling.
+
 ## 2026-10-12 — DECISION M: the head-to-head matches PanMixer's evaluator exactly
 
 **The question, raised to Dylan.** PanMixer holds the target out when sampling
