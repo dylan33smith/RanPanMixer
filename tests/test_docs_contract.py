@@ -620,8 +620,13 @@ def _excused(line: str, at: int) -> bool:
     return any(0 <= line.find(e) < at for e in _ESCAPES)
 
 
-_CLAIMS_NOT_ON_DISK = ("PLANNED", "not yet exist", "does not exist", "not built",
-                       "none yet", "is PLANNED")
+# ⚠ "is not built" rather than bare "not built". The bare form collides with ordinary
+# English that is NOT an absence claim -- "a check not built in" means "not
+# pre-planned", and it tripped this gate on 2026-10-12. A marker has to be specific
+# enough that it only matches the claim it is looking for; the cost of a loose one is a
+# false positive on correct text, which is how a gate gets switched off.
+_CLAIMS_NOT_ON_DISK = ("PLANNED", "not yet exist", "does not exist", "is not built",
+                       "not built yet", "none yet", "is PLANNED")
 
 
 def test_a_path_claimed_absent_is_actually_absent():

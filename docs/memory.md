@@ -1532,6 +1532,50 @@ out the failure mode worth worrying about, ten identical copies of one person, w
 presence check could never have seen.
 
 
+### 17. [CHUNK 7] The Arm 2 privacy ceiling, computed exactly — chunk 7 complete
+
+**`acc_ceiling` is 0.501555 at `tau` = 0.99, against a theorem bound of 0.9950.** No
+attacker — including ones nobody has written — can exceed **50.16%** at the loosest
+setting on the grid, and 50.01% to 50.03% across the operating range `tau` = 0.05 to
+0.25. chr21, T = 332,521, K = 88, D1_extremal, 10 targets, ZERO Monte-Carlo error.
+
+| `tau` | `kl_exact` | `acc_ceiling` | `p_succ_bound` |
+|---|---|---|---|
+| 0 | 0 | 0.500000 | 0.5000 |
+| 0.05 | 6.9e-09 | 0.500029 | 0.5250 |
+| 0.10 | 2.8e-08 | 0.500059 | 0.5500 |
+| 0.25 | 1.8e-07 | 0.500150 | 0.6250 |
+| 0.50 | 8.3e-07 | 0.500323 | 0.7500 |
+| 0.90 | 6.0e-06 | 0.500865 | 0.9500 |
+| 0.99 | 1.9e-05 | **0.501555** | 0.9950 |
+
+⚠⚠ **THE VALIDATION I DID NOT BUILD IN, which is why it is worth more than the ones I
+did.** Theory says KL ~ (eta^2/2) Var, so `kl_exact / eta_tau^2` must be CONSTANT. Across
+a **53-fold range of eta_tau** it is: 2.7267e-06, 2.7352e-06, 2.7348e-06, 2.7341e-06,
+2.7342e-06, 2.7342e-06 — a **0.31% spread**. The implied Var(u_p - u_q) = **5.4664e-06**,
+consistent with the Var_Q(u) ~ 4.05e-06 recorded from earlier chr21 work at a different
+`beta` scope. This falls out of the numbers rather than being asserted, and it would
+break if either the normalisers or the marginals were wrong.
+
+**The gate passes 70/70 cells:** `acc_ceiling <= p_succ_bound` everywhere.
+
+**What it says about the paper.** The theorem's bound is **enormously loose at genome
+scale** — at `tau` = 0.99 the actual advantage is 0.0016 against the 0.495 permitted, a
+factor of about 300. That is R5 in its sharpest form: the budget spread over 332,521
+positions leaves almost nothing for an attacker, and this says so EXACTLY rather than by
+failing to detect it.
+
+⚠ **Caveat that must travel with every quotation:** Pinsker is an inequality, so the true
+ceiling is CLOSER TO 0.5 than these numbers. They are upper bounds on an upper bound, and
+the looseness runs in the direction that flatters us.
+
+**Chunk 7's two deliverables, and why both were needed.** A1, the sampled attack, gives a
+measured attacker at chance — which standing constraint 7 says is only a LOWER bound on
+distinguishability, and which sampling provably cannot sharpen (sd(Lambda) 6.15e-04
+against a true 1.78e-07 needs n ~ 1.2e7). `acc_ceiling` gives the ceiling over all
+attackers. Neither alone is the result.
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The
