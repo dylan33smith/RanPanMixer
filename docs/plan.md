@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-11 (chunk 5 SIGNED; chunk 6 is **3 of 4** — cohorts, panel and the release writer done, genome-wide TARGET preprocessing open. Next: chunk 7, the Arm 2 attack run.)
+**Last updated:** 2026-10-12. Chunks 0-7 DONE. ⚠ Next: chunk 8 (Arm 1 leave-one-out releases). ⚠⚠ The open scientific question is UTILITY, not privacy — see the Current state bullet.
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -38,6 +38,30 @@ Read at session start. This file exists so a new session never has to grep
   `[0, eta_tau]`, and `tau` = 0 reproduces `baseline_model` to 1e-15. 46 new tests, **87
   in the suite, all passing.** The O(TK) rank-one forward pass agrees with an O(TK^2)
   dense reference to **1.11e-16**.
+- ⚠⚠⚠ **THE OPEN SCIENTIFIC QUESTION IS UTILITY, AND IT IS NOT A DEFECT — IT IS THE
+  RESULT (raised by Dylan 2026-10-12).** Privacy is settled and strong: `acc_ceiling` =
+  **0.501555** at `tau` = 0.99 against a `p_succ_bound` of 0.9950, computed exactly. But
+  the SAME thinness that makes the mechanism undetectable makes it useless:
+  - `utility_retained` on chr21 at SHARE 1 is **0.6931 at `tau` = 0** and **0.6932 at
+    `tau` = 0.9**. The mechanism moves the FOURTH DECIMAL. Exact expected-utility
+    movement across the whole grid: **2.94e-06**.
+  - ⚠ **THE 0.6931 IS NOT OURS.** It is obtained at `tau` = 0, where the release is a
+    pure cohort mosaic carrying ZERO target information — any two humans share most of
+    their alleles. Quoting the LEVEL as the mechanism's utility is exactly the free-lunch
+    error `target_fidelity` exists to prevent. **The movement is the figure.**
+  - At genome scope `mean beta_v` falls from 3.27e-06 to **4.52e-08**, a factor of 72, so
+    the movement should shrink by about that again. `scripts/exact_utility.py` measures it
+    exactly rather than extrapolating.
+  - ✅ **THE MECHANISM IS NOT BROKEN AND THE TOY PROVES IT**: at `mean beta_v` = 0.111
+    instead of 4.52e-08, `E_Q[u]` moves **0.4502 -> 0.6477** across the grid. It is BUDGET
+    DILUTION, which is a far better finding to write up, and it is what R5 was reopened to
+    quantify.
+  - ⚠ **NOT YET MEASURED AT ALL:** Arm 1 utility at any scope (needs chunk 8), and
+    PanMixer's own four metrics on our build (chunk 9).
+  ⚠ A reviewer will put the privacy ceiling and the utility movement side by side
+  immediately. They are the same fact from two sides, and the paper has to say so rather
+  than be caught by it.
+
 - ✅✅ **CHUNK 6 IS COMPLETE: ALL 22 AUTOSOMES AND THE FULL PANEL, BOTH GATED
   (2026-10-10).** The cohort is **22,307,009 records / 22,134,562 chain positions**;
   driver exit 0, verifier 22 of 22. **TWO exclusions, both target-independent:** 305
@@ -279,6 +303,45 @@ variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2
 | 5 | ✅ **CLOSED 2026-10-10.** **R3** — `w_v = 1 / support(v)`, pinned and declared as INHERITED rather than argued for, which is the honest form. | — |
 | 6 | ✅ **DROPPED 2026-10-10.** The **secondary window** is not pursued: the pre-registration section 0 drops the contiguous-window second arm. | — |
 | 7 | ✅ **CLOSED 2026-10-10.** **Arm 2's attacker set** is pinned (A1-A4, each with a mandatory positive control) and the **target count** is all 10 — chr21 for the powered attack, genome-wide for exact utility. ⚠ **[CORRECTION - 2026-10-10]** This row said the repo has "no implemented attacker of any kind" and that `attacker_accuracy` "names a module that does not exist": `src/attacks.py` was built 2026-10-10 with the Neyman-Pearson optimal statistic, the exact ceiling, a BALANCED `src/attacks.py:empirical_accuracy`, the arm guard and the pre-registration lock, with `tests/test_attacks.py` over it. | — |
+
+## ⚠ HANDOFF — read this first after a compaction (written 2026-10-12)
+
+**State:** chunks 0-7 done. Working tree clean, 335 tests pass. Next is chunk 8.
+
+**The three things a fresh session will not infer from the code:**
+
+1. ⚠⚠ **PRIVACY IS SETTLED; UTILITY IS THE OPEN QUESTION.** See the Current state bullet.
+   `acc_ceiling` = 0.501555 at `tau` = 0.99 (bound 0.9950) is exact and strong. But
+   `utility_retained` is 0.6931 at `tau` = 0 and 0.6932 at `tau` = 0.9 on chr21, and the
+   level is NOT attributable to the mechanism. Do not quote the level as utility.
+2. ⚠ **ARM 1'S CHAIN IS PER-TARGET** (consequence of decision K). Leave-one-out removes
+   both of the target's haplotypes, which lowers `support(v)` and can EMPTY a
+   zero-distance block's donor intersection that was non-empty for arm 2. So chunk 8
+   needs 44 chains, 44 `T` values, 44 `beta_share` allocations, and the
+   `untraversable_block` set recomputed per target. Reusing arm 2's mask reintroduces the
+   dead end decision K removed.
+3. ⚠ **ONE CHUNK-9 DECISION IS OPEN:** PanMixer applies leave-one-out at the SAMPLING
+   step but not at PMI block scoring (`hmm.py:122` uses all 88 haplotypes while
+   `hmm.py:42-43` holds the target out). Arm 1 must match it or diverge DELIBERATELY and
+   say which; the two give different numbers and the head-to-head is only direct if the
+   choice is declared. Recommendation on record: hold out at both steps, state the
+   difference.
+
+**Running jobs at handoff:** `scripts/exact_utility.py` in tmux session `eut`, logging
+to `logs/B_exact_utility.md` and writing a status sentinel named exactutil.status under
+logs/ ON COMPLETION (so that file does not exist while the job runs — which is why it is
+named in prose here rather than as a path, since the contract check resolves paths and
+would fail on a file that is correctly absent). Genome-wide exact `E_Q[u]` at `tau` = 0
+and 0.99 for one target. It is the number the utility bullet is waiting on; chr1 took
+51 s, so the 44 chromosome-passes are roughly half an hour.
+
+**Standing hazards this session hit repeatedly, all in `docs/bugs.md`:** common random
+numbers (THREE occurrences — a per-position tilt of ~1e-06 means two runs sharing a seed
+ARE the same draw); `pgrep -f` matching your own command line (five occurrences); a
+number read without checking what it is SCOPED to (CPU vs elapsed, system vs process);
+and a self-computed checksum verifying storage rather than transfer.
+
+---
 
 ## ⚠ THE CHUNK MAP — the review-gated plan, and where we are
 
