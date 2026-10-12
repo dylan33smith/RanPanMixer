@@ -296,6 +296,30 @@ PanMixer's goal is donor protection, and we make no claim that its scoring scope
 defect; we adopt it precisely because adopting it unchanged is what keeps the comparison
 honest.
 
+**THE FORMULA, READ OFF THEIR SOURCE so chunk 9 implements it rather than re-deriving
+it.** `external/PanMixer/tools/panmixer/obfuscate.py:207-211` builds
+`not_missing = np.sum(pangenome != -1, axis=(0, 2))` — a per-site count over ALL 88
+haplotypes, both axes — then `utility_loss[v] = 1 / not_missing[v]`, zero where
+`not_missing` is 0. Lines 279-290 accumulate, per block and PER HAPLOTYPE,
+`sum_v utility_loss[v] * (new[v, h] != orig[v, h])`. So for a whole release:
+
+> `utility_loss_panmixer` = sum over altered (v, h) cells of 1 / support(v), support over K = 88.
+
+⚠⚠ **AND THEY DO NOT MASK `-1` BEFORE COMPARING.** `new_block != orig_block` is a raw
+inequality, so a position where the TARGET IS UNCALLED counts as altered whenever the
+release puts a called allele there — and ours always does, since the RENORMALISE policy
+means a released path carries no missing allele and `ffbs.release` raises if it ever
+would. Under this formula every target-uncalled cell therefore enters the cost. That is
+not an error to fix: it is their convention, it applies identically to their own output,
+and masking `-1` on our side ALONE would make our cost incomparable to theirs — the exact
+denominator-mixing `docs/terms.md` warns about. **Match it, and state in the write-up that
+the cost counts uncalled-target cells as alterations on both sides.**
+⚠ `docs/terms.md:utility_loss_panmixer` also records a legacy `2/support` variant in
+`get_support.py:25`. The obfuscator path above is the one that produced their published
+numbers and is the one to match; if the two ever disagree, say which was used.
+⚠ It is a COST, unbounded above. It is NOT a similarity and must never be reused as
+`phi_v` without the normalisation recorded under `phi_v`.
+
 ⚠⚠ **"MATCH EXACTLY" IS ABOUT THE HOLD-OUT SCOPING, NOT ABOUT WHICH METRICS WE ADOPT.**
 Section 3 of the signed pre-registration is a FROZEN field and it says Arm 1 adopts
 `utility_loss_panmixer` **only** (decision H); `af_loss` and `ld_loss` are explicitly not
