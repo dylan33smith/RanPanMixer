@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-12 (later still — reallocation measured, and it is privacy-neutral). Chunks 0-7 DONE. ⚠ Next: chunk 8 (Arm 1 leave-one-out releases). ⚠⚠ The open scientific question is UTILITY, not privacy: genome-wide `e_q_u` MOVES +8.345e-08 across the whole `tau` range, and the 0.8586 level is reached at `tau` = 0 so it is not ours to quote — see the Current state bullet.
+**Last updated:** 2026-10-12 (later still — reallocation measured, privacy-neutral, and PARKED). Chunks 0-7 DONE. ⚠ **ACTIVE: chunk 8 (Arm 1 leave-one-out releases).** ⚠⚠ The open scientific question is UTILITY, not privacy: genome-wide `e_q_u` MOVES +8.345e-08 across the whole `tau` range, and the 0.8586 level is reached at `tau` = 0 so it is not ours to quote — see the Current state bullet.
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -83,6 +83,13 @@ Read at session start. This file exists so a new session never has to grep
     `eta_tau`, `epsilon_tau` and `p_succ_bound` never move. The bound depends ONLY on the
     global range of `u`, never on how `beta_v` is spread. Reallocation is privacy-neutral;
     it REDEFINES what we call useful, which is constraint 8 and not a free lunch.
+  - ⏸ **PARKED BY DYLAN 2026-10-12, DELIBERATELY.** Reallocation is NOT an endpoint and
+    is NOT pre-registered. It stays an exploratory finding in
+    `logs/B_beta_concentration.md` until someone chooses to write a public-panel
+    secondary endpoint under constraint 6. ⚠ Do not quote any concentrated-allocation
+    number as a result of this paper, and do not re-run it in place of chunk 8. The
+    reason to keep it on the board at all is that it answers "can the budget be spent
+    better" with a measured yes, which a reviewer will ask.
   - ⚠ **THE REUSABLE CRITERION.** A choice moves the release only if
     `eta_tau`/2 x (the `beta_v` mass that choice controls) exceeds the choice's cost in
     -log R_D. Donor identity within a fixed switch skeleton costs **ZERO** (every
@@ -342,7 +349,9 @@ variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2
 
 ## ⚠ HANDOFF — read this first after a compaction (written 2026-10-12)
 
-**State:** chunks 0-7 done. Working tree clean, 335 tests pass. Next is chunk 8.
+**State:** chunks 0-7 done. 343 tests pass. **Chunk 8 is ACTIVE.** Addendum 2
+(`paper/addendum_2026-10-12_chain_rebuild.md`) is signed; reallocation is PARKED and is
+not an endpoint.
 
 **The three things a fresh session will not infer from the code:**
 
