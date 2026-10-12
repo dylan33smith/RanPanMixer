@@ -2165,8 +2165,26 @@ Is:                   The PER-TARGET leave-one-out cohort D = HPRC \ {target}, w
                       is ~160-380 GB cheaper.
                       ✅ The attack database is built ONCE, with the target removed AT
                       USE rather than 44 databases built.
-Computed by:          PLANNED — the row mask is not implemented; `CohortHMM` is built
-                      from all K rows today and nothing takes a held-out pair.
+Computed by:          src/cohort/loo.py:loo_chain (built 2026-10-12). This read
+                      "PLANNED — the row mask is not implemented". It masks both rows in
+                      memory, recomputes support(v) over the remaining donors, and
+                      RE-APPLIES decision K per target. Surveyed over all 44 x 22 = 968
+                      chains by scripts/loo_chain_survey.py.
+                      ⚠ Validated by reconstruction, not by inspection: run at K = 88
+                      the same composition reproduces in_chain.npy BIT-IDENTICALLY and
+                      support.npy bit-identically, so the only difference on the
+                      leave-one-out path is the two masked rows.
+                      ⚠⚠ **MEASURED, AND THE UNTRAVERSABLE SET IS NOT MONOTONE IN THE
+                      DONOR PANEL.** T spans 22,129,531 to 22,136,532 over the 44
+                      targets against arm 2's 22,134,562, and `untraversable_block`
+                      counts span 19 to 21 against arm 2's 20 — so leave-one-out
+                      sometimes leaves FEWER dead ends, not more. On chr16 the 2,026-
+                      position block arm 2 excludes becomes TRAVERSABLE once HG02630 is
+                      held out, putting 1,981 positions in that target's chain that are
+                      NOT in arm 2's. Mechanism: dropping positions SHORTENS the
+                      surviving zero-distance runs, and a shorter run needs a donor to
+                      span fewer positions. **So arm 1's chain must never be built by
+                      subsetting arm 2's.**
 CHANGES MEANING WITH: which artifacts were actually recomputed. Recomputing only the
                       donor panel (what PanMixer does) is NOT a loo_cohort — and under
                       decision E, every item in the list above must be recomputed per

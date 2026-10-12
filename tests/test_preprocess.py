@@ -66,6 +66,36 @@ def test_no_cohort_function_takes_a_target():
     )
 
 
+def test_cohort_never_names_a_targets_path():
+    """Close the loophole the `held_out` rename could open later.
+
+    `src/cohort/loo.py` legitimately takes an individual as a parameter, under the name
+    `held_out`, because it only deletes that individual's rows. That means the
+    parameter-name scan above no longer catches a future function under `src/cohort/`
+    that takes `held_out` and then goes and READS the individual's data. This scan does:
+    no non-docstring string literal under `src/cohort/` may name a targets path. Docstrings
+    are exempt because they must be able to discuss the rule they are subject to.
+    """
+    offenders = []
+    for py in (SRC / "cohort").rglob("*.py"):
+        tree = ast.parse(py.read_text())
+        docs = {id(ast.get_docstring(n, clean=False)) for n in ast.walk(tree)
+                if isinstance(n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                                  ast.ClassDef))}
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant) \
+                    and isinstance(n.value.value, str):
+                continue                     # a bare string expression IS a docstring
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) \
+                    and id(n.value) not in docs and "targets" in n.value:
+                offenders.append(f"{py.name}: {n.value[:60]!r}")
+    assert not offenders, (
+        "cohort/ names a targets path:\n  " + "\n  ".join(offenders) +
+        "\nStanding constraint 1: the baseline is a function of G and D only. "
+        "src/cohort/loo.py may DELETE a held-out individual's rows; it may not read them."
+    )
+
+
 def test_cli_does_not_share_a_parser_between_stages():
     """A shared argparse parent would put a target flag one refactor away.
 

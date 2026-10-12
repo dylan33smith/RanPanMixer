@@ -104,6 +104,92 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-12 (later still) — CHUNK 8 OPENED: the 44 leave-one-out chains, and a non-monotone exclusion set
+
+**Hypothesis.** `docs/plan.md` recorded a risk before chunk 8 opened: leave-one-out
+removes both of the target's haplotypes, which lowers `support(v)` and shrinks every
+donor-intersection, so a zero-distance block some donor spans at K = 88 may be spanned by
+NONE at K = 86 — and such a block dead-ends the forward pass. The expectation was
+therefore that arm 1's chains would be SUBSETS of arm 2's, each a little shorter.
+
+**Method.** `src/cohort/loo.py`, new, implementing what `docs/terms.md:loo_cohort` recorded
+as "PLANNED — the row mask is not implemented". Masks both rows in memory per decision E
+(~160-380 GB cheaper than 44 cohort trees), recomputes `support(v)` over the remaining 86,
+and re-applies decision K per target. `scripts/loo_chain_survey.py` sweeps all
+44 x 22 = 968 chains, chromosome-outer so each `haplotypes.npy` is read once.
+✅ Validated by RECONSTRUCTION rather than inspection: run at K = 88 the same composition
+reproduces `in_chain.npy` bit-identically (0 differing positions) and `support.npy`
+bit-identically, so the only difference on the leave-one-out path is the two masked rows.
+The fast path (zeroing the two rows in the called-matrix, which is equivalent because an
+all-False row can never be all-True in `allowed[:, a:b+1].all(axis=1).any()`) is
+cross-checked against the row-DELETING path on 2 targets per chromosome.
+
+**⚠⚠ RESULT — THE EXPECTATION WAS WRONG IN ONE DIRECTION, AND THE WRONGNESS IS THE
+FINDING. The untraversable set is NOT MONOTONE in the donor panel.** T spans
+**22,129,531 to 22,136,532** across the 44 targets against arm 2's 22,134,562, so one
+target's chain is LONGER. `untraversable_block` counts span **19 to 21** against arm 2's
+20. On chr16 the 2,026-position block arm 2 excludes becomes TRAVERSABLE once HG02630 is
+held out: 0 blocks dropped instead of 1, and **1,981 positions sit in that target's chain
+that are NOT in arm 2's**. Both directions occur — chr7 has targets dropping 2 blocks
+where arm 2 drops 1, chr10 has targets dropping 1 where arm 2 drops 0, chr16 has targets
+dropping 0 where arm 2 drops 1. Mechanism: removing a donor removes positions from the
+base mask, which SHORTENS the surviving zero-distance runs, and a shorter run needs a
+donor to span fewer positions. **Arm 1's chain must never be built by subsetting arm 2's**,
+which is the obvious implementation and would be wrong.
+Per-target `beta_share` moves accordingly: chr1's spans 0.079680141 to 0.079705304
+against arm 2's 0.079687278, and all 44 targets' 22 shares sum to 1 within 1e-12.
+Provenance `logs/B_loo_chain_survey.md` + `.json`.
+
+**✅ I nearly gated on the false invariant.** I was about to assert
+`in_chain_loo` is contained in arm 2's `in_chain` — it is the natural gate and it is NOT
+provable, for exactly the reason above. I reasoned it through before writing it, measured
+containment instead of asserting it, and the measurement then FAILED on 1 of 44 targets.
+Had it been a gate it would have passed on 43 targets and fired on HG02630 as a spurious
+error, which is the failure mode that wastes a day. The module says in its docstring that
+containment is measured and not a theorem.
+
+**The gate that matters is constructed, because real data cannot reach it.**
+`tests/test_loo.py:test_a_block_only_the_target_could_span_is_dropped` builds 4 samples,
+5 positions and one zero-distance block that ONLY the held-out individual is called across.
+The full cohort keeps it; leave-one-out must drop it. Its control holds out a DIFFERENT
+member and asserts nothing is dropped, so the drop is attributable to the hold-out rather
+than to running the code. 8 tests.
+
+**⚠ Two reporting bugs of mine, both caught and both the same class.** (1) The survey's
+ARM 2 reference column printed the GENOME-WIDE 305 / 20 / 172,142 from the record beside a
+chr21-only run — a mislabelled denominator. It now recomputes the reference from whichever
+chromosomes were actually surveyed, and asserts the K = 88 reconstruction matches
+`in_chain.npy` so the column cannot drift from what it is compared against. (2) The
+`beta_share` row printed `0 / 0 / 0` because the shared formatter used `,.0f`, correct for
+counts and useless for a fraction; the shares themselves were always right. Both corrected
+in place in the log with a dated block and `--from-json`, no chains recomputed.
+
+**⚠⚠ A STANDING-CONSTRAINT-1 GATE FIRED ON MY OWN CODE, AND IT WAS RIGHT TO.**
+`tests/test_preprocess.py:test_no_cohort_function_takes_a_target` reads the AST of every
+file under `src/cohort/` and fails on any function taking a target-shaped parameter —
+"enforced by construction" rather than by discipline. `loo_chain(chrom_dir, target)`
+tripped it immediately. The collision is real and not a false positive: arm 1's
+construction NECESSARILY names an individual, while the gate exists because `Y_D` and
+`R_D` must be functions of `G` and `D` alone.
+Resolved in three parts rather than by an exemption. (1) The parameter is renamed
+`held_out`, which is the accurate name — this module DELETES those two rows and never
+reads the individual's alleles, path, or anything under `data/targets/`. (2) Because a
+rename alone would be gaming the gate, it is paired with a STRICTLY STRONGER property
+that is actually tested: `test_the_chain_ignores_the_held_out_data` garbles the held-out
+individual's two rows completely, alleles and missingness alike, and asserts `in_chain`,
+`support`, `k_states` and the traversal come back bit-identical. Mutation-verified with
+the realistic bug — computing `support` from the UNMASKED panel — which the gate catches
+on `support`, though NOT on `in_chain`, which is why both are asserted. Its control
+garbles a REMAINING donor and asserts something DOES move, so the invariance test cannot
+pass vacuously. (3) The rename would otherwise open a loophole, since the AST scan no
+longer catches a future `held_out`-taking function that goes and reads the individual,
+so `test_cohort_never_names_a_targets_path` forbids any non-docstring string literal
+under `src/cohort/` from naming a targets path. Docstrings are exempt because they must
+be able to discuss the rule they are subject to; verified that the scan fires on a real
+`Path("data/targets")` read and not on a docstring mentioning it.
+⚠ Worth keeping because the tempting move was a one-line allowlist for `loo.py`, which
+would have removed the protection for every future file in that package.
+
 ## 2026-10-12 (later) — B-THY-running-weight: Dylan's accumulated-weight idea, ruled on and MEASURED
 
 **The question.** Dylan asked: if the path sits on one donor for 50 variants without
