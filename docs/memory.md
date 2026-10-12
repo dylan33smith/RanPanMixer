@@ -1462,6 +1462,76 @@ looser than Theorem 1's promise, the computation is wrong — and the computatio
 to suspect.
 
 
+### 16. [CHUNK 6c] All 10 targets on all 22 autosomes — and a corrupt panel found by using it
+
+**Chunk 6 is 4 of 4.** 220 target-chromosome pairs, driver exit 0, "all 10 target(s)
+complete on all 22 chromosome(s)". Genome-wide **T = 22,134,562**, with
+**187,268,720 called cells** across the ten targets — a mean called fraction of
+**0.846047**, ranging 0.7141 (chr22) to 0.8778 (chr3) by chromosome.
+
+⚠ **THE TARGET VCFs HAD NO PRODUCER ON RECORD.** chr21's ten were hand-made and carry no
+provenance sidecar, so the one target set that existed was not reproducible from anything
+written down. `scripts/prep_all_targets.py` is now that producer: it records the
+extraction command and the panel digest on an artifact that SURVIVES, then deletes the
+single-sample VCF (about 6.8 GB per target genome-wide, 68 GB for ten) because it is a
+pure `bcftools view -s` of a panel we keep checksummed. ⚠ The digest is taken BEFORE the
+unlink, which is the ordering that cost nine chromosomes on 2026-10-10.
+⚠ chr21's ten remain unprovenanced: resume correctly skips them, and regenerating would
+overwrite the artifacts every recorded chr21 number was measured against.
+
+#### ⚠⚠ A CORRUPT PANEL, FOUND BY USING THE DATA RATHER THAN BY CHECKING IT
+
+Ten of the 220 jobs failed, all chr10, all `[E::bgzf_uncompress] CRC32 checksum
+mismatch` at offset **393,732,438**. The chr10 panel had arrived corrupt.
+
+**Every check in `scripts/verify_panel.py` had passed it**: index intact, record count
+3,495,473, sample set 3,202, reference build matching our own pangenome, and the
+truncation test passing because it SEEKS to the last 3 Mb and the damage is mid-file.
+
+⚠⚠ **SO DID THE sha256, AND THAT IS THE REAL LESSON.** `get_panel.sh` computed the
+sidecar FROM the downloaded bytes, so it matched whatever arrived — verified, recorded
+and actual were identical on the corrupt file. **A checksum you compute yourself after
+download verifies STORAGE, not TRANSFER.** `--deep` compared against that same
+self-referential sidecar, so it would have passed too; I had told Dylan it would have
+caught this and it would not.
+
+⚠ The fresh download is **exactly the same size**, 1,493,904,721 bytes, with a different
+hash (`a8f71fc6...` against `3b54d73d...`). So it was in-flight bit damage, not
+truncation, and no size or self-derived checksum could ever have seen it.
+
+**What works:** every bgzf block carries its own CRC, so decompressing the whole file is
+a check that can FAIL ON ITS OWN TERMS rather than against a reference derived from the
+same bytes. `bgzip -t` located the bad block exactly. All 22 panels swept: only chr10.
+Both `get_panel.sh` (test the `.part` BEFORE the mv, and DISCARD a failure, since
+`curl -C -` would skip a complete-but-corrupt file forever) and
+`verify_panel.py --deep` now do it.
+
+#### ⚠ Two readings of mine that were wrong, in one verification pass
+
+1. **A false alarm from my own monitor.** It reported "BGZF INTEGRITY: ** STILL FAILING
+   **" on the fresh download. `bgzip` is not on PATH without conda and the monitor never
+   activated it, so a MISSING BINARY was reported as a CORRUPT FILE. ⚠ The construction
+   `if bgzip -t f; then PASS; else FAIL; fi` conflates "the tool failed" with "the test
+   failed" — and this is the one place a false "corrupt" would have sent me
+   re-downloading 1.5 GB a second time. The file is sound: `bgzip -t` passes and
+   `bcftools` streams to chr10:133,787,400, past the corrupt copy's failure point.
+2. **I explained a uniformity that was not there.** My first verification printed called
+   fractions to three decimals, showing 0.836–0.836 for all ten targets, and I wrote that
+   the panel's lack of missing genotypes makes "called" identical for every sample — which
+   my own mask check contradicted two lines below, printing False for every pair. Exact
+   counts are 1,474,911 to 1,474,914: four distinct values, spread 7 positions
+   genome-wide at the widest. ⚠ The formatting hid the variation and I reached for an
+   explanation of a pattern that did not exist.
+
+#### The check that mattered
+
+The paths differ between targets at 15–21% of chain positions, and the structure is
+biologically sensible: HG00096 vs HG00097 agree at 84.50%, vs NA19056 at 83.48%, vs
+NA20294 at 79.14% — same-population pairs closer than cross-population ones. That rules
+out the failure mode worth worrying about, ten identical copies of one person, which a
+presence check could never have seen.
+
+
 ## 2026-10-09 — PHASE B OPENED: the two-arm paper, and the four measurements that sized it
 
 **Goal.** Dylan set a new scope on 2026-10-08: the paper becomes two sections. The
