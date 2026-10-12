@@ -463,10 +463,40 @@ def _draw_one(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_1d: np.ndarra
     return z, released, lz, u
 
 
+def _streams(seed: int, stream_key: str, n: int):
+    """`n` disjoint streams from one RECORDED integer, keyed by `stream_key`.
+
+    ⚠⚠ WHY `stream_key` EXISTS (added 2026-10-12, before any genome release was written).
+    `GenomeRelease` requires all 22 parts to agree on `seed`, because one genome release
+    is one draw of one person. But the stream was derived from `seed` ALONE, so every
+    chromosome of a genome release got the SAME two streams -- verified bit-identical --
+    and `_pick` samples by inverse CDF on one uniform per position (see `_pick`). Every
+    chromosome would therefore have chosen its donor at the SAME QUANTILE of its own
+    posterior at every step: a systematic cross-chromosome coupling that nothing in the
+    record would show. Keying the stream by the chromosome removes it while leaving the
+    recorded `seed` the genome's, so a part stays reproducible from `(seed, chrom)` --
+    both already fields of `Release`, so no record schema changed.
+
+    ⚠ This is the FOURTH common-random-numbers defect in this project, and the first
+    caught before it reached an artifact: no genome-scope release existed when it was
+    found, so nothing on record is affected.
+
+    ⚠ `stream_key=""` reproduces the previous behaviour EXACTLY, so every
+    single-chromosome release already on disk stays reproducible from its seed.
+
+    ⚠ hashlib, never `hash()`: Python's `hash()` is PYTHONHASHSEED-salted, which made a
+    decoy choice irreproducible once already in this project.
+    """
+    if not stream_key:
+        return np.random.SeedSequence(seed).spawn(n)
+    h = int.from_bytes(hashlib.sha256(stream_key.encode()).digest()[:4], "big")
+    return np.random.SeedSequence([int(seed), h]).spawn(n)
+
+
 def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarray,
             util: utility.Utility, tau: float, *, seed: int, target_id: str,
             graph_id: str = "", loo_id: str | None = None,
-            baseline_norm: float | None = None) -> Release:
+            baseline_norm: float | None = None, stream_key: str = "") -> Release:
     """Draw one release for one target at one `tau`. The whole mechanism, once.
 
     `haplotypes_chain` and `target_chain` are over CHAIN positions, in chain
@@ -522,7 +552,7 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
     if target_chain.ndim == 1:
         z, released, lz, u = _draw_one(hmm, haplotypes_chain, target_chain,
                                        util.beta, eta,
-                                       np.random.SeedSequence(seed).spawn(1)[0], base)
+                                       _streams(seed, stream_key, 1)[0], base)
         ceiling = utility.u_ceiling(target_chain, util.beta)
         ploidy = 1
     elif target_chain.ndim == 2 and target_chain.shape[1] == 2:
@@ -542,7 +572,7 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
         # therefore four correlated haplotype draws, which inflated the observed
         # seed-to-seed spread 2.2x. spawn() gives provably disjoint streams from
         # one recorded integer, so a release stays reproducible from its `seed`.
-        streams = np.random.SeedSequence(seed).spawn(2)
+        streams = _streams(seed, stream_key, 2)
         draws = [_draw_one(hmm, haplotypes_chain, target_chain[:, h], util.beta,
                            eta / 2.0, streams[h], base) for h in (0, 1)]
         z = np.stack([d[0] for d in draws], axis=1)

@@ -481,3 +481,51 @@ def test_the_overrun_the_gate_prevents_is_quantified():
     assert math.isclose(math.tanh(eta * 1.0), 0.5, rel_tol=1e-12)        # the stamp
     assert math.isclose(math.tanh(eta * 1.979595), 0.795929, abs_tol=1e-6)
     assert math.isclose(math.tanh(eta * 2.0), 0.8, rel_tol=1e-12)
+
+
+# ----------------------------------------------------------------------------------
+# Per-chromosome RNG streams, added 2026-10-12 before any genome release was written.
+#
+# ⚠⚠ THE DEFECT. `GenomeRelease` requires all 22 parts to agree on `seed`, because one
+# genome release is one draw of one person. But the stream was derived from `seed` alone,
+# so every chromosome got the SAME two streams, and `_pick` samples by inverse CDF on one
+# uniform per position. Every chromosome would have chosen its donor at the SAME QUANTILE
+# of its own posterior at every step -- a cross-chromosome coupling nothing in the record
+# would reveal. This is the FOURTH common-random-numbers defect here and the first caught
+# before it reached an artifact.
+# ----------------------------------------------------------------------------------
+
+def test_stream_key_empty_reproduces_the_old_derivation():
+    """BACKWARD COMPATIBILITY. Every single-chromosome release already on disk must
+    stay reproducible from its recorded seed, so the default path may not move."""
+    for n in (1, 2):
+        old = np.random.SeedSequence(4242).spawn(n)
+        new = F._streams(4242, "", n)
+        for a, b in zip(old, new):
+            assert np.array_equal(np.random.default_rng(a).random(8),
+                                  np.random.default_rng(b).random(8))
+
+
+def test_two_chromosomes_no_longer_share_a_stream():
+    """THE GATE. Same genome seed, different chromosome, disjoint uniforms."""
+    a = F._streams(4242, "chr1", 2)
+    b = F._streams(4242, "chr21", 2)
+    for h in (0, 1):
+        ua = np.random.default_rng(a[h]).random(64)
+        ub = np.random.default_rng(b[h]).random(64)
+        assert not np.allclose(ua, ub), (
+            f"haplotype {h} draws the same uniforms on chr1 and chr21, so both "
+            f"chromosomes pick their donor at the same posterior quantile")
+    # and the two haplotypes of ONE chromosome stay disjoint too
+    assert not np.allclose(np.random.default_rng(a[0]).random(64),
+                           np.random.default_rng(a[1]).random(64))
+
+
+def test_a_keyed_stream_is_reproducible_from_the_record():
+    """`seed` and `chrom` are both fields of `Release`, so a part must replay from them."""
+    first = np.random.default_rng(F._streams(99, "chr7", 2)[0]).random(16)
+    again = np.random.default_rng(F._streams(99, "chr7", 2)[0]).random(16)
+    assert np.array_equal(first, again)
+    assert not np.array_equal(
+        first, np.random.default_rng(F._streams(100, "chr7", 2)[0]).random(16)), \
+        "a different genome seed must give a different stream"

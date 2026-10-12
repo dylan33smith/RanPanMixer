@@ -164,6 +164,23 @@ chromosomes were actually surveyed, and asserts the K = 88 reconstruction matche
 counts and useless for a fraction; the shares themselves were always right. Both corrected
 in place in the log with a dated block and `--from-json`, no chains recomputed.
 
+**⚠⚠ AND A FOURTH COMMON-RANDOM-NUMBERS DEFECT, THE FIRST CAUGHT BEFORE AN ARTIFACT.**
+Before launching the 308-release sweep I checked what `seed` actually keys.
+`GenomeRelease` requires all 22 parts to agree on `seed` — correctly, since one genome
+release is one draw of one person — but `release()` derived its streams from `seed`
+ALONE, so every chromosome got bit-identical streams, verified by printing them. Since
+`_pick` samples by inverse CDF on one uniform per position, every chromosome would have
+picked its donor at the SAME QUANTILE of its own posterior at every step. Nothing in the
+record would have shown it. Fixed with `stream_key`: the stream is keyed by the
+chromosome via sha256 (never `hash()`, which is salted and cost this project a
+reproducible decoy choice once already), while the RECORDED `seed` stays the genome's, so
+the one-seed invariant is untouched and a part replays from `(seed, chrom)` — both
+already fields of `Release`, so no schema changed. `stream_key=""` reproduces the old
+derivation exactly, pinned by a test, so the single-chromosome releases on disk stay
+reproducible. ✅ **Nothing on record is affected**: the two release records on disk are
+single-chromosome, and no genome-scope release had been written. The previous three
+occurrences were all found in results; this one was found by reading the seeding path.
+
 **⚠⚠ A STANDING-CONSTRAINT-1 GATE FIRED ON MY OWN CODE, AND IT WAS RIGHT TO.**
 `tests/test_preprocess.py:test_no_cohort_function_takes_a_target` reads the AST of every
 file under `src/cohort/` and fails on any function taking a target-shaped parameter —

@@ -911,6 +911,32 @@ which was mostly a DIFFERENT set.
   the sampler, and the natural response to a failing statistical gate is to loosen
   its threshold, which would have blinded it for real.
 
+### Every chromosome of a genome release drew the same uniforms
+- **[2026-10-12] the RNG stream was keyed by `seed` alone, not by the chromosome**
+  **[Symptom]** None visible. The release records would look correct, each part well
+  formed, `log_z_p` in range, shares summing to 1. ⚠ Caught by reading the seeding path
+  while building arm 1, not by any check.
+  **[Cause]** `GenomeRelease` requires all 22 parts to agree on `seed`, because one genome
+  release is one draw of one person — correctly. But `release()` derived its streams as
+  `SeedSequence(seed).spawn(2)`, which depends on `seed` ALONE, so every chromosome of one
+  genome release got bit-identical streams (verified). `_pick` samples by inverse CDF on
+  one uniform per position, so every chromosome would have chosen its donor at the SAME
+  QUANTILE of its own posterior at every step — a systematic cross-chromosome coupling
+  that nothing in the record would reveal.
+  **[Proven fix]** `release()` takes `stream_key`, and `ffbs._streams` derives
+  `SeedSequence([seed, sha256(stream_key)]).spawn(n)`. The arm 1 runner passes the
+  chromosome. The RECORDED `seed` stays the genome's, so `GenomeRelease`'s one-seed
+  invariant is untouched and a part replays from `(seed, chrom)` — both already fields of
+  `Release`, so no record schema changed. `stream_key=""` reproduces the old derivation
+  EXACTLY, pinned by a test, so every single-chromosome release on disk stays
+  reproducible.
+  **[Severity]** Would have been invisible and uncorrectable after the fact. ⚠ **Nothing
+  on record is affected**: no genome-scope release existed when it was found — the two
+  records on disk are single-chromosome, where no cross-chromosome sharing can occur.
+  **[Severity note]** FOURTH common-random-numbers defect in this project, and the FIRST
+  caught before it reached an artifact. The previous three were found in the results.
+  **[Found by]** Asking what `seed` keys, before launching a 308-release sweep.
+
 ### A normalisation gate whose tolerance is computed from the thing it checks
 - **[2026-10-12] `sum beta_v` was unchecked on the whole release path**
   **[Symptom]** A hand-built `beta` summing to 2.0 runs the entire release path with no
