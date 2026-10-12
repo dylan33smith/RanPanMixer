@@ -2014,7 +2014,16 @@ Valid vs:             itself across capacities on one cohort, at a stated suppor
                       be used as phi_v without the normalization recorded under phi_v.
 Status:               ARM 1: PRIMARY — **the ONLY metric adopted from PanMixer's
                       utility suite** (decision H, 2026-10-08); `af_loss` and `ld_loss`
-                      are not adopted. ARM 2: DIAGNOSTIC — an axis we can plot on, not
+                      are not adopted.
+                      ✅ **AND IT IS SCORED AT K = 88 ON BOTH SIDES (decision M,
+                      2026-10-12).** The head-to-head runs PanMixer's evaluator
+                      UNMODIFIED, so this metric uses its shipped support INCLUDING
+                      the target, for our released arrays and theirs alike. That puts
+                      the same denominator on both sides, which is what the warning
+                      above asks for. ⚠ So this column is NOT a leave-one-out
+                      quantity, while our RELEASE is (K = 86, decision E) and every
+                      quantity we compute ourselves stays at K = 86. Never put a
+                      K = 88-scored column beside a K = 86 one. ARM 2: DIAGNOSTIC — an axis we can plot on, not
                       an endpoint.
 Aliases:              "utility loss". Ours is `utility_retained`; do not mix the names.
 ```

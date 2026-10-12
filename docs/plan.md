@@ -263,6 +263,47 @@ Nine decisions opened Phase B. They were taken after a seven-surface audit
 | **J** | The **`beta_share` allocation rule** (proposed by Dylan, 2026-10-10): a chromosome's share is its **variant count** over the genome-wide total, `T_c / T_total`. This is definitional rather than merely defensible — it makes mean `beta_v` per position `1/T_total` on EVERY chromosome, i.e. it is exactly what "normalise `beta_v` over the whole genome in one go" means, with the per-chromosome share as bookkeeping rather than a second reweighting. ⚠ `T_c` is defined on the FULL 88-haplotype cohort, fixed before any target is selected, so Arm 1's leave-one-out cannot move it: under LOO up to 5 chr21 positions of 305,886 (0.0016%) would drop to support 0, which would otherwise make `beta_share` weakly target-dependent. ⚠ Consequence: the shares cannot be written as 22 numbers until preprocessing runs, so the pre-registration pins the RULE. |
 | **I** | Arm 1's linkage attack scores "self" from the target's **own assembly-derived path** (defined for all 44), not its 1000G panel row (defined for only 39 of 44). PanMixer's panel-row semantics run as a labelled parity column. |
 
+### ✅ DECISION M (Dylan, 2026-10-12) — the head-to-head matches PanMixer's evaluator EXACTLY
+
+**The question.** PanMixer already does leave-one-out, but only at one of two steps: it
+holds the target out when SAMPLING (`hmm.py:42-43`) while its PMI block scoring uses all
+88 haplotypes (`hmm.py:122`). When we run its evaluations on our build for chunk 9, do we
+match that scoping or hold out at both steps?
+
+**The answer: match it exactly. Run their evaluator UNMODIFIED, on both sides.**
+`utility_loss_panmixer` is therefore computed with PanMixer's shipped `support(v)` over
+all **K = 88** — including the target's own two haplotypes — for OUR released arrays and
+for THEIRS alike.
+
+**Why this is the right choice and not a shortcut.** Arm 1 exists so the comparison is
+direct. Our sampler emits exactly the `(n_sites, 2)` int16 array their evaluators consume,
+so their whole benchmark runs on our output unchanged. Editing their evaluator would mean
+measuring our mechanism against a benchmark that is no longer theirs, and any difference
+would then be partly attributable to our edit. `docs/terms.md:utility_loss_panmixer`
+already names the hazard this avoids: "a head-to-head that silently mixes the two is
+comparing denominators, not mechanisms." Matching exactly puts the SAME denominator on
+both sides, so the comparison is about the mechanisms.
+
+⚠⚠ **WHAT MUST BE DECLARED WITH EVERY HEAD-TO-HEAD NUMBER.** Because the scoring support
+includes the target, `utility_loss_panmixer` is **NOT a leave-one-out quantity**. That is
+a property of the evaluator, applied identically to both sides, and it does not transfer
+to anything else: our RELEASE remains fully leave-one-out at K = 86 under decision E, and
+every quantity we compute ourselves — `e_q_u`, `u_ceiling`, `attacker_accuracy` — stays at
+K = 86. **Never mix a K = 88-scored column with a K = 86 one in a single comparison.**
+
+⚠⚠ **THIS IS NOT A CRITICISM OF PANMIXER, AND THE WRITE-UP MUST NOT READ AS ONE.**
+PanMixer's goal is donor protection, and we make no claim that its scoring scope is a
+defect; we adopt it precisely because adopting it unchanged is what keeps the comparison
+honest.
+
+⚠⚠ **"MATCH EXACTLY" IS ABOUT THE HOLD-OUT SCOPING, NOT ABOUT WHICH METRICS WE ADOPT.**
+Section 3 of the signed pre-registration is a FROZEN field and it says Arm 1 adopts
+`utility_loss_panmixer` **only** (decision H); `af_loss` and `ld_loss` are explicitly not
+adopted. Reading decision M as license to adopt their full utility suite would contradict
+a frozen endpoint and would require a dated addendum. It does not, and no addendum is
+required for decision M itself: it selects whose code runs, not what is measured, and no
+outcome had been inspected when it was made.
+
 ### ✅ DECISION L (Dylan, 2026-10-11) — the exact KL is its OWN quantity, not an A2 substitute
 
 **The question.** `scripts/exact_kl.py` computes `kl_exact` exactly and derives

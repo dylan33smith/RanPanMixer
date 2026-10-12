@@ -104,6 +104,33 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-12 — DECISION M: the head-to-head matches PanMixer's evaluator exactly
+
+**The question, raised to Dylan.** PanMixer holds the target out when sampling
+(`hmm.py:42-43`) but its PMI block scoring uses all 88 haplotypes (`hmm.py:122`). Match
+that scoping for chunk 9, or hold out at both steps?
+
+**Dylan, 2026-10-12: match exactly.** Run their evaluator unmodified, so
+`utility_loss_panmixer` is scored with their shipped `support(v)` over K = 88 — the target
+included — for our arrays and theirs alike. The reason it is right: `docs/terms.md` had
+already named the hazard ("a head-to-head that silently mixes the two is comparing
+denominators, not mechanisms"), and matching puts the same denominator on both sides, so
+the difference measures the mechanisms rather than our edits to their code.
+
+**⚠ What must travel with it.** That column is NOT a leave-one-out quantity, and the
+property does not transfer: our release stays fully leave-one-out at K = 86 under decision
+E, and every quantity we compute ourselves stays at K = 86. A K = 88-scored column may
+never sit beside a K = 86 one. And this is NOT a criticism of PanMixer — its goal is donor
+protection and we claim no defect; adopting its scope unchanged is what keeps the
+comparison honest.
+
+**⚠⚠ A SCOPE TRAP I SURFACED BEFORE ACTING ON THE DECISION.** "Match PanMixer exactly"
+could be read as adopting their whole utility suite. It must not be: section 3 of the
+SIGNED pre-registration is a frozen field and says Arm 1 adopts `utility_loss_panmixer`
+ONLY (decision H), with `af_loss` and `ld_loss` explicitly not adopted. Reading decision M
+that way would contradict a frozen endpoint and need an addendum. Decision M itself needs
+none — it selects whose code runs, not what is measured, and no outcome had been inspected.
+
 ## 2026-10-12 (later still) — CHUNK 8 OPENED: the 44 leave-one-out chains, and a non-monotone exclusion set
 
 **Hypothesis.** `docs/plan.md` recorded a risk before chunk 8 opened: leave-one-out
