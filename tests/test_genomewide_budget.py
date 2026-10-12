@@ -34,6 +34,7 @@ from mechanism import calibration as C  # noqa: E402
 from mechanism import ffbs as F  # noqa: E402
 from mechanism import hmm as H  # noqa: E402
 from mechanism import toy as TOY  # noqa: E402
+from mechanism import utility  # noqa: E402
 from mechanism import utility as U  # noqa: E402
 
 TAUS = (0.05, 0.25, 0.50, 0.90)
@@ -425,3 +426,58 @@ def test_the_per_chain_bracket_is_derived_from_the_weights(monkeypatch):
     with pytest.raises(AssertionError, match="eta_tau \\* share"):
         F.release(m, t.haplotypes, tgt, util, tau, seed=5,
                   target_id="toy", baseline_norm=base)
+
+
+# ----------------------------------------------------------------------------------
+# sum(beta) <= 1 on the TILT path, added 2026-10-12 after Dylan proposed accumulating
+# the weights of positions where the sampler did not switch donors.
+#
+# ⚠⚠ WHY THIS GATE EXISTS AND WHY IT HAD TO BE HERE. `beta_v` asserts sum == share, but
+# NOTHING REQUIRES A CALLER TO GO THROUGH `beta_v` -- `scripts/beta_concentration.py`
+# legitimately hand-builds its allocations. And the one downstream check that looks like
+# it would catch a mis-normalised beta cannot: `ffbs._draw_one` hands `log_z_p` a bracket
+# of `eta * float(beta.sum())`, which WIDENS in lockstep with the very error it would
+# need to catch. Mutation-verified 2026-10-12: with this gate removed, beta summing to
+# 2.0 flows through `tilt_potentials` and the release carries a TRUE bound of
+# tanh(eta * 2) = 0.80 while being STAMPED tau = 0.5.
+#
+# ⚠ The invariant is sum(beta) <= 1, not == 1, because a per-chromosome release carries
+# that chromosome's SHARE and the 22 shares sum to 1 (decision J).
+# ----------------------------------------------------------------------------------
+
+def _tiny():
+    hap = np.array([[0, 1, 0], [0, 0, 1]], dtype=np.int8)
+    tgt = np.array([0, 1, 0], dtype=np.int8)
+    allowed = np.ones((2, 3), dtype=bool)
+    return allowed, hap, tgt
+
+
+def test_tilt_refuses_beta_summing_above_one():
+    """THE GATE. delta_u > 1 does not weaken the bound, it REMOVES it (constraint 2)."""
+    allowed, hap, tgt = _tiny()
+    beta = np.array([0.7, 0.7, 0.6])                      # sums to 2.0
+    with pytest.raises(ValueError, match="above 1"):
+        utility.tilt_potentials(allowed, hap, tgt, beta, math.atanh(0.5))
+
+
+def test_tilt_accepts_a_full_budget_and_a_share():
+    """CONTROL. Both legitimate cases must pass, or the gate is just blocking work."""
+    allowed, hap, tgt = _tiny()
+    eta = math.atanh(0.5)
+    for beta in (np.array([0.2, 0.5, 0.3]),               # a whole budget, sums to 1
+                 np.array([0.01, 0.02, 0.01])):           # a chromosome's share
+        psi = utility.tilt_potentials(allowed, hap, tgt, beta, eta)
+        assert np.isfinite(psi).all() and (psi >= 0).all()
+
+
+def test_the_overrun_the_gate_prevents_is_quantified():
+    """The gate's REASON, as arithmetic: an unnormalised beta silently raises tau.
+
+    This is the number that makes the gate worth having rather than a style rule -- a
+    release stamped tau = 0.5 while carrying sum(beta) = 1.979595 is really at TV 0.7959,
+    and `p_succ_bound` cannot detect it because measured TV reaches only 27-43% of tau.
+    """
+    eta = math.atanh(0.5)
+    assert math.isclose(math.tanh(eta * 1.0), 0.5, rel_tol=1e-12)        # the stamp
+    assert math.isclose(math.tanh(eta * 1.979595), 0.795929, abs_tol=1e-6)
+    assert math.isclose(math.tanh(eta * 2.0), 0.8, rel_tol=1e-12)

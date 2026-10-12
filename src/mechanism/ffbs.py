@@ -18,12 +18,19 @@ FOUR THINGS THIS FILE IS CAREFUL ABOUT, each a real failure it would otherwise h
    vector, which is all a forward-only ancestral simulation needs; backward
    sampling needs the whole (T, K) array. float64 is LOAD-BEARING here, not a
    preference: under model C the per-position tilt is eta_tau * mean(beta_v) =
-   eta_tau / T, so at tau = 0.5 over the CHAIN's T = 305,886 it is
-   0.549306 / 305,886 = 1.80e-06 against float32's resolution of 1.19e-07, only
-   15.1x the noise floor (MODEL B's coarser T = 100,757 would have had 5.45e-06,
-   45.7x -- a fallback-model figure, quoted for contrast only, not a model-C
-   number). ⚠ The denominator is the chain, NOT the 340,849-record site
-   axis; quoting the site axis understates the tilt's headroom by 10%. Rounding
+   eta_tau / T. ⚠ **[CORRECTION - 2026-10-12]** This read "the CHAIN's T = 305,886
+   ... 1.80e-06 ... only 15.1x the noise floor", which is the SUPERSEDED
+   coordinate-cut chain. The live decision-K chain is T = 332,521, giving
+   1.6519e-06 = 13.86x float32's 1.1921e-07. And the release runs each haplotype at
+   `eta_tau / 2` (see `_draw_one`), so the REALISED per-position tilt is half that
+   again: 8.2597e-07 = 6.93x. ⚠⚠ GENOME-WIDE IT GOES UNDER: at T = 22,134,562 the
+   realised per-haplotype tilt at tau = 0.5 is 1.2408e-08, which is **0.104x float32
+   epsilon** -- an order of magnitude BELOW the representable step, so in float32 the
+   tilt would vanish entirely rather than merely lose precision. The guard below is
+   load-bearing by a wider margin than it used to claim. (MODEL B's coarser
+   T = 100,757 would have had 5.45e-06, 45.7x -- a fallback-model figure, quoted for
+   contrast only, not a model-C number.) ⚠ The denominator is the chain, NOT the
+   340,849-record site axis; quoting the site axis understates the headroom. Rounding
    would consume a meaningful fraction of the target's entire influence on its
    own release. Storage is about 215 MB at chr21's T = 305,886 and K = 88.
 
@@ -119,8 +126,8 @@ def forward(hmm: CohortHMM, potentials: np.ndarray) -> Forward:
     if potentials.dtype != np.float64:
         raise TypeError(
             f"potentials are {potentials.dtype}; float64 is load-bearing here "
-            f"(the per-position tilt is only ~15.1x float32 resolution on "
-            f"chr21's chain, and less on any longer axis)")
+            f"(the realised per-haplotype tilt is ~6.9x float32 resolution on chr21's "
+            f"live chain and ~0.10x -- BELOW the representable step -- genome-wide)")
     if (potentials < 0).any():
         raise ValueError("negative potential; psi = exp(...) times a 0/1 mask cannot be")
 

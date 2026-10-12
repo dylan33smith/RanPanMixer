@@ -104,6 +104,110 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-12 (later) — B-THY-running-weight: Dylan's accumulated-weight idea, ruled on and MEASURED
+
+**The question.** Dylan asked: if the path sits on one donor for 50 variants without
+switching, could we keep a running weight summing those variants, since "those weights
+were never used because the switching probability was so low"? And would that invalidate
+any claims?
+
+**The premise is false and the instinct is right about something else.** `beta_v` is an
+EMISSION-type per-position factor: `tilt_potentials` forms
+`psi_t(j) = exp(eta_tau * beta_t * phi_t(j))` for every donor at every position and the
+forward recursion multiplies it in at every position; the switch mass enters only as the
+mixing coefficient. So every weight is already spent — a weight at a non-matching position
+is SPENT-BUT-UNEARNED, not unapplied. There is no bank to draw on.
+What IS true, and is the sharpest thing here: changing WHICH donor fills an existing run,
+switch positions unchanged, costs EXACTLY ZERO under `R_D`, because
+`A_t = (1 - s_t) I + (s_t / K) J` enters every other state with the same `s_t / K`. So the
+summed `beta` over a run IS the entire posterior preference among donors for that run, and
+it competes against nothing. The run is the unit where the weight acts. Dylan was right
+about the unit and wrong only about the weight being idle.
+
+**Ruling on four variants.** V1 DYNAMIC (weight a function of the realised draw) is dead
+two ways. As a REGROUPING it keeps `sum beta_v` = 1 so Theorem 1's proof survives, but it
+destroys the additivity the factorisation needs, so the forward recursion, `log_z_p` and
+the backward conditional all become WRONG rather than approximate — the bound would hold
+of a distribution the sampler does not produce, and `tau` would attach to no computed
+object. This is the THIRD utility this project has rejected for failing to factor along
+the chain. As RE-SPENDING it makes `sum beta_v` > 1, hence `delta_u` > 1, hence
+`eta_tau = arctanh(tau)` the wrong calibration: at a stated `tau` = 0.5 the true TV would
+be 0.795929 and true accuracy 0.897964. V2 BLOCK-COLLAPSE is admissible, is an algebraic
+identity the code already computes (verified over all 437 chr21 frozen runs, 38,427
+(run, donor) pairs, max error 2.665e-15), and buys exactly nothing. ⚠ It also does not
+describe what Dylan saw: chr21's frozen runs are min 2, MAX 25 positions, 0.450% of
+positions and 0.3935% of the budget — **there is no 50-variant frozen run on chr21 at
+all**; a 50-variant stretch is a REALISED run where switching was merely improbable
+(median 7, max 1,797). V3 STATIC REALLOCATION is the sound version and is measured below.
+V4 RECALIBRATION (divide `eta_tau` by a smaller `delta_u`) is the most dangerous: it is
+textbook local-sensitivity calibration, which Nissim-Raskhodnikova-Smith prove is not
+private at any epsilon, since `u_ceiling` is literally `beta[target >= 0].sum()` — a direct
+readout of the target's missingness. And the SAFE form yields precisely zero, because
+`sup_p u_ceiling(p)` = 1 exactly, attained by any path called everywhere.
+
+**Result — V3 measured exactly** (`scripts/beta_concentration.py`, new;
+`logs/B_beta_concentration.md`; chr21, `beta_share` = 1, HG00096, ARM 2, n = 1, 14
+allocations x 3 `tau`, exact marginals, every allocation summing to 1 and selected by
+POSITION INDEX so none can see the target). Across `tau` = 0 to 0.99 the production
+`beta_v` moves `e_q_u` by +3.6368e-06, while 10 CONTIGUOUS positions move it by
+**+1.6546e-02** — about 4,500x. Contiguity alone is worth 6.7x at 10 positions and 60x at
+1,000 against evenly-spaced weight at the SAME count and the same `sum beta_v`, which is
+the run-as-unit fact made quantitative.
+⚠⚠ But the privacy claim does not change AT ALL: `sum beta_v` = 1 on every row, so
+`delta_u` = 1, and `tau`, `eta_tau`, `epsilon_tau` and `p_succ_bound` are IDENTICAL
+throughout. **Reallocation is privacy-neutral; it redefines what we call useful.**
+⚠ And the honest reading is the headroom column, not the movement: `window_1` captures
+73.3% of its headroom but its headroom is 0.004164, because the baseline mosaic already
+matches that single position 99.6% of the time. The positions where the tilt has the most
+power are mostly the ones that needed it least — the free-lunch phenomenon in miniature.
+The best case, 10 contiguous positions, moves fidelity from 86.1% to 87.9% of its ceiling
+having spent the ENTIRE budget there, at 66.6x the real genome-wide per-position budget.
+
+**THE CRITERION, which is the reusable part.** A choice moves the release only if
+`eta_tau/2 * (beta mass the choice controls) > the choice's cost in -log R_D`. Two regimes.
+Free choices (donor identity within a fixed switch skeleton) cost ZERO, the tilt is the
+only decider, and the first-order shift is `p(1-p) * eta_tau/2 * d_beta` — linear in the
+mass one decision controls, and this is where all the mechanism's effect already lives.
+Costly choices (buying or removing a switch) are UNREACHABLE at any usable `tau`: measured
+over 331,462 chr21 steps with `s_t` > 0 the median switch cost is **10.1529 nats**, while
+`d_beta` <= 1 means the tilt can offer at most half `eta_tau`, 1.3233 nats, at `tau` = 0.99.
+Breaking even on ONE median switch needs `d_beta` = 7.67 at `tau` = 0.99 and 36.97 at
+`tau` = 0.5 — more than the whole budget exists. **The tilt can never create or remove a
+donor switch; it can only reassign donors among choices the baseline charges nothing for.**
+That is R5 as an inequality rather than a variance figure.
+
+**⚠ MY OWN ERROR, told to Dylan before verifying.** I said the dynamic variant is "a
+direct constraint-1 violation" because which switches occurred correlates with the target.
+WRONG: constraint 1 governs `Y_D` and `R_D`, and `beta` touches only the tilt exponent,
+which is SUPPOSED to depend on the target — that is what `u(p, y)` means. V1 fails on
+factorisation and on constraint 2, not on constraint 1. Corrected to Dylan the same day.
+
+**⚠ AND MY OWN REPORTING BUG, caught by a closed form.** `scripts/beta_concentration.py`
+reported its tilt column as full `eta_tau * beta_v`, but the diploid release applies
+half `eta_tau` per haplotype, so the column overstated the REALISED exponent by exactly 2x.
+Settled exactly rather than by inspection: with `beta` on ONE position the tilted law is
+the baseline reweighted pointwise, so a closed form exists, and the half-`eta_tau` form
+matches the measured `window_1` to **3.5e-10** while full `eta_tau` is off by 8.2e-04.
+Fixed, `--from-json` added, and the table regenerated from the saved results with no
+recomputation; every measured value asserted bit-identical.
+
+**✅ GATE ADDED, AND IT WAS MISSING FOR A REASON WORTH RECORDING.** Nothing on the release
+path checked `sum beta_v`. `beta_v` asserts it, but no caller is required to go through
+`beta_v` — `scripts/beta_concentration.py` legitimately hand-builds its allocations — and
+the one downstream check that LOOKS like it would catch a mis-normalised `beta` cannot:
+`ffbs._draw_one` hands `log_z_p` a bracket of `eta * float(beta.sum())`, so the bracket
+WIDENS in lockstep with the very error it would need to catch. `tilt_potentials` now
+rejects `sum beta_v` > 1 (<= not ==, because a per-chromosome release carries its share).
+Mutation-verified: with the gate removed, `beta` summing to 2.0 flows through and the
+release carries a TRUE bound of tanh(`eta_tau` * 2) = 0.80 while stamped `tau` = 0.5.
+This is the fourth recorded instance of a gate that could not fail.
+
+**⚠ Verification coverage, stated so it is not mistaken for more than it was.** A 18-agent
+adversarial pass produced 126 load-bearing claims and verified only 6; two of its
+refutations were themselves wrong (it "refuted" that the potential applies at every
+position and that frozen-run betas sum, both of which I confirmed directly from the code).
+The ruling above rests on the claims I checked myself, not on the vote.
+
 ## 2026-10-12 — B-EVL-exact-utility: the genome-wide utility number, and TWO failed predictions of it
 
 **Hypothesis.** Privacy was settled (`acc_ceiling` = 0.501555 at `tau` = 0.99 against a

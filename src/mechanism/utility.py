@@ -117,10 +117,15 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
     ⚠ WHICH SCOPE `tau` COVERS IS DEFERRED DECISION R1, AND IT IS NOT COSMETIC.
 
     `scope="chain"` normalises over every chain position. Honest, and the current
-    default. On chr21 that means 16.4% of the weight sits on positions where the
-    target has no call at all, so `u` can never exceed 0.815: the full `tau` is
-    paid for 81.5% of the leverage, and the release at the other positions is a
-    pure prior draw with no reference to the target whatsoever.
+    default. ⚠ **[CORRECTION - 2026-10-12]** This read "16.4% of the weight ... `u`
+    can never exceed 0.815 ... paid for 81.5% of the leverage", which was measured on
+    the SUPERSEDED coordinate-cut chain of T = 305,886. On the live decision-K chain
+    of T = 332,521 it is **30.749104%** of the weight on positions where HG00096 has
+    no call at all, so `u` cannot exceed **0.692509** — the inert share very nearly
+    DOUBLED, because the rebuild added 26,635 positions of which only 4,362 are
+    called. So the full `tau` is paid for 69.3% of the leverage, and the release at
+    the other positions is a pure prior draw with no reference to the target
+    whatsoever. ⚠ The figure is per target; this one is HG00096, ARM 2.
 
     `scope="chain_readable"` normalises over `in_chain & readable`, taking the
     ceiling to 1.000 over 253,846 of 305,886 chain positions. Legitimate in the
@@ -287,7 +292,9 @@ def u_ceiling(target: np.ndarray, beta: np.ndarray) -> float:
 
     ⚠ REPORT THIS WITH EVERY UTILITY FIGURE. It is the honest ceiling, and it is
     below 1 whenever the target has no call at some position carrying weight --
-    which under `scope="chain"` is 16.4% of the chr21 weight. Quoting
+    which under `scope="chain"` is **30.749104%** of the live chr21 weight for
+    HG00096 (this read 16.4%, measured on the superseded T = 305,886 chain; the live
+    chain is T = 332,521 -- corrected 2026-10-12). Quoting
     `utility_retained` against an implicit ceiling of 1 understates the mechanism
     by exactly that factor, and quoting it against this number without saying so
     overstates it. Both are the reporting error the two measurement paths in
@@ -351,6 +358,22 @@ def tilt_potentials(hmm_allowed: np.ndarray, haplotypes_chain: np.ndarray,
             raise ValueError(f"{name} has {len(arr)} positions, chain has {n_pos}")
     if eta < 0:
         raise ValueError(f"eta_tau must be non-negative, got {eta}")
+    # ⚠⚠ THE ONLY STRUCTURAL CHECK ON `beta` ON THIS PATH, added 2026-10-12. `beta_v`
+    # asserts sum == share, but NOTHING REQUIRES A CALLER TO GO THROUGH IT, and
+    # `ffbs._draw_one` hands `log_z_p` a bracket of `eta * float(beta.sum())` -- which
+    # WIDENS in lockstep with a mis-normalised `beta` instead of firing on it. So before
+    # this, a hand-built `beta` summing to 2 ran the whole release path with no symptom.
+    # Every legitimate `beta` sums to one chromosome's SHARE of a single genome-wide
+    # budget and the shares sum to 1, so `sum(beta) <= 1` ALWAYS. Above 1 means
+    # `delta_u > 1`, and standing constraint 2 is explicit that an unnormalised utility
+    # does not weaken the bound -- it REMOVES it. Checked here because this is the one
+    # function every tilted release must call.
+    s_beta = float(beta.sum())
+    if s_beta > 1.0 + 1e-9:
+        raise ValueError(
+            f"sum beta_v = {s_beta!r}, above 1, so delta_u > 1 and "
+            f"eta_tau = arctanh(tau) is the WRONG calibration: the release would carry "
+            f"a larger tau than the one it is stamped with. The calibration is void.")
 
     match = (haplotypes_chain == target_chain[None, :]) & (target_chain[None, :] >= 0)
     weighted = match * beta[None, :]                       # (K, n_pos)

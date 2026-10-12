@@ -272,10 +272,20 @@ CHANGES MEANING WITH: the ARM first, then the beta_v SCOPE (deferred decision R1
                       **Arm 1's ceiling is UNMEASURED** — it needs the LOO panel, so
                       it cannot be inferred from the Arm-2 figure below. Never put the
                       two arms' ceilings in one column.
-                      Measured 2026-09-30, **ARM 2** (external stand-in target), on
+                      ⚠⚠ **SUPERSEDED BY THE CHAIN REBUILD (2026-10-12). THE LIVE
+                      VALUE IS 0.692509**, measured on HG00096, chr21, scope="chain",
+                      ARM 2, over the decision-K chain of T = 332,521, where
+                      30.749104% of the weight sits on positions the target does not
+                      call. The rebuild added 26,635 positions of which only 4,362
+                      are called, so the called fraction fell 0.829871 -> 0.776516.
+                      ⚠ The figure below is CORRECT FOR ITS BUILD and is kept because
+                      many recorded numbers divide by it: measured 2026-09-30,
+                      **ARM 2** (external stand-in target), on
                       HG00096, chr21, scope="chain": **0.815455** over 253,846 of
                       305,886 chain positions -- independently reproducing the 0.815
-                      that R1 predicted from the weight arithmetic. Under
+                      that R1 predicted from the weight arithmetic. Restricting the
+                      live arrays to the old span reproduces both exactly, which pins
+                      the change to the BUILD rather than to the arithmetic. Under
                       scope="chain_readable" it is 1.000 for a target drawn from the
                       same panel `readable` was built from.
                       ⚠ **AND THAT NUMBER IS CHR21-NORMALISED.** It was measured with
@@ -606,6 +616,48 @@ Status:               DIAGNOSTIC — but load-bearing. ⚠ log_z_p IS THE TILTED
                       widening the bracket would discard the cheapest correctness
                       check in the project.
 Aliases:              none. Never "Z_base" in a table; it is not a reportable number.
+```
+
+### delta_u  [theory] [calibration] [gate]
+```
+Is:                   the GLOBAL RANGE of the utility,
+                      sup over all admissible p, q, y of |u(p, y) - u(q, y)|. For a
+                      non-negative indicator utility it is exactly `sum_v beta_v`.
+                      ⚠⚠ **IT IS THE ONLY PROPERTY OF THE UTILITY THAT THE PRIVACY
+                      BOUND DEPENDS ON.** Established 2026-10-12: `beta_v` appears
+                      nowhere in Theorem 1's proof, only in the example construction
+                      and in the factorisation, which is about COMPUTABILITY. So the
+                      DISTRIBUTION of `beta_v` across positions is free -- concentrate
+                      the whole budget on 10 positions or spread it over 22,134,562 and
+                      `tau`, `eta_tau`, `epsilon_tau` and `p_succ_bound` are IDENTICAL,
+                      provided `delta_u` is unchanged. This is what makes budget
+                      reallocation privacy-neutral.
+Computed by:          nothing computes it as a named value -- it is 1 BY CONSTRUCTION,
+                      enforced as `sum beta_v` == the declared share inside
+                      src/mechanism/utility.py:beta_v, and as `sum beta_v` <= 1 inside
+                      src/mechanism/utility.py:tilt_potentials (added 2026-10-12, the
+                      only check on the path every tilted release must take).
+CHANGES MEANING WITH: the utility FUNCTION, and nothing else. Not the target, not the
+                      cohort, not `tau`. ⚠ If a raw utility has `delta_u` != 1 the
+                      calibration is `eta_tau = arctanh(tau) / delta_u` -- standing
+                      constraint 2. An unnormalised utility does not weaken the bound,
+                      it REMOVES it.
+Valid vs:             nothing; it is a property of the utility definition, not a
+                      measurement. Quote it only to state which calibration is in force.
+Status:               STRUCTURAL. 1 by construction on every release on record.
+                      ⚠⚠ **DO NOT SHRINK IT USING THE DATA.** `u_ceiling` is the range
+                      achievable for a GIVEN TARGET and is a readout of that target's
+                      missingness, so calibrating `eta_tau` to it is local-sensitivity
+                      calibration, which Nissim-Raskhodnikova-Smith show is not private
+                      at any `epsilon_tau`. And the SAFE form, dividing by
+                      sup over p of `u_ceiling`(p), gains precisely nothing, because
+                      that supremum is exactly 1 -- attained by any admissible path
+                      called at every chain position. Ruled on 2026-10-12.
+                      ⚠ Measured consequence of getting it wrong: at a stated
+                      `tau` = 0.5, a `delta_u` of 1.979595 means a TRUE total variation
+                      of 0.795929 and a true accuracy of 0.897964.
+Aliases:              "the sensitivity", "the range of u". Never "the ceiling", which
+                      is `u_ceiling` and is a different, target-dependent quantity.
 ```
 
 ### e_q_u  [utility] [theory] [evaluation]

@@ -911,6 +911,50 @@ which was mostly a DIFFERENT set.
   the sampler, and the natural response to a failing statistical gate is to loosen
   its threshold, which would have blinded it for real.
 
+### A normalisation gate whose tolerance is computed from the thing it checks
+- **[2026-10-12] `sum beta_v` was unchecked on the whole release path**
+  **[Symptom]** A hand-built `beta` summing to 2.0 runs the entire release path with no
+  exception and no symptom. The release is stamped `tau` = 0.5 while really carrying
+  TV = tanh(`eta_tau` * 2) = 0.80.
+  **[Cause]** Two gaps composing. `beta_v` asserts `sum beta_v` == `share`, but nothing
+  requires a caller to route through `beta_v`, and `scripts/beta_concentration.py`
+  legitimately hand-builds allocations. The one downstream check that looks protective is
+  not: `ffbs._draw_one` passes `log_z_p` a bracket of `eta * float(beta.sum())`, so the
+  tolerance is DERIVED FROM THE QUANTITY UNDER TEST and widens in lockstep with the error.
+  `tilt_potentials` validated only array lengths and `eta_tau` >= 0.
+  **[Proven fix]** `tilt_potentials` rejects `sum beta_v` > 1 + 1e-9 — the one function
+  every tilted release must call. `<=` and not `==`, because a per-chromosome release
+  carries that chromosome's `beta_share` and the 22 shares sum to 1 (decision J).
+  Mutation-verified: removing it lets `sum beta_v` = 2.0 through.
+  **[Severity]** Silent and unbounded in the dangerous direction — it inflates the real
+  `tau` above the stamped one, and `p_succ_bound` cannot catch it because measured TV
+  reaches only 27-43% of `tau`.
+
+### Two figures pinned to the superseded coordinate-cut chain
+- **[2026-10-12] `u_ceiling` and the float64 headroom argument both quote T = 305,886**
+  **[Symptom]** `u_ceiling` on HG00096 chr21 at scope `chain` measures **0.692509** on the
+  live build, against **0.815455** on record in three places. Separately,
+  `src/mechanism/ffbs.py`'s float64 justification quotes a per-position tilt of 1.80e-06
+  and "15.1x the noise floor".
+  **[Cause]** Both were measured on the pre-decision-C coordinate-cut chain, T = 305,886.
+  The live decision-K chain is T = 332,521. The rebuild added 26,635 positions of which
+  only 4,362 are called for HG00096, so the called fraction fell 0.829871 -> 0.776516 and
+  the inverse-support-weighted ceiling fell further still. Restricting to the old span
+  reproduces 305,886 and 0.815455 exactly, which pins the cause to the build, not the
+  arithmetic.
+  **[Proven fix]** Corrected in place at `src/mechanism/ffbs.py` (both the docstring and
+  the runtime error message) with the live T, the `eta_tau`/2 halving, and the
+  genome-wide figure. ⚠⚠ Correcting it STRENGTHENS the guard: at T = 22,134,562 the
+  realised per-haplotype tilt at `tau` = 0.5 is 1.2408e-08 = **0.104x float32 epsilon**,
+  an order of magnitude BELOW the representable step, so in float32 the tilt vanishes
+  outright rather than losing precision.
+  **[Severity]** Documentation-only for the headroom claim, and in the conservative
+  direction. For `u_ceiling` it is a live denominator: anything divided by 0.815455 on
+  this build overstates by 17.8%.
+  **[Found by]** The first row of a new experiment failing to reproduce a recorded number,
+  which is only diagnosable because the record carried its DENOMINATOR (253,846 of
+  305,886) rather than the ratio alone.
+
 ### A utility figure quoted against a ceiling of 1 that is actually 0.815
 - **[2026-09-30] `utility_retained` has no meaning without `u_ceiling`**
   **[Symptom]** `utility_retained` = 0.6940 on HG00096 looks like 69.4% of
