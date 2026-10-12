@@ -357,18 +357,20 @@ Is:                   Non-negative per-position weights with sum_v beta_v = 1. T
 Computed by:          src/mechanism/utility.py:beta_v (built 2026-09-30), which takes an
                       explicit `scope` -- see u_ceiling, `beta_scope` and deferred
                       decision R1.
-                      ⚠ **THE CODE CANNOT EXPRESS A SHARE TODAY, AND SAYS SO.** beta_v
-                      normalises over the chain positions it is handed and then HARD
-                      ASSERTS the result -- src/mechanism/utility.py:171 raises
-                      "sum beta_v = ..., not 1. The calibration is void." So run per
-                      chromosome it necessarily produces a per-chromosome sum of 1,
-                      which is exactly what decision B forbids, and its own docstring
-                      (src/mechanism/utility.py:129-135, "AND IT IS PER-CHROMOSOME
-                      EITHER WAY ... Decide before any multi-chromosome run") names the
-                      gap. A genome-wide normaliser with per-chromosome shares is NOT
-                      YET IMPLEMENTED. Until it is, every beta_v, u_ceiling, E_Q[u] and
-                      utility_retained figure on record is CHR21-NORMALISED and is not
-                      a genome-wide number.
+                      ✅ **THE CODE EXPRESSES A SHARE AS OF DECISION J (2026-10-11).**
+                      This paragraph used to read "THE CODE CANNOT EXPRESS A SHARE
+                      TODAY, AND SAYS SO". beta_v normalises over the chain positions
+                      it is handed, multiplies by `share`, and HARD ASSERTS the result
+                      AGAINST THE SHARE -- src/mechanism/utility.py raises "sum beta_v
+                      = ..., not the declared share ...; the calibration is void." The
+                      22 autosome shares are T_c / T_total by variant count and sum to
+                      1.000000 over T = 22,134,562, so `tau` is genome-wide.
+                      ⚠ A CHR21 FIGURE AT share = 1 IS STILL CHR21-NORMALISED, and
+                      every pre-2026-10-12 beta_v, u_ceiling, E_Q[u] and
+                      utility_retained figure on record is one. That is legitimate as a
+                      SINGLE-CHROMOSOME release, not as a genome-wide number; read the
+                      share off the figure before comparing two. Genome-wide E_Q[u] is
+                      measured -- see `e_q_u`.
                       ⚠ support(v) needs NO computation — measured 2026-09-28,
                       the pangenome VCF's own INFO/AN field is bit-identical to
                       np.sum(pangenome != -1, axis=(0,2)) across all 340,849 chr21
@@ -624,15 +626,28 @@ Computed by:          scripts/results_table.py:var_and_mean — three forward pa
                       src/mechanism/ffbs.py:state_marginals, exact for any quantity
                       that is a per-position sum — is the alternative and is what
                       src/mechanism/ffbs.py:expected_mismatches already uses.
-                      ⚠ NOT YET A GENOME-WIDE ROUTINE: nothing assembles it across the
-                      22 autosomes, and no script emits it under a genome-wide beta.
+                      ✅ **AND THE GENOME-WIDE ROUTINE NOW EXISTS (2026-10-12):**
+                      scripts/exact_utility.py assembles it across the 22 autosomes by
+                      the marginals route under a genome-wide beta, one forward +
+                      state_marginals pass per (chromosome, haplotype, tau), 44 passes
+                      in ~30 min. This paragraph used to read "NOT YET A GENOME-WIDE
+                      ROUTINE". It carries NO finite-difference step: the marginals
+                      route needs no h.
 CHANGES MEANING WITH: the ESTIMATOR ROUTE and, for the finite-difference route, the
                       step h — a derivative taken at a different h is a different
                       number, so h must be stamped. And with `beta_v`'s scope and
                       normalisation axis: the recorded value **E_Q[u] = 0.6951**
                       (HG00096, chr21, scope "chain", ARM 2, tau = 0.5) was taken with
                       beta CHR21-NORMALISED, so it is NOT the genome-wide endpoint
-                      decision A pre-registers. The genome-wide value is UNMEASURED.
+                      decision A pre-registers. ✅ **THE GENOME-WIDE VALUE IS NOW
+                      MEASURED (2026-10-12): E_Q[u] = 0.708967646 at tau = 0 and
+                      0.708967729 at tau = 0.99** — HG00096, ARM 2, 22 autosomes,
+                      T = 22,134,562, shares by decision J summing to 1.000000, scope
+                      "chain", n = 1 target, exact marginals route, zero Monte-Carlo
+                      error. **The MOVEMENT is +8.345e-08 and that is the figure**; the
+                      LEVEL is reached at tau = 0 too, where the release carries zero
+                      target information, so the level is not attributable to the
+                      mechanism.
                       ⚠ AND WITH THE ARM, through the ceiling it must be read against:
                       quote it beside `u_ceiling` for its OWN arm, never against 1.
 Valid vs:             the same route at matched tau, beta scope and normalisation axis;
@@ -645,6 +660,38 @@ Aliases:              "E_Q[u]", "the exact expected utility". ⚠ Never "the uti
                       a finite-sample average of the same quantity.
 ```
 
+
+### e_q_u_over_ceiling  [utility] [evaluation] [derived]
+```
+Is:                   `e_q_u` / `u_ceiling` — the EXACT expected utility as a fraction
+                      of the best any release could achieve for that target. A pure
+                      ratio of two exact quantities, so it carries no sampling error.
+                      ⚠ **IT IS NOT `utility_retained`**, which is the SAMPLED u_path
+                      average and is a LEVEL, not a ratio. This term exists because
+                      scripts/exact_utility.py emitted the ratio under that name on
+                      2026-10-12 and the label was wrong; the saved JSON key was
+                      relabelled, values bit-identical.
+Computed by:          scripts/exact_utility.py — a derived row, from the same two
+                      exact quantities on the rows above it (built 2026-10-12).
+CHANGES MEANING WITH: everything `e_q_u` and `u_ceiling` each change with — the arm,
+                      tau, beta_v's scope AND its share, and the target. Both the
+                      numerator and the denominator are arm-indexed, so a ratio built
+                      across arms is meaningless.
+Valid vs:             the SAME target's ratio at another tau, same arm, same share.
+                      ⚠ Never across targets: `u_ceiling` differs per target, so the
+                      ratio's denominator moves and the comparison is not like-for-like.
+Status:               DERIVED and SECONDARY. The primary endpoint is `e_q_u` itself,
+                      and the figure that carries a claim is its MOVEMENT in tau, not
+                      any level. **Measured 0.858617102 at tau = 0 and 0.858617203 at
+                      tau = 0.99** — HG00096, ARM 2, 22 autosomes, share 1.000000,
+                      scope "chain", n = 1 target, exact.
+                      ⚠⚠ **DO NOT QUOTE THIS AS "WE RETAIN 86% OF UTILITY".** 0.8586 is
+                      reached at tau = 0, where the release is a pure cohort mosaic
+                      carrying ZERO target information — any two humans share most of
+                      their alleles. Quoting the level is exactly the free-lunch error
+                      `target_fidelity` was defined to prevent.
+Aliases:              none. Never "utility retained", which is a different quantity.
+```
 ### var_q_u  [utility] [theory] [diagnostic]
 ```
 Is:                   Var_Q(u), the EXACT variance of the utility under Q^tau_p — the

@@ -1,16 +1,28 @@
 #!/usr/bin/env python
-"""Genome-wide E_Q[u] and `utility_retained`, EXACTLY, with zero Monte-Carlo error.
+"""Genome-wide `e_q_u` and `e_q_u_over_ceiling`, EXACTLY, with zero Monte-Carlo error.
 
 ⚠⚠ WHY THIS EXISTS. Every utility figure on record is chr21 at SHARE 1 -- the whole
 privacy budget spent on one chromosome -- and reads `utility_retained` = 0.6931 at
 `tau` = 0 through 0.50 and 0.6932 at `tau` = 0.9, i.e. the mechanism moves the fourth
 decimal. At genome scope each chromosome takes its share (decision J), `mean beta_v`
-drops from 3.27e-06 to 4.52e-08, and the movement should shrink by about the same
-factor of 72. Dylan asked for the measured number rather than that extrapolation.
+drops from 3.27e-06 to 4.52e-08. Dylan asked for the measured number rather than an
+extrapolation, and MEASURED 2026-10-12 (n = 1 target, HG00096, 22 autosomes, 44 exact
+passes): `e_q_u` goes 7.089676460e-01 -> 7.089677294e-01 across `tau` = 0 to 0.99, a
+movement of +8.345e-08, and `e_q_u_over_ceiling` is 0.858617 at BOTH ends.
 
-⚠ THE FIGURE THAT MATTERS IS THE MOVEMENT, NOT THE LEVEL. `utility_retained` is ~0.69
-at `tau` = 0 too, where the release carries ZERO target information, because any two
-humans share most of their alleles. Quoting the level as the mechanism's utility is the
+⚠ TWO FIRST-ORDER PREDICTIONS OF THAT MOVEMENT BOTH FAILED, in OPPOSITE directions.
+The measured shrink against chr21's 2.94e-06 is a factor of 35.2. Scaling by `mean
+beta_v` predicts 72; scaling by sum(beta_v^2) -- the correct first-order factor if
+matches were independent, measured 9.290392e-06 on chr21 against 7.223240e-08
+genome-wide -- predicts 128.6. So the movement is NOT a function of budget dilution
+alone. The untested explanation is that allele matches are POSITIVELY CORRELATED along
+the HMM copying path, so Var_Q(u) exceeds sum(beta_v^2) by a chromosome-dependent
+factor; settling it needs Var_Q(u) from PAIR marginals, which this script does not
+compute. Do not quote a mechanism for the 35.2 until that is measured.
+
+⚠ THE FIGURE THAT MATTERS IS THE MOVEMENT, NOT THE LEVEL. `e_q_u_over_ceiling` is
+0.8586 at `tau` = 0 too, where the release carries ZERO target information, because any
+two humans share most of their alleles. Quoting the level as the mechanism's utility is the
 free-lunch error `target_fidelity` was defined to prevent. So this reports
 E_Q[u] - E_R[u] as its own row.
 
@@ -85,7 +97,18 @@ def main(argv=None) -> int:
     ap.add_argument("--taus", type=float, nargs="+", default=[0.0, 0.99])
     ap.add_argument("--chroms", nargs="+", default=AUTOSOMES)
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--from-json", type=Path, default=None,
+                    help="re-report a saved run instead of recomputing it")
     a = ap.parse_args(argv)
+
+    if a.from_json:
+        d = json.loads(a.from_json.read_text())
+        rows = d["results"]
+        taus = sorted({r["tau"] for r in rows})
+        print(f"re-reporting {len(rows)} saved row(s) from {a.from_json}. "
+              f"NO marginals computed.")
+        _report(rows, taus, d["scope"])
+        return 0
 
     sh, T, tot = shares()
     sub = {c: sh[c] for c in a.chroms}
@@ -109,32 +132,46 @@ def main(argv=None) -> int:
                 print(f"    {t} tau={tau:g} {c}: E_Q[u]={e:.6e} "
                       f"({time.time() - t0:.0f}s)", flush=True)
             out.append({"target": t, "tau": tau, "e_q_u": eu, "u_ceiling": ceil,
-                        "utility_retained": eu / ceil if ceil else float("nan"),
+                        "e_q_u_over_ceiling": eu / ceil if ceil else float("nan"),
                         "chroms": len(a.chroms)})
             print(f"  {t} tau={tau:g}: E_Q[u] = {eu:.9e}, u_ceiling = {ceil:.9e}, "
-                  f"utility_retained = {eu / ceil:.6f}", flush=True)
+                  f"e_q_u_over_ceiling = {eu / ceil:.6f}", flush=True)
 
-    print(f"\n{scope} exact utility. n = {len(tids)} target(s), ZERO Monte-Carlo error.\n")
-    print("| metric | " + " | ".join(f"{x:g}" for x in a.taus) + " |")
-    print("|" + "---|" * (len(a.taus) + 1))
-    for name, key in (("`e_q_u`", "e_q_u"), ("`u_ceiling`", "u_ceiling"),
-                      ("`utility_retained` *", "utility_retained")):
-        cells = [f"{np.mean([r[key] for r in out if r['tau'] == x]):.9f}"
-                 for x in a.taus]
-        print(f"| {name} | " + " | ".join(cells) + " |")
-    if len(a.taus) > 1:
-        lo = np.mean([r["e_q_u"] for r in out if r["tau"] == min(a.taus)])
-        hi = np.mean([r["e_q_u"] for r in out if r["tau"] == max(a.taus)])
-        print(f"\n⚠⚠ **THE MOVEMENT**: E_Q[u] goes {lo:.9e} -> {hi:.9e} across "
-              f"tau = {min(a.taus):g} to {max(a.taus):g}, a change of **{hi - lo:+.3e}** "
-              f"({100 * (hi - lo) / lo:+.6f}%).")
-        print(f"⚠ For comparison, chr21 at SHARE 1 moves 2.94e-06, and the toy at "
-              f"mean beta_v = 0.111 moves 0.4502 -> 0.6477. The mechanism is not broken; "
-              f"the budget is diluted.")
+    _report(out, a.taus, scope)
     if a.json:
         a.json.write_text(json.dumps({"scope": scope, "results": out}, indent=1) + "\n")
         print(f"\nJSON -> {a.json}")
     return 0
+
+
+def _report(out, taus, scope) -> None:
+    """Emit the table from `out`. Shared by a live run and `--from-json`, so a
+    relabelled row never requires recomputing 44 exact passes."""
+    n = len({r["target"] for r in out})
+    print(f"\n{scope} exact utility. n = {n} target(s), ZERO Monte-Carlo error.\n")
+    print("| metric | " + " | ".join(f"{x:g}" for x in taus) + " |")
+    print("|" + "---|" * (len(taus) + 1))
+    for name, key in (("`e_q_u` *", "e_q_u"), ("`u_ceiling`", "u_ceiling"),
+                      ("`e_q_u_over_ceiling`", "e_q_u_over_ceiling")):
+        cells = []
+        for x in taus:
+            vals = [r[key] for r in out if r["tau"] == x]
+            assert vals, f"no saved rows at tau = {x}; the report would be silent"
+            cells.append(f"{np.mean(vals):.9f}")
+        print(f"| {name} | " + " | ".join(cells) + " |")
+    if len(taus) > 1:
+        lo = np.mean([r["e_q_u"] for r in out if r["tau"] == min(taus)])
+        hi = np.mean([r["e_q_u"] for r in out if r["tau"] == max(taus)])
+        print(f"\n⚠⚠ **THE MOVEMENT**: E_Q[u] goes {lo:.9e} -> {hi:.9e} across "
+              f"tau = {min(taus):g} to {max(taus):g}, a change of **{hi - lo:+.3e}** "
+              f"({100 * (hi - lo) / lo:+.6f}%).")
+        print(f"⚠ For comparison, chr21 at SHARE 1 moves 2.94e-06 (a factor of "
+              f"{2.94e-06 / (hi - lo):.1f} more), and the toy at mean beta_v = 0.111 moves "
+              f"0.4502 -> 0.6477. The mechanism is not broken; the budget is diluted.")
+        print(f"⚠ That factor is NOT predicted by budget dilution: mean beta_v predicts "
+              f"72, sum(beta_v^2) predicts 128.6. Positive correlation of matches along "
+              f"the copying path is the UNTESTED explanation; it needs Var_Q(u) from pair "
+              f"marginals, which this script does not compute.")
 
 
 if __name__ == "__main__":

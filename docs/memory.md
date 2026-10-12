@@ -104,6 +104,85 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-12 — B-EVL-exact-utility: the genome-wide utility number, and TWO failed predictions of it
+
+**Hypothesis.** Privacy was settled (`acc_ceiling` = 0.501555 at `tau` = 0.99 against a
+`p_succ_bound` of 0.9950, exact). Dylan asked whether utility had been measured on either
+arm. It had not been, at genome scope: every figure on record was chr21 at `share` = 1.
+The standing prediction, recorded in `docs/plan.md` and `docs/data.md`, was that because
+`mean beta_v` falls 72x at genome scope (3.27e-06 to 4.52e-08), the `tau`-movement in
+expected utility would shrink by about 72x from chr21's 2.94e-06.
+
+**Method.** `scripts/exact_utility.py`, new. `E_Q[u]` is a LINEAR functional of the
+posterior state marginals, so one `ffbs.forward` + one `ffbs.state_marginals` pass per
+(chromosome, haplotype, `tau`) gives it with NO sampling and NO finite difference — which
+matters because the derivative route BREAKS at genome scale (2026-10-10 entry). 44 exact
+passes, 22 autosomes x 2 `tau`, ~30 min. `tau` = 0 is the same pass with all-ones
+potentials, which is the untilted baseline posterior, so the floor needs no special case.
+HG00096, ARM 2 (nothing held out), scope "chain", shares by decision J summing to
+**1.000000** over T = 22,134,562, n = 1 target.
+
+**Result.** `e_q_u` = **0.708967646** at `tau` = 0 and **0.708967729** at `tau` = 0.99.
+`u_ceiling` = 0.825708741. `e_q_u_over_ceiling` = 0.858617102 and 0.858617203.
+**THE MOVEMENT IS +8.345e-08** (+0.000012%), and the movement is the only figure that
+carries a claim: the 0.8586 LEVEL is reached at `tau` = 0 too, where the release is a pure
+cohort mosaic carrying ZERO target information, because any two humans share most of their
+alleles. Quoting the level is the free-lunch error `target_fidelity` was defined to prevent.
+Provenance `logs/B_exact_utility.md` + `.json`.
+
+**⚠⚠ THE PREDICTION WAS WRONG, AND SO WAS MY SECOND ONE, IN THE OPPOSITE DIRECTION.**
+Measured shrink against chr21 is **35.2x**, not the 72x on record. Before writing a cause
+into the docs I checked the better first-order argument: movement ~ `eta` * Var_Q(u), and
+if matches were INDEPENDENT across variants then Var_Q(u) ~ sum(`beta_v`^2), which I
+measured at 9.290392e-06 for chr21 at `share` = 1 against 7.223240e-08 genome-wide — a
+predicted 128.6x. So the two scalings bracket the measurement (72, **35.2**, 128.6) and
+NEITHER predicts it. The movement is not a function of budget dilution alone.
+The untested explanation is that allele matches are POSITIVELY CORRELATED along the HMM
+copying path — the sampler copies long stretches from one donor — so Var_Q(u) exceeds
+sum(`beta_v`^2) by a chromosome-dependent factor, and chr21-as-one-chromosome differs from
+22 chromosomes whose per-chromosome correlation structures add. **Settling it needs
+Var_Q(u) from PAIR marginals, which `scripts/exact_utility.py` does not compute.** No
+mechanism for the 35.2 may be quoted until that is measured. Recorded because the general
+lesson is the project's own: a number that "should scale by" something is a prediction, and
+checking it cost one 30-second computation and overturned two docs claims.
+
+**✅ The mechanism is NOT broken and the toy proves it.** At `mean beta_v` = 0.111 instead
+of 4.52e-08, `E_Q[u]` moves 0.4502 -> 0.6477 across the grid (`logs/B_toy_genome_demo.md`).
+It is BUDGET DILUTION. That is a better finding to write up than a utility score, and it is
+what deferred decision R5 was reopened to quantify.
+
+**⚠ A definition drift I introduced and then caught.** The script emitted the exact ratio
+`e_q_u`/`u_ceiling` under the row label `utility_retained`, but `docs/terms.md` defines
+`utility_retained` as the SAMPLED `u_path` average — a LEVEL, demoted to diagnostic by
+decision A — not a ratio. Row labels must be exact `docs/terms.md` identifiers, so this
+was the drift CLAUDE.md forbids, committed by the author of the script against the authority
+of the docs. Fixed: new term `e_q_u_over_ceiling` defined in `docs/terms.md`, row and JSON
+key renamed, `--from-json` added so the table regenerated from the SAVED results rather than
+30 minutes of recomputation, values asserted bit-identical, and `logs/B_exact_utility.md`
+carries a dated RELABEL block. ⚠ Note that chr21's 0.6931 IS correctly labelled
+`utility_retained` — it was a sampled average; chr21's exact `E_Q[u]` is
+0.6951 at `tau` = 0.5 (HG00096, scope "chain", ARM 2). Two
+different quantities, correctly distinguished on the record, which is why the drift was
+visible at all.
+
+**✅ Two stale "not yet implemented" claims retired.** `src/mechanism/utility.py`'s own
+docstring still read "Today `beta` sums to 1 over one chromosome ... Decide before any
+multi-chromosome run", and `docs/terms.md` quoted that docstring as evidence that a
+genome-wide normaliser was NOT YET IMPLEMENTED and that therefore every figure on record was
+chr21-normalised. Decision J implemented it on 2026-10-11: `beta` is multiplied by `share`
+and the assertion checks the sum AGAINST THE SHARE, not against 1. Verified by reading the
+code before rewriting the claim. Both updated; the chr21-at-`share`-1 caveat is kept, because
+those figures ARE single-chromosome releases and remain legitimate as such.
+
+**⚠ PROTOCOL GAP FOUND, NOT FILLED.** This file had NO entries dated 2026-10-11 or
+2026-10-12 before this one, so Wrap-Up step 1 was skipped for decision K and its addendum,
+chunk 6c (`scripts/prep_all_targets.py`, the corrupt chr10 panel and the `bgzip -t` fix) and
+chunk 7 (the Arm 2 attack run and `scripts/exact_kl.py`). Those results ARE registered in
+`docs/data.md` and `docs/plan.md` and are not lost. They are deliberately NOT reconstructed
+here: this session's context was compacted, and writing their history from a summary would
+put unverified narrative into a permanent ledger. Whoever closes chunk 8 should archive them
+from the primary artifacts.
+
 ## 2026-10-10 (chunk 6, part 1) — the fill decision C needed, parallelism by default, and a lock
 
 ⚠ **PARTIAL ENTRY.** The 22-chromosome build and the panel download were still

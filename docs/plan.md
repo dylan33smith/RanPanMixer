@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-12. Chunks 0-7 DONE. ⚠ Next: chunk 8 (Arm 1 leave-one-out releases). ⚠⚠ The open scientific question is UTILITY, not privacy — see the Current state bullet.
+**Last updated:** 2026-10-12 (later — genome-wide utility measured). Chunks 0-7 DONE. ⚠ Next: chunk 8 (Arm 1 leave-one-out releases). ⚠⚠ The open scientific question is UTILITY, not privacy: genome-wide `e_q_u` MOVES +8.345e-08 across the whole `tau` range, and the 0.8586 level is reached at `tau` = 0 so it is not ours to quote — see the Current state bullet.
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -49,9 +49,26 @@ Read at session start. This file exists so a new session never has to grep
     pure cohort mosaic carrying ZERO target information — any two humans share most of
     their alleles. Quoting the LEVEL as the mechanism's utility is exactly the free-lunch
     error `target_fidelity` exists to prevent. **The movement is the figure.**
-  - At genome scope `mean beta_v` falls from 3.27e-06 to **4.52e-08**, a factor of 72, so
-    the movement should shrink by about that again. `scripts/exact_utility.py` measures it
-    exactly rather than extrapolating.
+  - ✅ **MEASURED GENOME-WIDE 2026-10-12, EXACTLY** (`scripts/exact_utility.py`, 44
+    marginals passes, no sampling, no finite difference; HG00096, ARM 2, 22 autosomes,
+    shares by decision J summing to 1.000000 over T = 22,134,562, scope "chain", n = 1):
+    `e_q_u` = **0.708967646** at `tau` = 0 and **0.708967729** at `tau` = 0.99,
+    `u_ceiling` = 0.825708741, `e_q_u_over_ceiling` = 0.858617102 and 0.858617203.
+    **THE MOVEMENT IS +8.345e-08** (+0.000012%). Provenance `logs/B_exact_utility.md`.
+  - ⚠ **AND THE 0.8586 IS NOT OURS EITHER** — same free-lunch error as the 0.6931, same
+    reason: it is reached at `tau` = 0. Never write "we retain 86% of utility".
+  - ⚠⚠ **TWO PREDICTIONS OF THAT MOVEMENT BOTH FAILED, IN OPPOSITE DIRECTIONS.** This
+    bullet used to read: `mean beta_v` falls 3.27e-06 -> **4.52e-08**, a factor of 72, so
+    the movement "should shrink by about that again". Measured shrink is **35.2x**. The
+    better first-order argument — movement ~ `eta_tau` * Var_Q(u), and Var_Q(u) ~
+    sum(`beta_v`^2) if matches were independent, measured 9.290392e-06 on chr21 against
+    7.223240e-08 genome-wide — predicts **128.6x**. The two bracket the measurement and
+    neither predicts it, so **the movement is not a function of budget dilution alone**.
+    Untested explanation: matches are POSITIVELY CORRELATED along the HMM copying path, so
+    Var_Q(u) exceeds sum(`beta_v`^2). Settling it needs `Var_Q(u)` from PAIR marginals,
+    which `scripts/exact_utility.py` does NOT compute. **Quote no mechanism for the 35.2
+    until that is measured.** `mean beta_v` is still 72x smaller; it just does not set the
+    movement.
   - ✅ **THE MECHANISM IS NOT BROKEN AND THE TOY PROVES IT**: at `mean beta_v` = 0.111
     instead of 4.52e-08, `E_Q[u]` moves **0.4502 -> 0.6477** across the grid. It is BUDGET
     DILUTION, which is a far better finding to write up, and it is what R5 was reopened to
@@ -311,9 +328,16 @@ variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2
 **The three things a fresh session will not infer from the code:**
 
 1. ⚠⚠ **PRIVACY IS SETTLED; UTILITY IS THE OPEN QUESTION.** See the Current state bullet.
-   `acc_ceiling` = 0.501555 at `tau` = 0.99 (bound 0.9950) is exact and strong. But
-   `utility_retained` is 0.6931 at `tau` = 0 and 0.6932 at `tau` = 0.9 on chr21, and the
-   level is NOT attributable to the mechanism. Do not quote the level as utility.
+   `acc_ceiling` = 0.501555 at `tau` = 0.99 (bound 0.9950) is exact and strong. Utility
+   is now MEASURED genome-wide and exactly: `e_q_u` moves **+8.345e-08** across `tau` = 0
+   to 0.99 (0.708967646 -> 0.708967729), `e_q_u_over_ceiling` 0.858617102 -> 0.858617203,
+   HG00096, ARM 2, 22 autosomes, n = 1. **The MOVEMENT is the figure.** The LEVEL — 0.8586
+   genome-wide, 0.6931 on chr21 — is reached at `tau` = 0, where the release carries zero
+   target information, so it is NOT attributable to the mechanism. Never quote the level
+   as utility. ⚠ And do not re-derive the movement from budget dilution: `mean beta_v`
+   scaling predicts 72x, sum(`beta_v`^2) predicts 128.6x, measured 35.2x — both failed, so
+   `Var_Q(u)` from PAIR marginals is the open measurement. Arm 1 utility is still
+   UNMEASURED at any scope (chunk 8).
 2. ⚠ **ARM 1'S CHAIN IS PER-TARGET** (consequence of decision K). Leave-one-out removes
    both of the target's haplotypes, which lowers `support(v)` and can EMPTY a
    zero-distance block's donor intersection that was non-empty for arm 2. So chunk 8
@@ -884,6 +908,7 @@ segment count is set by the chromosome's genetic length, not by T.
 | B-THY-toy-genome | Demonstrate what the mechanism DOES, exactly, on a 2-chromosome toy genome | the tilt visible, and the sampler matching the enumeration | 2 chr, 7 `tau`, 40,000 draws | **THE TILT IS VISIBLE.** Shares 7/9 and 2/9 by decision J; mean `beta_v` 0.111 against chr21's 3.27e-06. TV(Q, R_D) reaches **0.3090**, `E_Q[u]` moves **0.4502 -> 0.6477** against chr21's 2.94e-06, `Var_Q(u)` 7.3e-02 against 4.05e-06. `ratio_spread` equals `exp(epsilon_tau)` to the last digit at every `tau`. Same `ffbs` path, no special case — **so it is budget dilution that makes the chr21 effect invisible, not the mechanism.** ⚠ A correlated-seed bug in the demo was caught by its own joint assertion: every marginal was right and only the joint was wrong | done | 2026-10-10 |
 | B-EVL-exact-endpoint | Re-measure the PRIMARY endpoint at a genome-wide share, since every figure on record used the whole budget on chr21 | monotone and exactly computable at the share that will be used | 3 shares x 7 `tau`, two independent routes | **MARGINALS ROUTE WORKS, DERIVATIVE ROUTE BREAKS.** Movement scales EXACTLY linearly in the share (5 s.f. at two shares); monotone at every share; 3.45e+09x float64 headroom at the smallest. ⚠⚠ But `Var_Q(u)` from the finite-difference second derivative goes **NEGATIVE** at chr21's genetic-length share and scatters over 5x at 1/22 — and every recorded `Var_Q(u)` came from that route. The pre-registered endpoint must name the marginals route; the derivative route survives only as a chr21-scale diagnostic. ⚠ New residual: the share ALLOCATION RULE is undecided and the candidates span 2.8x | done | 2026-10-10 |
 | B-DAT-map-coverage | Measure how much of each autosome the map speaks to, before the declared rate is chosen | the three classes reported separately, and chr21's split reconciling with the record | 22 autosomes, bp; chr21 positions | **MEASURED.** Map-silent **3.00%** of autosomal bp (86.2 Mb), **96% of it the five acrocentric p arms**; interior zero-cM **3.27%** (93.9 Mb), LARGER than the class the rate covers, chr9 alone 25.61 Mb. Autosomal mean mapped rate **1.2707 cM/Mb**, per-chromosome spread **1.84x**. chr21: 26,044 map-silent + 8,327 in-span plateau = 34,371, RECONCILES. ⚠⚠ **A per-chromosome rate is LESS defensible than a global one** — the acrocentrics' rates are the genome's highest and are measured entirely on the q arm, so they would extrapolate a hot q-arm rate onto heterochromatin. ⚠ N-gap policy BLOCKED: no reference assembly on disk | done | 2026-10-10 |
+| B-EVL-exact-utility | Measure the PRIMARY utility endpoint genome-wide and exactly, since Dylan asked whether utility had been measured at all and every figure on record was chr21 at `beta_share` = 1 | the movement, not the level; and the completeness of the fan-out asserted | 44 exact passes; 22 autosomes x 2 `tau`; n = 1 target | **THE MOVEMENT IS +8.345e-08 ACROSS THE WHOLE `tau` RANGE.** `e_q_u` 0.708967646 -> 0.708967729 from `tau` = 0 to 0.99, `u_ceiling` 0.825708741, `e_q_u_over_ceiling` 0.858617102 -> 0.858617203. Zero Monte-Carlo error, no finite difference — the marginals route, because the derivative route breaks at genome scale. ⚠⚠ **TWO FIRST-ORDER PREDICTIONS OF THE MOVEMENT BOTH FAILED, IN OPPOSITE DIRECTIONS**: `mean beta_v` scaling said 72x, sum(`beta_v`^2) scaling said 128.6x, measured **35.2x**. So budget dilution alone does not set the movement; positive correlation along the copying path is the untested explanation and needs `Var_Q(u)` from PAIR marginals. ⚠ **The level is NOT the result** — 0.8586 is reached at `tau` = 0, where the release carries zero target information. ⚠ I introduced a definition drift and caught it: the ratio row was labelled `utility_retained`, which `docs/terms.md` defines as the SAMPLED `u_path`; renamed `e_q_u_over_ceiling`, and `--from-json` added so the relabelled table regenerated from saved results rather than 30 min of recomputation. ⚠ Two stale "not yet implemented" claims about the genome-wide normaliser retired — decision J built it on 2026-10-11 | done | 2026-10-12 |
 | B-EVL-arm2-ceiling | Put an exact ceiling on every Arm 2 attacker, since sampling provably cannot | the ceiling must respect `p_succ_bound`, and the computation must reproduce its own second-order scaling | 70 cells; 10 targets | **0.501555 AT `tau` = 0.99 AGAINST A BOUND OF 0.9950.** No attacker, written or not, exceeds **50.16%** at the loosest grid point; 50.01-50.03% across the operating range. ⚠⚠ Validated by a check I did NOT build in: `kl_exact / eta_tau^2` constant to **0.31%** over a 53x range of `eta_tau`, the second-order behaviour theory requires. Implied Var(u_p - u_q) = 5.4664e-06, consistent with the recorded 4.05e-06 at a different scope. Gate passes 70/70. ⚠ The theorem is loose by a factor of ~300 at genome scale — R5 stated exactly rather than by failing to detect it. ⚠ Pinsker flatters us; quote the caveat | done | 2026-10-12 |
 | B-DAT-targets | Map every prepared target onto every autosome's site axis, and give the target VCFs a producer | 220/220 pairs with provenance, and the paths must be distinct data rather than copies | 220 pairs; 10 targets | **CHUNK 6 IS 4 OF 4.** 187,268,720 called cells over a genome-wide `in_chain` of 22,134,562, mean fraction **0.846047**. ⚠ The target VCFs had NO PRODUCER: chr21's were hand-made without a sidecar, so the only target set that existed was irreproducible. ⚠⚠ **A CORRUPT PANEL SURFACED BY USING THE DATA, NOT BY CHECKING IT** — chr10 arrived with a CRC32 mismatch at offset 393,732,438 that passed every check in `scripts/verify_panel.py` INCLUDING the sha256, because the sidecar is computed FROM the download; the fresh copy is the SAME SIZE with a different hash. Fixed with `bgzip -t` in both the fetcher and the verifier. ⚠ Two false readings of mine in one pass: a monitor reported a MISSING BINARY as a corrupt file, and I explained a uniformity that 3-decimal formatting had invented | done | 2026-10-11 |
 | B-ATK-arm2-run | Run the pre-registered Arm 2 attack and establish whether its null is trustworthy | the exact route must agree with the sampler, and every cell must have its own stream | 1,750 trials; 5 hypotheses; 3,320 validation draws | ⚠⚠ **FIRST RUN INVALID — COMMON RANDOM NUMBERS, THIRD OCCURRENCE.** Seeded from the draw index alone, so 10 targets x 7 `tau` shared 25 seeds; at a per-position tilt of **7.7e-07** the released path is **bit-identical** at `tau` = 0, 0.05 and 0.25, so the seven columns were ONE experiment. Clustered SEs move z from -3.81 to **-1.99**. ✅ The IMPLEMENTATION is correct: exact `E_Q[Lambda]` = **+1.784e-07**, positive for all ten targets, sampler at **z = -0.16** over 3,320 draws, `log_z_p` bit-equal. ⚠ Three of my own claims were wrong, including a first-order `eta_tau` "fingerprint" that was an artefact and that I used to narrow the search. ⚠ Decoy selection also ran through Python's salted `hash()` and was NOT reproducible. ⚠ Cost **110 CPU-hours** against the prereg's 18.3 — it omitted the 6 forward passes per trial. ✅ Both fixed, re-run launched with 1,750 distinct streams | rerunning | 2026-10-11 |

@@ -137,12 +137,16 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
     something fixed and public: `G` itself, or a named reference callset pinned in
     advance. Never of the target's own VCF.
 
-    ⚠ AND IT IS PER-CHROMOSOME EITHER WAY. Today `beta` sums to 1 over one
-    chromosome, which silently means "`tau` per chromosome". A genome-wide `tau`
-    needs a genome-wide normaliser, with each chromosome taking a SHARE of the
-    budget; 22 chromosomes each normalised to 1 would be 22 independent releases
-    of the same person and would compose, which standing constraint 5 forbids.
-    Decide before any multi-chromosome run.
+    ✅ **RESOLVED BY DECISION J (2026-10-11); THIS USED TO SAY "DECIDE BEFORE ANY
+    MULTI-CHROMOSOME RUN".** `beta` now sums to the declared `share`, not to 1, and
+    the assertion below checks it against `share` rather than against 1. Each
+    chromosome takes `share` = T_c / T_total by variant count, the 22 autosome
+    shares sum to 1, and `tau` is therefore genome-wide. Run per chromosome with
+    `share` = 1 it still means "`tau` on that chromosome alone" -- which is what
+    every chr21 figure on record is, legitimately, as a single-chromosome release.
+    22 chromosomes each normalised to 1 would be 22 independent releases of the
+    same person and would compose, which standing constraint 5 forbids; passing a
+    share is what prevents that, and the caller must pass one.
     """
     if scope not in BETA_SCOPES:
         raise ValueError(f"scope must be one of {BETA_SCOPES}, not {scope!r}")
