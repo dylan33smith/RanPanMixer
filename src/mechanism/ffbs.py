@@ -431,7 +431,8 @@ class Release:
 
 
 def _draw_one(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_1d: np.ndarray,
-              beta: np.ndarray, eta: float, seed, baseline_norm: float
+              beta: np.ndarray, eta: float, seed, baseline_norm: float,
+              exact_out: dict | None = None
               ) -> tuple[np.ndarray, np.ndarray, float, float]:
     """One tilted chain: `(state_path, released_alleles, log_z, u_achieved)`.
 
@@ -451,6 +452,24 @@ def _draw_one(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_1d: np.ndarra
     # genome-wide normaliser `sum(beta)` is the chromosome's share, so this
     # is ~22x tighter than `eta` and is the only form that can fire.
     lz = log_z_p(fwd, baseline_norm, eta, budget=eta * float(beta.sum()))
+
+    # ⚠⚠ THE EXACT ENDPOINT, FROM THE SAME `psi` AND THE SAME `fwd`. `E[differ]` and
+    # `E_Q[u]` need the state marginals, which are a backward pass over the forward
+    # messages this draw already computed. Computing them in a SEPARATE run would
+    # recompute `psi` and `forward` from scratch: measured 2026-10-12, that doubling
+    # was the difference between ~17.4 h and ~10.9 h for arm 1's 308 cells.
+    # ⚠ It consumes NO randomness and is placed BEFORE the draw, so the released path
+    # is bit-identical whether or not it was requested -- pinned by a test.
+    if exact_out is not None:
+        gam = state_marginals(hmm, fwd, psi)
+        known = target_1d >= 0
+        match = (haplotypes_chain == target_1d[None, :]) & known[None, :]
+        exact_out["e_differ"] = exact_out.get("e_differ", 0.0) + expected_mismatches(
+            hmm, haplotypes_chain, target_1d, gam)
+        exact_out.setdefault("u_haps", []).append(
+            float((gam * match.T).sum(axis=1) @ beta))
+        exact_out["called"] = exact_out.get("called", 0) + int(known.sum())
+        del gam
 
     z = backward_sample(hmm, fwd, np.random.default_rng(seed))
     released = expand_to_positions(hmm, haplotypes_chain, z)
@@ -496,7 +515,8 @@ def _streams(seed: int, stream_key: str, n: int):
 def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarray,
             util: utility.Utility, tau: float, *, seed: int, target_id: str,
             graph_id: str = "", loo_id: str | None = None,
-            baseline_norm: float | None = None, stream_key: str = "") -> Release:
+            baseline_norm: float | None = None, stream_key: str = "",
+            exact_out: dict | None = None) -> Release:
     """Draw one release for one target at one `tau`. The whole mechanism, once.
 
     `haplotypes_chain` and `target_chain` are over CHAIN positions, in chain
@@ -552,7 +572,8 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
     if target_chain.ndim == 1:
         z, released, lz, u = _draw_one(hmm, haplotypes_chain, target_chain,
                                        util.beta, eta,
-                                       _streams(seed, stream_key, 1)[0], base)
+                                       _streams(seed, stream_key, 1)[0], base,
+                                       exact_out=exact_out)
         ceiling = utility.u_ceiling(target_chain, util.beta)
         ploidy = 1
     elif target_chain.ndim == 2 and target_chain.shape[1] == 2:
@@ -574,7 +595,8 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
         # one recorded integer, so a release stays reproducible from its `seed`.
         streams = _streams(seed, stream_key, 2)
         draws = [_draw_one(hmm, haplotypes_chain, target_chain[:, h], util.beta,
-                           eta / 2.0, streams[h], base) for h in (0, 1)]
+                           eta / 2.0, streams[h], base, exact_out=exact_out)
+                 for h in (0, 1)]
         z = np.stack([d[0] for d in draws], axis=1)
         released = np.stack([d[1] for d in draws], axis=1)
         lz = draws[0][2] + draws[1][2]

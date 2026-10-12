@@ -126,7 +126,14 @@ def run_target(target: str, taus, root: str | None) -> dict:
     inputs = _inputs()
 
     parts: dict[int, list] = {i: [] for i, _ in todo}
-    for c in AUTOSOMES:
+    # ⚠⚠ THE EXACT ENDPOINT RIDES ALONG. `E[differ]` and `E_Q[u]` need the state
+    # marginals, which are a backward pass over the SAME forward messages the draw
+    # already computes. Measured 2026-10-12: computing them in a separate run doubles
+    # `psi` and `forward` and cost ~6.5 h extra across arm 1's 308 cells. Pinned inert
+    # with respect to the draw by tests/test_exact_out.py.
+    ex: dict[int, dict] = {i: {"e_differ": 0.0, "e_q_u": 0.0, "called": 0,
+                               "u_ceiling": 0.0} for i, _ in todo}
+    for n_c, c in enumerate(AUTOSOMES, 1):
         d = REPO / "data" / "cohort" / c
         lc = chains[c]
         ic = lc.in_chain
@@ -142,22 +149,49 @@ def run_target(target: str, taus, root: str | None) -> dict:
                             cohort_id=f"{c}_loo_{target}")
         util = utility.beta_v(lc.support, in_chain=ic, share=shares[c], chrom=c)
         base = ffbs.baseline_log_norm(m)
+        # ⚠ `u_ceiling` is `tau`-INDEPENDENT, so it is accumulated once per chromosome.
+        # Adding it inside the `tau` loop would multiply it by len(taus) and still print
+        # a plausible table -- the bug caught in arm1_exact_endpoint.py before it ran.
+        ceil_c = utility.diploid_utility(
+            utility.u_ceiling(tgt[:, 0], util.beta),
+            utility.u_ceiling(tgt[:, 1], util.beta))
         for i, tau in todo:
+            box: dict = {}
             parts[i].append(ffbs.release(
                 m, panel, tgt, util, tau, seed=genome_seed(target, i),
                 target_id=target, loo_id=target, baseline_norm=base,
-                stream_key=c))
+                stream_key=c, exact_out=box))
+            assert len(box["u_haps"]) == 2, (
+                f"{target}/{c}/tau={tau:g}: {len(box['u_haps'])} haplotype "
+                f"contribution(s), expected 2 -- a diploid release must give two")
+            ex[i]["e_differ"] += box["e_differ"]
+            # the diploid utility is the MEAN of the two haplotypes, matching the
+            # density exp(eta * u_mean) the sampler draws from
+            ex[i]["e_q_u"] += 0.5 * (box["u_haps"][0] + box["u_haps"][1])
+            ex[i]["called"] += box["called"]
+            ex[i]["u_ceiling"] += ceil_c
+        print(f"      {target} [{n_c}/22] {c} done ({time.time() - t0:.0f}s)",
+              flush=True)
         del panel, hap_all, m, util
 
-    written = []
+    written, cells = [], {}
     for i, tau in todo:
         gr = ffbs.GenomeRelease(parts=tuple(parts[i]))
         p = R.save_genome_release(gr, arm="arm1", axis_digest=axis, inputs=inputs,
                                   root=root, scope="genome")
         written.append(str(p))
+        e = ex[i]
+        cells[str(tau)] = {
+            "e_differ": e["e_differ"], "called_cells": e["called"],
+            "target_fidelity": e["e_differ"] / e["called"] if e["called"] else float("nan"),
+            "e_q_u": e["e_q_u"], "u_ceiling": e["u_ceiling"],
+            "e_q_u_over_ceiling": e["e_q_u"] / e["u_ceiling"] if e["u_ceiling"] else float("nan"),
+        }
     return {"target": target, "skipped": False, "cells": len(todo),
             "written": written, "seconds": time.time() - t0,
-            "t_total": sum(chains[c].t_chain for c in AUTOSOMES)}
+            "k_states": chains[AUTOSOMES[0]].k_states,
+            "t_total": sum(chains[c].t_chain for c in AUTOSOMES),
+            "exact": cells}
 
 
 def _one(args):
@@ -176,6 +210,9 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=24)
     ap.add_argument("--root", default=None)
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--endpoint-json", type=Path, default=None,
+                    help="write the exact endpoint in the shape "
+                         "scripts/arm1_results.py --endpoint expects")
     a = ap.parse_args(argv)
 
     if set(a.taus) != set(PINNED_TAUS):
@@ -232,6 +269,23 @@ def main(argv=None) -> int:
             {"targets": targets, "taus": a.taus, "results": out,
              "missing": [[t, tau] for t, tau in missing]}, indent=1) + "\n")
         print(f"JSON -> {a.json}")
+    if a.endpoint_json:
+        # ⚠ Only targets that actually produced exact values go in. A skipped target
+        # (its cells already written by an earlier run) has none, and inventing an
+        # entry for it would make a resumed run look complete when its endpoint is not.
+        res = [{"target": r["target"], "cells": r["exact"],
+                "t_total": r.get("t_total"), "k_states": r.get("k_states")}
+               for r in out if "exact" in r and r.get("exact")]
+        a.endpoint_json.write_text(json.dumps(
+            {"arm": "arm1", "taus": a.taus, "k_states": 86, "results": res},
+            indent=1) + "\n")
+        skipped = [r["target"] for r in out if r.get("skipped")]
+        print(f"ENDPOINT JSON -> {a.endpoint_json} ({len(res)} target(s))")
+        if skipped:
+            print(f"⚠ {len(skipped)} target(s) were SKIPPED as already-released and so "
+                  f"carry NO exact endpoint here: {skipped[:5]}. Their releases exist; "
+                  f"their endpoint must come from scripts/arm1_exact_endpoint.py or "
+                  f"from a re-run with the releases removed.")
     if errs or missing:
         raise SystemExit(
             f"INCOMPLETE: {len(errs)} worker error(s), {len(missing)} cell(s) missing. "
