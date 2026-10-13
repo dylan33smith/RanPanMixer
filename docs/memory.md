@@ -104,6 +104,86 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-13 — CHUNK 9 DONE: the head-to-head. They offer a frontier; we offer a point at its far end
+
+**Method, and it is same-code-on-both-sides rather than a log parse.**
+`scripts/arm1_headtohead.py` scores BOTH tools' final released objects with ONE function.
+Theirs is read from their retained `obfuscated.vcf.gz` per capacity; ours from the stored
+arm 1 release. ✅ **Validated against their own output BEFORE ours was quoted**: our
+scoring reproduces their changed_alleles and total_alleles **exactly at all 8
+capacities**, and their max utility loss **9288.854446** reproduces their logged 9288.85
+from their own `pangenome.npy`.
+
+**⚠ Their logged utility_loss is the OPTIMISER'S OBJECTIVE, not the realised cost on the
+final object**, and the two diverge: 0.27% at capacity 0.01 but **102% at capacity 0.3**
+(2,786.66 reported against 1,380.70 recomputed). Parsing their log — which
+`scripts/fidelity_frontier.py` does — would have compared our REALISED cost against their
+BUDGET. Recomputing both sides avoids it. ⚠ NOT a defect in PanMixer: a different quantity
+is being reported, and its own saturation is visible in their own numbers.
+
+**THE RESULT.** Their `target_fidelity` spans **0.012045 to 0.164113** across capacity,
+SATURATING from capacity 0.3 up. Ours is **0.167125** and does not move with `tau`. So
+**no matched-fidelity capacity exists** — `capacity -> fidelity` is not invertible above
+their saturation and our level sits at or above it, so nothing is interpolated and no
+matched-capacity number is reported. **They offer a FRONTIER tunable down to 1.20%
+alteration; we offer a POINT at its far end.** That is the budget-dilution finding seen
+through their axis, and it was predictable from chunk 8: our `tau` grid moves `e_differ`
+by -4.31 cells of 7,630,132.
+
+**⚠⚠ THE COST ORDERING REVERSES WITH THE -1 CONVENTION, so neither figure stands alone.**
+RAW (what decision M mandates): ours 0.2713 of our total against theirs 0.0100-0.1487.
+MASKED: ours 0.1459 against theirs 0.0100-0.1371. Measured cause: the convention is
+**46.2% of our cost and 0.045%-7.78% of theirs**, because their released object is
+`original_haplotypes.copy()` with selected blocks replaced (`obfuscate.py:330-340`) and so
+preserves -1, while ours is a complete mosaic — `ffbs.release` refuses a path carrying -1.
+So a target-uncalled cell is altered in ours BY CONSTRUCTION and almost never in theirs.
+✅ **The ALIGNMENT AXIS IS UNAFFECTED**, which is the cleanest fact here: both sides mask
+-1 for fidelity (theirs at `obfuscate.py:474-481`, ours via `known` in
+`expected_mismatches`), so the convention problem touches only the cost row.
+⚠ NOT a defect in PanMixer. Its goal is donor protection, preserving missingness is
+consistent with that, and this is a difference in what the two mechanisms EMIT.
+
+**✅ THE EXIT GATE EARNED ITS PLACE.** Chunk 9's gate requires "the EXACT expectation
+printed beside every sampled mean, so the small R is a diagnostic and never the evidence".
+Measured: **exact E[cost] moves -7e-07 across the whole `tau` range while a single draw
+spans ±20** — the one-draw wobble is 5.6 million times the real effect, and without the
+exact row a reader would read a `tau` trend into noise. The exact figure decomposes
+cleanly: an uncalled target cell is altered with probability **1**, because
+`allowed = hap != -1` puts zero posterior mass on a donor without a call, so that part is
+DETERMINISTIC (1,082.939) and the rest is a weighted marginals functional. The mean of the
+7 independent draws lands 0.33 from the exact expectation.
+
+**⚠⚠ WHAT CHUNK 9 DOES NOT DELIVER, and the writeup must say it.** This is **NOT a
+same-build comparison.** Their retained sweep ran on their own vg-1.36-derived
+`starting_data`, and nothing of their mechanism has run on our vg-1.68 build, so decision
+F's "both arms run on ONE consistent build" is **unsatisfied on their side**. Every
+cross-tool cell is cross-build, which is exactly why only SHARES of each side's own total
+are quotable and never raw counts. Also undelivered: genome-scope cost (chr21 only), the
+exact chr21-restricted `target_fidelity` per target, the arm 1 `target_fidelity` ceiling
+(UNMEASURED), and `attacker_accuracy` for arm 1.
+⚠ No addendum is required: the endpoints, `tau` grid, attacker set, database and decoy
+design are untouched, and K = 88 scoring is a property of whose evaluator runs rather
+than a pre-registered field. ⚠ Two adjacent moves WOULD breach a frozen field and need a
+NEW dated pre-registration, not an addendum: adopting `af_loss`/`ld_loss`, or reporting
+their privacy evaluators' output as an arm 1 attack result.
+
+**⚠⚠ THREE ERRORS OF MINE, one a repeat of a hazard already in this file.**
+(1) I told Dylan "their obfuscated arrays aren't retained — only the sweep log". WRONG:
+everything is there — their `pangenome.npy`, all 8 capacities' `new_haplotypes.npy`,
+`xsol.npy`, `stats.json` and `obfuscated.vcf.gz`. My `find` omitted `-L` and
+`external/PanMixer` is a SYMLINK, so it searched nothing. **That exact hazard is already
+recorded in this file** and I repeated it. The fix is mechanical: any find under
+`external/` needs `-L`.
+(2) I told Dylan their axis was "~325,360 sites against our 340,849, different builds".
+WRONG: their axis is **340,824** against our 340,849 — 25 sites apart. The 325,360 was
+their changed_frac DENOMINATOR (650,720/2), not their axis, and the 2.84% denominator gap
+is the per-site CALL-RATE PROFILE, not axis length. I read a number without checking what
+it was a denominator OF, which is the error class this file already names.
+(3) I doubted a correct citation because my own grep was broken: the exit-gate phrase
+wraps across a line break, so `grep "EXACT expectation is printed beside"` found nothing
+and I briefly treated the agent's citation as possibly hallucinated. The citation was
+right. ⚠ grep for a phrase that may wrap is not a test of whether the phrase exists.
+
 ## 2026-10-12 — CHUNK 8 DONE: arm 1's 308 releases, and four cells in seven and a half million
 
 **Result.** All 308 arm 1 cells released and verified: 44 held-out individuals x the 7
