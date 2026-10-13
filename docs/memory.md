@@ -127,6 +127,16 @@ the other 86 haplotypes. The level is not attributable to the mechanism.
 different arm, a different K, a different ceiling and 44 targets instead of 1. Budget
 dilution is now confirmed rather than inferred from one measurement.
 
+**✅ VALIDATED BY TWO INDEPENDENT IMPLEMENTATIONS, agreeing to 2.6e-16.** The endpoint
+rides along inside `ffbs.release` via `exact_out`, sharing the draw's `psi` and `forward`.
+`scripts/arm1_exact_endpoint.py` computes `psi`, `forward` and the marginals ITSELF, from
+a separate code path. On HG00438 at `tau` = 0 and 0.99 every quantity matches to float64
+round-off — worst relative disagreement **2.646e-16** across `e_differ`, `called_cells`,
+`target_fidelity`, `e_q_u` and `u_ceiling`. That is why the standalone script was kept
+after the endpoint was folded into the release: it is the second implementation, not dead
+code. ⚠ HG00438's own movement is -5.10 cells, inside the per-target range of -5.33 to
+-3.97 measured across the 44.
+
 **Structure, for the record.** `u_ceiling` median 0.972588907 — far above arm 2's
 0.8257087, as expected and NOT a better result: a cohort member is called at nearly every
 position of a graph built from its own assembly. `e_q_u_over_ceiling` 0.825586196.
