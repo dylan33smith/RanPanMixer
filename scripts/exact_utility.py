@@ -11,14 +11,18 @@ passes): `e_q_u` goes 7.089676460e-01 -> 7.089677294e-01 across `tau` = 0 to 0.9
 movement of +8.345e-08, and `e_q_u_over_ceiling` is 0.858617 at BOTH ends.
 
 ⚠ TWO FIRST-ORDER PREDICTIONS OF THAT MOVEMENT BOTH FAILED, in OPPOSITE directions.
-The measured shrink against chr21's 2.94e-06 is a factor of 35.2. Scaling by `mean
+The measured shrink is a factor of **43.6** -- the current-build chr21-at-share-1
+movement of 3.6368e-06 over the genome-wide 8.345e-08. ⚠ This read "against chr21's
+2.94e-06 ... a factor of 35.2" until 2026-10-13; 2.94e-06 is the PRE-REBUILD figure from
+the finite-difference route and dividing it by a current genome number is a cross-build
+ratio. Scaling by `mean
 beta_v` predicts 72; scaling by sum(beta_v^2) -- the correct first-order factor if
 matches were independent, measured 9.290392e-06 on chr21 against 7.223240e-08
 genome-wide -- predicts 128.6. So the movement is NOT a function of budget dilution
 alone. The untested explanation is that allele matches are POSITIVELY CORRELATED along
 the HMM copying path, so Var_Q(u) exceeds sum(beta_v^2) by a chromosome-dependent
 factor; settling it needs Var_Q(u) from PAIR marginals, which this script does not
-compute. Do not quote a mechanism for the 35.2 until that is measured.
+compute. Do not quote a mechanism for the 43.6 until that is measured.
 
 ⚠ THE FIGURE THAT MATTERS IS THE MOVEMENT, NOT THE LEVEL. `e_q_u_over_ceiling` is
 0.8586 at `tau` = 0 too, where the release carries ZERO target information, because any
@@ -165,9 +169,14 @@ def _report(out, taus, scope) -> None:
         print(f"\n⚠⚠ **THE MOVEMENT**: E_Q[u] goes {lo:.9e} -> {hi:.9e} across "
               f"tau = {min(taus):g} to {max(taus):g}, a change of **{hi - lo:+.3e}** "
               f"({100 * (hi - lo) / lo:+.6f}%).")
-        print(f"⚠ For comparison, chr21 at SHARE 1 moves 2.94e-06 (a factor of "
-              f"{2.94e-06 / (hi - lo):.1f} more), and the toy at mean beta_v = 0.111 moves "
-              f"0.4502 -> 0.6477. The mechanism is not broken; the budget is diluted.")
+        # ⚠ the CURRENT-build chr21-at-share-1 movement, from
+        # logs/B_beta_concentration.md:inv_support_all. The pre-rebuild 2.94e-06 that
+        # stood here until 2026-10-13 made this a cross-build ratio.
+        CHR21_SHARE1 = 3.6368e-06
+        print(f"⚠ For comparison, chr21 at SHARE 1 moves {CHR21_SHARE1:.4e} (a factor of "
+              f"{CHR21_SHARE1 / (hi - lo):.1f} more), and the toy at mean beta_v = 0.111 "
+              f"moves 0.4502 -> 0.6477. The mechanism is not broken; the budget is "
+              f"diluted.")
         print(f"⚠ That factor is NOT predicted by budget dilution: mean beta_v predicts "
               f"72, sum(beta_v^2) predicts 128.6. Positive correlation of matches along "
               f"the copying path is the UNTESTED explanation; it needs Var_Q(u) from pair "

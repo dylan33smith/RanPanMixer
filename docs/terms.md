@@ -251,6 +251,40 @@ Aliases:              "u". Never "similarity" — phi_t is the similarity; u is 
 ```
 
 
+### tv_pinsker  [theory] [privacy] [evaluation]
+```
+Is:                   The Pinsker UPPER BOUND on the total variation between the release
+                      distributions of two inputs, `sqrt(kl_exact / 2)`, clipped at 1.
+                      `acc_ceiling` is `(1 + tv_pinsker) / 2`.
+                      ⚠⚠ **IT IS A BOUND, NOT A MEASUREMENT.** The KL it is derived from
+                      is exact; the total variation is not. Pinsker is an inequality, so
+                      the TRUE total variation is SMALLER than this and the true attacker
+                      ceiling is closer to 0.5 than `acc_ceiling` prints. The looseness
+                      runs in the direction that FLATTERS US, which is why the caveat is
+                      printed on every run and must travel with the number.
+                      ⚠ Never call it "the measured TV". "measured TV" is an alias of
+                      `tv_empirical`, a sampled diagnostic and a different quantity.
+Computed by:          scripts/exact_kl.py:140, `min(1.0, sqrt(kl / 2.0))`, from
+                      `kl_exact` computed by the state-marginals route.
+CHANGES MEANING WITH: everything `kl_exact` changes with -- the arm, `tau`, and above all
+                      `beta_v`'s SCOPE AND SHARE. ⚠⚠ The recorded values are chr21 at
+                      `beta_share` = 1, the WHOLE budget on one chromosome, because
+                      scripts/exact_kl.py calls `beta_v` with no `share` and takes the
+                      default of 1.0. That is 66.6x more generous per position than the
+                      genome-wide release, so these figures are NOT the genome-wide
+                      release's and must never be quoted as such.
+Valid vs:             `p_succ_bound` at matched `tau` and matched scope, as a gate.
+                      ⚠ Not against a SAMPLED attacker accuracy as though they were the
+                      same kind of quantity: this bounds every attacker including
+                      unwritten ones, while a measured accuracy is a LOWER bound on
+                      distinguishability (constraint 7).
+Status:               REPORTED. **Measured 0.000e+00 to 3.109e-03 across `tau` = 0 to
+                      0.99** (ARM 2, chr21, `beta_share` = 1, T = 332,521, K = 88,
+                      n = 10 targets, max over targets; `logs/B_exact_kl.md`).
+                      ⚠⚠ **THE GENOME-WIDE VALUE IS NOT MEASURED.**
+Aliases:              "the Pinsker ceiling". Never "the measured TV", never "the TV".
+```
+
 ### u_ceiling  [utility] [gate]
 ```
 Is:                   The largest u_path a GIVEN target could achieve at any tau:

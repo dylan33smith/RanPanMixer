@@ -104,6 +104,75 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-13 — CHUNK 10 DONE: the draft, and an audit that found four flattering errors
+
+**What was written.** `paper/draft_2026-10-13.md`: two sections, one per arm, a synthesis,
+11 stated limitations and a pre-submission list. Every number carries its arm, `tau`,
+denominator and n.
+
+**⚠⚠ THE AUDIT IS THE FINDING. 17 agents, 12 alleged defects verified, 8 confirmed and 4
+rejected — and ALL FOUR of the serious ones ran in the direction that flattered us.**
+That is this project's named recurring failure, appearing one more time in the document
+that was supposed to be its careful summary.
+
+1. **A suppressed above-bound attack cell.** The draft said the measured attack "found no
+condition exceeding `p_succ_bound` at any `tau`". `logs/B_arm2_attack.md` flags one that
+does: `D3_random` at `tau` = 0.05 reads **0.5400 against a bound of 0.5250**, labelled
+"Reported, not claimed" because it is not significant (z = +0.67 against z_crit 2.82). I
+had quoted the log's looser closing line and dropped the qualification three lines above
+it, and printed no attack table, so the row was invisible. Now the full 8-row table is in
+the draft with the exceedance called out.
+2. **A chr21 privacy ceiling welded to a genome-wide utility movement** as "the same
+fact". `scripts/exact_kl.py` hardcodes `CHROM = "chr21"` and calls `beta_v` with NO
+`share`, so it measures chr21 at the WHOLE budget — **66.6x more generous per position**
+than the genome-wide release every utility figure comes from. Constraint 8 forbids reading
+them as one quantity, and I wrote the sentence that does.
+3. **The headline divided the movement by the wrong denominator.** "4.31 cells out of
+7,630,132" uses the DIFFERING cells; the denominator is the **43,958,219 CALLED** cells.
+5.64e-07 against the true 9.79e-08 — **overstating the reach 5.76x**, and contradicting the
+`target_fidelity` movement in the draft's own table.
+4. **An asserted cause.** "The cause is budget dilution, and it is quantified rather than
+asserted" — while Section 2 of the same draft reports that both first-order predictions of
+that movement FAILED and closes "no mechanism is claimed".
+
+Two more concerned PanMixer and both were restored to the committed framing: the
+objective-vs-realised divergence now carries "**a difference in which quantity is
+reported, NOT a defect**", and a saturation mechanism I had invented is removed — their
+own stats show the optimiser making 18,640 MORE moves and spending 10.4% more between
+capacity 0.3 and 0.5; what stops changing is the released OBJECT (106,534 against
+106,549 altered cells), not the spending.
+
+**⚠⚠ A STALE RATIO I REPEATED ALL SESSION: 43.6x, NOT 35.2x.** The chr21-to-genome shrink
+divided the PRE-REBUILD chr21 movement of 2.94e-06 — finite-difference route, superseded
+chain — by the CURRENT genome-wide 8.345e-08. A cross-build ratio, the same error class as
+the stale `u_ceiling` of 0.815455 caught yesterday. The current-build
+chr21-at-`beta_share`-1 movement is **3.6368e-06**, giving **43.6x**. ⚠ The finding is
+unchanged: 72x and 128.6x still bracket it and neither predicts it. Only the number moved.
+Corrected in place here under the correction rule, and propagated to `docs/plan.md`,
+`paper/draft_2026-10-13.md` and `scripts/exact_utility.py`, whose printed comparison
+hardcoded the stale numerator.
+
+**⚠⚠ THE GENOME-WIDE PRIVACY CEILING IS NOT COMPUTABLE BY THE KL-DIFFERENCE ROUTE.** The
+audit named its absence as the single most important gap, so I wrote
+`scripts/exact_kl_genome.py` to close it — summing the per-chromosome KL at each
+chromosome's share, which is valid because KL is additive across chromosomes, with the
+Pinsker step taken ONCE on the total because `sqrt` is concave. **It fails its own sign
+check.** KL = **-1.96e-11** on chr19 at `tau` = 0.05, because
+`eta_tau * (E[u_p] - E[u_q])` = 6.768228233e-04 and `log Z_p - log Z_q` = 6.768228429e-04
+agree to ten significant figures. Expected genome-wide KL is ~3.4e-11 by extrapolation;
+the cancellation noise of a difference between two accumulations over 22,134,562 positions
+is ~2e-11. **The signal is at the noise floor of the estimator.** This is the same failure
+mode already recorded for the finite-difference derivative route at genome scale, and the
+`KL >= 0` assertion — a theorem, not a convention — is what caught it. ⚠ The DIRECTION is
+known (the genome-wide tilt is 66.6x smaller, so the ceiling is closer to 0.5) but the
+MAGNITUDE is unmeasured, and it is now limitation 11 of the draft. **A route that does not
+difference two nearly-equal accumulations is the first thing to build next.**
+
+⚠ Thirteen of the fourteen committed disclosures were present and correct before the
+audit. The draft was honest about what it had decided in advance to be honest about, and
+not yet honest about what it discovered late — which is the useful way to state the
+failure.
+
 ## 2026-10-13 — CHUNK 9 DONE: the head-to-head. They offer a frontier; we offer a point at its far end
 
 **Method, and it is same-code-on-both-sides rather than a log parse.**
@@ -561,18 +630,27 @@ alleles. Quoting the level is the free-lunch error `target_fidelity` was defined
 Provenance `logs/B_exact_utility.md` + `.json`.
 
 **⚠⚠ THE PREDICTION WAS WRONG, AND SO WAS MY SECOND ONE, IN THE OPPOSITE DIRECTION.**
-Measured shrink against chr21 is **35.2x**, not the 72x on record. Before writing a cause
+[INCORRECT] - Measured shrink against chr21 is **35.2x**, not the 72x on record. Before writing a cause
+[CORRECTION - 2026-10-13]: the shrink is **43.6x**, not 35.2x. The 35.2 divided the
+PRE-REBUILD chr21 movement of 2.94e-06 — measured by the finite-difference route on the
+superseded chain — by the CURRENT genome-wide 8.345e-08, which is a cross-build ratio and
+the same error class as the stale `u_ceiling` of 0.815455. The current-build
+chr21-at-`beta_share`-1 movement is **3.6368e-06** (`logs/B_beta_concentration.md`,
+`inv_support_all`), giving 3.6368e-06 / 8.345e-08 = 43.6x. ⚠ The FINDING is unchanged:
+both first-order predictions still bracket the measurement (72x and 128.6x against 43.6x)
+and neither predicts it. Only the number moved. Before writing a cause
 into the docs I checked the better first-order argument: movement ~ `eta` * Var_Q(u), and
 if matches were INDEPENDENT across variants then Var_Q(u) ~ sum(`beta_v`^2), which I
 measured at 9.290392e-06 for chr21 at `share` = 1 against 7.223240e-08 genome-wide — a
-predicted 128.6x. So the two scalings bracket the measurement (72, **35.2**, 128.6) and
+predicted 128.6x. So the two scalings bracket the measurement (72, **43.6** [corrected
+2026-10-13 from 35.2], 128.6) and
 NEITHER predicts it. The movement is not a function of budget dilution alone.
 The untested explanation is that allele matches are POSITIVELY CORRELATED along the HMM
 copying path — the sampler copies long stretches from one donor — so Var_Q(u) exceeds
 sum(`beta_v`^2) by a chromosome-dependent factor, and chr21-as-one-chromosome differs from
 22 chromosomes whose per-chromosome correlation structures add. **Settling it needs
 Var_Q(u) from PAIR marginals, which `scripts/exact_utility.py` does not compute.** No
-mechanism for the 35.2 may be quoted until that is measured. Recorded because the general
+mechanism for the 43.6 may be quoted until that is measured. Recorded because the general
 lesson is the project's own: a number that "should scale by" something is a prediction, and
 checking it cost one 30-second computation and overturned two docs claims.
 
