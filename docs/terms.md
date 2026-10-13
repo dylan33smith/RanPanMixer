@@ -660,6 +660,78 @@ Aliases:              "the sensitivity", "the range of u". Never "the ceiling", 
                       is `u_ceiling` and is a different, target-dependent quantity.
 ```
 
+### e_differ  [utility] [evaluation] [gate]
+```
+Is:                   `E[# released cells differing from the target]`, EXACT, over the
+                      target's CALLED cells only. The raw COUNT whose rate is
+                      `target_fidelity`: target_fidelity = e_differ / called_cells.
+                      ✅ **THE PRE-REGISTERED PRIMARY ENDPOINT** is this quantity via
+                      the MARGINALS route (prereg_2026-10-10.md section 3), reported
+                      against its own arm's ceiling and never against 1.
+                      ⚠ It is a DIFFER count, so LOWER is more faithful -- the same
+                      direction as `target_fidelity`, whose entry records the 2026-10-08
+                      inversion that this direction corrects.
+Computed by:          src/mechanism/ffbs.py:expected_mismatches from the state marginals,
+                      summed over chromosomes and over both haplotypes. Since 2026-10-12
+                      it rides along inside `ffbs.release` via `exact_out`, computed from
+                      the SAME `psi` and `forward` the draw already holds, which is
+                      pinned inert with respect to the draw by tests/test_exact_out.py.
+                      ⚠⚠ **THE FINITE-DIFFERENCE ROUTE IS FORBIDDEN** at genome-wide
+                      scope: it returns a NEGATIVE `Var_Q(u)` there. The marginals route
+                      needs no step size and is the only admissible one.
+CHANGES MEANING WITH: the ARM (K = 86 under leave-one-out, K = 88 in arm 2), `tau`, the
+                      utility function, and the CALLED-CELL DENOMINATOR, which is per
+                      target. Report the count and its denominator together; a count
+                      without its denominator is uninterpretable, not merely imprecise.
+Valid vs:             the same target at another `tau`, same arm. ⚠ Across targets only
+                      as a distribution, never pooled: leave-one-out gives each arm 1
+                      target its own chain and its own denominator.
+Status:               PRIMARY. **Measured ARM 1, 2026-10-12: median 7,630,132.36 cells
+                      of 43,958,219 called at `tau` = 0, moving -4.3056 cells across
+                      `tau` = 0 to 0.99** (n = 44 held-out individuals, K = 86, 22
+                      autosomes, exact). 44/44 targets move in the faithful direction.
+                      ⚠⚠ **THE MOVEMENT IS THE CLAIM, NOT THE LEVEL.** The level is
+                      reached at `tau` = 0 by an untilted draw carrying ZERO target
+                      information, so it belongs to human allele sharing and not to the
+                      mechanism. Four cells in seven and a half million is what the whole
+                      privacy range buys, and it reproduces arm 2's +8.345e-08 `e_q_u`
+                      movement on a different arm.
+Aliases:              "E[differ]" in the pre-registration. Never "mismatches" bare,
+                      which hides whether a count or a rate is meant.
+```
+
+### loo_id  [dataset] [provenance] [gate]
+```
+Is:                   The identifier of the individual HELD OUT of the donor panel for a
+                      release -- the machine-checked half of `loo_cohort`. In ARM 1 it
+                      is the target's own id, because the target IS a cohort member and
+                      the guarantee holds only when both its haplotypes leave the panel.
+                      In ARM 2 it is literally absent: the target is external to `G`,
+                      `D`, every panel and the attack database, so nothing is held out.
+Computed by:          stamped on every record by src/mechanism/ffbs.py:release and
+                      enforced by src/releases.py:_check_arm, which REFUSES an arm 1
+                      release with no `loo_id` and an arm 2 release that carries one.
+                      ⚠ Both directions are refused because each is a different false
+                      claim: the first would be a release drawn against a panel
+                      containing its own target, the second an arm 1 release mislabelled.
+CHANGES MEANING WITH: nothing -- it is an identifier. ⚠ But it is part of the CONFIG
+                      STAMP that decides whether two results are comparable at all
+                      (`docs/plan.md` Reporting contract): graph+cohort id, arm, `tau`,
+                      utility id, `loo_id`.
+Valid vs:             itself. Two releases with different `loo_id` were drawn against
+                      DIFFERENT donor panels and therefore different `R_D`, so their
+                      utilities are not comparable (constraint 8).
+Status:               REQUIRED throughout ARM 1 and absent throughout ARM 2. Verified
+                      present and equal to the target on all 308 arm 1 releases,
+                      2026-10-12.
+                      ⚠ It records the hold-out, which is what makes arm 1's guarantee
+                      conditional rather than void. It does NOT record the other
+                      condition: `G` was built from all HPRC assemblies INCLUDING the
+                      target's, so arm 1's guarantee is conditional on the graph too.
+                      Nothing on the record captures that; it must be said in prose.
+Aliases:              none. Never "held out" bare in a table -- the field name is this.
+```
+
 ### e_q_u  [utility] [theory] [evaluation]
 ```
 Is:                   E_Q[u], the EXACT expected utility of a release under Q^tau_p —

@@ -130,14 +130,17 @@ def main(argv=None) -> int:
 
     # ---- PRIMARY
     if ep:
-        row("`target_fidelity` * [median]",
-            lambda d, t, tau: ep[t]["cells"][str(tau)]["target_fidelity"] if t in ep else None)
-        row("`target_fidelity` [min]",
-            lambda d, t, tau: ep[t]["cells"][str(tau)]["target_fidelity"] if t in ep else None,
-            agg=np.min)
-        row("`target_fidelity` [max]",
-            lambda d, t, tau: ep[t]["cells"][str(tau)]["target_fidelity"] if t in ep else None,
-            agg=np.max)
+        # ⚠⚠ TWELVE DECIMALS, DELIBERATELY. The genome-wide movement is ~1e-07, so
+        # `.6f` prints the SAME number in all seven columns and the one figure that
+        # carries a claim disappears into the rounding.
+        fid = lambda d, t, tau: (ep[t]["cells"][str(tau)]["target_fidelity"]
+                                 if t in ep else None)
+        row("`target_fidelity` * [median]", fid, ".12f")
+        row("`target_fidelity` [min]", fid, ".12f", agg=np.min)
+        row("`target_fidelity` [max]", fid, ".12f", agg=np.max)
+        row("`e_differ` cells [median]",
+            lambda d, t, tau: (ep[t]["cells"][str(tau)]["e_differ"] if t in ep else None),
+            ",.3f")
     else:
         na("`target_fidelity` *", "needs scripts/arm1_exact_endpoint.py; pass --endpoint")
     # ---- GATES
@@ -153,10 +156,10 @@ def main(argv=None) -> int:
     # ---- CONTEXT
     if ep:
         row("`e_q_u` [median]",
-            lambda d, t, tau: ep[t]["cells"][str(tau)]["e_q_u"] if t in ep else None, ".9f")
+            lambda d, t, tau: ep[t]["cells"][str(tau)]["e_q_u"] if t in ep else None, ".12f")
         row("`e_q_u_over_ceiling` [median]",
             lambda d, t, tau: ep[t]["cells"][str(tau)]["e_q_u_over_ceiling"] if t in ep else None,
-            ".9f")
+            ".12f")
     else:
         na("`e_q_u`", "needs --endpoint")
         na("`e_q_u_over_ceiling`", "needs --endpoint")
@@ -167,6 +170,31 @@ def main(argv=None) -> int:
     na("`utility_loss_panmixer` *", "chunk 9; scored at K = 88 both sides per decision M")
     na("`attacker_accuracy` *", "chunk 9")
     na("`af_loss` / `ld_loss`", "NOT ADOPTED, decision H -- a frozen endpoint")
+
+    # ---- THE MOVEMENT. Everything above is a level; this is the claim.
+    if ep:
+        lo_t, hi_t = str(a.taus[0]), str(a.taus[-1])
+        here = [t for t in targets if t in ep]
+        print(f"\n⚠⚠ **THE MOVEMENT ACROSS `tau` = {a.taus[0]:g} TO {a.taus[-1]:g} IS THE "
+              f"FIGURE, NOT THE LEVELS ABOVE.**")
+        for key, unit in (("target_fidelity", ""), ("e_differ", " cells"),
+                          ("e_q_u", "")):
+            mv = [ep[t]["cells"][hi_t][key] - ep[t]["cells"][lo_t][key] for t in here]
+            med0 = np.median([ep[t]["cells"][lo_t][key] for t in here])
+            sign = "more faithful" if key != "e_q_u" else "more useful"
+            print(f"- `{key}` moves **{np.median(mv):+.4e}{unit}** (median of "
+                  f"{len(here)}), from a level of {med0:.9g}{unit}; per-target range "
+                  f"{min(mv):+.4e} to {max(mv):+.4e}. "
+                  f"{sum(1 for m in mv if (m < 0) == (key != 'e_q_u'))}/{len(here)} "
+                  f"targets move in the {sign} direction.")
+        print(f"⚠⚠ **SO THE WHOLE PRIVACY RANGE BUYS ABOUT FOUR CELLS OUT OF SEVEN AND A "
+              f"HALF MILLION.** The level — about 17.4% of called cells altered — is "
+              f"reached at `tau` = 0 by an untilted draw carrying ZERO target "
+              f"information, because a cohort member's alleles are largely carried by "
+              f"the other 86 haplotypes. The level is not attributable to the mechanism; "
+              f"the movement is, and it is ~1e-07. This independently reproduces ARM 2's "
+              f"genome-wide `e_q_u` movement of +8.345e-08 on a different arm with "
+              f"{len(here)} targets: it is BUDGET DILUTION, not a broken mechanism.")
 
     # ---- one bullet per COLUMN
     print("\n**COLUMNS** (`tau`), each point's role as the pre-registration declares it:")

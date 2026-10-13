@@ -104,6 +104,64 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-12 — CHUNK 8 DONE: arm 1's 308 releases, and four cells in seven and a half million
+
+**Result.** All 308 arm 1 cells released and verified: 44 held-out individuals x the 7
+pinned `tau`, diploid, 22 autosomes, K = 86, per-target leave-one-out, one release per
+genome per `tau`. 275.9 min on 24 workers, **0 failures**. Every record verified on read
+by `scripts/arm1_results.py` — arm1, genome scope, 22 autosomes, `loo_id` == target,
+`log_z_p` inside `[0, eta_tau]`. Provenance `logs/B_arm1_results.md`,
+`logs/B_arm1_release.md`, `logs/B_arm1_release.json`, `logs/B_arm1_endpoint.json`.
+
+**The pre-registered PRIMARY, exact from the marginals, and it is the same story as arm 2.**
+`target_fidelity` median **0.173716006** at `tau` = 0 moving **-9.8015e-08** to
+`tau` = 0.99 — i.e. `e_differ` median **7,630,132.36 cells moving -4.3056 cells** of
+43,958,219 called. `e_q_u` median **0.802982751** moving **+9.6048e-08**.
+**44/44 targets move in the faithful direction on all three**, with per-target movement
+spanning -1.2129e-07 to -9.0451e-08, so the effect is SYSTEMATIC and not noise.
+⚠⚠ **THE WHOLE PRIVACY RANGE BUYS ABOUT FOUR CELLS IN SEVEN AND A HALF MILLION.** The
+LEVEL — ~17.4% of called cells altered — is reached at `tau` = 0 by an untilted draw
+carrying zero target information, because a cohort member's alleles are largely carried by
+the other 86 haplotypes. The level is not attributable to the mechanism.
+✅ **AND THIS INDEPENDENTLY REPRODUCES ARM 2's +8.345e-08 `e_q_u` MOVEMENT** on a
+different arm, a different K, a different ceiling and 44 targets instead of 1. Budget
+dilution is now confirmed rather than inferred from one measurement.
+
+**Structure, for the record.** `u_ceiling` median 0.972588907 — far above arm 2's
+0.8257087, as expected and NOT a better result: a cohort member is called at nearly every
+position of a graph built from its own assembly. `e_q_u_over_ceiling` 0.825586196.
+`donor_switches` median ~830,714, essentially flat in `tau`, which is what the criterion
+predicts: the tilt cannot create or remove a switch, only reassign donors within a fixed
+skeleton. `in_chain` T median 22,134,548. `log_z_p` median 2.125216362 at `tau` = 0.99
+against an `eta_tau` of 2.646652412 — 80.3% of budget, against 69.5% recorded for arm 2's
+chr21.
+
+**⚠ MY REPORTING BUG, CAUGHT ON THE FIRST READ OF MY OWN TABLE.** `.6f` printed
+`target_fidelity` IDENTICALLY in all seven columns. The genome-wide movement is ~1e-07, so
+six decimals rounded away the only figure that carries a claim, and the table looked like
+the mechanism did nothing at all rather than doing something tiny. Fixed to 12 decimals
+with a MOVEMENT block that prints the per-target range and the direction count. ⚠ The
+general lesson is the one this project keeps relearning in a new costume: a format is part
+of a measurement. Earlier today the same class of error printed `beta_share` as `0/0/0`
+from a count formatter on a fraction.
+
+**⚠⚠ THREE WRONG ETAs FOR ONE RUN: 2.5 h, 11.5 h, 10.6 h, against an actual 4.6 h.**
+Each failed the same way and the third is the instructive one. (1) 2.5 h came from timing
+one release ALONE on an idle machine. (2) 11.5 h came from applying a contention factor
+measured on the release-only workload to the combined one. (3) 10.6 h came from a
+*marginal* chr1-to-chr2 rate, which I had argued was "the only number that extrapolates" —
+and it was still 2.3x too slow, because chr1 and chr2 are measured while all 24 workers
+are SYNCHRONISED on the two largest chromosomes with a COLD page cache. That is peak
+contention, not steady state; as workers drift apart onto different chromosomes the
+aggregate memory pressure smooths out. Real contention was only **1.25x** (110 min per
+target against ~88 isolated). **A rate measured during a synchronised cold start is a
+worst case, and a parallel run's steady state cannot be measured until the workers have
+desynchronised.** Recorded in `docs/bugs.md`.
+⚠ Worth stating plainly: the release-only run I killed would likely have finished in ~3.5
+h, not 8.7 h, so combining saved about 1.5 h rather than the ~6 h I claimed. The decision
+was still right, but for the STRUCTURAL reason — one forward pass instead of two — and
+not for the numbers I used to justify it.
+
 ## 2026-10-12 (later) — B-IMP-exact-out: the sweep is 8.7 h not 2.5 h, and the endpoint now rides along
 
 **What I got wrong.** I timed one genome-wide arm 1 release ALONE at 12.3 min, scaled it
