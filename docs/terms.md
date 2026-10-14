@@ -2226,8 +2226,25 @@ Is:                   PanMixer's integration artifact: the released allele vecto
                       target, shape (n_sites, 2) int16, -1 = missing, row-aligned to
                       that chromosome's pangenome VCF record order. Every PanMixer
                       attack and utility evaluator consumes exactly this file.
-Computed by:          PanMixer writes it from tools/panmixer/stacker.py. On our side it
-                      is PLANNED and UNIMPLEMENTED — nothing in src/ emits this format.
+Computed by:          PanMixer writes it from tools/panmixer/stacker.py. ✅ **ON OUR
+                      SIDE, scripts/emit_new_haplotypes.py since 2026-10-13.** This read
+                      "PLANNED and UNIMPLEMENTED — nothing in src/ emits this format".
+                      It maps our release from OUR per-target chain onto THEIR site axis
+                      by POSITION, and ships a sites.tsv beside every array.
+                      ⚠⚠ ROWS WE DO NOT RELEASE ARE -1, NOT THE TARGET'S TRUE ALLELE.
+                      Their stacker leaves the original in place outside the blocks it
+                      swaps, so filling ours the same way would hand a linkage attack
+                      ~9,400 alleles our mechanism never released. Measured for HG00438:
+                      331,416 released rows of their 340,824, 9,408 at -1.
+                      ⚠ Their evaluators mask on both sides being called, so those rows
+                      DROP OUT rather than scoring as matches — the conservative
+                      direction, and it must be stated with any number from this file.
+                      ✅ THE ALIGNMENT CONTROL, which the vacuous shape assertion below
+                      cannot provide: map the target's own original onto their axis and
+                      compare to THEIR original. Correct alignment gives **98.6475%**
+                      jointly-called agreement; shifts of 1, 2, 10, 100, 1,000 and 10,000
+                      rows all give 71.9-77.0%, every one caught by the 0.90 threshold.
+                      The script REFUSES to write below it.
                       ⚠ It is no longer optional: under decision E Arm 1 runs PanMixer's
                       own evaluations on our release, and this file is what every one of
                       their evaluators consumes. It is ARM 1 PLUMBING.
