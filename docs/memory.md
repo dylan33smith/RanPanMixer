@@ -5306,7 +5306,8 @@ modified.
 MINUS the best candidate's, so POSITIVE means the attack ranked the target top, and
 `hap_original_rank` = 1 means identified. **Their release is identified at 3 of 8 capacities** —
 0.01, 0.05, 0.1 — at rank 1 of 44 with `g_to_gstar` +2,453 / +1,566 / +1,141 and match-vs-original
-up to 0.994796; at capacity >= 0.2 it defeats all three. **Ours is identified at 0 of 7 `tau`**,
+up to 0.994796; at capacity >= 0.2 it defeats all three (0.2 itself included -- an earlier
+wording said "above 0.2", which wrongly excluded the boundary cell). **Ours is identified at 0 of 7 `tau`**,
 rank 14-19 of 44, `g_to_gstar` -6,088 to -8,080.
 
 ⚠ Their identification is **NOT a defect in PanMixer** and must never be written as one. `capacity`
@@ -5345,3 +5346,103 @@ conclusion was also still live in `docs/data.md` (the `exact_kl_genome.py` row, 
 its original text preserved verbatim behind `[INCORRECT]`) and in two places in `docs/plan.md`,
 both corrected. This is the correction-does-not-propagate-itself rule biting on the same day the
 correction was written.
+
+### 2026-10-13 — B-ATK-a3a4: Arm 2's attacker set completed, and a control that could not fail
+
+**Hypothesis.** A3 and A4 are rows 3 and 4 of the attacker set frozen on 2026-10-10 and
+neither had ever been run. A1 is provably optimal for the whole released path, so these two
+only earn their place by changing the game: A3 is the attack a REAL adversary runs (no
+knowledge of `eta_tau`, `beta_v`, `Z_p`, or that a mechanism was applied), and A4 asks
+whether the signal CONCENTRATES, since A1 sums one statistic over the whole chain and would
+average away a tilt loud in one block and silent elsewhere.
+
+**Method.** `scripts/arm2_attack_a3a4.py`, importing A1's `load_state`, `pick_decoys` and
+seeding discipline rather than copying them, so all four attacks run on one experiment. Both
+hypotheses drawn (the bound covers the BALANCED accuracy only), independent seeds per
+hypothesis, three decoy conditions. 10 targets x 7 `tau` x 25 draws = 250 trials per
+(`tau`, condition) per hypothesis — A1's realised design — so 7,000 releases.
+
+⚠ Three degrees of freedom the pre-registration left open were fixed in the docstring BEFORE
+any outcome was inspected: A3's allele frequencies come from the PUBLIC cohort (constraint 1
+admits `G` and `D`); A4's block grid is {512, 4096, 32768} with ALL THREE reported and never
+a best-of, 64 dropped for a reason that is not an outcome (a 64-position block carries ~2e-4
+of the weight, so its statistic is dominated by the baseline's own randomness); and A4's
+planted block is the one with the most p-vs-q differing calls, which is deterministic and
+the best case for the attacker, as a positive control should be.
+
+**Provenance.** `logs/B_arm2_a3a4.md` + `.json` + `.log`, exit 0.
+
+**Result. NO CONDITION EXCEEDED `p_succ_bound` SIGNIFICANTLY IN EITHER ATTACK.** Ten cells
+exceed by point estimate; the largest is A4 block 4096, D2_nearest, `tau` = 0.05, at 0.5820
+against 0.5250 — **z = +2.65 against a critical value of 4.51**, Bonferroni over the 15,603
+block-cells actually examined. Reported, not claimed.
+
+⚠⚠⚠ **THE FINDING THAT MATTERS MOST IS ABOUT OUR OWN PRE-REGISTRATION: A3's POSITIVE
+CONTROL CANNOT FAIL.** It requires the attack to "link the UNOBFUSCATED target at
+near-100%", and it passed 30 of 30 — because PanMixer's score credits only AGREEMENT, never
+penalises disagreement, and its weights are non-negative, so `score(y, q)` over the agreeing
+sites is a SUBSET SUM of `score(y, y)` and `Lambda > 0` is algebraically forced the moment
+one site differs. Measured: 96,316.8 against 43,294.9 over 45,411 differing sites, minimum
+weight 0.022857. **A 100% pass was the only possible outcome**, so the control verifies the
+site axis, the genotype encoding and the weights — the plumbing — and says NOTHING about
+power. CLAUDE.md's own rule: a gate that cannot fail is decoration. Replaced by a labelled
+POWER DIAGNOSTIC (constraint 6 permits a labelled diagnostic, as the PanMixer evaluator
+column was): an untilted release with a declared fraction `f` of positions overwritten by
+the target verbatim, subsets taken as prefixes of ONE random permutation so the curve is
+monotone by construction. **A3 reaches 0.75 accuracy at f = 0.01 — about 3,300 of 332,521
+positions — and sits at chance at f = 0.001.** That is the power statement constraint 7
+demands, and it is what makes A3's null mean something.
+
+✅ **A4's control is NOT vacuous and it passed 30/30**: a 4,096-position block copied
+verbatim from the target was the argmax block every time, against an untilted background.
+
+⚠⚠ **A4's MAXIMA ARE PURE MULTIPLICITY, AND THE EVIDENCE IS QUANTITATIVE RATHER THAN A
+THRESHOLD COMPARISON.** The expected maximum of `B` chance-level accuracies is
+`0.5 + SE * z(1 - 1/B)` with SE = 0.02236, giving **0.5662 / 0.5503 / 0.5299** at 650 / 82 /
+11 blocks, against observed means of **0.5634 / 0.5445 / 0.5235** — tracking the null at
+every size and slightly BELOW it, as positive dependence between blocks sharing a release
+predicts. ⚠ The clinching detail is the DIRECTION: the maximum rises with the block COUNT,
+which is what multiplicity does, and NOT with the block SIZE, which is what a genuinely
+localised signal would do because a larger block carries more of the budget. **So the tilt's
+dilution is UNIFORM — it does not hide in a segment.** That is a new fact about the central
+result, obtained from an attack that found nothing.
+
+⚠⚠ **A3's D1_extremal ROW IS DEGENERATE AND MUST NOT BE READ AS A NULL.** Measured
+TPR = 1.0000 and TNR = 0.0000 at every `tau`: the statistic prefers the target under BOTH
+hypotheses and never prefers the extremal decoy, so its 0.5000 is arithmetic — an attacker
+that always answers "p" scores exactly 0.5 balanced. The cause is the score's shape: a
+constructed path differing from the target everywhere shares almost nothing with any cohort
+mosaic and so accumulates almost no agreement weight. The extremal condition is
+uninformative FOR A3 specifically and remains the sharp case for A1 and A4.
+
+⚠ **THE `tau` = 0 COLUMN CANNOT BE A VIOLATION, and two of the ten above-bound cells are in
+it.** At `tau` = 0 the tilt vanishes and `Q_p = R_D = Q_q` — the hypotheses are the SAME
+distribution — so every attacker's true balanced accuracy is exactly 0.5 and half the
+sampling noise must land above a bound of exactly 0.5. A3's 0.5340 and 0.5160 there are that
+noise. The column's real job is to catch a BUG: a genuine excess would mean the two
+hypotheses are not exchangeable in the harness. It came in clean, and A4's `tau` = 0 column
+is exactly 0.5000 throughout because `eta_tau` = 0 makes every block statistic identically
+zero. **Both of these were written down as expected values BEFORE the output was read.**
+
+**Verification of the instrument, not just the result.** A3 is pre-registered as PANMIXER'S
+score, so agreement with their code was measured rather than assumed: their
+`score_genotypes_remove_missing` was called directly, in their own env, on shared inputs,
+and ours agrees to **1.4e-13** (the residual is their float32 cast). Their outputs are
+pinned as golden values in `tests/test_a3_matches_panmixer.py`, which runs in OUR env so the
+check survives without theirs. The A4 block partition was separately checked to cover all
+332,521 positions exactly once at every block size.
+
+**A process failure worth keeping.** The first launch used `--draws 250` and would have
+drawn **70,000 releases over about four hours**, because A1's "250 per (`tau`, condition)"
+is 25 draws x 10 TARGETS, not 250 draws. Caught from the run's own first progress line
+("17,500 trials"), killed, and relaunched at the pre-registered size. The default is now 25,
+and the printed minimum detectable advantage is read off the DATA with an assertion
+(`n_cell == draws * n_targets`) instead of from the draws argument, where it had been
+silently wrong by a factor of sqrt(10).
+
+**Limitations stated.** A3 is blind to 29,974 of 332,521 chain positions — their
+genotype-as-a-sum encoding is defined only on bi-allelic sites — and that 9.0% carries
+weight the attack cannot see, which flatters us. Neither A3 nor A4 has run on an ARM 1
+release or on PanMixer's output, though the pre-registration admits both attacks in both
+arms. Nine of the ten above-bound point estimates sit at `tau` = 0.05 and 0.10, which the
+experiment does not resolve below the bound at `delta` = 0.0556; the proof carries them.

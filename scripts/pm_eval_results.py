@@ -102,7 +102,7 @@ def main(argv=None) -> int:
           f"{', '.join(str(r['capacity']) for r in id_t)} — at rank 1 of 44, with a "
           f"POSITIVE gap. That is the threshold their own `eps_private` sweep exists to "
           f"find, and it is visible here in their own evaluators. ⚠ It is NOT a defect: "
-          f"the capacity knob is meant to be turned up, and above 0.2 their release "
+          f"the capacity knob is meant to be turned up, and at 0.2 and ABOVE their release "
           f"defeats all three attacks.")
     print(f"- **Our release is identified at {len(id_o)} of {len(ours)} `tau` values.** "
           f"Rank {min(r['MIA_privacy']['hap_original_rank'] for r in ours)}-"

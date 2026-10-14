@@ -1352,3 +1352,22 @@ merely that the new one is present. Grep the distinctive NUMBER or PHRASE afterw
 `3.4e-11` and `NOT COMPUTABLE` — across `docs/`, `paper/`, `src/`, `tests/` and `CLAUDE.md`,
 because the same stale conclusion was simultaneously live in a `docs/data.md` row and in two
 places in `docs/plan.md`. Corrections do not propagate themselves.
+
+### [Symptom] A pre-registered positive control passes at 100% on the first try
+
+Seen 2026-10-13 on attack A3. The pre-registration requires the attack to "link the
+UNOBFUSCATED target at near-100%", and it did -- 30 of 30. ⚠ The control was
+ALGEBRAICALLY UNABLE TO FAIL. PanMixer's linkage score sums `-log P_HWE` only over sites
+where the genotypes AGREE, mismatches contribute nothing, and the weights are
+non-negative, so `score(y, q)` over the agreeing sites is a SUBSET SUM of `score(y, y)`
+and `Lambda > 0` is forced the moment a single site differs. A 100% pass rate was the
+only possible outcome.
+
+[Proven fix] Before trusting a control, ask what INPUT would make it fail and construct
+it; if none exists, the control is decoration and must be replaced, not reported. Here
+the replacement is a graded POWER CURVE -- an untilted release with a declared fraction
+`f` of positions overwritten by the target verbatim -- which answers the question the
+control was meant to answer: A3 needs f = 0.01 (about 3,300 of 332,521 positions) to
+reach 0.75 accuracy and is at chance at f = 0.001. ⚠ A perfect score on a first run is
+evidence about the TEST at least as often as about the thing tested; the same reasoning
+caught the `log_z_p` gate that could not fail in 2026-10.

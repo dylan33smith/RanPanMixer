@@ -2845,6 +2845,22 @@ Status:               DESCRIPTIVE for ARM 1 — a labelled external column, whic
                       constraint 6 permits without a new pre-registration. ⚠⚠ It is NOT
                       `attacker_accuracy` and must never be reported as one: that term
                       names OUR pre-registered attackers, which remain unrun on Arm 1.
+                      ⚠⚠ **THE SAME SCORE IS ALSO THE STATISTIC OF PRE-REGISTERED ATTACK
+                      A3**, where it is re-posed as a 1-of-2 discrimination and IS a
+                      claimable `attacker_accuracy` — the two uses must not be confused.
+                      As PanMixer runs it, the score ranks 44 candidates and the result
+                      is their `g_to_gstar`; as A3 runs it, it scores exactly two
+                      candidates and the result is a balanced accuracy bounded by
+                      `p_succ_bound`. `scripts/arm2_attack_a3a4.py` implements A3 and is
+                      held to THEIR code by `tests/test_a3_matches_panmixer.py`, which
+                      pins golden values obtained by calling their own function.
+                      ⚠⚠⚠ A3's pre-registered positive control CANNOT FAIL, which is a
+                      property of this score and not of the harness: it credits only
+                      agreement, never penalises disagreement, and its weights are
+                      non-negative, so `score(y, q)` over the agreeing sites is a SUBSET
+                      SUM of `score(y, y)` and handing the attack the target's own path
+                      forces a win. The control tests the plumbing; the power statement
+                      is the leak-fraction curve in that script.
                       ⚠⚠⚠ AND A NULL HERE PROVES LESS THAN IT APPEARS TO. Our `tau` = 0
                       release defeats all three, and `tau` = 0 applies NO protection, so
                       the nulls are a property of the RELEASE FORM — a complete mosaic of
