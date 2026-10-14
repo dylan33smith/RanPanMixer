@@ -5324,8 +5324,12 @@ visible, and it is the single most important cell in the table. ✅ Separately, 
 evaluators agree on every release about identification — an internal check across independent code
 paths.
 
-⚠ The honest trade: where both tools defeat the attacks their utility is also the same (72.75% of
-the ceiling against our 73.1%). PanMixer's advantage is that it can TUNE to a point we cannot
+⚠ The honest trade: where both tools defeat the attacks their RELEASES retain the same share of
+the shared-axis ceiling (72.7455% at their saturation against 73.0596% at our `tau` = 0.99).
+⚠⚠ This first read "against our 73.1%" — and 73.1055% is the `tau` = 0 value, so that sentence
+quoted a LEVEL reached with zero target information as ours. The free-lunch error, caught on
+re-check the same day, in a paragraph written to be careful about everything else. Across the whole
+`tau` grid our share spans 0.4654 points against 13.6314 across their capacity grid. PanMixer's advantage is that it can TUNE to a point we cannot
 reach, retaining 86.38% at capacity 0.01 — and the cost of that point is being identified at rank
 1 of 44.
 

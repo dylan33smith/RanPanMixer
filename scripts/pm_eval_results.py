@@ -115,10 +115,14 @@ def main(argv=None) -> int:
           f"exactly the error standing constraint 7 names.")
     print(f"- ✅ The two gap evaluators AGREE on every release about whether the target "
           f"was identified, which is an internal check across independent code paths.")
-    print(f"- ⚠ Where both tools defeat the attacks, their utility is also the same: at "
-          f"their saturation they retain 72.75% of the ceiling against our 73.1% "
-          f"(`logs/B_arm1_symmetric.md`). Their advantage is that they can TUNE to a "
-          f"point we cannot reach; the cost of that point is being identified.")
+    print(f"- ⚠ Where both tools defeat the attacks, their RELEASES retain the same "
+          f"share of the shared-axis ceiling: 72.7455% at their saturation against "
+          f"73.0596% at our `tau` = 0.99 (`logs/B_arm1_symmetric.md`). ⚠⚠ OUR LEVEL IS "
+          f"NOT ATTRIBUTABLE TO THE TILT -- 73.1055% is reached at `tau` = 0, so it is "
+          f"a property of the release FORM; this line first read 'our 73.1%' and that "
+          f"was the tau = 0 value, the free-lunch error. Across the whole grid our "
+          f"share spans 0.4654 points against 13.6314 across their capacity: they "
+          f"offer a frontier, we offer a point at its far end.")
     print(f"- ⚠ NOT a same-build comparison. Their sweep ran on their own vg-1.36 data, "
           f"and the two builds disagree about the target itself at 1.34% of cells.")
 
