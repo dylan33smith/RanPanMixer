@@ -1336,3 +1336,19 @@ which was mostly a DIFFERENT set.
   **[Tests]** 12 in `tests/test_verify_panel.py`, including one that corrupts a real
   bgzf file by flipping a single mid-file byte and then asserts that its freshly
   computed sha256 MATCHES — the finding written as an assertion rather than prose.
+
+### [Symptom] A "resolved" item and the stale text it resolves BOTH present in a document
+
+Seen 2026-10-13 in `paper/draft_2026-10-13.md`: limitation 11 appeared twice — once as
+`✅ RESOLVED` and once as the original `NOT COMPUTABLE BY THIS ROUTE / ~3.4e-11` text that the
+resolution disproves by a factor of 13,000 — and limitation 12 appeared twice verbatim. A reader
+following the list in order hits the CORRECTION first and the STALE CLAIM last, which is worse
+than never having corrected it. Detected only because a later edit asserted `count(old) == 1` and
+got 2.
+
+[Proven fix] An insert-before-anchor edit CANNOT resolve anything. A resolution must REPLACE the
+old text, and the edit must then assert the old distinctive phrase is ABSENT from the file, not
+merely that the new one is present. Grep the distinctive NUMBER or PHRASE afterwards — here
+`3.4e-11` and `NOT COMPUTABLE` — across `docs/`, `paper/`, `src/`, `tests/` and `CLAUDE.md`,
+because the same stale conclusion was simultaneously live in a `docs/data.md` row and in two
+places in `docs/plan.md`. Corrections do not propagate themselves.

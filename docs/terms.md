@@ -2808,6 +2808,55 @@ Aliases:              "singleton survival", "private-allele leakage". ⚠ Never 
 
 ---
 
+### panmixer_linkage_score  [attack] [evaluation] [external]
+
+```
+Is:                   THE UMBRELLA NAME for the three metrics PanMixer's own privacy
+                      evaluators emit, which we now quote because their evaluators have
+                      been run UNMODIFIED on both tools' releases. Their names, verbatim
+                      from their JSON, because renaming an external tool's output is how
+                      a comparison stops being one:
+                        * `genotype_g_to_gstar` (`gap_score.py`) and
+                          `haplotype_g_to_gstar` (`diploid_gap_score.py`) — the TRUE
+                          subject's score MINUS the best candidate's.
+                        * `hap_original_rank` out of `hap_original_rank_out_of`
+                          (`MIA_privacy.py`) — the true subject's rank among the 44.
+                        * `hap_bin_match_frac_vs_original` — how much of the original
+                          survives in the release. HIGHER = less obfuscated.
+                      ⚠⚠ DIRECTION, or every number reads backwards: a POSITIVE
+                      `g_to_gstar`, or a rank of 1, means THE ATTACK IDENTIFIED THE
+                      TARGET. Negative, or a rank far from 1, means it did not.
+Computed by:          THEIR code, not ours: `external/PanMixer/tools/downstream/privacy/gap_score.py`,
+                      `diploid_gap_score.py`, `MIA_privacy.py`, driven by
+                      `scripts/pm_eval_run.sh` over the staging built by
+                      `scripts/pm_eval_setup.py`; tabled by
+                      `scripts/pm_eval_results.py`. ⚠ THREE evaluators, not four:
+                      `sampled_gap_score.py` reads a PRE-stacker object and
+                      `external/PanMixer/starting_data/chr21/subjects/` is absent from
+                      this checkout — see its `docs/data.md` row, state MISSING.
+CHANGES MEANING WITH: the candidate set it ranks against (44 here), the site set, and
+                      the build — their sweep ran on vg-1.36 data and ours on vg-1.68,
+                      so this is NOT a same-build comparison (decision F). Also with
+                      WHICH object is scored: their released `obfuscated.vcf.gz`, not
+                      the pre-stacker `new_haplotypes.npy` in their sweep output.
+Valid vs:             each tool against itself across its own parameter, and across
+                      tools only with the cross-build caveat attached.
+Status:               DESCRIPTIVE for ARM 1 — a labelled external column, which is what
+                      constraint 6 permits without a new pre-registration. ⚠⚠ It is NOT
+                      `attacker_accuracy` and must never be reported as one: that term
+                      names OUR pre-registered attackers, which remain unrun on Arm 1.
+                      ⚠⚠⚠ AND A NULL HERE PROVES LESS THAN IT APPEARS TO. Our `tau` = 0
+                      release defeats all three, and `tau` = 0 applies NO protection, so
+                      the nulls are a property of the RELEASE FORM — a complete mosaic of
+                      other people`s haplotypes — not of the tilt. Constraint 7: a
+                      failing attacker is a LOWER bound on distinguishability. The upper
+                      bound is `acc_ceiling`, which is proof-derived.
+Aliases:              "their attacks", "the gap scores", "the MIA rank". ⚠ Never "the
+                      attacker accuracy" and never "the privacy result" unqualified.
+```
+
+---
+
 ## THE TWO MEASUREMENT PATHS
 
 These must never be mixed in one comparison. Naming one when you mean the other

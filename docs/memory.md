@@ -5277,3 +5277,67 @@ our maximal-privacy point looks like a free lunch. The critic established that s
 a measurement already exists and is mechanism-agnostic
 (`MIA_privacy.py:80-83,140`), correcting the synthesis's claim that it had to be built.
 
+### 2026-10-13 — B-ATK-pmeval: PanMixer's own attacks on both releases, and what the nulls do not prove
+
+**Hypothesis.** Their exit gate reads "Both emit `new_haplotypes`; the shared evaluators run
+unchanged." With our emitter landed, their privacy evaluators should run on both tools' releases
+and give the head-to-head a privacy axis it did not have.
+
+**Method.** A mirror root at `/data/ds85/RanPanMixer/runs/pm_eval` holding a COPY of their
+`constants.py` — `BASE_PATH` is `os.path.dirname(os.path.abspath(__file__))` with no env override,
+and `abspath` does not resolve symlinks, so copying that one file redirects `EXPERIMENT_PATH` into
+our tree while their code stays byte-identical. `tools` and `starting_data` are read-only symlinks
+back to theirs. Their `main.py` is unusable: every evaluator verb builds a SLURM array and shells
+to `sbatch`, absent here; the real entry point is `<evaluator>.py <experiment> <chromosome> <row>`.
+One experiment PER evaluator, because `gap_score.py` and `diploid_gap_score.py` write identical
+output filenames into the row directory and sharing a row lets the second overwrite the first.
+15 rows: our 7 `tau`, their 8 capacities taken from their own `obfuscated.vcf.gz` (the released
+object; their `new_haplotypes.npy` is the pre-stacker resampled array). Every array passed their
+own `verify_genotypes` contract before staging.
+
+**Provenance.** `scripts/pm_eval_setup.py`, `scripts/pm_eval_run.sh`, `scripts/pm_eval_results.py`,
+`logs/B_pm_eval_results.md` + `.json`. 45 launched, 45 succeeded, 0 failed; 45 result files
+asserted present FROM DISK rather than from the loop's bookkeeping; `external/` verified 0 files
+modified.
+
+**Result.** THREE evaluators ran, not four — `sampled_gap_score.py` reads
+`starting_data/chr{C}/subjects/{id}/new_haplotypes.npy`, and
+`external/PanMixer/starting_data/chr21/subjects/` is absent from this checkout. Direction matters or every number reads backwards: `g_to_gstar` is the true subject's score
+MINUS the best candidate's, so POSITIVE means the attack ranked the target top, and
+`hap_original_rank` = 1 means identified. **Their release is identified at 3 of 8 capacities** —
+0.01, 0.05, 0.1 — at rank 1 of 44 with `g_to_gstar` +2,453 / +1,566 / +1,141 and match-vs-original
+up to 0.994796; at capacity >= 0.2 it defeats all three. **Ours is identified at 0 of 7 `tau`**,
+rank 14-19 of 44, `g_to_gstar` -6,088 to -8,080.
+
+⚠ Their identification is **NOT a defect in PanMixer** and must never be written as one. `capacity`
+is a knob meant to be turned up; finding the threshold at which linkage fails is precisely what
+their `eps_private` sweep exists to do. What the table adds is that the threshold is visible in
+their own evaluators with both tools on a common footing.
+
+⚠⚠⚠ **AND THE LESSON THAT GOVERNS OUR WHOLE COLUMN: our `tau` = 0 release defeats all three
+attacks as thoroughly as every other `tau`.** At `tau` = 0 the mechanism applies NO protection —
+the release is an untilted mosaic carrying zero target information. So these nulls measure the
+RELEASE FORM, a complete mosaic of other people's haplotypes, and NOT the tilt. Quoting them as
+evidence that our privacy mechanism works is exactly the error standing constraint 7 names: a
+failing attacker is a LOWER bound on distinguishability. The `tau` = 0 row is what makes this
+visible, and it is the single most important cell in the table. ✅ Separately, the two gap
+evaluators agree on every release about identification — an internal check across independent code
+paths.
+
+⚠ The honest trade: where both tools defeat the attacks their utility is also the same (72.75% of
+the ceiling against our 73.1%). PanMixer's advantage is that it can TUNE to a point we cannot
+reach, retaining 86.38% at capacity 0.01 — and the cost of that point is being identified at rank
+1 of 44.
+
+**Collateral finding, and a process lesson.** Folding this into the draft surfaced a CORRUPTED
+limitations list: item 12 appeared TWICE and item 11 appeared twice — once as the ✅ RESOLVED
+version and once as the old "NOT COMPUTABLE BY THIS ROUTE / ~3.4e-11" text that the same day's
+`exact_kl_stable.py` had disproved by a factor of 13,000. The draft therefore carried both a
+correction and the claim it corrects, unmarked, where a reader would hit the stale one last. Cause:
+an earlier "resolve limitation 11" edit inserted the resolved item plus a copy of its neighbour
+INSTEAD of replacing in place. **Lesson: an insert-before-anchor edit cannot resolve anything — a
+resolution must replace, and the edit must assert the old text is gone afterwards.** The same stale
+conclusion was also still live in `docs/data.md` (the `exact_kl_genome.py` row, now `STALE` with
+its original text preserved verbatim behind `[INCORRECT]`) and in two places in `docs/plan.md`,
+both corrected. This is the correction-does-not-propagate-itself rule biting on the same day the
+correction was written.
