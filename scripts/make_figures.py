@@ -45,10 +45,13 @@ ACC_CEILING = [0.500000000, 0.500000000, 0.500010631, 0.500022737,
 
 # label, mean beta_v, movement in E_Q[u].  logs/B_toy_genome_demo.md |
 # logs/B_beta_concentration.md | logs/B_exact_utility.md | logs/B_arm1_results.md
+# ⚠ the genome point is the MEAN of two independent measurements at the same per-position
+# budget -- Arm 2 (one external target) at 8.345e-08 and Arm 1 (44 held-out cohort members)
+# at 9.6048e-08, which agree to 15%. They are collapsed to one marker here; both values are
+# reported separately in the text.
 DILUTION = [("toy genome", 0.111, 0.1975),
             ("chr21", 3.27e-06, 3.636777e-06),
-            ("genome, Arm 2", 4.5177e-08, 8.345e-08),
-            ("genome, Arm 1", 4.5177e-08, 9.6048e-08)]
+            ("genome", 4.5177e-08, (8.345e-08 + 9.6048e-08) / 2)]
 
 # the most successful cell of ANY attack we ran, per tau. logs/B_arm2_attack.md +
 # logs/B_arm2_a3a4.md. ⚠ includes A4's multiplicity-inflated block maxima.
@@ -57,8 +60,9 @@ BEST_ATTACK = [0.5340, 0.5820, 0.5700, 0.5520, 0.5670, 0.5760, 0.5710]
 # tau = 0 -> tau = 0.99 in units of each attack's own standard error.
 # ⚠ A4's tau = 0 is exactly 0.5 by construction, so its z is an artefact -- flagged red.
 ZMOVE = [("A1", -0.36, False), ("A3", -0.36, False), ("A4", +3.18, True),
-         ("Gap Score", -1.45, False), ("diploid Gap Score", +0.32, False),
-         ("Beagle", -1.16, False)]
+         ("Gap Score", -1.45, False), ("diploid Gap Score", -0.11, False),
+         ("MIA rank", 0.00, False), ("Beagle (their code)", -1.16, False),
+         ("Beagle (their paper)", -0.29, False)]
 
 # logs/B_arm1_symmetric.md (utility retained) + logs/B_pm_eval_results.md (gap score)
 THEIRS = [(0.01, 86.3770, 2453.0), (0.05, 82.7906, 1565.6), (0.10, 78.1504, 1141.1),
@@ -113,8 +117,8 @@ def fig1(out):
 def fig2(out):
     fig, ax = plt.subplots(figsize=(8.5, 5.6))
     ax.plot([1e-8, 1.0], [1e-8, 1.0], "--", color=GREY, lw=1.2, zorder=1)
-    for (lab, b, m), c, dx, dy in zip(DILUTION, [GREY, GREY, ACCENT, ACCENT],
-                                      (16, 16, 58, 58), (-22, -22, 16, -24)):
+    for (lab, b, m), c, dx, dy in zip(DILUTION, [GREY, GREY, ACCENT],
+                                      (16, 16, 16), (-22, -22, -22)):
         ax.scatter([b], [m], s=130, color=c, zorder=3, edgecolor="white", linewidth=1.5)
         ax.annotate(lab, (b, m), xytext=(dx, dy), textcoords="offset points",
                     fontsize=13, color=c, ha="left",
