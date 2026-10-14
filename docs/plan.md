@@ -419,10 +419,16 @@ variant count every chromosome's share moved — chr9 by **-6.43%**, chr20 by -2
 ## ⚠ HANDOFF — read this first after a compaction (written 2026-10-12)
 
 **State:** **ALL TEN CHUNKS DONE.** `paper/draft_2026-10-13.md` is the results draft,
-audited and corrected. ⚠⚠ **The first thing to run next is a genome-wide privacy
-measurement by a route that does not difference two nearly-equal accumulations** — the
-KL-difference route fails its own sign check at genome scale (limitation 11), so the
-paper's privacy and utility figures are still measured on different objects. The
+audited and corrected. ✅ **The genome-wide privacy ceiling is MEASURED
+(2026-10-13)**: `acc_ceiling` **0.500234679** at `tau` = 0.99 against a bound of 0.9950,
+on the SAME object the utility movement is measured on — so the paper's two headline
+results are finally one fact: the mechanism uses **0.047%** of its permitted
+distinguishability while `e_q_u` moves +8.345e-08. ⚠ It needed a route that does not
+difference two nearly-equal accumulations (`scripts/exact_kl_stable.py`); my earlier claim
+that it was "not computable" was wrong on BOTH the diagnosis and the magnitude, the latter
+by 13,000x. ⚠⚠ Both quantities shrink **43.6-43.9x** from chr21-at-`beta_share`-1 to
+genome-wide while sum(`beta_v`^2) predicts 128.6x for both — the first evidence they are
+one phenomenon, mechanism still unclaimed. The
 head-to-head
 is run and validated against PanMixer's own reported numbers. ⚠⚠ **Its headline is that
 they offer a FRONTIER and we offer a POINT at its far end** — their `target_fidelity`

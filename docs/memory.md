@@ -104,6 +104,55 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-13 (later) — B-EVL-kl-stable: the genome-wide privacy ceiling, and I was wrong twice about it
+
+**Result.** `kl_exact` genome-wide, ARM 2, K = 88, 22 autosomes, T = 22,134,562, shares
+summing to 1.000000, n = 1 target, D1_extremal, exact: **4.406e-07 at `tau` = 0.99**, with
+`tv_pinsker` **4.694e-04** and `acc_ceiling` **0.500234679** against a `p_succ_bound` of
+0.9950. Gate passes 7 of 7. Provenance `logs/B_exact_kl_stable.md`.
+⚠ At `tau` = 0.05 the value came back marginally negative and was clamped to 0; there the
+KL is still below what the computation resolves and the figure is an upper bound, not a
+measurement.
+
+**✅ THE PAPER'S TWO HEADLINE RESULTS ARE NOW MEASURED ON THE SAME OBJECT.** On the
+genome-wide release the mechanism uses **0.047%** of the distinguishability it is
+permitted (4.694e-04 of an allowed 0.99) while its expected utility moves **+8.345e-08**.
+Limitation 11 of the draft — that the two were measured on different releases and the
+sentence joining them was a conjecture — is RESOLVED. ⚠ The 0.3% figure quoted previously
+was the chr21-at-`beta_share`-1 object, 66.6x more generous per position.
+
+**⚠⚠ AND THE TWO QUANTITIES SHRINK BY THE SAME FACTOR, which is the first real evidence
+that they are one phenomenon.** From chr21 at `beta_share` = 1 to genome-wide, `kl_exact`
+falls **43.9x** (1.934e-05 to 4.406e-07) and the `e_q_u` movement falls **43.6x**
+(3.6368e-06 to 8.345e-08). Independently measured, different routes, different endpoints,
+same factor — and sum(`beta_v`^2) predicts **128.6x** for both and is wrong for both by the
+same amount. ⚠ No mechanism is claimed; settling it still needs `Var_Q(u)` from pair
+marginals.
+
+**THE FIX, because the quantity was always computable.** `scripts/exact_kl_genome.py`
+failed its own sign check at -1.96e-11 and I concluded the signal was at the estimator's
+noise floor. The real problem was grouping. `ffbs.log_z_p`'s own docstring says its
+tolerance "covers accumulated floating-point error in the difference of two large sums" —
+each about -5.85e2 per chromosome, ~66x that genome-wide — so it computes two numbers near
+-39,000 and subtracts them to get something near 1e-7. `scripts/exact_kl_stable.py`
+regroups: `log Z_p - log Z_q` accumulated PER POSITION, where the shared
+`baseline_log_norm` cancels exactly and never enters the arithmetic, and `E[u_p - u_q]` as
+ONE expectation whose per-position factor is an exact integer in {-1, 0, +1}. Both totals
+via `math.fsum`, which is exactly rounded.
+
+**⚠⚠ TWO ERRORS OF MINE, both in the same claim.** I wrote that the ceiling was "NOT
+COMPUTABLE BY THIS ROUTE" and put it in the draft as limitation 11. The diagnosis was
+wrong — the route failed, the quantity did not — and the magnitude estimate was wrong by
+**13,000x**, since I predicted 3.4e-11 against a measured 4.406e-07. The share-squared
+extrapolation behind that estimate was unsound and I should have measured before
+concluding. Corrected in place above.
+
+**✅ The new route had to earn the right to report.** It validates against chr21 at
+`beta_share` = 1, where the old route works and `logs/B_exact_kl.md` has the answer, and
+refuses to emit a genome-wide figure unless it agrees to within 1%. It reproduces all six
+logged values to a worst relative difference of **1.83e-04**, which is the rounding in
+their own display — as close as the comparison can resolve.
+
 ## 2026-10-13 — CHUNK 10 DONE: the draft, and an audit that found four flattering errors
 
 **What was written.** `paper/draft_2026-10-13.md`: two sections, one per arm, a synthesis,
@@ -152,7 +201,21 @@ Corrected in place here under the correction rule, and propagated to `docs/plan.
 `paper/draft_2026-10-13.md` and `scripts/exact_utility.py`, whose printed comparison
 hardcoded the stale numerator.
 
-**⚠⚠ THE GENOME-WIDE PRIVACY CEILING IS NOT COMPUTABLE BY THE KL-DIFFERENCE ROUTE.** The
+[INCORRECT] - **⚠⚠ THE GENOME-WIDE PRIVACY CEILING IS NOT COMPUTABLE BY THE KL-DIFFERENCE ROUTE.**
+[CORRECTION - 2026-10-13]: **it IS computable, and the measured value is 4.406e-07 at
+`tau` = 0.99** (`logs/B_exact_kl_stable.md`). Two things below are wrong. (1) The
+DIAGNOSIS: the cancellation is real but it is an artefact of how the terms are GROUPED,
+not a property of the quantity. `ffbs.log_z_p` forms each `log Z` as the difference of two
+sums of about -5.85e2 per chromosome; accumulating `log Z_p - log Z_q` PER POSITION makes
+the shared `baseline_log_norm` cancel exactly so it never enters, and taking
+`E[u_p - u_q]` as ONE expectation gives a per-position factor that is an exact integer in
+{-1, 0, +1}. With `math.fsum` on both totals the quantity resolves easily.
+(2) The MAGNITUDE: I estimated the genome-wide KL at ~3.4e-11 and compared it to a ~2e-11
+noise floor. The measured value is **4.406e-07 — about 13,000x larger than I predicted**,
+so it was never anywhere near the noise floor. The share-squared extrapolation I used was
+simply wrong. ⚠ The route is validated where the old one works: it reproduces the logged
+chr21 figures to 1.83e-04, which is the rounding in their own 4-significant-figure
+display. Original text follows, preserved: The
 audit named its absence as the single most important gap, so I wrote
 `scripts/exact_kl_genome.py` to close it — summing the per-chromosome KL at each
 chromosome's share, which is valid because KL is additive across chromosomes, with the

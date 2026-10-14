@@ -127,6 +127,22 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
     out = np.full((their_pos.shape[0], 2), -1, dtype=np.int16)
     out[ti[have]] = rel[ci[have]]
 
+    # ⚠⚠ ALLELE CODES ARE INDICES INTO EACH BUILD'S OWN ALT LIST, so a code valid on our
+    # axis can be out of range on theirs. Measured 2026-10-13: 5 cells across our 7 taus
+    # exceed their `num_alleles` — e.g. row 269,520 carries our code 9 where their
+    # encoding declares 4 — at multi-allelic sites where our build called more ALTs than
+    # theirs. Their own original has 0 such cells, so this is ours alone.
+    # `tools/common/verify_genotypes.py` asserts code < num_alleles, so an unfixed file
+    # fails their OWN pre-flight; rendering it to VCF for Beagle would emit an allele
+    # index with no corresponding ALT.
+    # We MASK rather than remap: our release carries an allele their encoding has no name
+    # for, and -1 says exactly that. It is also the conservative direction, since their
+    # evaluators drop both-called cells.
+    na = np.load(PM_DATA / "num_alleles.npy")
+    oor = (out >= na[:, None]) & (out >= 0)
+    n_oor = int(oor.sum())
+    out[oor] = -1
+
     d = out_root / "arm1" / target / f"tau_{tau:.2f}".replace(".", "p") / CHROM
     d.mkdir(parents=True, exist_ok=True)
     np.save(d / "new_haplotypes.npy", out)
@@ -141,6 +157,7 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
 
     return {"target": target, "tau": tau, "path": str(d / "new_haplotypes.npy"),
             "shape": list(out.shape), "released_rows": int(have.sum()),
+            "out_of_range_masked": n_oor,
             "missing_rows": int(their_pos.shape[0] - have.sum()),
             "their_sites": int(their_pos.shape[0]), **ctl}
 
@@ -161,7 +178,9 @@ def main(argv=None) -> int:
         r = emit(a.target, tau, a.out, a.force)
         rows.append(r)
         print(f"  tau = {tau:<5g} -> {r['shape']}, {r['released_rows']:,} released rows, "
-              f"{r['missing_rows']:,} at -1")
+              f"{r['missing_rows']:,} at -1"
+              + (f"  ⚠ {r['out_of_range_masked']} cell(s) masked as OUT OF RANGE for "
+                 f"their allele encoding" if r['out_of_range_masked'] else ""))
     c = rows[0]
     print(f"\n✅ ALIGNMENT CONTROL: jointly-called agreement **{c['aligned']:.6%}** over "
           f"{c['n_compared']:,} cells, against **{c['shifted_by_one']:.6%}** with their "
