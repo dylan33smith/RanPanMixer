@@ -104,6 +104,99 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-15 — B-EVL-arm1-ingraph + B-EVL-pm-beagle: the two metrics we declined, and the attack we had never run on them
+
+**Two units of work, both at Dylan's request, both CROSS-TOOL.**
+
+### 1. `af_loss` and `ld_loss`, ours and theirs
+
+**Result.** PanMixer's own `af_loss.py` and `ld_loss.py`, run UNMODIFIED on all 308 of our
+releases (`exp_5`) and on their own 8 capacity releases (`exp_6`). 0 failures. Provenance
+`logs/B_arm1_af_ld.md`, emitted by `scripts/arm1_af_ld_results.py`.
+
+| | ours, across `tau` | theirs, across `capacity` |
+|---|---|---|
+| `af_loss` [all] | 0.003668 .. 0.003698 | 0.000220 .. 0.002734 |
+| `ld_loss` per pair | 0.005228 .. 0.005418 | 0.000042 .. 0.040113 |
+
+**⚠⚠ EXPLORATORY, NOT PRE-REGISTERED.** Decision H (2026-10-08) declared both NOT adopted.
+These were computed AFTER outcomes were inspected. They are reported in their own labelled
+subsection of the briefing and stay OUT of the endpoint tables; promoting them needs a NEW
+dated pre-registration, not an addendum.
+
+**⚠⚠ THEY BEAT US ON `af_loss` AT EVERY CAPACITY** — their saturated worst (0.002734) is
+below our best (0.003668). This is close to their optimiser's OWN objective:
+`utility_loss_panmixer` equals the induced L1 allele-frequency change by their
+Supplementary Remark 1. The comparison is on the quantity they explicitly minimise and we
+do not optimise at all. Reported as measured, with that stated.
+
+**✅ WE BEAT THEM ON `ld_loss` FROM `capacity` 0.05 UP, by about 7.4x.** At `capacity` 0.01
+they are ~130x better, where they alter 7,687 cells against our ~107,797.
+
+**⚠⚠ `af_loss` FAILS THE DIRECTION CHECK THAT THE PRE-REGISTERED ENDPOINTS PASS.** Across
+`tau` = 0 -> 0.99 the per-target split is **20/44 down, 24/44 up**, median +6.478e-06 — a
+coin flip. `target_fidelity` and `e_q_u` move 44/44 the same way. So `af_loss` does not
+resolve the effect at all; its movement is noise, not a small signal. **This is the first
+metric in the project that fails that check**, and it is the reason the direction check
+exists.
+
+**⚠ THEIR LD WINDOW IS 5 POSITION UNITS, NOT 5 KB.** `KB_WINDOW_SIZE = 5` (`ld_loss.py:8`)
+is compared against a RAW position difference (`ld_loss.py:107`). Median SNP gap on chr21
+is 83 bp, so it reaches **2.92% of SNP positions and ~7,450 pairs**; a true 5 kb window
+would be **10,588,565 pairs**, about 1,400x more. Run AS SHIPPED, because that is the
+faithful comparison, and the window is stated wherever the number appears.
+
+### 2. Beagle reconstruction on PanMixer's own releases
+
+**Result.** The cross-tool Beagle gap is CLOSED: 16 runs, 0 failures. Provenance
+`logs/B_arm1_pm_beagle.md`, emitted by `scripts/arm1_pm_beagle.py`.
+
+By their own published criterion (does Beagle beat "guess the commonest allele"):
+
+| | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5+ |
+|---|---|---|---|---|---|---|
+| theirs, matched mask | **+0.0283** | **+0.0192** | -0.0124 | -0.0489 | -0.0490 | -0.0478 |
+| ours (any `tau`) | -0.045 .. -0.055, 0 of 308 beaten | | | | | |
+
+**✅ THEIR MECHANISM HAS SETTINGS WHERE THE RECONSTRUCTION ATTACK SUCCEEDS; OURS HAS NONE.**
+`obfuscated_accuracy` explains it: at `capacity` 0.01 their release is **99.88% identical
+to the truth** and alters 597 SNP cells, so there is nearly nothing to undo. Same region
+where their Gap Score is +2,453 and MIA ranks the target 1 of 44 — **three independent
+attacks agreeing `capacity` <= 0.1 is not a protected setting.**
+
+**⚠⚠ AT THEIR PROTECTED SETTINGS THE TWO TOOLS ARE CLOSE** — theirs -0.0478..-0.0490 from
+`capacity` 0.2 up against our -0.045..-0.055. No advantage is claimed there.
+
+**⚠⚠ VALIDATING ONE ROW BEFORE EIGHT CAUGHT A COMPARABILITY DECISION, NOT A MISSING FILE.**
+The first attempt died on an absent `xsol.npy`. `accuracy_stats.py:162` scores every metric
+ONLY over cells inside `xsol`-selected blocks. Ours used an ALL-ONES mask (the declared
+substitution: a path release has no selection step). Theirs carry a REAL mask from their
+optimiser — 14,342 blocks at `capacity` 0.01 rising to 177,865. Scoring their releases
+under their mask while ours used all-ones would have put DIFFERENT DENOMINATORS on the two
+sides of one table. So theirs was run BOTH ways: `exp_6` all-ones (comparable), `exp_7`
+their own `xsol` (native, reported separately). Under their native mask the crossover moves
+to `capacity` 0.01 only.
+
+### 3. A label error in the briefing, found by a question
+
+Dylan asked how `tau` and `kl_exact` relate. The briefing's metric table read "`tau` | the
+privacy dial. Attacker ADVANTAGE over a coin flip" — **wrong**. `tau` is a CEILING ON TOTAL
+VARIATION (`docs/terms.md`); the accuracy bound is `(1+tau)/2` and the ADVANTAGE bound is
+half of `tau`. The same message had given an example implying half of `tau`, so the text contradicted
+itself. Corrected in the briefing. ⚠ `paper/figures/fig1_permitted_vs_achieved.png` was already correct — it plots
+half of `tau`.
+
+### 4. HG00438 is not a typical target, and the median hid it
+
+PanMixer's sweep runs on HG00438 only; our Arm 1 tables are medians over 44. On
+`haplotype_g_to_gstar` at `tau` = 0, HG00438 sits at **-26,268 against a 44-target median
+of -53,280 — 0.49x, rank 38 of 44** (spread -90,994 .. -16,401). Quoting their HG00438
+against our median would have flattered us by ~2x on that row. The briefing now carries a
+like-for-like HG00438-vs-HG00438 section. ⚠ The conclusion is unchanged and is now stated
+on the target UNFAVOURABLE to us: their release is identified at `capacity` 0.01-0.1, ours
+at no `tau`.
+
+
 ## 2026-10-13 (later) — B-EVL-kl-stable: the genome-wide privacy ceiling, and I was wrong twice about it
 
 **Result.** `kl_exact` genome-wide, ARM 2, K = 88, 22 autosomes, T = 22,134,562, shares

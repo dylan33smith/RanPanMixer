@@ -17,6 +17,49 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
 
 ## Tooling / reading source documents
 
+### A PanMixer evaluator dies on a missing `xsol.npy`, and the fix is a comparability decision
+
+**[Symptom]** `scripts/beagle_attack_one.py --experiment 6` raises
+`FileNotFoundError: .../exp_6/data/chr21/0/xsol.npy` when run on PanMixer's own releases.
+
+**[Why it is not a missing file]** `accuracy_stats.py:162` loads `xsol.npy` and builds
+`xsol_expanded`, then ANDs every variant subset with it, so **every metric is computed only
+over cells inside selected blocks**. Our releases were staged with an ALL-ONES mask — the
+declared substitution in `scripts/beagle_attack_setup.py`, because a path release has no
+selection step. PanMixer's releases carry a REAL mask from their optimiser (14,342 blocks
+at `capacity` 0.01, 177,865 at saturation). Dropping their mask in would score their
+releases over a SELECTED SUBSET while ours were scored over EVERY CELL — different
+denominators on two sides of one table.
+
+**[Proven fix]** Stage BOTH and report both: `exp_6` with an all-ones mask (matched to
+ours, the comparable column) and `exp_7` with their own `xsol` (their native protocol,
+reported separately and labelled not-comparable). `scripts/arm1_pm_beagle.py --stage` does
+this. ⚠ The crossover where Beagle beats the baseline MOVES between the two masks —
+`capacity` 0.01 and 0.05 under all-ones, 0.01 only under theirs — so the choice is not
+cosmetic.
+
+**[Found by]** Validating ONE row before launching eight, 2026-10-15.
+
+### A constant-answer attacker reports balanced accuracy 0.5 and reads as a clean null
+
+**[Symptom]** A3's `D1_extremal` row is exactly 0.5000 at all seven `tau` — the tidiest
+null in the table.
+
+**[Why it is wrong]** Measured over all 1,750 trials: **TPR = 1.0000, FPR = 1.0000**. The
+attacker answers "p" every single time regardless of which hypothesis produced the release.
+Balanced accuracy of an attacker that always gives the same answer is 0.5 BY CONSTRUCTION,
+so the number carries no information about the mechanism. The cause is structural:
+PanMixer's score credits agreement with non-negative weights and never penalises
+disagreement, and `D1_extremal` differs from the target at 100% of called positions.
+
+**[Proven fix]** Check TPR and TNR separately before reading any balanced accuracy as a
+null. A genuine null has BOTH near 0.5 (A1 `D1_extremal`: 0.4947 / 0.4767; A3 `D3_random`:
+0.4566 / 0.5326). Report A3's informative conditions (`D2_nearest`, `D3_random`) and label
+`D1_extremal` degenerate wherever it appears.
+
+**[Found by]** Dylan asking for the `D1_extremal` row specifically, 2026-10-15. ⚠ Same
+failure family as A3's positive control, which was also algebraically unable to fail.
+
 ### `pypdf` returns empty strings for every page of a PDF
 - **[2026-08-29] Image-only PDF extracts as blank, with no error**
   **[Symptom]** `pypdf.PdfReader(f).pages[i].extract_text()` returns `""` or a

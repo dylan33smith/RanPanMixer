@@ -2154,9 +2154,27 @@ CHANGES MEANING WITH: the MAF strata, which are read from pangenome_mask.npy —
                       the identical-site-set and identical-row-count requirement still
                       has to be ASSERTED rather than assumed.
 Valid vs:             the other arm at the identical site set and row count.
-Status:               PANMIXER-ONLY — **NOT ADOPTED by this project in either arm
-                      (decision H, 2026-10-08), and that is a SCOPE CHOICE, not a
-                      definitional impossibility.**
+Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H,
+                      2026-10-08), and that is a SCOPE CHOICE, not a definitional
+                      impossibility.**
+                      ⚠⚠ **MEASURED ANYWAY ON 2026-10-15, EXPLORATORY, AT DYLAN'S
+                      REQUEST — AFTER OUTCOMES WERE INSPECTED.** ARM 1, chr21, 44
+                      targets x 7 `tau` (`exp_5`) plus PanMixer's own 8 capacities
+                      (`exp_6`), their `af_loss.py` run unmodified. Ours **0.003668 ..
+                      0.003698** across the grid; theirs **0.000220 .. 0.002734**.
+                      **THEY BEAT US AT EVERY CAPACITY** — ⚠ and `af_loss` is close to
+                      their optimiser's OWN objective, since `utility_loss_panmixer`
+                      equals the induced L1 AF change (their Supplementary Remark 1),
+                      so this scores them on what they minimise and us on what we do
+                      not optimise.
+                      ⚠⚠ **IT FAILS THE DIRECTION CHECK THE PRE-REGISTERED ENDPOINTS
+                      PASS: 20/44 targets down, 24/44 up** from `tau` 0 to 0.99, median
+                      +6.478e-06. `target_fidelity` and `e_q_u` move 44/44 together.
+                      So its movement is NOISE, not a small signal, and no `tau` trend
+                      may be read from it. First metric in the project to fail that
+                      check.
+                      ⚠ Reporting it as an ENDPOINT needs a NEW dated pre-registration,
+                      not an addendum. Provenance `logs/B_arm1_af_ld.md`.
                       ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE.** This entry
                       used to say "we never modify the cohort, so the quantity is not
                       defined for our release object". That is true of ARM 2 only. In
@@ -2172,6 +2190,36 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED by this project in either 
                       its OWN ARM's ceiling), `utility_retained` and, as the
                       pre-registered endpoint, `e_q_u`.
 Aliases:              "U_AF"
+```
+
+### obfuscated_accuracy  [utility] [evaluation]
+```
+Is:                   PanMixer's own measure of how much of the TARGET a release still
+                      carries, computed by their Beagle evaluator: the share of
+                      xsol-selected called cells where the RELEASE equals the TRUTH.
+                      Higher means LESS obfuscated. It is the complement of
+                      `target_fidelity` restricted to the same cell mask, and it is
+                      THEIR field name, not ours.
+Computed by:          external/PanMixer/tools/beagle/accuracy_stats.py:compute_accuracy,
+                      reported per variant subset alongside `beagle_accuracy`,
+                      `major_allele_accuracy` and `reconstruction_accuracy`.
+CHANGES MEANING WITH: the xsol mask, which decides WHICH CELLS are scored at all --
+                      ours is an all-ones substitution, PanMixer's is their optimiser's
+                      real block selection. ⚠ Never compare it across two different
+                      masks; see `docs/bugs.md`.
+                      And with the variant subset: the figures quoted are `snp_only`.
+Valid vs:             the same tool across its own knob, and across tools ONLY at a
+                      matched mask and matched subset.
+Status:               REPORTED, ARM 1, as CONTEXT for the Beagle result rather than as
+                      an endpoint of ours. **Measured 2026-10-15 on PanMixer's own 8
+                      capacity releases: 0.998846 at `capacity` 0.01 falling to
+                      0.854683 at saturation.** ⚠⚠ **IT IS WHAT EXPLAINS THEIR BEAGLE
+                      CROSSOVER**: at `capacity` 0.01 their release is 99.88% identical
+                      to the truth and alters 597 SNP cells, so there is nearly nothing
+                      for the attack to undo and a baseline that ignores the data is
+                      easy to beat. Provenance `logs/B_arm1_pm_beagle.md`.
+Aliases:              none. ⚠ NOT `target_fidelity`, which is OURS, is a DIFFER rate
+                      (lower is better) and is computed over a different cell set.
 ```
 
 ### ld_loss  [utility] [evaluation]
@@ -2190,21 +2238,29 @@ Valid vs:             the other arm at the identical window and site set. If it 
                       run, run it BOTH as-shipped (5 bp, for parity with the published
                       figure) and corrected to 5,000 bp, as two separate rows — never
                       one row whose window is unstated.
-Status:               PANMIXER-ONLY — **NOT ADOPTED by this project in either arm
-                      (decision H, 2026-10-08), as a SCOPE CHOICE.**
-                      ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE,** exactly as
-                      for `af_loss`: this entry used to say it "is not defined for a
-                      release which never edits the cohort". That describes ARM 2 only.
-                      In ARM 1 the released object is the 44 cohort members' paths, so
-                      the release does change the released cohort's LD and U_LD is
-                      FULLY DEFINED for us there. We decline it because Arm 1 reports
-                      `utility_loss_panmixer` only (decision H), not because it cannot
-                      be computed.
-                      ARM 2: n/a BY DEFINITION — the release never edits the cohort.
-                      The honest analogue, if one is wanted, is the LD DECAY CURVE of
-                      our release ensemble against the cohort's over R draws at real
-                      distances — a different quantity, not `ld_loss`.
-Aliases:              "U_LD"
+Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H,
+                      2026-10-08).**
+                      ⚠⚠ **MEASURED ANYWAY ON 2026-10-15, EXPLORATORY, AFTER OUTCOMES
+                      WERE INSPECTED.** ARM 1, chr21, 44 targets x 7 `tau` (`exp_5`)
+                      plus PanMixer's own 8 capacities (`exp_6`), their `ld_loss.py`
+                      run unmodified. Ours **0.005228 .. 0.005418** per pair, flat
+                      across `tau`; theirs **0.000042** at `capacity` 0.01 then
+                      **0.0380 .. 0.0401** from 0.05 up. **WE BEAT THEM FROM
+                      `capacity` 0.05 UP BY ~7.4x**; at 0.01 they are ~130x better,
+                      where they alter 7,687 cells against our ~107,797.
+                      ⚠⚠ **THE WINDOW IS 5 POSITION UNITS, NOT 5 KB.**
+                      `KB_WINDOW_SIZE = 5` (`ld_loss.py:8`) is compared against a RAW
+                      position difference (`ld_loss.py:107`). Median SNP gap on chr21
+                      is 83 bp, so it reaches **2.92% of SNP positions and ~7,450
+                      pairs**; a true 5 kb window would be **10,588,565 pairs**, ~1,400x
+                      more. We run it AS SHIPPED — that is the faithful comparison —
+                      and the window must be stated wherever the number appears,
+                      because the name implies something 1,400x larger than what is
+                      measured.
+                      ⚠ Our 44-target spread MIXES between-person variation with
+                      single-draw noise (one release per target per `tau`,
+                      constraint 5), so the grid scatter is NOT a trend.
+                      Provenance `logs/B_arm1_af_ld.md`.
 ```
 
 ### capacity  [mechanism] [evaluation]
