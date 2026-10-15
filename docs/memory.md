@@ -186,6 +186,36 @@ half of `tau`. The same message had given an example implying half of `tau`, so 
 itself. Corrected in the briefing. ⚠ `paper/figures/fig1_permitted_vs_achieved.png` was already correct — it plots
 half of `tau`.
 
+### 5. `donor_coherence`: the two tools are NOT the same kind of object at saturation
+
+**The question (Dylan, 2026-10-15).** Both tools alter ~16% of cells and both pass the
+attacks at their protected settings, so is PanMixer-at-saturation essentially a randomiser
+in the same sense ours is?
+
+**Tested, not argued. The answer is NO, and it points the other way.** Two measurements:
+
+1. **Are the altered alleles real?** Of cells each tool changes, the share carrying an
+   allele some other donor has there: theirs **98.8%**, ours **99.8%**. Both ~99%. This
+   does NOT separate them -- so the difference is in the COMBINATIONS.
+2. **`donor_coherence`** -- largest share of a 200-position window explained by any single
+   donor, target excluded from the pool. Real genome **98.3934%**. Ours
+   **94.83%..95.07%**; theirs **97.88%** at `capacity` 0.01 falling to **92.17%** at
+   saturation. **AT SATURATION OURS IS THE MORE HAPLOTYPE-LIKE OBJECT**, about half their
+   departure from a real genome, tracking `ld_loss` (0.00542 vs 0.0401).
+
+**Why.** Ours is a PATH through the graph -- real donor segments joined at switch points,
+so local haplotype structure survives. Theirs is the target's own sequence with ~16% of
+cells flipped, chosen to be cheap in allele-frequency terms, with nothing constraining
+whether the result is a combination that occurs in nature.
+
+**⚠ AND THE PREMISE NEEDED CORRECTING: 16% altered is not "randomised" for either tool.** A
+mosaic of other people's real haplotypes naturally differs from the target at ~16-17% of
+called cells. Our `tau` = 0 release alters **17.4%** carrying ZERO target information. 16%
+is the FLOOR set by human haplotype sharing, not evidence of randomisation.
+
+**⚠ `donor_coherence` IS NOT A PRIVACY METRIC AND NOT AN ENDPOINT.** It says a release
+looks like a real haplotype, never whose. Provenance `logs/B_arm1_donor_coherence.md`.
+
 ### 4. HG00438 is not a typical target, and the median hid it
 
 PanMixer's sweep runs on HG00438 only; our Arm 1 tables are medians over 44. On

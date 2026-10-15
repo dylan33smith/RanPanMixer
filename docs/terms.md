@@ -2192,6 +2192,50 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
 Aliases:              "U_AF"
 ```
 
+### donor_coherence  [utility] [evaluation]
+```
+Is:                   The mean, over random windows of W consecutive positions, of the
+                      largest share of a window explained by any SINGLE donor
+                      haplotype. It asks whether a release is a MOSAIC of real
+                      haplotypes or a patched copy of the target.
+                      ⚠ IT IS NOT A PRIVACY METRIC AND NOT AN ENDPOINT. High coherence
+                      means the release looks like a real haplotype; it says nothing
+                      about WHOSE. A `tau` = 0 release is coherent and carries ZERO
+                      target information. It exists to explain the `ld_loss` gap
+                      between the two tools, nothing more.
+Computed by:          scripts/arm1_donor_coherence.py. W = 200, 2,000 windows, seed 0,
+                      both haplotype columns, windows needing >= 50% called positions.
+CHANGES MEANING WITH: W above all -- a shorter window is explained better by chance and
+                      a longer one worse, so W must be stated with the number.
+                      And with THE DONOR POOL: the target MUST be excluded (43 others
+                      x 2 = 86 haplotypes). Leaving it in lets a patched copy of the
+                      target match itself and score ~100%, measuring nothing.
+Valid vs:             the TARGET'S OWN haplotypes at the same W and pool, never against
+                      100%. ⚠ A real human genome scores only **98.3934%** at W = 200
+                      against 86 others; that shortfall IS human haplotype sharing, and
+                      scoring a release against 100% makes every release look worse
+                      than it is.
+Status:               REPORTED, ARM 1, as an EXPLANATION of `ld_loss` rather than a
+                      result of its own. Measured 2026-10-15, chr21, HG00438:
+                      **ours 94.83%..95.07% across the `tau` grid; theirs 97.88% at
+                      `capacity` 0.01 falling to 92.17% at saturation**, against the
+                      real genome's 98.39%.
+                      ✅ **AT SATURATION OURS IS THE MORE HAPLOTYPE-LIKE OBJECT** --
+                      about half their departure from a real genome -- which tracks
+                      `ld_loss` (ours 0.00542, theirs 0.0401). Ours is a path through
+                      real donor segments; theirs is the target's sequence with ~16% of
+                      cells flipped, with nothing constraining whether the result is a
+                      combination that occurs in nature.
+                      ⚠ It also answers "is 16% altered just randomising?" -- no, for
+                      either tool. A mosaic of real haplotypes naturally differs from
+                      the target at ~16-17% of called cells; our `tau` = 0 release
+                      alters 17.4% carrying zero target information. 16% is the FLOOR
+                      set by haplotype sharing, not evidence of randomisation.
+                      Provenance `logs/B_arm1_donor_coherence.md`.
+Aliases:              none. ⚠ NOT a measure of similarity to the TARGET -- that is
+                      `target_fidelity`, and coherence is deliberately blind to it.
+```
+
 ### obfuscated_accuracy  [utility] [evaluation]
 ```
 Is:                   PanMixer's own measure of how much of the TARGET a release still
