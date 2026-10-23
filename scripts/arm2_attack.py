@@ -60,6 +60,12 @@ from mechanism import ffbs, hmm, utility  # noqa: E402
 # Without it the run has no control, and a chance-level result at every other
 # point cannot be distinguished from an attacker that never worked at all.
 TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
+# ⚠ EXPLORATORY, NOT PRE-REGISTERED (requested 2026-10-22, after the pinned grid's
+# outcomes were seen). Listed only so each point keeps a FIXED seed index whatever
+# subset of `--taus` is run: the index used to be the position in `--taus`, so running
+# these three alone would have reused the seeds of 0, 0.05 and 0.10.
+EXPLORATORY_TAUS = (0.999, 0.9999, 0.99999)
+SEED_GRID = TAUS + EXPLORATORY_TAUS
 CHROM = "chr21"
 DECOY_SEED = 20261010
 # the release-stream base; the per-cell seed is a SeedSequence over
@@ -444,8 +450,18 @@ def main(argv=None) -> int:
     def _cell_seed(ti: int, taui: int, i: int) -> int:
         return int(np.random.SeedSequence([SEED_BASE, ti, taui, i]).generate_state(1)[0])
 
-    jobs = [(t, tau, _cell_seed(ti, taui, i), a.one_sided)
-            for taui, tau in enumerate(a.taus)
+    # the `tau` index is its place in SEED_GRID, NOT in `--taus`, so a subset run
+    # draws the same streams as the full grid; the pinned points keep their indices
+    off = [t for t in a.taus if t not in SEED_GRID]
+    if off:
+        raise SystemExit(f"tau {off} is in neither the pinned grid nor "
+                         f"EXPLORATORY_TAUS, so it has no fixed seed index")
+    if any(t in EXPLORATORY_TAUS for t in a.taus):
+        print(f"⚠⚠ EXPLORATORY `tau` {[t for t in a.taus if t in EXPLORATORY_TAUS]}: "
+              f"NOT in the signed grid {list(TAUS)}. Report apart from the "
+              f"pre-registered result.\n")
+    jobs = [(t, tau, _cell_seed(ti, SEED_GRID.index(tau), i), a.one_sided)
+            for tau in a.taus
             for ti, t in enumerate(tids)
             for i in range(a.draws)]
     n_per = len(tids) * a.draws

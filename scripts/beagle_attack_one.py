@@ -49,6 +49,9 @@ def main(argv=None) -> int:
     ap.add_argument("--xmx", default="32g")
     ap.add_argument("--exclude-self", action="store_true")
     ap.add_argument("--keep-vcf", action="store_true")
+    # a second mirror (e.g. the exploratory high-`tau` rows) must be read from ITS
+    # root: constants.py there points EXPERIMENT_PATH at that tree
+    ap.add_argument("--root", type=Path, default=ROOT)
     # ⚠ exp_6 holds PANMIXER'S OWN 8 capacity releases, so the same Beagle attack can be
     # run on their output as on ours. Their rows are NOT in the main manifest (whose
     # row_ids 0..307 are ours), so `--subject` overrides the lookup; without it row 0 of
@@ -58,19 +61,21 @@ def main(argv=None) -> int:
                     help="override the manifest lookup (required for exp_6)")
     a = ap.parse_args(argv)
     exp = a.experiment
+    root = a.root
+    jar = root / "downloaded_tools" / "beagle.27Feb25.75f.jar"
 
-    sys.path.insert(0, str(ROOT))                 # the mirror: constants.py + tools
+    sys.path.insert(0, str(root))                 # the mirror: constants.py + tools
     import numpy as np
     from tools.common.convert_2_vcf import produce_vcf_from_np
     from tools.beagle.accuracy_stats import accuracy_computer
 
     if a.subject is None:
-        man = json.loads((ROOT / "manifest.json").read_text())
+        man = json.loads((root / "manifest.json").read_text())
         row = next(r for r in man["rows"] if r["row_id"] == a.row)
         subject, tau = row["subject"], row["tau"]
     else:
         subject, tau = a.subject, f"exp{exp}"
-    rd = ROOT / "experiments" / f"exp_{exp}" / "data" / f"chr{CHROM}" / str(a.row)
+    rd = root / "experiments" / f"exp_{exp}" / "data" / f"chr{CHROM}" / str(a.row)
     tag = f"row {a.row} {subject} tau={tau}" + (" [exclude-self]" if a.exclude_self else "")
     print(f"=== {tag} ===", flush=True)
 
@@ -84,7 +89,7 @@ def main(argv=None) -> int:
     if not (rd / "new_haplotypes.vcf.gz").exists():
         arr = np.load(rd / "new_haplotypes.npy")
         produce_vcf_from_np(
-            arr, str(ROOT / "starting_data" / f"chr{CHROM}" / "pangenome.vcf.gz"),
+            arr, str(root / "starting_data" / f"chr{CHROM}" / "pangenome.vcf.gz"),
             subject, str(vcf))
         subprocess.run([str(BCF / "bgzip"), "-@2", "-f", str(vcf)], check=True, env=env)
         subprocess.run([str(BCF / "bcftools"), "index", "-f", f"{vcf}.gz"],
@@ -107,7 +112,7 @@ def main(argv=None) -> int:
         if not ref.exists():
             print(f"  MISSING per-target panel {ref}")
             return 1
-    cmd = [str(JRE / "java"), f"-Xmx{a.xmx}", "-jar", str(JAR),
+    cmd = [str(JRE / "java"), f"-Xmx{a.xmx}", "-jar", str(jar),
            f"gt={vcf}.gz", f"ref={ref}", f"out={out_prefix}",
            f"nthreads={a.threads}"]
     t0 = time.time()

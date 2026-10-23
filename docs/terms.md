@@ -81,6 +81,19 @@ Computed by:          not computed — CHOSEN, and pre-registered before any att
                       git_rev b5a220f122ca. The grid is FROZEN under constraint 6 — it
                       does not change because a result is disappointing; a change
                       means a NEW dated file and this one is never edited.
+                      ⚠⚠ THREE FURTHER POINTS EXIST AND ARE **NOT** PRE-REGISTERED:
+                      tau = 0.999, 0.9999 and 0.99999, run 2026-10-23 at the PI's
+                      request and AFTER the signed grid's outcomes were seen. They
+                      are EXPLORATORY, live in logs/B_tau_0p999_0p9999_0p99999/ and
+                      are reported APART from the pre-registered result; promoting
+                      any of them needs a NEW dated pre-registration file. They are
+                      named in SEED_GRID in scripts/arm1_release.py and
+                      scripts/arm2_attack.py so each has a FIXED seed index — see
+                      docs/bugs.md for why a list position is not one. ✅ What they
+                      establish: eta_tau = arctanh(tau) is LOGARITHMIC, so 1 - tau
+                      shrinking 1000x multiplies the tilt only 2.3059x, and the
+                      measured movement is linear in eta_tau to three decimals at
+                      all nine points. tau is a very weak lever, by construction.
                       ⚠ Field 6 was reopened and re-closed on 2026-10-10: the attack
                       design it had pinned was ONE-SIDED, drawing only from Q_p, and
                       so could not measure the equal-prior quantity p_succ_bound
@@ -857,24 +870,187 @@ Is:                   Var_Q(u), the EXACT variance of the utility under Q^tau_p 
                       Var_Q(u) = d2 log Z_p / d eta2. It is what says whether a
                       measurement of `e_q_u` is resolvable at a feasible number of
                       draws, which is why it is reported beside it rather than hidden.
-Computed by:          scripts/results_table.py:var_and_mean, the same three forward
-                      passes as `e_q_u` (second central difference, H_STEP = 0.05), and
-                      cross-checked against direct enumeration on the toy
-                      (scripts/results_table.py emits both rows).
-CHANGES MEANING WITH: the estimator route and the step h, exactly as for `e_q_u`; and
-                      with `beta_v` — the recorded **Var_Q(u) = 4.046e-06**, so
-                      sd(u) = 2.011e-03 (HG00096, chr21, scope "chain", ARM 2,
-                      tau = 0.5) is CHR21-NORMALISED and the genome-wide value is
-                      UNMEASURED. ⚠ 94.8% of Var_R(u) is between-position COVARIANCE
-                      from the mosaic's segment structure, which no reweighting of
-                      beta_v touches — see `beta_v`'s last block before concluding that
-                      a utility can be given variance by reweighting.
-Valid vs:             itself across tau at matched beta scope, and against the per-draw
-                      sd it implies. ⚠ It is the denominator of the project's own
-                      feasibility argument: quoting a sampled utility difference without
-                      it is how an unresolvable measurement gets reported as a result.
-Status:               DIAGNOSTIC — reported beside `e_q_u`, never alone.
+Computed by:          ✅ **scripts/exact_variance.py:haplotype_variance, EXACTLY and in
+                      O(TK)** (2026-10-22). One centred forward sweep carrying the first
+                      AND second conditional moments of the running prefix sum over
+                      FFBS's backward chain; no sampling, no finite difference, no pair
+                      marginals. Gated against brute-force enumeration on the toy
+                      (7.7e-15), against 30 real chr21 draws (SD ratio 1.0334), and by
+                      its own centred first moment, which must be 0 and comes back at
+                      2.4e-13 or below.
+                      ⚠⚠ **IT HAS A FLOOR NEAR 1e-33 AND IT ERRS IN THE FLATTERING
+                      DIRECTION — measured 2026-10-23.** The centring subtracts
+                      quantities of order 1, so once the posterior concentrates onto
+                      one path the result is cancellation noise: on the toy it returns
+                      a CONSTANT 7.703720e-34 where enumeration gives 3.52e-127 and
+                      4.42e-276, overstated by 10^93 and 10^242. Var is the SLOPE of
+                      the response curve, so an overstated floor overstates how much
+                      the next unit of `eta` would buy. **NEVER quote var_q_u below
+                      ~1e-28.** `e_q_u` is unaffected (no centring, no cancellation)
+                      and agrees to 4.76e-16 at every `eta`. See docs/bugs.md.
+                      ⚠ THE SUPERSEDED ROUTE: scripts/results_table.py:var_and_mean,
+                      a second central difference with H_STEP = 0.05. It is the route the
+                      pre-registration FORBIDS at genome scope — it returns a NEGATIVE
+                      variance there — and it is what left this quantity unmeasured
+                      genome-wide until the sweep above existed.
+                      ⚠ **[CORRECTION - 2026-10-22]** `docs/plan.md` and
+                      `scripts/exact_utility.py` both say settling the 43.6x "needs
+                      Var_Q(u) from PAIR marginals". Wrong about the METHOD, not the
+                      quantity: all-pairs is O(T^2 K^2) and unreachable at
+                      T = 22,134,562, while `u` is an ADDITIVE functional of the path, so
+                      one O(TK) sweep is exact. The stale wording is still in that
+                      script's docstring and in paper/draft_2026-10-13.md.
+CHANGES MEANING WITH: the BUILD, the arm, the ploidy and `beta_v`'s scope and share, and
+                      every figure needs all five. Diploid is the release's own quantity,
+                      Var(u_dip) = (Var(u1) + Var(u2))/4 over two independent chains at
+                      eta_tau/2.
+                      **CURRENT BUILD, exact** — ARM 2, HG00096, 22 autosomes at
+                      decision-J shares, diploid: **3.153126468e-08**
+                      (`logs/B_exact_variance_genome.md`). Same target, chr21 at
+                      share 1: **1.374101750e-06** at tau = 0 and 1.374107483e-06 at
+                      tau = 0.99 (`logs/B_exact_variance_chr21_share1.md`). ARM 1, HG00438 held out
+                      at K = 86, chr21 at its own share 0.0150248984, diploid:
+                      **4.652085850e-10** (`logs/B_exact_variance_arm1_chr21.md`).
+                      ⚠ The recorded **4.046e-06** / sd(u) = 2.011e-03 (HG00096, chr21,
+                      scope "chain", ARM 2, tau = 0.5) is PRE-REBUILD and HAPLOID, by the
+                      finite-difference route. The matched configuration on the current
+                      chain gives 2.790926e-06, and `e_q_u` moved 0.6951 -> 0.5898 over
+                      the same rebuild, so the gap is the BUILD and not the estimator.
+                      Neither figure is wrong; they describe different chains.
+                      ⚠ 94.8% of Var(u) is between-position COVARIANCE from the mosaic's
+                      segment structure, which no reweighting of beta_v touches — see
+                      `cov_share`, and `beta_v`'s last block before concluding that a
+                      utility can be given variance by reweighting. ✅ That share is now
+                      reproduced INDEPENDENTLY: 0.948906 by the exact route on the current
+                      build against 0.948 by finite differences on the old one.
+Valid vs:             itself across tau at matched beta scope, arm and build; against the
+                      per-draw sd it implies; and against the `e_q_u` MOVEMENT, which it
+                      predicts — `d E_Q[u] / d eta = Var_Q(u)`, so the movement across the
+                      grid is the variance integrated. ✅ MEASURED: eta_tau * Var(tau = 0)
+                      = 3.636770e-06 against a measured movement of 3.636777e-06 on chr21
+                      at share 1 (relative 1e-05), and 8.345230e-08 against a logged
+                      8.345e-08 genome-wide (relative 3e-05). BOTH scopes.
+                      ✅ **THE 43.6x BETWEEN THE TWO SCOPES IS A PRODUCT OF THREE
+                      MEASURED FACTORS**: sum beta_v^2 128.6181 / 2.2679 (the
+                      beta_v^2-weighted mean p(1-p) rises, 0.007675 -> 0.017405) =
+                      56.7130 diagonal part / 1.3014 (the covariance multiplier rises,
+                      18.27 -> 24.08) = **43.5790**, reproducing the measured ratio to
+                      1.6e-16. ⚠⚠ The standing correlation hypothesis is only the 1.30x;
+                      the larger 2.27x is WHICH positions carry beta_v weight at each
+                      scope, which no correlation argument touches.
+                      ⚠ It is the denominator of the project's own feasibility argument:
+                      quoting a sampled utility difference without it is how an
+                      unresolvable measurement gets reported as a result.
+Status:               DIAGNOSTIC — reported beside `e_q_u`, never alone. ⚠ It is NOT a
+                      pre-registered endpoint; it explains and predicts the primary
+                      endpoint's movement and is reported as explanation, not as a result
+                      of its own.
 Aliases:              "Var_Q(u)", "sd(u)" for its square root. Never "the noise".
+```
+
+### var_q_u_diag  [utility] [theory] [diagnostic]
+```
+Is:                   what `var_q_u` WOULD BE if the per-position allele matches were
+                      independent: sum_v beta_v^2 * p_v * (1 - p_v), with p_v the
+                      posterior probability that the release carries the target's allele
+                      at v. It is the quantity the project's `sum(beta_v^2)` argument
+                      implicitly assumes, written out so the assumption is measured
+                      rather than reasoned about.
+Computed by:          scripts/exact_variance.py:haplotype_variance, from the SAME
+                      posterior marginals as `var_q_u` — so the comparison between them
+                      isolates the independence assumption and nothing else.
+CHANGES MEANING WITH: exactly what `var_q_u` does. Never quote one without the other.
+Valid vs:             `var_q_u` at matched everything, and only that. ⚠ It is NOT an
+                      estimate of the variance and must never be reported as one: on
+                      chr21 at share 1 it is **7.130104363e-08** against the true
+                      1.374101750e-06, low by a factor of 19.3. It is the null it exists
+                      to reject.
+Status:               DIAGNOSTIC — the denominator of `cov_share`.
+Aliases:              "the independence prediction". Never "the diagonal variance"
+                      alone, which reads as a property of the data rather than of an
+                      assumption about it.
+```
+
+### cov_share  [utility] [theory] [diagnostic]
+```
+Is:                   `1 - var_q_u_diag / var_q_u`: the share of the utility's variance
+                      that comes from COVARIANCE between positions rather than from the
+                      positions individually. It is why the tilt has more to push on than
+                      a per-position account predicts, and it is the mechanism behind the
+                      43.6x that two first-order predictions both missed.
+Computed by:          scripts/exact_variance.py, as the ratio of the two above.
+CHANGES MEANING WITH: the arm and the beta scope, but FAR LESS than the variance itself,
+                      which is what makes it the quotable quantity: measured **0.948111**
+                      (ARM 2, chr21, share 1, diploid, current build), **0.948906** (the
+                      same by the pre-rebuild route's matched configuration) and
+                      **0.957022** (ARM 1, HG00438, chr21 at its own share) and
+                      **0.960128** (ARM 2, GENOME-WIDE, 22 autosomes). Per chromosome it
+                      spans 0.9334 (chr22) to 0.9684 (chr4). Two arms, two builds, two
+                      estimators, every scope: **0.93-0.97**.
+                      ⚠ It is a LEVEL, and the two-scope 43.6x is NOT this number — see
+                      `var_q_u`'s three-factor decomposition, where the covariance
+                      multiplier contributes only 1.30x of 2.95x.
+Valid vs:             itself across arms, scopes and builds — the comparison this quantity
+                      is FOR, since it is a ratio and the scale cancels.
+Status:               DIAGNOSTIC. ⚠ Not pre-registered; it is the explanation of a
+                      pre-registered endpoint's behaviour.
+Aliases:              "the covariance share". ⚠ Never "the correlation", which is a
+                      different quantity, and never phrase it as a share of the UTILITY —
+                      it is a share of the utility's VARIANCE.
+```
+
+### var_q_differ  [utility] [evaluation] [diagnostic]
+```
+Is:                   Var_Q(`e_differ`) — the exact posterior variance of the NUMBER of
+                      released cells differing from the target, summed over both
+                      haplotypes. Its square root, `sd_q_differ`, is the draw-to-draw
+                      standard deviation of a single release, so it is what says whether
+                      a difference between two single-draw table columns means anything.
+Computed by:          scripts/exact_variance.py:haplotype_variance with unit weights and
+                      the differs-from-target indicator — the same sweep as `var_q_u`, so
+                      one gate covers both. ⚠ Diploid adds OUTRIGHT here
+                      (Var(h1) + Var(h2)), not at a quarter: the cell count is a SUM over
+                      haplotypes while `u_dip` is their MEAN. Using the wrong one reports
+                      an SD 2x off for the row it is meant to describe.
+CHANGES MEANING WITH: the arm, the target, the chromosome scope and the denominator — and
+                      it does NOT change meaningfully with `tau`, which is the point.
+                      Measured: **6.467224125e+07** genome-wide (ARM 2, HG00096, 22
+                      autosomes), 7.739900306e+05 on chr21 at share 1, and
+                      1.127535146e+06 in ARM 1 (HG00438 held out, chr21 at its own
+                      share), all flat across tau = 0 to 0.99.
+Valid vs:             the observed scatter of single-draw columns at matched arm and
+                      scope. ✅ MEASURED: the head-to-head's seven `tau` columns give an
+                      empirical SD of 1,312 cells for `cells changed` against the exact
+                      1,061.9 — ratio 1.24, where a 7-draw SD estimate carries 1 sigma of
+                      +-29%. So that row's spread IS draw noise.
+                      ⚠ It does NOT cover `utility_loss_panmixer`, whose weights are
+                      PanMixer's own cost vector and are not loaded by this script. The
+                      `cells changed` and `target_fidelity` rows are covered; the cost row
+                      is not.
+Status:               DIAGNOSTIC — report it beside any single-draw column, because a
+                      column quoted without it invites a reader to compare noise.
+Aliases:              none. Its square root has its own entry, `sd_q_differ`, because it
+                      carries a different unit. Never "the error bar", which implies an
+                      estimate; this is exact.
+```
+
+### sd_q_differ  [utility] [evaluation] [diagnostic]
+```
+Is:                   sqrt(`var_q_differ`), in CELLS — the draw-to-draw standard
+                      deviation of one release's differing-cell count. It exists as its
+                      own name because it is the form every table needs: the unit of the
+                      variance is cells SQUARED, which no reported column is in.
+Computed by:          scripts/exact_variance.py, as the square root of `var_q_differ`.
+CHANGES MEANING WITH: everything `var_q_differ` does. Measured **8,041.9 cells** (ARM 2,
+                      HG00096, GENOME-WIDE), **879.8 cells** (same target, chr21 at
+                      share 1) and **1,061.9 cells** (ARM 1, HG00438 held out, chr21 at
+                      its own share), all flat across tau.
+Valid vs:             the observed spread of single-draw columns at matched arm and
+                      scope, and the difference between any two such columns — a gap
+                      smaller than about 2 of these is not a finding. ⚠ Do NOT compare it
+                      across arms: ARM 1's panel, chain and utility function all differ.
+Status:               DIAGNOSTIC — quote it beside any single-draw column.
+Aliases:              none. Never "the error bar" or "the noise".
 ```
 
 ### ratio_spread  [privacy] [evaluation] [gate]

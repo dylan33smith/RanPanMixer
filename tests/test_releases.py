@@ -146,13 +146,20 @@ def test_tau_directory_names_follow_the_naming_rule() -> None:
     assert R.tau_dir(0.99) == "tau_0p99"
 
 
-def test_a_tau_that_would_collide_in_its_directory_name_is_refused() -> None:
+def test_a_tau_past_two_decimals_gets_its_own_directory() -> None:
     """⚠ 0.995 and 0.99 both render as `tau_0p99` at two decimals, so the second
     release would land in the first one's directory — a silent collision between two
-    different PRIVACY LEVELS, which no reader could spot afterwards."""
-    with pytest.raises(ValueError, match="does not survive"):
-        R.tau_dir(0.995)
+    different PRIVACY LEVELS, which no reader could spot afterwards. The name is now
+    lossless rather than refused, so the guard is that every name is distinct and
+    reads back exactly."""
+    assert R.tau_dir(0.995) == "tau_0p995"
     assert R.tau_dir(0.99) == "tau_0p99"       # and the grid value still works
+    high = [0.99, 0.995, 0.999, 0.9999, 0.99999]
+    names = [R.tau_dir(t) for t in high]
+    assert len(set(names)) == len(high), names
+    assert names[2:] == ["tau_0p999", "tau_0p9999", "tau_0p99999"]
+    for t, n in zip(high, names):
+        assert float(n.removeprefix("tau_").replace("p", ".")) == t
 
 
 # ---------------------------------------------------------------------------

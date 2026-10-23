@@ -42,6 +42,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 import numpy as np                                        # noqa: E402
 
+import releases as R                                      # noqa: E402
 from cohort import loo                                     # noqa: E402
 from mechanism import utility                              # noqa: E402
 
@@ -145,7 +146,7 @@ def main(argv=None) -> int:
 
     ours, theirs = [], []
     for tau in a.taus:
-        td = REPO / "data" / "releases" / "arm1" / TARGET / f"tau_{tau:.2f}".replace(".", "p")
+        td = REPO / "data" / "releases" / "arm1" / TARGET / R.tau_dir(tau)
         hits = sorted(td.glob("*chromchr21_*_chr21/released_path.npy"))
         assert len(hits) == 1, f"{tau}: {len(hits)} parts"
         ours.append({"tau": float(tau),

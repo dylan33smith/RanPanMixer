@@ -73,6 +73,8 @@ def main(argv=None) -> int:
     ap.add_argument("--root", type=Path, default=ROOT)
     ap.add_argument("--targets", type=int, default=0,
                     help="limit to the first N targets (0 = all); for a smoke test")
+    ap.add_argument("--taus", nargs="+", default=list(TAUS),
+                    help="release directory labels, e.g. 0p999 (releases.tau_dir form)")
     a = ap.parse_args(argv)
     root = a.root
 
@@ -108,7 +110,7 @@ def main(argv=None) -> int:
     (ed / "data" / f"chr{CHROM}").mkdir(parents=True, exist_ok=True)
 
     for t in targets:
-        for tau in TAUS:
+        for tau in a.taus:
             src = OURS / t / f"tau_{tau}" / f"chr{CHROM}" / "new_haplotypes.npy"
             if not src.exists():
                 raise SystemExit(f"missing release: {src}")
@@ -136,9 +138,9 @@ def main(argv=None) -> int:
     man = {"root": str(root), "experiment": EXPERIMENT, "chrom": CHROM,
            "n_sites": n_sites, "n_blocks": n_blocks,
            "xsol": "ALL ONES -- declared substitution, see the module docstring",
-           "taus": list(TAUS), "targets": targets, "rows": rows}
+           "taus": list(a.taus), "targets": targets, "rows": rows}
     (root / "manifest.json").write_text(json.dumps(man, indent=1) + "\n")
-    print(f"  staged {len(rows)} rows ({len(targets)} targets x {len(TAUS)} tau)")
+    print(f"  staged {len(rows)} rows ({len(targets)} targets x {len(a.taus)} tau)")
     print(f"manifest -> {root / 'manifest.json'}")
     return 0
 

@@ -122,6 +122,74 @@ failure family as A3's positive control, which was also algebraically unable to 
 
 ## Our own run discipline
 
+### An index array read as a boolean mask, so a results table never ran at all
+- **[2026-10-22] `pangenome_mask.npy` is site INDICES, not a boolean**
+  **[Symptom]** `scripts/arm1_attacks_results.py` raised `ValueError: operands could
+  not be broadcast together with shapes (340824,2) (258610,2)` in `load_changed`.
+  **[Cause]** The file holds **258,610 site INDICES** into the 340,824-site chr21
+  axis, and the script did `.astype(bool)` on it. That is wrong twice: it is True at
+  every nonzero index (258,609 of 258,610 entries) and it is the wrong LENGTH, which
+  is what raised. PanMixer's own `tools/beagle/accuracy_stats.py:43` builds the
+  boolean correctly (`snp_mask = zeros(n, bool); snp_mask[snp_indices] = True`) and
+  `gap_score.py:101` uses it as indices.
+  **[Proven fix]** Build the boolean the way their code does. ⚠ Nothing published was
+  affected — it raised before returning, and `snp_only` is the default subset — but
+  the consequence is worth recording: **the 308-row pinned-grid attack matrix had
+  never been tabled**, so 396 evaluator runs plus 308 Beagle runs existed only as
+  unread result files on disk. A script that cannot run is not a script that produced
+  a conservative answer. See `docs/memory.md` 2026-10-23.
+
+### A directory namer refuses the parameter it is asked to name
+- **[2026-10-22] `releases.tau_dir` was pinned to two decimals, by design**
+  **[Symptom]** Every release at `tau` = 0.999, 0.9999 or 0.99999 was refused with
+  "does not survive the two-decimal directory name".
+  **[Cause]** It formatted `%.2f` and raised unless the name read back exactly —
+  deliberate, and right: without it, 0.995 and 0.99 would both render `tau_0p99` and
+  the second release would land in the first one's directory, a silent collision
+  between two PRIVACY LEVELS. The guard was correct; its two-decimal assumption was
+  not.
+  **[Proven fix]** Name losslessly — two decimals where that is exact (so every
+  pinned directory keeps its name), otherwise the shortest exact decimal — and keep
+  raising on any name that does not round-trip. Four scripts that built the same path
+  by hand with `f"tau_{tau:.2f}".replace(".", "p")` now call the one function, so the
+  rule cannot be bypassed. `tests/test_releases.py` asserts the names are distinct and
+  each reads back exactly.
+
+### A `tau` grid re-run redraws with ANOTHER `tau`'s seed, and the releases come out bit-identical
+- **[2026-10-22] Seeding a cell from the `tau`'s POSITION in `--taus`, not its VALUE**
+  **[Symptom]** `scripts/arm1_release.py --taus 0.999 0.9999 0.99999` wrote 132
+  plausible releases, and then PanMixer's `gap_score` on them returned
+  `genotype_g_to_gstar` identical to the PINNED grid's first three columns to 13
+  significant figures (-2,935.9 / -2,998.2 / -3,554.3). `obfuscated_accuracy` matched
+  to six decimals. Nothing errored; every file, sidecar and completeness assertion
+  passed.
+  **[Cause]** `genome_seed(target, tau_index)` took `tau_index` from
+  `enumerate(taus)`, i.e. the caller's list position. A subset run therefore passed
+  0, 1, 2 and reproduced the seeds of `tau` = 0, 0.05 and 0.10 — 4238719590,
+  2209799234, 1378656232. Because the tilt is far too weak to move the draw on one
+  chromosome, the chr21 slices were **BIT-IDENTICAL** to those releases (0 cells
+  differing of 681,648), so every DRAWN-path quantity was the pinned grid's number
+  wearing a new `tau` label. ⚠ This is occurrence FOUR: the entry below records it
+  for a headline finding (2026-09-30), `docs/memory.md` records seed reuse across
+  chromosomes, and `scripts/arm2_attack.py` carries fourteen lines of comment about
+  it. **A comment in another file is not a gate.**
+  **[What was NOT affected, and it is measured]** The exact endpoint.
+  `ffbs.state_marginals` uses no RNG and `scripts/arm1_exact_endpoint.py` has no seed
+  at all, so redrawing all 132 releases under different seeds reproduced **792/792
+  exact values bit-identical** (`e_differ`, `e_q_u`, `target_fidelity`, `u_ceiling`,
+  `e_q_u_over_ceiling`, `called_cells`; worst relative difference 0.000e+00).
+  **[Proven fix]** Key the seed on the value's index in a FIXED
+  `SEED_GRID = PINNED_TAUS + EXPLORATORY_TAUS`, and REFUSE a `tau` outside it rather
+  than invent an index. Append, never prepend: the seven pinned points keep the
+  indices their 308 releases were drawn under, verified against the seeds recorded on
+  disk (42 of 42 pinned directories agree; the 18 exploratory ones disagree because
+  they were the bad draws). Gated by `tests/test_arm1_release_seeding.py`, five tests,
+  mutation-tested — the positional seed fails 3, prepending fails the reproducibility
+  test, dropping the target fails 3. See `docs/memory.md` 2026-10-23.
+  **[How to recognise it again]** Two `tau` columns of a DRAWN quantity agreeing to
+  more digits than a median over 44 targets could. Check the seed in the release
+  filename: it embeds `_seed<n>`, so a collision is visible with `ls`.
+
 ### A stale status sentinel reports a job that is still running as FAILED
 - **[2026-09-18] Re-running a job without clearing its sentinel**
   **[Symptom]** A background `until [ -f run.status ]; do sleep; done` returned
@@ -484,6 +552,53 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
   **[Severity]** MEDIUM, all silent.
 
 ## Mechanism / sampler
+
+### A variance route reports a constant floor instead of a collapsing variance, in the flattering direction
+- **[2026-10-23] `haplotype_variance` cancels below ~1e-33**
+  **[Symptom]** `scripts/eta_sweep.py --validate` printed `var_q_u` =
+  **7.703720e-34** at toy `eta` = 2000 AND at `eta` = 4400, while enumeration gave
+  3.522099e-127 and 4.424217e-276. Identical to seven digits at two very different
+  `eta`, which is the tell: a real variance does not stop moving.
+  **[Cause]** The centred-moment recursion in `scripts/exact_variance.py`
+  subtracts quantities of order 1 to obtain a variance of order 1e-130, so the
+  result is pure cancellation noise once the posterior concentrates onto a single
+  path. Nothing errors; the number is finite and plausible.
+  **[Why it matters more than its size]** `Var_Q(u)` IS the slope of the response
+  curve (`d E_Q[u] / d eta = Var_Q(u)`), so an overstated floor **overstates how
+  much the next unit of `eta` would buy** — the flattering direction. At `eta` =
+  4400 it overstates by 10^242.
+  **[Proven fix]** Do not quote `var_q_u` below ~1e-28. The gate now compares the
+  mean at every `eta` (agrees to 4.76e-16) and the variance only above that probe,
+  prints the floored rows explicitly with the overstatement in powers of ten, and
+  asserts the floor runs ABOVE the truth so the direction of the error is known
+  rather than assumed. ⚠ `e_q_u` is NOT affected: it is a linear functional of the
+  marginals with no centring and no cancellation. See `docs/memory.md` 2026-10-23
+  (later).
+
+### A toy gate compares nan to nan and reports agreement
+- **[2026-10-23] The enumerator overflows before the sampler does**
+  **[Symptom]** The first `eta` sweep gate asked for toy `eta` = 1e4 and 1e6, and
+  printed `nan | nan | nan` for the enumerated value, the route and the relative
+  difference — then `worst relative difference: 1.311e-14`, a PASS, because `nan`
+  never exceeded the tolerance.
+  **[Cause]** TWO different walls, and the lower one was not the one being guarded.
+  `exact.release_distribution` computes `prob * exp(eta * u)` and `u` reaches 1 by
+  construction, so it overflows at `eta` ~ **709 whatever `beta` is**;
+  `utility.tilt_potentials` computes `exp(eta * beta_v)` and survives to
+  709/max(`beta_v`), which is 4,963 on the toy and 6.1e6 on chr21. The gate had
+  been written against the sampler's wall and the REFERENCE died first.
+  **[Proven fix]** Compute the reference with log-sum-exp, local to the gate, which
+  removes its wall entirely and is the better reference anyway because it owes
+  nothing to the code under test. ⚠ `src/mechanism/exact.py` is deliberately NOT
+  changed: it is load-bearing for the signed pre-registration's toy enumeration
+  gates. The gate now also asserts every compared value is finite before comparing,
+  so a nan can never again read as agreement, and asserts that past the wall the
+  potentials DO go non-finite so the sweep's own finiteness guard has a real defect
+  to catch.
+  **[How to recognise it again]** Any gate whose PASS line sits under a row of
+  `nan`. A tolerance comparison against nan is false, so `max()` silently ignores
+  it.
+
 
 ### ⚠ A GATE STATED AGAINST A BOUND THAT IS NEVER APPROACHED HAS NO POWER — third instance
 
@@ -1414,3 +1529,37 @@ control was meant to answer: A3 needs f = 0.01 (about 3,300 of 332,521 positions
 reach 0.75 accuracy and is at chance at f = 0.001. ⚠ A perfect score on a first run is
 evidence about the TEST at least as often as about the thing tested; the same reasoning
 caught the `log_z_p` gate that could not fail in 2026-10.
+
+### [Symptom] A variance comes back `nan` for a whole chromosome while the toy gate passes
+
+Seen 2026-10-22 on `scripts/exact_variance.py`'s first run: `var_q_u`, `var_q_differ`
+and the centred-mean gate all printed `nan` for every one of chr21's 332,521 positions,
+while `e_q_u` in the same run reproduced its logged value to five significant figures —
+so the setup was right and only the new recursion was poisoned. The enumeration gate on
+the project's toy cohort had passed at 7.7e-15 immediately before.
+
+The cause is a 0/0 in the backward kernel's normaliser,
+`D_t(i) = s_t/K + (1 - s_t) * alpha_{t-1}(i)`. It needs TWO conditions at once: a step
+with `switch_mass == 0` — zero genetic distance, where `unif = s/K` vanishes and the
+transition is the identity — AND a donor with no call at the SOURCE position, so
+`alpha_{t-1}(i) == 0` as well. chr21 has **1,058** zero-distance steps and **7** of them
+sit beside an unavailable donor. One NaN then propagates through every later scalar
+product, because `0 * nan = nan`, so a defect at 7 positions destroys all 332,521.
+
+⚠ **THE TOY COULD NOT CATCH IT, AND THAT IS THE REAL LESSON.** `toy.toy_cohort()` has a
+zero-distance step (index 2, `switch_mass` 0) and it has uncalled cells (2 of them), but
+never at the same place — so `D` never reaches 0 there. A gate built from the richest
+fixture in the project still had a hole exactly where the real chain does not.
+
+**[Proven fix]** Guard the division, and ASSERT the reason it is safe rather than
+assuming it: where `D == 0`, check that `alpha_t(i) == 0` too — with the identity
+transition such a state is reachable only from itself at `t-1`, where it has no mass, so
+it is genuinely unreachable and its conditional moments are weighted by zero everywhere
+they are used — then raise if any such state does carry forward mass, and otherwise set
+its moments to 0 so the dot products stay finite. Then build a fixture where the two
+conditions COINCIDE: `validate_dead_kernel()` uses a 4x5 cohort with donor 3 uncalled at
+position 1 and zero genetic distance from 1 to 2, agrees with enumeration to 5.2e-15,
+and returns `(nan, nan)` without the guard — measured, so the gate is known to fire.
+⚠ When a new gate passes on the existing fixture, ask which real-data property the
+fixture lacks before trusting it; "the toy has feature A and feature B" is not "the toy
+has A and B together".

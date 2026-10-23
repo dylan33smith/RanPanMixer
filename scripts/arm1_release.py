@@ -57,20 +57,41 @@ from mechanism import ffbs, hmm, utility                   # noqa: E402
 # ✅ FROZEN by prereg_2026-10-10.md section 1 under standing constraint 6, with each
 # point's declared role. Not a tunable: all seven run.
 PINNED_TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
+# ⚠ EXPLORATORY, NOT PRE-REGISTERED (requested 2026-10-22, after the pinned grid's
+# outcomes were seen). Listed only so each point has a FIXED seed index; appending
+# keeps every pinned point at the index it already used, so the 308 pinned releases
+# on disk still reproduce bit-for-bit from their recorded seed.
+EXPLORATORY_TAUS = (0.999, 0.9999, 0.99999)
+SEED_GRID = PINNED_TAUS + EXPLORATORY_TAUS
 SEED_BASE = 20261012
 AUTOSOMES = loo.AUTOSOMES
 
 
-def genome_seed(target: str, tau_index: int) -> int:
+def genome_seed(target: str, tau: float) -> int:
     """A distinct, reproducible seed per (target, `tau`) cell.
 
     ⚠ hashlib, NEVER `hash()`: Python's is PYTHONHASHSEED-salted and already made a
     decoy choice irreproducible once in this project.
-    ⚠ And keyed by BOTH target and `tau` index, because seeding from one of them alone
+    ⚠ And keyed by BOTH target and `tau`, because seeding from one of them alone
     is how common random numbers got into this project three times.
+
+    ⚠⚠ THE `tau` COMPONENT IS ITS INDEX IN `SEED_GRID` -- THE VALUE'S FIXED PLACE --
+    NOT ITS POSITION IN WHATEVER `--taus` WAS PASSED. That is occurrence FOUR of this
+    project's common-random-numbers defect and it was MEASURED on 2026-10-22: a run
+    of `--taus 0.999 0.9999 0.99999` passed positions 0, 1, 2 and so redrew with the
+    seeds of `tau` = 0, 0.05 and 0.10 from the pinned run. The chr21 slices came out
+    BIT-IDENTICAL to those releases (0 cells differing of 681,648), so every
+    drawn-path quantity -- PanMixer's evaluators, Beagle, `donor_switches` -- was the
+    pinned grid's number wearing a new `tau` label. The exact endpoint was untouched,
+    because `ffbs.state_marginals` uses no RNG at all, which is the only reason the
+    utility result survived. Guarded by tests/test_arm1_release_seeding.py.
     """
     h = int.from_bytes(hashlib.sha256(target.encode()).digest()[:4], "big")
-    ss = np.random.SeedSequence([SEED_BASE, h, int(tau_index)])
+    if float(tau) not in SEED_GRID:
+        raise ValueError(
+            f"tau={tau!r} has no fixed place in SEED_GRID {SEED_GRID}, so it has no "
+            f"reproducible seed. Append it rather than passing a bare index.")
+    ss = np.random.SeedSequence([SEED_BASE, h, SEED_GRID.index(float(tau))])
     return int(ss.generate_state(1, dtype=np.uint32)[0])
 
 
@@ -158,7 +179,7 @@ def run_target(target: str, taus, root: str | None) -> dict:
         for i, tau in todo:
             box: dict = {}
             parts[i].append(ffbs.release(
-                m, panel, tgt, util, tau, seed=genome_seed(target, i),
+                m, panel, tgt, util, tau, seed=genome_seed(target, tau),
                 target_id=target, loo_id=target, baseline_norm=base,
                 stream_key=c, exact_out=box))
             assert len(box["u_haps"]) == 2, (

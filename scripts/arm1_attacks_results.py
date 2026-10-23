@@ -74,7 +74,16 @@ def load_changed(man: dict) -> dict:
     """
     orig_all = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome.npy")
     subs = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome_subjects.npy").tolist()
-    snp = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome_mask.npy").astype(bool)
+    # ⚠⚠ `pangenome_mask.npy` IS AN INDEX ARRAY, NOT A BOOLEAN MASK: 258,610 site
+    # INDICES into the 340,824-site axis. This read it as `.astype(bool)`, which is
+    # wrong twice -- it is True at every nonzero index (so 258,609 of 258,610 entries)
+    # and it is the wrong LENGTH, which is what raised ValueError here. Their own
+    # `accuracy_stats.py:43` builds the boolean the way it is built below, and
+    # `gap_score.py:101` uses it as indices. Nothing published came from this
+    # function: it crashed before returning, and `--subset snp_only` is its default.
+    snp_idx = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome_mask.npy")
+    snp = np.zeros(orig_all.shape[1], dtype=bool)
+    snp[snp_idx] = True
     out = {}
     for r in man["rows"]:
         i = r["row_id"]
@@ -141,6 +150,7 @@ def interp_published(x: float, curve: list) -> float:
 
 
 def main(argv=None) -> int:
+    global ROOT, TAUS
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT)
     ap.add_argument("--json", type=Path, default=None)
@@ -148,7 +158,13 @@ def main(argv=None) -> int:
                     help="PRIMARY is snp_only -- the paper's 'SNPs overlapping with 1000G'")
     a = ap.parse_args(argv)
 
+    # ⚠ `rowdir` reads the module-level ROOT, so `--root` used to change ONLY the
+    # manifest: a second mirror's labels would have been printed over the FIRST
+    # mirror's result files, with no error. ROOT and the grid now both come from it.
+    ROOT = a.root
     man = json.loads((a.root / "manifest.json").read_text())
+    TAUS = tuple(man["taus"])
+    TAU_LABEL.update({t: f"{float(t.replace('p', '.')):g}" for t in TAUS})
     changed = load_changed(man)
     per = collect(man, changed)
     curve = published_curve()

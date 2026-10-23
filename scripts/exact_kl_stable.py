@@ -69,9 +69,23 @@ PINNED_TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 AUTOSOMES = loo.AUTOSOMES
 
 
-def kl_stable(m, hap, beta, p, q, tau: float) -> dict:
-    """KL(Q_p || Q_q) for one chromosome, grouped so nothing cancels."""
-    eta = C.eta_tau(tau)
+def kl_stable(m, hap, beta, p, q, tau: float | None = None, *,
+              eta: float | None = None) -> dict:
+    """KL(Q_p || Q_q) for one chromosome, grouped so nothing cancels.
+
+    ⚠ DRIVEN BY `tau` OR BY `eta`, never both. The `eta` entry point exists because
+    `tau` CANNOT express the high end of the tilt: `tanh(eta)` rounds to exactly 1.0
+    in float64 beyond `eta` ~ 19, and `calibration.eta_tau` rightly refuses
+    `tau` = 1. `scripts/eta_sweep.py` therefore parameterises by `eta` directly.
+    Kept as ONE implementation with two entry points rather than a second copy,
+    because two copies of a KL would drift and only one of them would be gated.
+    """
+    if (tau is None) == (eta is None):
+        raise ValueError("pass exactly one of tau= or eta=")
+    if eta is None:
+        eta = C.eta_tau(tau)
+    elif eta < 0.0:
+        raise ValueError(f"eta must be non-negative, got {eta}")
     if eta == 0.0:
         # tau = 0: Q_p == Q_q == R_D definitionally, so the KL is exactly 0.
         return {"kl": 0.0, "d_logz": 0.0, "d_eu": 0.0}

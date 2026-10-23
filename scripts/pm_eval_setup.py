@@ -74,6 +74,10 @@ def their_release(cap_dir: Path, n_sites: int) -> np.ndarray:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT)
+    # release directory labels in `releases.tau_dir` form, so a second mirror can hold
+    # the exploratory high-`tau` rows (0p999, 0p9999, 0p99999) beside their own copy
+    # of THEIR capacity sweep -- the two sides must always be staged together
+    ap.add_argument("--taus", nargs="+", default=list(TAUS))
     a = ap.parse_args(argv)
     root = a.root
 
@@ -95,7 +99,7 @@ def main(argv=None) -> int:
 
     # ---- the 15 release objects, in one row order shared by every experiment
     rows = []
-    for t in TAUS:
+    for t in a.taus:
         rows.append({"kind": "ours", "label": f"tau_{t}",
                      "array": np.load(OURS / f"tau_{t}" / "chr21" / "new_haplotypes.npy")})
     for cd in sorted(PM_SWEEP.glob("cap*")):

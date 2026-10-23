@@ -14,6 +14,7 @@ these establish the conditions under which it must succeed.
 
 from __future__ import annotations
 
+import ast
 import math
 import sys
 from pathlib import Path
@@ -495,14 +496,38 @@ def test_the_cell_seed_differs_across_target_tau_and_draw() -> None:
 
 def test_the_attack_does_not_seed_from_the_draw_index_alone() -> None:
     """⚠ STRUCTURAL. The defect was literally `50_000 + i` in the job list. This
-    fails if anyone reintroduces a seed that ignores the target or the tau."""
-    src = _code_only(Path(__file__).resolve().parents[1] / "scripts" / "arm2_attack.py")
-    assert "50_000+i" not in src, (
+    fails if anyone reintroduces a seed that ignores the target or the tau.
+
+    ⚠ IT ASSERTS THE THREE COMPONENTS, NOT ONE SPELLING. This pinned the literal
+    text `_cell_seed(ti,taui,i)` until 2026-10-22, when the tau component became
+    `SEED_GRID.index(tau)` so that a SUBSET of the grid keeps each point's own
+    stream. That change preserved the property exactly and the test failed anyway,
+    which is a test pinned to an incidental spelling rather than to the defect.
+    """
+    path = Path(__file__).resolve().parents[1] / "scripts" / "arm2_attack.py"
+    assert "50_000+i" not in _code_only(path), (
         "the job list seeds from the draw index alone again -- all targets and all "
         "tau would share 25 streams (common random numbers, third occurrence)")
-    assert "_cell_seed(ti,taui,i)" in src, (
-        "the per-cell seed derivation is gone; the seed must depend on the target "
-        "index, the tau index AND the draw index")
+    # ⚠ The AST is built from the RAW file, not from `_code_only`, for two reasons:
+    # `ast` drops comments and docstrings itself (so a comment quoting the old
+    # defective call is invisible here, which is what `_code_only` exists for in a
+    # substring check), and `_code_only` also strips the whitespace BETWEEN tokens,
+    # so its output is not parseable Python at all.
+    calls = [n for n in ast.walk(ast.parse(path.read_text()))
+             if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "_cell_seed"]
+    assert len(calls) == 1, f"{len(calls)} _cell_seed call sites, expected exactly 1"
+    assert len(calls[0].args) == 3, (
+        f"_cell_seed takes {len(calls[0].args)} argument(s); the seed must depend on "
+        f"the target index, the tau index AND the draw index")
+    names = {n.id for a in calls[0].args for n in ast.walk(a) if isinstance(n, ast.Name)}
+    for want, role in (("ti", "target index"), ("i", "draw index")):
+        assert want in names, (
+            f"the per-cell seed does not mention the {role} ({want!r}); every cell "
+            f"would share a stream over that axis (common random numbers)")
+    assert names & {"tau", "taui"}, (
+        "the per-cell seed does not mention the tau index; all seven tau would reuse "
+        "one set of streams, which is the defect measured on 2026-10-10 -- the "
+        "released path was bit-identical across tau at a fixed seed")
 
 
 def test_decoy_selection_uses_a_stable_hash() -> None:

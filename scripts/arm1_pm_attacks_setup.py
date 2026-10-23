@@ -42,6 +42,9 @@ EVAL = {"2": "gap_score", "3": "diploid_gap_score", "4": "MIA_privacy"}
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT)
+    # exp_5 = PanMixer's af_loss/ld_loss (EXPLORATORY, decision H), staged by hand on
+    # 2026-10-14: the same symlinks, and a `capacity` column holding the literal "n/a"
+    ap.add_argument("--af-ld", action="store_true", help="also stage exp_5")
     a = ap.parse_args(argv)
     root = a.root
 
@@ -51,14 +54,15 @@ def main(argv=None) -> int:
     if not src_base.exists():
         raise SystemExit(f"{src_base} missing -- run scripts/beagle_attack_setup.py first")
 
-    for exp, name in EVAL.items():
+    for exp, name in (EVAL | ({"5": "af_ld"} if a.af_ld else {})).items():
         ed = root / "experiments" / f"exp_{exp}"
         (ed / "data" / f"chr{CHROM}").mkdir(parents=True, exist_ok=True)
         with (ed / f"data_chr{CHROM}.csv").open("w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["subject", "tau"])
+            cap = exp == "5"
+            w.writerow(["subject", "tau"] + (["capacity"] if cap else []))
             for r in rows:
-                w.writerow([r["subject"], r["tau"]])
+                w.writerow([r["subject"], r["tau"]] + (["n/a"] if cap else []))
         n_link = 0
         for r in rows:
             i = r["row_id"]

@@ -104,6 +104,510 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-23 (later) — B-THY-eta-response: the mechanism DOES have a working regime, and it starts 3,488x past the point the guarantee dies
+
+**Goal.** Dylan, after the `tau` = 0.99999 run: stop treating `tau` as the knob, sweep
+`eta` itself far past any usable `tau`, and record `acc_ceiling`, `kl_exact` and the
+utility to find out whether the mechanism has ANY regime in which the tilt moves the
+release. ⚠⚠ EXPLORATORY, NOT PRE-REGISTERED, and NOT a proposal to release anything.
+
+**Method.** `scripts/eta_sweep.py` (new), exact via `ffbs.state_marginals`, no sampling.
+`eta` is the parameter because `tau` CANNOT carry the high end: `tanh(eta)` rounds to
+exactly 1.0 in float64 beyond `eta` ~ 19 and `calibration.eta_tau` rightly refuses
+`tau` = 1. The guarantee is therefore reported in log space,
+`log10(1 - tau) = log10(2) - 2*eta/log(10)`, on every row — an `eta` table with no `tau`
+column would read as a mechanism with a privacy parameter while being one without.
+Provenance `logs/B_eta_sweep/`. HG00096, chr21, ARM 2, K = 88, T = 332,521, diploid,
+`beta` CHROMOSOME scope (sums to 1), so 66.6x MORE generous per position than the real
+genome-wide release.
+
+### ✅ THE ANSWER: there is a working regime, and it is unreachable
+
+`e_q_u`(0) = 0.589212147, `u_ceiling` = 0.692508964, so the recoverable gap is
+0.103296817. Reading the privacy bound and the utility against each other:
+
+| `eta` | `acc_ceiling` * | % of the gap recovered | `kl_exact` | equivalent `tau` |
+|---|---|---|---|---|
+| 2.6467 (`tau` = 0.99) | 0.501547277 | 0.004% | 1.9153e-05 | 0.99 |
+| 6.1030 (`tau` = 0.99999) | 0.503567942 | 0.008% | 1.0184e-04 | 0.99999 |
+| 200 | 0.616928694 | 0.266% | 1.0938e-01 | 1 - 1e-173.4 |
+| 600 | 0.850799890 | 0.798% | 9.8448e-01 | 1 - 1e-520.9 |
+| **860** | **1.000000000** | **1.144%** | 2.0225e+00 | 1 - 1e-746.7 |
+| 10,000 | 1.000000000 | 12.894% | 2.6450e+02 | 1 - 1e-8686 |
+| 100,000 | 1.000000000 | 64.440% | 1.3344e+04 | 1 - 1e-8.686e+04 |
+| 3,000,000 | 1.000000000 | **97.801%** | 7.6611e+05 | 1 - 1e-2.606e+06 |
+
+**SYNTHESIS, and it reframes the whole project's negative result.** The mechanism is
+NOT inert — pushed hard enough it recovers **97.8%** of the achievable utility, taking
+`e_differ` from 76,040 cells to **1,350**. So "the tilt does nothing" was never the
+right statement. The right statement is that **the useful regime and the private regime
+do not overlap**: `acc_ceiling` reaches 1.000 — the bound permits certain
+identification — at `eta` ~ **860**, where only **1.14%** of the utility has been
+recovered, and reaching 97.8% needs `eta` = 3e6, **3,488x further**. Even at `eta` = 200,
+where an optimal attacker is already bounded only by 0.617 rather than 0.5, the
+mechanism has recovered 0.27%.
+
+⚠ `acc_ceiling` = 1.000 means the PINSKER BOUND IS VACUOUS (`kl` > 2), not that an
+attacker is provably certain. The true accuracy may be lower. But `p_succ_bound` at
+these `eta` is 1 - 5e-747 and worse, so there is no privacy statement left to make
+either way. Both instruments agree there is nothing to report above `eta` ~ 860.
+
+### ✅ AND IT EXPLAINS THE `eta_tau`-LINEARITY FOUND THE SAME DAY
+
+`var_q_u` is **CONSTANT at 1.374e-06** from `eta` = 0 through `eta` ~ 2000 (1.374102e-06
+at 0, 1.374115e-06 at 6.10, 1.371288e-06 at 2000). Since
+`d E_Q[u] / d eta = Var_Q(u)`, a constant variance means `E_Q[u]` is exactly LINEAR in
+`eta` over that whole span — and the movement divided by `eta_tau` is 1.374103e-06, 1.374105e-06,
+1.374108e-06 at `eta` = 1, 2.6467, 6.1030. **The entire pinned `tau` grid plus the three
+exploratory points live at `eta` <= 6.1, deep inside this linear regime**, which is why
+the earlier sweep found movement proportional to `eta_tau` to three decimals at all nine
+points. The two findings are one finding.
+
+### ✅ THE CURVE DEPENDS ONLY ON `eta` * `beta_v` — WITHIN a chromosome, exactly
+
+Rescaling chr21's `beta` from chromosome scope (sum 1) to its genome share (0.015) and
+rescaling `eta` by 1/0.015 = 66.67 reproduces every quantity:
+
+| matched point | `e_q_u_over_ceiling` | `e_differ` | `kl_exact` |
+|---|---|---|---|
+| chrom scope, `eta` = 1,000 | 0.852821803 | 75,016.8 | 2.7345e+00 |
+| genome share, `eta` = 66,667 | 0.852821813 | 75,016.8 | 2.7345e+00 |
+| chrom scope, `eta` = 1e6 | 0.991067800 | 4,160.8 | 2.1505e+05 |
+| genome share, `eta` = 6.667e7 | 0.991067800 | 4,160.8 | 2.1505e+05 |
+
+Agreement to **8-9 digits** at every matched point. So the posterior is a function of
+`eta` * `beta_v` alone, and the regime variable is that product, never `eta` by itself.
+
+⚠⚠ **BUT IT IS NOT UNIVERSAL ACROSS CHROMOSOMES, SO THE GENOME-WIDE CURVE IS NOT A
+SIMPLE RESCALE.** chr1 run at the `eta` that matches chr21's `eta` * mean(`beta_v`)
+lands CLOSE but not equal: `e_q_u_over_ceiling` 0.863413625 against chr21's 0.852821803
+at the first matched point, 0.883715720 against 0.870069907, 0.957921536 against
+0.946956990 — about 1.0 to 1.4 points of ceiling fraction apart, chr1 always moving
+MORE. The chromosomes differ in segment structure and allele sharing as well as in
+`beta_v`, so **a genome-wide response curve needs the real 22-autosome assembly and must
+not be extrapolated from one chromosome.** chr1's own crossover agrees in character:
+`acc_ceiling` = 1.000 by `eta` = 5,304 with 1.81% of its gap recovered.
+
+### ⚠ TWO NUMERICAL LIMITS FOUND BY THE GATE, both recorded in `docs/bugs.md`
+
+**(1) `var_q_u` HAS A FLOOR NEAR 1e-33 AND IT ERRS IN THE FLATTERING DIRECTION.** On the
+toy, where the truth is enumerable, the centred-moment route reports a constant
+**7.703720e-34** while the true variance keeps collapsing to 3.52e-127 and 4.42e-276 —
+overstated by 10^93 and 10^242. `Var` is the curve's SLOPE, so an overstated floor
+overstates how much the next unit of `eta` would buy. **Never quote `var_q_u` below
+~1e-28.** `e_q_u` itself is unaffected and agrees to **4.76e-16** at every `eta`.
+
+**(2) THE ENUMERATOR OVERFLOWS BEFORE THE SAMPLER DOES.**
+`exact.release_distribution` computes `prob * exp(eta * u)` with `u` reaching 1, so it
+dies at `eta` ~ 709 WHATEVER `beta` is, while the sampler survives to
+709/max(`beta_v`). The gate's first version asked for `eta` = 1e4 and 1e6, sailed past
+that wall and **compared nan to nan**, reporting agreement. Fixed with a log-sum-exp
+reference local to the gate; `exact.py` is deliberately untouched because it is
+load-bearing for the signed pre-registration's toy gates.
+
+### The gate, and that it can fail
+
+`scripts/eta_sweep.py --validate` checks the swept route against enumeration of the
+toy's 96-path support. ⚠ The project's existing variance gate
+(`scripts/exact_variance.py`) only ever ran at `tau` <= 0.99, i.e. `eta` <= 2.65, and a
+route correct there can still die at `eta` = 1e6. **The regime variable makes the toy
+sufficient**: its `beta_v` = 1/7 is five orders of magnitude larger than a real
+chromosome's, so toy `eta` = 4,400 sits at `eta` * max(`beta_v`) = 629, the regime chr21
+reaches at `eta` ~ 5.4e6. The gate also asserts monotonicity in `eta`, that the limit
+reaches `max_y u` = 1.0 exactly, and that past the wall the potentials DO go non-finite
+so `one_eta`'s finiteness guard has a real defect to catch.
+
+### What this does NOT establish
+
+Nothing about a genome-wide response curve (see the chr1 caveat), and nothing
+releasable. ⚠ Standing constraint 3: the `eta` -> infinity limit IS argmax, which is not
+a release procedure and carries no guarantee; the limit is approached by raising `eta`,
+never by running Viterbi. ⚠ Constraint 5 still permits ONE release per genome, so the
+whole curve is an evaluation device. ⚠⚠ And NONE of these `eta` is proposable: at the
+cheapest point where the mechanism does anything measurable the guarantee is already
+`tau` = 1 - 10^-747.
+
+---
+
+## 2026-10-23 — B-EVL-hightau: `tau` to 0.99999, and the movement is EXACTLY linear in `eta_tau`
+
+**Goal.** Dylan's PI asked whether a much higher allowed accuracy opens any range in the
+result. Both arms re-run at `tau` = 0.999, 0.9999, 0.99999, with the full metric set and
+every runnable attack.
+
+⚠⚠ **EXPLORATORY, NOT PRE-REGISTERED.** `paper/prereg_2026-10-10.md` section 1 freezes the
+grid at seven points ending at 0.99, SIGNED, under standing constraint 6, and these three
+were requested after the pinned grid's outcomes were seen. They live in
+`logs/B_tau_0p999_0p9999_0p99999/`, every script printed a non-pinned warning, and they are
+reported APART from the pre-registered result. Promoting any of them needs a NEW dated
+pre-registration file, never an edit to the signed one.
+
+### The answer: `tau` is a logarithmic lever, and that is a property of the calibration
+
+`eta_tau = arctanh(tau)`, so **shrinking the privacy margin `1 - tau` by 1000x multiplies
+the tilt by 2.3059x**:
+
+| `tau` | 0.9 | 0.99 | 0.999 | 0.9999 | 0.99999 |
+|---|---|---|---|---|---|
+| `eta_tau` | 1.4722 | 2.6467 | 3.8002 | 4.9517 | 6.1030 |
+| `epsilon_tau` | 2.9444 | 5.2933 | 7.6004 | 9.9034 | 12.2061 |
+| `p_succ_bound` | 0.950000 | 0.995000 | 0.999500 | 0.999950 | 0.999995 |
+
+**AND THE MEASURED MOVEMENT IS PROPORTIONAL TO `eta_tau` AT EVERY POINT OF A TEN-POINT
+GRID.** ARM 1, 44 held-out individuals, 22 autosomes, K = 86, per-target leave-one-out,
+EXACT via `ffbs.state_marginals` (no sampling, no differencing). Provenance
+`logs/B_tau_0p999_0p9999_0p99999/arm1_endpoint.json` merged with `logs/B_arm1_endpoint.json`
+— all 44 targets report the same `t_total` in both, so they are one build.
+
+| from `tau` = 0 to | `e_q_u` movement | `e_differ` cells | x(`tau` = 0.99) | `eta_tau` ratio |
+|---|---|---|---|---|
+| 0.05 | +1.8134e-09 | -0.08 | 0.019 | 0.019 |
+| 0.1 | +3.6360e-09 | -0.16 | 0.038 | 0.038 |
+| 0.25 | +9.2557e-09 | -0.42 | 0.097 | 0.097 |
+| 0.5 | +1.9906e-08 | -0.89 | 0.208 | 0.208 |
+| 0.9 | +5.3350e-08 | -2.39 | 0.556 | 0.556 |
+| 0.99 | +9.5909e-08 | -4.30 | 1.000 | 1.000 |
+| 0.999 | +1.3771e-07 | -6.18 | 1.436 | 1.436 |
+| 0.9999 | +1.7944e-07 | -8.05 | 1.871 | 1.871 |
+| 0.99999 | +2.2116e-07 | -9.93 | 2.306 | 2.306 |
+
+**COLUMNS** · the last two columns agree to three decimals on all nine rows, so the movement
+is a LINEAR FUNCTION of `eta_tau` and of nothing else across four orders of magnitude in
+`1 - tau`. **ROWS** · `e_q_u` level 0.802982751 at `tau` = 0 (median of 44, `u_ceiling`
+0.972588907); `e_differ` level 7,630,132.36 cells. 44/44 targets move the useful way at
+every point, median +2.2148e-07 over the whole range (min +2.0323e-07, max +3.3502e-07).
+
+**SO THE WHOLE EXTRA RANGE BUYS TEN CELLS OF 7,630,132.** A first-order prediction written
+down BEFORE the genome-wide Arm 2 run — movement ~ `eta_tau`, so 8.345e-08 x 2.3059 =
+1.924e-07 — came out at **+1.924e-07** measured, to four significant figures.
+
+### ARM 2, genome-wide, exact: the budget goes almost entirely unspent
+
+`scripts/exact_utility.py`, HG00096, scope `chain`, shares by decision J summing to
+1.000000 over T = 22,134,562, n = 1, zero Monte-Carlo error. Provenance
+`logs/B_tau_0p999_0p9999_0p99999/arm2_exact_utility.md`.
+
+| metric | 0 | 0.99 | 0.999 | 0.9999 | 0.99999 |
+|---|---|---|---|---|---|
+| `e_q_u` * | 0.708967646 | 0.708967729 | 0.708967766 | 0.708967802 | 0.708967838 |
+| `e_q_u_over_ceiling` | 0.858617102 | 0.858617203 | 0.858617247 | 0.858617291 | 0.858617335 |
+
+✅ The `tau` = 0.99 column REPRODUCES the 2026-10-12 movement of 8.345e-08 exactly, which
+is an independent check that the build and the route are unchanged. `u_ceiling` 0.825708741
+at every `tau`.
+
+**AND THE PRIVACY CEILING, genome-wide, EXACT** (`scripts/exact_kl_stable.py`, D1_extremal,
+22 autosomes, T = 22,134,562, n = 1; `logs/B_tau_0p999_0p9999_0p99999/arm2_exact_kl_genome.md`):
+
+| metric | 0.99 | 0.999 | 0.9999 | 0.99999 |
+|---|---|---|---|---|
+| `kl_exact` (max over targets) | 4.406e-07 | 9.075e-07 | 1.541e-06 | 2.341e-06 |
+| `tv_pinsker` | 4.694e-04 | 6.736e-04 | 8.777e-04 | 1.082e-03 |
+| `acc_ceiling` * | 0.500234679 | 0.500336799 | 0.500438838 | 0.500540948 |
+| `p_succ_bound` * | 0.995000 | 0.999500 | 0.999950 | 0.999995 |
+
+⚠⚠ **THIS IS THE SHARPEST FORM OF THE PROJECT'S CENTRAL RESULT.** At `tau` = 0.99999 the
+theorem PERMITS an attacker 0.999995 and the best attacker that can exist reaches
+**0.500541**. The mechanism cannot spend the budget it is given. `kl_exact` grows 5.31x
+where `eta_tau` grows 2.31x — that is 2.31^2, the second-order behaviour `kl ~ eta^2 Var/2`
+predicts, so the two tables corroborate each other. ⚠ Pinsker is an inequality; the true
+ceiling is closer to 0.5 still, and the looseness flatters us. The chr21-at-`beta_share`-1
+figures (`acc_ceiling` 0.503585 at `tau` = 0.99999) are a DIFFERENT, 66.6x more generous
+quantity and are in `arm2_exact_kl_chr21.md`.
+
+### Every attack is null, and the instruments are shown to work
+
+**ARM 2 A1** (`scripts/arm2_attack.py`, chr21, 10 targets x 25 draws x 3 `tau`, balanced,
+250 trials per cell per hypothesis, `delta` = 0.0556): balanced accuracy **0.4680 to
+0.5400** over nine cells, none above `p_succ_bound`. **A3/A4** (`arm2_attack_a3a4.py`):
+A3 0.4900-0.5320; A4 max-over-blocks 0.5000-0.5710 against a Bonferroni z_crit of 4.33 over
+6,687 block-cells. No cell significantly above the bound in either.
+
+✅ **THE CONTROLS CARRY THESE NULLS.** A4 found a 4,096-position verbatim block in 30/30
+pairs. A3's power curve against a KNOWN leak reaches 0.9900 (D1), 0.8000 (D2) and 0.8300
+(D3) once **1%** of positions are copied verbatim, and sits at 0.5000/0.5700/0.5200 at
+f = 0. So the attacks can see a 1% leak and see nothing here. ⚠ A3's pre-registered control
+is still ALGEBRAICALLY UNABLE TO FAIL (subset-sum, mismatches contribute zero), so its
+1.0000 verifies the plumbing and the power curve is the actual power statement.
+
+**ARM 1, PanMixer's own evaluators on our 132 releases** (chr21, 44 targets x 3 `tau`,
+396 evaluator jobs + 132 Beagle, 0 failures; `arm1_pm_attacks.md`): Gap Score **0 of 44**
+linked at every `tau` (`genotype_g_to_gstar` -3,060.1 to -3,595.1), diploid Gap Score 0 of
+44, MIA `hap_original_rank` **25.0-26.5 of 44** with 0 at rank 1, Beagle
+`beagle_accuracy - major_allele_accuracy` **-0.045368 to -0.046176** (negative = the attack
+loses to guessing the commonest allele). Unchanged in character from the pinned grid.
+
+**Their evaluators on BOTH tools** (`pm_eval_results.md`, HG00438): ours identified at
+**0 of 3** `tau` (rank 18/44); theirs at **3 of 8** capacities (0.01, 0.05, 0.1 — rank 1/44,
+positive gap, up to 0.994796 match-vs-original), defeating all three from capacity 0.2 up.
+⚠⚠ **OUR `tau` = 0 RELEASE DEFEATS THEM TOO**, so these nulls measure the release FORM, a
+complete mosaic of other people's haplotypes, and NOT the tilt (standing constraint 7).
+
+**`af_loss` / `ld_loss`** (EXPLORATORY, decision H declined both; `arm1_af_ld.md`):
+`af_loss` [all] ours **0.003664..0.003686** against theirs 0.000220..0.002734 — they still
+beat us at every capacity, on a quantity near their own optimiser's objective. `ld_loss`
+per pair ours 0.005374..0.005456 against theirs 0.000042 then 0.0380..0.0401. ⚠ `af_loss`
+again FAILS the direction check: **23/44 down, 21/44 up** across `tau` 0.999 -> 0.99999,
+median -3.361e-06 — noise, where `target_fidelity` and `e_q_u` are 44/44.
+
+**The head-to-head** (`arm1_headtohead.md`, HG00438, K = 88 both sides per decision M):
+`utility_loss_panmixer` [EXACT E, RAW -1] = **2,342.9131 / 2,342.9128 / 2,342.9125** — the
+exact cost moves in the SEVENTH significant figure, while the 1-draw rows scatter
+2,357.66 / 2,341.10 / 2,354.01. ⚠ That contrast is worth keeping: sampling noise exceeds
+the signal by about four orders of magnitude, which is why decision A demoted the drawn
+route.
+
+### ⚠⚠⚠ OCCURRENCE FOUR OF THE COMMON-RANDOM-NUMBERS DEFECT, AND I CAUSED IT
+
+`scripts/arm1_release.py:genome_seed(target, tau_index)` keyed the seed on the `tau`'s
+POSITION in the `--taus` list. Running `--taus 0.999 0.9999 0.99999` passed 0, 1, 2 and so
+redrew with the seeds of `tau` = 0, 0.05 and 0.10 from the pinned run: 4238719590,
+2209799234, 1378656232. **The chr21 slices came out BIT-IDENTICAL to those releases, 0
+cells differing of 681,648**, so PanMixer's evaluators, Beagle, `donor_switches` and
+`utility_retained` returned the pinned grid's numbers under a new `tau` label.
+
+**How it surfaced:** `genotype_g_to_gstar` in the first Arm 1 table was identical to the
+pinned grid's first three columns to 13 significant figures. A median over 44 targets does
+not do that by chance.
+
+✅ **THE EXACT ENDPOINT WAS NEVER AFFECTED, AND THAT IS NOW MEASURED RATHER THAN ARGUED.**
+`ffbs.state_marginals` uses no RNG and `scripts/arm1_exact_endpoint.py` contains no seed at
+all. Re-running all 132 releases under different seeds reproduced **792/792 exact values
+BIT-IDENTICAL** (worst relative difference 0.000e+00) across `e_differ`, `e_q_u`,
+`target_fidelity`, `u_ceiling`, `e_q_u_over_ceiling` and `called_cells`. So the headline
+above rests on a route the defect cannot touch.
+
+**Fix.** The `tau` component is its index in a fixed `SEED_GRID = PINNED_TAUS +
+EXPLORATORY_TAUS`, and a `tau` outside that grid is REFUSED rather than given a bare index.
+Appending is load-bearing: the seven pinned points keep the indices they were released
+under, so the 308 pinned releases still reproduce from their recorded seeds — verified
+against disk, **42 of 42 pinned directories agree** with the new formula while the 18
+exploratory ones disagree precisely because they were the bad draws. The 132 contaminated
+releases are quarantined at
+`/data/ds85/RanPanMixer/DEPRECATED_arm1_hightau_crn_2026-10-22/` with a README, and the
+withdrawn tables are renamed `*.CRN_INVALID.*`.
+
+**Gate.** `tests/test_arm1_release_seeding.py`, five tests, mutation-tested: the old
+positional seed fails 3, prepending the exploratory points fails the reproducibility test,
+dropping the target fails 3. ⚠ The project had already recorded this defect TWICE
+(`docs/bugs.md` 2026-09-30 common random numbers; `docs/memory.md` seed reuse across
+chromosomes) and `scripts/arm2_attack.py` carries fourteen lines of comment about it. **A
+comment in another file is not a gate.** `arm2_attack.py` was given the same SEED_GRID
+treatment in this run, before any attack was launched, which is why the Arm 2 attacks are
+unaffected.
+
+### Two further defects found and fixed on the way in
+
+**`releases.tau_dir` REFUSED every `tau` past two decimals.** It formatted at `%.2f` and
+raised unless the name round-tripped — deliberately, so 0.995 and 0.99 could not share a
+directory. All three requested points were therefore unreleasable. It now names them
+losslessly (`tau_0p999`, `tau_0p9999`, `tau_0p99999`), still raising on any name that does
+not read back exactly, and four scripts that built that path by hand call the one function.
+
+**`scripts/arm1_attacks_results.py` read an INDEX ARRAY as a boolean mask.**
+`pangenome_mask.npy` is 258,610 site INDICES into the 340,824-site axis;
+`.astype(bool)` makes it True at every nonzero index and the wrong length, which raised
+`ValueError: operands could not be broadcast together with shapes (340824,2) (258610,2)`.
+PanMixer's own `accuracy_stats.py:43` builds the boolean the correct way, which is now what
+we do. ⚠ Nothing published was affected — it raised before returning, and `snp_only` is its
+default subset — but the script had **never produced its table**, so the 308-row pinned-grid
+attack matrix existed only as unread result files until this run.
+
+### What this does NOT establish
+
+Nothing about whether the mechanism is correct — that is the toy's job and it passes. And
+nothing about `tau` as a DESIGN choice: these three points are far past any setting we would
+propose, the pre-registration calls 0.90 and 0.99 "bound-checking only", and the sampled
+attacks at these `tau` are structurally incapable of contributing, since `delta` = 0.0556
+can only ever state "< 0.556" against a permitted 0.999995. **The exact `acc_ceiling` is the
+instrument that answers the PI's question; the attacks are a lower bound beside it.**
+
+---
+
+## 2026-10-22 (later) — B-THY-variance CLOSED: the genome-wide half, and the 43.6x decomposed into three measured factors
+
+**Goal.** Close what the entry below left open: the genome-wide `var_q_u`, and therefore
+whether the two-scope 43.6x is accounted for rather than merely explained at one scope.
+
+**Method.** `scripts/exact_variance.py` over all 22 autosomes at decision-J shares
+summing to 1.000000, ARM 2, HG00096, diploid, `tau` = 0 and 0.99. 44 exact passes,
+4,000 s. Provenance `logs/B_exact_variance_genome.md`.
+
+**Result, genome-wide, exact:** `var_q_u` = **3.153126468e-08**, `var_q_u_diag` =
+1.257225965e-09, **`cov_share` = 0.960128**, `var_q_differ` = 6.467224125e+07 so
+**`sd_q_differ` = 8,041.9 cells**, `sum beta_v^2` = 7.223240212e-08. `e_q_u` =
+0.708967646, which reproduces `logs/B_exact_utility.md` exactly — an end-to-end check
+that this script's marginals are the same object that file measured.
+
+✅ **THE PREDICTION HOLDS AT GENOME SCALE TOO.** `eta_tau * Var(tau=0)` =
+**8.345230e-08** and the trapezoid is 8.345229e-08, against the logged movement of
+**8.345e-08** — a relative agreement of 3e-05. With chr21's 1e-05 that is the identity
+`d E_Q[u]/d eta = Var_Q(u)` confirmed at BOTH scopes, on real data, by a route that
+shares no arithmetic with the movement it predicts.
+
+✅✅ **THE 43.6x IS NOW FULLY ACCOUNTED FOR, AS A PRODUCT OF THREE MEASURED FACTORS.**
+The old argument used `sum beta_v^2` alone and predicted 128.6. Two further factors were
+missing, and both run the same way:
+
+| factor | value |
+|---|---|
+| `sum beta_v^2` (what the old argument used) | 128.6181 |
+| / `beta_v^2`-weighted mean p(1-p) rises | 2.2679 |
+| = the diagonal (independence) part | 56.7130 |
+| / the covariance multiplier (1 + cov/diag) rises | 1.3014 |
+| = **TOTAL `var_q_u` ratio** | **43.5790** |
+
+The product reproduces the measured ratio to **1.6e-16**, and 43.5790 against the
+movement ratio of 43.581 from the two logged figures. So:
+1. **`sum beta_v^2` is not the diagonal.** The diagonal is
+   `sum_v beta_v^2 p_v (1 - p_v)`, and the `beta_v^2`-weighted mean of `p(1-p)` is
+   **2.27x larger genome-wide** (0.007675 -> 0.017405): the positions carrying the most
+   weight genome-wide have more variable matches than chr21's do. That factor alone
+   takes 128.6 to 56.7.
+2. **The covariance multiplier grows.** The covariance over the diagonal goes
+   **18.27 -> 24.08**, so `(1 + m)` rises 1.30x and takes 56.7 to 43.6.
+
+⚠ **THE FIRST FACTOR IS THE BIGGER SURPRISE AND IT IS NOT ABOUT CORRELATION AT ALL.**
+The project's standing hypothesis was that positive correlation along the copying path
+explains the gap, and it does contribute — but only 1.30x of the 2.95x total
+discrepancy. The larger 2.27x is a property of which positions carry `beta_v` weight at
+each scope, which no correlation argument touches. Both are now measured and neither was
+predicted.
+
+**`cov_share` is stable across every scope measured:** 0.9334 (chr22) to 0.9684 (chr4)
+per chromosome, 0.960128 genome-wide, 0.948111 on chr21 at share 1, 0.957022 in ARM 1.
+Covariance is 93-97% of the variance everywhere, which is why no reweighting of `beta_v`
+can give the utility real variance (`beta_v`'s last block in `docs/terms.md`).
+
+**What this does NOT establish.** n = 1 target genome-wide, and one target in ARM 1.
+`Var` at the two endpoint `tau` only, so the integral is bracketed rather than
+integrated — the gap between the first-order and trapezoid figures is 0.00% at both
+scopes, so it carries no conclusion here. `utility_loss_panmixer`'s own SD still needs
+PanMixer's cost weight vector. The stale "needs pair marginals" wording is still in
+`scripts/exact_utility.py` and `paper/draft_2026-10-13.md`; the script edit remains HELD
+while `ht_a2_util` is mid-run on it.
+
+---
+
+## 2026-10-22 — B-THY-variance: `Var_Q(u)` measured EXACTLY in O(TK), and the 43.6x is covariance
+
+**Goal.** Settle the open item this project has carried since 2026-10-12: the
+`e_q_u` movement shrinks **43.6x** from chr21-at-share-1 to genome-wide while
+`mean beta_v` predicts 72 and `sum(beta_v^2)` predicts 128.6, and no mechanism was
+claimed. `docs/plan.md` and `scripts/exact_utility.py` both record that settling it
+"needs `Var_Q(u)` from PAIR marginals". Dylan asked for it, and for the standard
+deviation of the single-draw table columns, before any of the paper is written.
+
+**[CORRECTION - 2026-10-22] IT DOES NOT NEED PAIR MARGINALS.** That wording is wrong
+about the METHOD, not about the quantity. Pair marginals over all position pairs are
+O(T^2 K^2) and unreachable at T = 22,134,562, which is why the item sat open. But `u`
+is an ADDITIVE functional of the hidden path and FFBS's backward chain is a Markov
+chain whose kernels are already in hand, so ONE O(TK) sweep carrying the first and
+second conditional moments of the running prefix sum returns the variance exactly —
+the same order of cost as the `e_q_u` pass already run. `scripts/exact_variance.py`
+is that sweep. ⚠ The stale "pair marginals" wording still stands in
+`scripts/exact_utility.py`'s docstring and in `paper/draft_2026-10-13.md` (twice);
+the script edit is HELD because `ht_a2_util` is mid-run on it (see the process note
+below).
+
+**Method.** `Q_eta ∝ R_D exp(eta * u)` is an exponential family in `eta` with
+sufficient statistic `u`, so `d E_Qeta[u] / d eta = Var_Qeta(u)` and the movement
+across the grid is that variance integrated. The recursion is CENTRED — the
+per-position posterior mean is subtracted before accumulating, so it computes
+`E[(u - E u)^2]` directly instead of differencing `E[u^2] - E[u]^2`, which here is a
+cancellation of eight orders of magnitude. Centring also makes the recursion's own
+first moment exactly 0, an instrument check computed through the alpha-kernels while
+the centring constants come from the gamma-marginals, so the two routes share no
+arithmetic. Measured: `max abs centred mean` 2.4e-13 and below on every run.
+
+**Results, chr21, ARM 2, HG00096, share 1, diploid, exact** (`logs/B_exact_variance_chr21_share1.md`):
+
+| quantity | tau = 0 | tau = 0.99 |
+|---|---|---|
+| `var_q_u` | 1.374101750e-06 | 1.374107483e-06 |
+| `var_q_u_diag` (independence) | 7.130104363e-08 | 7.129875176e-08 |
+| `cov_share` | 0.948111 | 0.948113 |
+| `var_q_differ` | 7.739900306e+05 | 7.739978038e+05 |
+| `sd_q_differ` | 879.8 cells | 879.8 cells |
+
+**THE PREDICTION HOLDS ON REAL DATA, and that is the result.** `eta_tau * Var(tau=0)`
+= **3.636770e-06** and the trapezoid over the two endpoints is **3.636777e-06**,
+against the movement measured in the same run, **3.636777e-06**, and the logged
+`logs/B_beta_concentration.md` figure of 3.6368e-06 — agreement to five significant
+figures. So the variance does not merely explain the movement after the fact; it
+PREDICTS it from an independently computed quantity.
+
+**And the 43.6x is covariance, with the covariance share now measured at both
+scopes.** 94.8% of `var_q_u` on chr21 is between-position covariance, so the
+independence prediction misses by a factor of 19.3. ⚠ The 94.8% figure is NOT new —
+`docs/terms.md` has carried it since 2026-09-30 from the finite-difference route on
+the pre-rebuild chain — and this is an INDEPENDENT reproduction of it: a different
+estimator on a different build agrees to three digits (0.948906 against 0.948 in the
+matched configuration: tau = 0.5, haploid, chr21, share 1, HG00096).
+
+**Results, ARM 1, HG00438 held out at K = 86, chr21 at its OWN share 0.0150248984**
+(`logs/B_exact_variance_arm1_chr21.md`): `var_q_u` = 4.652085850e-10,
+`cov_share` = 0.957022, **`sd_q_differ` = 1,061.9 cells**, `e_differ` = 107,287.2.
+
+**THE ANSWER TO DYLAN'S PI, and it is quantitative.** The wiggle across `tau` in the
+head-to-head's `utility_loss_panmixer` row is single-draw noise, not an effect of
+`tau`. Within that row the exact expected cost moves **0.0007** across the whole grid
+(1,259.9751 -> 1,259.9744) while the seven single draws span 1,234.6 to 1,273.6. And
+the scatter is the right SIZE: because `tau` barely moves the expected value, the
+seven `tau` columns act as seven repeat draws of one quantity, giving an empirical SD
+of **1,312 cells** for `cells changed` against the EXACT **1,061.9** — a ratio of
+1.24 where a 7-draw SD estimate carries 1 sigma of +-29%. Every column of every
+single-draw row sits within 2 SD of its own mean.
+
+**Verification of the instrument, not just the result.** Four separate checks:
+1. **Brute-force enumeration on the toy.** The recursion agrees with direct summation
+   over the enumerated release distribution to a worst **7.7e-15** across two input
+   paths and three `tau`.
+2. **Mutation test of that gate.** The independence formula — the hypothesis under
+   test — is off by **409%** on the same toy, so the gate can tell the two apart.
+   A gate that cannot fail is decoration.
+3. **30 real draws from one chr21 posterior.** Exact SD 626.89 cells against observed
+   647.83 (ratio **1.0334**) and exact sd(u) 1.670607e-03 against 1.763e-03 (ratio
+   **1.0555**), both inside a 3-sigma gate of 0.394 at n = 30; the means land at
+   -0.13 and -0.15 SE.
+4. **The centred first moment**, above.
+
+**⚠⚠ A BUG THE TOY GATE COULD NOT CATCH, AND IT RETURNED NaN FOR A WHOLE
+CHROMOSOME.** The backward kernel's normaliser `D_t(i) = s/K + (1-s) alpha_{t-1}(i)`
+reaches exactly 0 when a zero-genetic-distance step (`switch_mass == 0`, so `unif`
+vanishes and the transition is the identity) meets a donor with no call at the SOURCE
+position (`alpha_{t-1}(i) == 0`). chr21 has **1,058** zero-distance steps and **7** of
+them sit next to an unavailable donor. The first version divided anyway and reported
+`var_q_u` = nan for all 332,521 positions — caught because the number was nan and not
+because any gate fired. ⚠ The project's toy cohort carries BOTH features, a
+zero-distance step at index 2 and two uncalled cells, but never together, so the
+enumeration gate passed while every real run was nan. The fix asserts that such a
+state carries no forward mass at `t` either (it is reachable only from itself, where
+it has none) and then skips it; `validate_dead_kernel()` builds a 4x5 cohort where the
+two coincide and gates that line against enumeration, agreeing to 5.2e-15 where the
+unguarded version returns nan. See `docs/bugs.md`.
+
+**Process note — the no-edit-during-a-long-run rule held, and was then tested.**
+`ht_a1_rel` (arm1_release, 44 targets, chr16 of 22) and `ht_a2_util` (exact_utility at
+`tau` = 0.999+) were both mid-run throughout, importing `src/`. Nothing in `src/`,
+`configs/` or `tests/` was touched: every line of this unit is a NEW file,
+`scripts/exact_variance.py`, which no running job imports. ⚠ The Arm 1 refactor DID
+edit that new file while this unit's own genome-wide job was running on it. The job
+holds its own loaded copy, so the risk was a split-brain result set, and it was closed
+rather than argued away: chr21 at share 1 was re-run under the post-refactor code and
+reproduces **1.374101750e-06 bit-identically**, and the two gates pass on both
+versions.
+
+**What this does NOT establish.** The genome-wide `var_q_u` was still running when
+this entry was written, so the 43.6x is explained at chr21 scope and the two-scope
+decomposition is NOT yet closed. `utility_loss_panmixer`'s own SD needs PanMixer's
+cost weight vector, which this script does not load; the `cells changed` and
+`target_fidelity` rows are covered and the cost row is not. One target per arm.
+`Var` was computed at the two endpoint `tau` only, so the integral is bracketed by
+two points rather than integrated.
+
+---
+
 ## 2026-10-15 — B-EVL-arm1-ingraph + B-EVL-pm-beagle: the two metrics we declined, and the attack we had never run on them
 
 **Two units of work, both at Dylan's request, both CROSS-TOOL.**

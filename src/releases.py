@@ -65,18 +65,25 @@ def release_root(root: str | Path | None = None) -> Path:
 def tau_dir(tau: float) -> str:
     """`0.1` -> `tau_0p10`, the form `CLAUDE.md`'s naming rule asks for.
 
-    ⚠ IT REFUSES A `tau` THAT DOES NOT ROUND-TRIP at two decimals. Without that,
-    0.995 and 0.99 would both become `tau_0p99` and the second release would land
-    in the first one's directory -- a silent collision between two different
-    privacy levels, which is the one collision no reader could spot afterwards.
+    Two decimals wherever that is exact, so every pinned-grid directory keeps its
+    name; otherwise the shortest exact decimal, so `0.999` -> `tau_0p999` and
+    `0.99999` -> `tau_0p99999` (the exploratory high-`tau` points of 2026-10-22).
+
+    ⚠ THE NAME MUST READ BACK AS EXACTLY `tau`. At two decimals alone, 0.995 and
+    0.99 would both become `tau_0p99` and the second release would land in the
+    first one's directory -- a silent collision between two different privacy
+    levels, which is the one collision no reader could spot afterwards. This used
+    to REFUSE any `tau` past two decimals; it now names it losslessly instead, and
+    still raises on any name that does not round-trip.
     """
-    name = f"tau_{tau:.2f}".replace(".", "p")
+    two = f"{float(tau):.2f}"
+    num = two if float(two) == float(tau) else repr(float(tau))
+    name = "tau_" + num.replace(".", "p")
     back = float(name.removeprefix("tau_").replace("p", "."))
-    if abs(back - float(tau)) > 1e-12:
+    if back != float(tau):
         raise ValueError(
-            f"tau={tau!r} does not survive the two-decimal directory name {name!r} "
-            f"(it reads back as {back!r}). Two tau values that differ beyond two "
-            f"decimals would share a directory, so name it explicitly instead.")
+            f"tau={tau!r} does not survive its directory name {name!r} (it reads "
+            f"back as {back!r}). Two tau values would share a directory.")
     return name
 
 

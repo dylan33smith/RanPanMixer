@@ -76,7 +76,8 @@ from mechanism import ffbs, utility  # noqa: E402
 # `pick_decoys` and `concordance` define the cohort, the model, the decoy conditions
 # and the seeding discipline; a second copy would drift and then the two attacks
 # would no longer be running on the same experiment.
-from arm2_attack import CHROM, DECOY_SEED, TAUS, load_state, pick_decoys  # noqa: E402
+from arm2_attack import (CHROM, DECOY_SEED, EXPLORATORY_TAUS, SEED_GRID,  # noqa: E402
+                         TAUS, load_state, pick_decoys)
 
 SEED_BASE = 70_000           # disjoint from A1's 50_000
 BLOCK_SIZES = (512, 4096, 32768)
@@ -628,7 +629,18 @@ def main(argv=None) -> int:
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--controls-only", action="store_true")
     ap.add_argument("--from-json", type=Path, default=None)
+    # the `tau` index in the seed is its place in SEED_GRID, NOT in `--taus`, so a
+    # subset run draws the same streams as the full grid (see arm2_attack.SEED_GRID)
+    ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))
     a = ap.parse_args(argv)
+    off = [t for t in a.taus if t not in SEED_GRID]
+    if off:
+        raise SystemExit(f"tau {off} is in neither the pinned grid nor "
+                         f"EXPLORATORY_TAUS, so it has no fixed seed index")
+    if any(t in EXPLORATORY_TAUS for t in a.taus):
+        print(f"⚠⚠ EXPLORATORY `tau` {[t for t in a.taus if t in EXPLORATORY_TAUS]}: "
+              f"NOT in the signed grid {list(TAUS)}. Report apart from the "
+              f"pre-registered result.\n")
 
     prereg, rev = A.require_signed_prereg()
     st = load_state()
@@ -666,9 +678,9 @@ def main(argv=None) -> int:
             print(f"JSON -> {a.json}")
         return 0
 
-    jobs = [(t, tau, SEED_BASE + i * 10_000 + j * 1_000 + k)
+    jobs = [(t, tau, SEED_BASE + i * 10_000 + SEED_GRID.index(tau) * 1_000 + k)
             for i, t in enumerate(tids)
-            for j, tau in enumerate(TAUS)
+            for tau in a.taus
             for k in range(a.draws)]
     plan = R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(jobs))
     print(f"\n{len(jobs):,} trials, each drawing 1 release under Q_p and 3 under "
@@ -677,7 +689,7 @@ def main(argv=None) -> int:
     res = R.run_jobs(_one_trial, jobs, workers=plan.workers, label="trials",
                      progress_every=max(1, len(jobs) // 20))
 
-    table = _report(res, ctl, TAUS, prereg, rev, tids, a.draws, pw=pw)
+    table = _report(res, ctl, tuple(a.taus), prereg, rev, tids, a.draws, pw=pw)
     if a.json:
         # ⚠ the raw per-block statistics are DROPPED from the JSON: 1,750 trials x 3
         # conditions x 2 hypotheses x 743 blocks is ~8M numbers. `table["a4"]`
@@ -689,7 +701,7 @@ def main(argv=None) -> int:
                                   for c, cell in r["conditions"].items()}}
                 for r in res]
         a.json.write_text(json.dumps(
-            {"prereg": prereg, "git_rev": rev, "taus": list(TAUS), "targets": tids,
+            {"prereg": prereg, "git_rev": rev, "taus": list(a.taus), "targets": tids,
              "n_per": a.draws, "block_sizes": list(BLOCK_SIZES),
              "n_bi_sites": _A3["n_bi"], "controls": ctl, "power": pw, "table": table,
              "trials": lean,

@@ -55,6 +55,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 import numpy as np                                        # noqa: E402
 
+import releases as R                                      # noqa: E402
 from cohort import loo                                     # noqa: E402
 from mechanism import calibration as C                     # noqa: E402
 from mechanism import ffbs, hmm, utility                   # noqa: E402
@@ -157,7 +158,7 @@ def our_side(target: str, taus) -> list[dict]:
     ul = ul_site[ic]
     out = []
     for tau in taus:
-        tdir = REPO / "data" / "releases" / "arm1" / target / f"tau_{tau:.2f}".replace(".", "p")
+        tdir = REPO / "data" / "releases" / "arm1" / target / R.tau_dir(tau)
         hits = sorted(tdir.glob("*chromchr21_*_chr21/released_path.npy"))
         if len(hits) != 1:
             raise AssertionError(f"{target}/{tau:g}: {len(hits)} chr21 parts, expected 1")

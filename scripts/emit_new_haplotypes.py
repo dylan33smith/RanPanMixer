@@ -49,6 +49,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 import numpy as np                                        # noqa: E402
 
+import releases as R                                      # noqa: E402
 from cohort import loo                                     # noqa: E402
 
 PM_DATA = REPO / "external" / "PanMixer" / "starting_data" / "chr21"
@@ -113,7 +114,7 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
     # our per-target chain, and the release on it
     ic = loo.loo_chain(REPO / "data" / "cohort" / CHROM, target, haplotypes=hap).in_chain
     tdir = (REPO / "data" / "releases" / "arm1" / target
-            / f"tau_{tau:.2f}".replace(".", "p"))
+            / R.tau_dir(tau))
     hits = sorted(tdir.glob(f"*chrom{CHROM}_*_{CHROM}/released_path.npy"))
     if len(hits) != 1:
         raise AssertionError(f"{target}/{tau:g}: {len(hits)} chr21 parts, expected 1")
@@ -143,7 +144,7 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
     n_oor = int(oor.sum())
     out[oor] = -1
 
-    d = out_root / "arm1" / target / f"tau_{tau:.2f}".replace(".", "p") / CHROM
+    d = out_root / "arm1" / target / R.tau_dir(tau) / CHROM
     d.mkdir(parents=True, exist_ok=True)
     np.save(d / "new_haplotypes.npy", out)
     # ⚠ the sidecar docs/terms.md requires: "Ship a `sites.tsv` beside any emitted copy

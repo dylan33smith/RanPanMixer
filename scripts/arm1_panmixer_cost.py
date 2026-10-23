@@ -56,6 +56,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 import numpy as np                                        # noqa: E402
 
+import releases as R                                      # noqa: E402
 from cohort import loo                                     # noqa: E402
 
 PINNED_TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
@@ -76,7 +77,7 @@ def panmixer_weights(chrom: str):
 
 def released_for(target: str, tau: float, chrom: str) -> Path:
     """The one stored part for this (target, `tau`, chromosome)."""
-    d = ARM1 / target / f"tau_{tau:.2f}".replace(".", "p")
+    d = ARM1 / target / R.tau_dir(tau)
     hits = sorted(d.glob(f"*chrom{chrom}_*_{chrom}/released_path.npy"))
     if len(hits) != 1:
         raise AssertionError(

@@ -15,8 +15,10 @@
 #   MODE=selfout ROWS="0 6 7 13" bash scripts/beagle_attack_run.sh # the labelled diagnostic
 set -u
 REPO=/home/ds85/projects/Pangenome/RanPanMixer
-ROOT=/data/ds85/RanPanMixer/runs/beagle_attack/root
-LOGS=/data/ds85/RanPanMixer/runs/beagle_attack/logs
+# ROOT/LOGS/SCRATCH are overridable so a second mirror never touches this one's rows
+ROOT=${ROOT:-/data/ds85/RanPanMixer/runs/beagle_attack/root}
+LOGS=${LOGS:-/data/ds85/RanPanMixer/runs/beagle_attack/logs}
+SCRATCH=${SCRATCH:-/data/ds85/RanPanMixer/runs/beagle_attack/scratch}
 PY=/home/ds85/miniconda3/envs/panmixer/bin/python
 NPAR=${NPAR:-8}
 THREADS=${THREADS:-6}
@@ -34,11 +36,11 @@ if [ "$MODE" = "selfout" ]; then EXTRA="--exclude-self"; SUF="_selfout"; fi
 run_one() {
   local row=$1
   local tag="beagle${SUF}_row${row}"
-  local cwd="/data/ds85/RanPanMixer/runs/beagle_attack/scratch/$tag"
+  local cwd="$SCRATCH/$tag"
   mkdir -p "$cwd"
   ( cd "$cwd" \
     && PYTHONDONTWRITEBYTECODE=1 "$PY" -B "$REPO/scripts/beagle_attack_one.py" \
-         --row "$row" --threads "$THREADS" --xmx "$XMX" $EXTRA \
+         --row "$row" --root "$ROOT" --threads "$THREADS" --xmx "$XMX" $EXTRA \
        > "$LOGS/$tag.log" 2>&1 )
   echo $? > "$LOGS/$tag.status"
 }

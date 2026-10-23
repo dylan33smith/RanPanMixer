@@ -16,8 +16,10 @@
 #
 #   NPAR=8 bash scripts/arm1_pm_attacks_run.sh
 set -u
-ROOT=/data/ds85/RanPanMixer/runs/beagle_attack/root
-LOGS=/data/ds85/RanPanMixer/runs/beagle_attack/logs
+# ROOT/LOGS/SCRATCH are overridable so a second mirror never touches this one's rows
+ROOT=${ROOT:-/data/ds85/RanPanMixer/runs/beagle_attack/root}
+LOGS=${LOGS:-/data/ds85/RanPanMixer/runs/beagle_attack/logs}
+SCRATCH=${SCRATCH:-/data/ds85/RanPanMixer/runs/beagle_attack/scratch}
 PY=/home/ds85/miniconda3/envs/panmixer/bin/python
 NPAR=${NPAR:-8}
 N=$(PATH=/home/ds85/miniconda3/envs/ranpanmixer/bin:$PATH python -c \
@@ -28,7 +30,7 @@ mkdir -p "$LOGS"
 run_one() {
   local exp=$1 name=$2 row=$3
   local tag="${name}_row${row}"
-  local cwd="/data/ds85/RanPanMixer/runs/beagle_attack/scratch/$tag"
+  local cwd="$SCRATCH/$tag"
   mkdir -p "$cwd"
   ( cd "$cwd" \
     && PYTHONPATH="$ROOT" PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg \

@@ -28,6 +28,7 @@ real PanMixer setting.
 
 from __future__ import annotations
 
+import argparse
 import json
 import statistics as st
 from pathlib import Path
@@ -70,7 +71,15 @@ def theirs():
     return af, [float(a[0]) / int(a[1]) for a in ld]
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    # The grid is read from the MIRROR's own manifest, so a second mirror (the
+    # exploratory high-`tau` one) is tabled by this same code.
+    global ROOT, TAUS, TAU_LBL
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", type=Path, default=ROOT)
+    ROOT = ap.parse_args(argv).root
+    TAUS = tuple(json.loads((ROOT / "manifest.json").read_text())["taus"])
+    TAU_LBL = [f"{float(t.replace('p', '.')):g}" for t in TAUS]
     af, ld, per_target = ours()
     n = [len(af["all"][t]) for t in TAUS]
     if set(n) != {44}:
@@ -78,12 +87,12 @@ def main() -> int:
     taf, tld = theirs()
 
     print("ARM 1 IN-GRAPH UTILITY -- EXPLORATORY, NOT PRE-REGISTERED (decision H).")
-    print("chr21. Ours: 44 targets x 7 tau, median. Theirs: HG00438 x 8 capacities.")
+    print(f"chr21. Ours: 44 targets x {len(TAUS)} tau, median. Theirs: HG00438 x 8 capacities.")
     print("⚠ ld_loss window is 5 POSITION UNITS, not 5 kb. ⚠ Not same-build.\n")
 
     print("**OURS**\n")
     print("| variable | " + " | ".join(TAU_LBL) + " |")
-    print("|---|" + "---|" * 7)
+    print("|---|" + "---|" * len(TAUS))
     for k in KEYS:
         print(f"| `af_loss` [{k}] | " + " | ".join(f"{st.median(af[k][t]):.6f}" for t in TAUS) + " |")
     print("| `ld_loss` per pair | " + " | ".join(f"{st.median(ld[t]):.6f}" for t in TAUS) + " |")
@@ -97,9 +106,11 @@ def main() -> int:
 
     # ⚠ THE DIRECTION CHECK IS THE POINT, not the movement size: the pre-registered
     # endpoints move 44/44 the same way. If this one does not, it does not resolve.
-    mv = [v["0p99"] - v["0p00"] for v in per_target.values() if "0p00" in v and "0p99" in v]
+    t0, t1 = TAUS[0], TAUS[-1]
+    mv = [v[t1] - v[t0] for v in per_target.values() if t0 in v and t1 in v]
     down, up = sum(1 for x in mv if x < 0), sum(1 for x in mv if x > 0)
-    print(f"\naf_loss[all] per-target direction, tau 0 -> 0.99: {down}/{len(mv)} down, "
+    print(f"\naf_loss[all] per-target direction, tau {TAU_LBL[0]} -> {TAU_LBL[-1]}: "
+          f"{down}/{len(mv)} down, "
           f"{up}/{len(mv)} up, median {st.median(mv):+.3e}")
     print("  -> NO systematic direction, unlike target_fidelity and e_q_u (44/44)."
           if min(down, up) > len(mv) // 4 else "  -> systematic.")
