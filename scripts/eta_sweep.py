@@ -82,6 +82,8 @@ import numpy as np                                        # noqa: E402
 from mechanism import calibration as C                    # noqa: E402
 from mechanism import exact, ffbs, hmm, toy, utility       # noqa: E402
 
+from exact_utility import AUTOSOMES                        # noqa: E402
+from exact_utility import shares as exact_utility_shares   # noqa: E402
 from exact_variance import haplotype_variance              # noqa: E402
 from exact_kl_stable import extremal, kl_stable            # noqa: E402
 
@@ -89,6 +91,53 @@ from exact_kl_stable import extremal, kl_stable            # noqa: E402
 # grid's own top (`eta_tau`(0.99) = 2.6467, `eta_tau`(0.99999) = 6.1030)
 DEFAULT_ETAS = (0.0, 1.0, 2.6466524124, 6.1030338228, 20.0, 60.0, 200.0,
                 1e3, 1e4, 1e5, 1e6, 3e6)
+
+
+def genome_chrom(args) -> dict:
+    """One chromosome of the GENOME-WIDE curve, at its decision-J share.
+
+    A worker body, so it takes one tuple and never raises into the pool: a fan-out
+    that loses a chromosome silently would produce a complete-looking curve over 21.
+    """
+    chrom, target, share, etas, with_kl = args
+    try:
+        d = REPO / "data" / "cohort" / chrom
+        ic = np.load(d / "in_chain.npy").astype(bool)
+        hap = np.load(d / "haplotypes.npy")[:, ic]
+        m = hmm.from_arrays(hap, np.load(d / "genetic_pos.npy")[ic],
+                            np.load(d / "positions.npy")[ic], cohort_id=chrom)
+        beta = utility.beta_v(np.load(d / "support.npy"), in_chain=ic,
+                              share=share, chrom=chrom).beta
+        p = np.load(REPO / "data" / "targets" / target / chrom / "path.npy")[ic]
+        wall = psi_wall(beta)
+        over = [e for e in etas if e >= wall]
+        if over:
+            raise ValueError(f"{chrom}: eta {over} past its wall {wall:.3e}")
+        ceil = utility.diploid_utility(utility.u_ceiling(p[:, 0], beta),
+                                       utility.u_ceiling(p[:, 1], beta))
+        rows = []
+        for eta in etas:
+            # ⚠ NAME THE `eta` IN ANY FAILURE. The forward pass can dead-end at a
+            # zero-distance step once the posterior concentrates (measured 2026-10-23
+            # on chr7 and chr10), and that is eta-DEPENDENT, so a traceback without
+            # the eta does not say whether the curve died at its second point or its
+            # eighth -- which is the only thing that decides what is reportable.
+            try:
+                r = one_eta(m, hap, p, beta, eta, with_kl=with_kl)
+            except Exception as e:
+                raise RuntimeError(
+                    f"{chrom} FAILED AT eta={eta:g} (rows up to "
+                    f"{rows[-1]['eta']:g} succeeded): {type(e).__name__}: {e}"
+                ) from e
+            r["chrom"] = chrom
+            rows.append(r)
+        return {"chrom": chrom, "share": share, "t_chain": int(ic.sum()),
+                "u_ceiling": ceil, "beta_mean": float(beta.mean()),
+                "beta_max": float(beta.max()), "wall": wall, "rows": rows}
+    except Exception as e:                  # a worker must report, never vanish
+        import traceback
+        return {"chrom": chrom, "error": f"{type(e).__name__}: {e}",
+                "traceback": traceback.format_exc()[-1200:]}
 
 
 def psi_wall(beta: np.ndarray) -> float:
@@ -306,9 +355,113 @@ def validate() -> int:
 
 # --------------------------------------------------------------------- the sweep
 
+def run_genome(a) -> int:
+    """The GENOME-WIDE curve: all 22 autosomes at decision-J shares, summed.
+
+    ⚠ THIS IS THE ONE THAT MATTERS, because the release IS genome-wide and the
+    single-chromosome curve CANNOT be rescaled into it: the `eta` * `beta_v` scaling
+    is exact WITHIN a chromosome (measured to 8-9 digits) but chr1 sits 1.0-1.4
+    points of ceiling fraction above chr21 at matched `eta` * mean(`beta_v`), so the
+    chromosomes are not one curve and the composition has to be run.
+    """
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    sh, T, tot = exact_utility_shares()
+    print(f"⚠⚠ EXPLORATORY, NOT PRE-REGISTERED, AND NOT AN OPERATING POINT.")
+    print(f"THE GENOME-WIDE RESPONSE CURVE. {a.target}, ARM 2, 22 autosomes, "
+          f"T = {tot:,}, shares by decision J summing to {sum(sh.values()):.6f}, "
+          f"diploid, EXACT via state marginals.")
+    print(f"{len(a.etas)} `eta` x 22 chromosomes, {a.workers} workers.\n")
+    jobs = [(c, a.target, sh[c], list(a.etas), a.with_kl) for c in AUTOSOMES]
+    out, t0 = {}, time.time()
+    with ProcessPoolExecutor(max_workers=a.workers) as ex:
+        futs = {ex.submit(genome_chrom, j): j[0] for j in jobs}
+        for n, f in enumerate(as_completed(futs), 1):
+            r = f.result()
+            out[r["chrom"]] = r
+            tag = f"❌ {r['error']}" if "error" in r else f"✅ T = {r['t_chain']:,}"
+            print(f"  [{n}/22] {r['chrom']}: {tag} "
+                  f"[{(time.time()-t0)/60:.0f} min]", flush=True)
+    errs = [r for r in out.values() if "error" in r]
+    # ⚠ completeness asserted from the RESULT SET, not from the loop's bookkeeping
+    missing = [c for c in AUTOSOMES if c not in out or "error" in out[c]]
+    if missing:
+        for r in errs[:3]:
+            print(f"\n❌ {r['chrom']}\n{r['traceback']}")
+        raise SystemExit(f"INCOMPLETE: {len(missing)} chromosome(s) missing "
+                         f"({missing[:5]}). A curve over 21 autosomes is not the "
+                         f"genome-wide curve and must not be reported as one.")
+
+    ceil = math.fsum(out[c]["u_ceiling"] for c in AUTOSOMES)
+    agg = []
+    for i, eta in enumerate(a.etas):
+        cells = [out[c]["rows"][i] for c in AUTOSOMES]
+        assert all(abs(x["eta"] - eta) < 1e-9 for x in cells), "eta misalignment"
+        row = {"eta": eta, "epsilon": 2.0 * eta, "tau": tau_label(eta),
+               "log10_one_minus_tau": log10_one_minus_tau(eta),
+               "e_q_u": math.fsum(x["e_q_u"] for x in cells),
+               "var_q_u": math.fsum(x["var_q_u"] for x in cells),
+               "e_differ": math.fsum(x["e_differ"] for x in cells),
+               "called_cells": sum(x["called_cells"] for x in cells),
+               "u_ceiling": ceil}
+        row["e_q_u_over_ceiling"] = row["e_q_u"] / ceil if ceil else float("nan")
+        if a.with_kl:
+            row["kl_exact"] = math.fsum(x["kl_exact"] for x in cells)
+            tv = min(1.0, math.sqrt(max(row["kl_exact"], 0.0) / 2.0))
+            row |= {"tv_pinsker": tv, "acc_ceiling": 0.5 * (1.0 + tv)}
+        agg.append(row)
+
+    base = agg[0]["e_q_u"] if agg[0]["eta"] == 0.0 else None
+    print(f"\n`u_ceiling` = {ceil:.9f} (summed over 22 autosomes).")
+    print(f"\nMetrics are ROWS, `eta` is the COLUMN.\n")
+    print("| metric | " + " | ".join(f"{r['eta']:g}" for r in agg) + " |")
+    print("|" + "---|" * (len(agg) + 1))
+    print("| equivalent `tau` | " + " | ".join(r["tau"] for r in agg) + " |")
+    print("| `epsilon_tau` | " + " | ".join(f"{r['epsilon']:.4g}" for r in agg) + " |")
+    print("| `e_q_u` * | " + " | ".join(f"{r['e_q_u']:.12f}" for r in agg) + " |")
+    print("| `e_q_u_over_ceiling` | " + " | ".join(
+        f"{r['e_q_u_over_ceiling']:.9f}" for r in agg) + " |")
+    if base is not None:
+        gap = ceil - base
+        print("| movement from `eta` = 0 | " + " | ".join(
+            f"{r['e_q_u'] - base:+.4e}" for r in agg) + " |")
+        print("| % of the recoverable gap | " + " | ".join(
+            f"{100*(r['e_q_u']-base)/gap:.3f}%" for r in agg) + " |")
+    print("| `var_q_u` | " + " | ".join(f"{r['var_q_u']:.4e}" for r in agg) + " |")
+    print("| `e_differ` cells | " + " | ".join(
+        f"{r['e_differ']:,.1f}" for r in agg) + " |")
+    if a.with_kl:
+        print("| `kl_exact` | " + " | ".join(f"{r['kl_exact']:.4e}" for r in agg) + " |")
+        print("| `acc_ceiling` * | " + " | ".join(
+            f"{r['acc_ceiling']:.9f}" for r in agg) + " |")
+    print("| `p_succ_bound` * | " + " | ".join(
+        ("0.5" if r["eta"] == 0 else
+         (f"{(1+math.tanh(r['eta']))/2:.9f}" if r["log10_one_minus_tau"] > -15
+          else "1 - 5e" + f"{r['log10_one_minus_tau']:.4g}")) for r in agg) + " |")
+    print(f"\n⚠⚠ **READ THE MOVEMENT, NOT THE LEVEL.** `e_q_u` at `eta` = 0 is the "
+          f"untilted cohort mosaic carrying ZERO target information.")
+    print(f"⚠ `var_q_u` is summed over chromosomes, which is correct because the 22 "
+          f"chains are independent given the shares; it FLOORS near 1e-33 per "
+          f"chromosome and must not be quoted below ~1e-28 (docs/terms.md).")
+    print(f"⚠ Standing constraint 3: the `eta` -> infinity limit is argmax, NOT a "
+          f"release procedure. Constraint 5: one release per genome; this is an "
+          f"evaluation device.")
+    if a.json:
+        a.json.write_text(json.dumps(
+            {"target": a.target, "arm": "arm2", "scope": "genome", "T": tot,
+             "shares": sh, "u_ceiling": ceil, "exploratory": True,
+             "aggregate": agg,
+             "per_chrom": {c: {k: v for k, v in out[c].items() if k != "rows"}
+                           for c in AUTOSOMES}}, indent=1) + "\n")
+        print(f"\nJSON -> {a.json}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--validate", action="store_true")
+    ap.add_argument("--genome", action="store_true",
+                    help="all 22 autosomes at decision-J shares, summed")
+    ap.add_argument("--workers", type=int, default=11)
     ap.add_argument("--chrom", default="chr21")
     ap.add_argument("--target", default="HG00096")
     ap.add_argument("--etas", type=float, nargs="+", default=list(DEFAULT_ETAS))
@@ -323,6 +476,8 @@ def main(argv=None) -> int:
 
     if a.validate:
         return validate()
+    if a.genome:
+        return run_genome(a)
 
     d = REPO / "data" / "cohort" / a.chrom
     ic = np.load(d / "in_chain.npy").astype(bool)

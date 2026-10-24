@@ -553,6 +553,37 @@ verified by reading the cited line or by executing the shipped code, on 2026-09-
 
 ## Mechanism / sampler
 
+### The forward pass dead-ends at a zero-distance step once the posterior concentrates
+- **[2026-10-23] An `eta`-DEPENDENT zero-mass failure, distinct from decision K**
+  **[Symptom]** `scripts/eta_sweep.py --genome` at `eta` = 1.997e8 raised, on chr7
+  and chr10 only, from `ffbs.forward`: *"chain position 1154456 (pos 142603528) has
+  zero total mass: every state reachable from position 1154455 is excluded there."*
+  chr7 at chain position 1,154,456; chr10 at 676,991 (pos 79,896,712). The other 20
+  autosomes completed, and the same two chromosomes succeed at EVERY `eta` up to
+  6.6566e7 — so it is the top point alone.
+  **[Cause]** NOT the structural untraversable-block case decision K excluded. At a
+  step with zero genetic distance the transition is the identity, so no mass mixes
+  between donors. At low `eta` the forward message holds mass on many donors and
+  some are callable at the next position. At extreme `eta` the posterior
+  concentrates so hard that the donors carrying non-negligible mass are ALL
+  excluded at that one position, and the total goes to exactly zero. "Reachable" in
+  the message means "still carrying representable mass", which is `eta`-dependent.
+  **[Proven fix / disposition]** NOT fixed, deliberately, and the curve is reported
+  only up to `eta` = 6.6566e7 — the highest `eta` all 22 autosomes reach. Removing
+  the limit needs a LOG-SPACE forward pass, and `ffbs.forward` is load-bearing for
+  every release and every gate including the signed pre-registration's toy
+  enumeration, so it is not changed on the side of an exploratory sweep. ⚠ The
+  genome driver's completeness assertion REFUSED to print a 21-chromosome curve as
+  the genome-wide result, which is that assertion working as intended.
+  **[How to recognise it again]** A "zero total mass" raise that appears only at
+  high `eta`, only on some chromosomes, and goes away when `eta` is lowered. If it
+  fires at an `eta` you need, the answer is a log-space forward pass, not a wider
+  tolerance. ⚠ Any sweep over a parameter must NAME THAT PARAMETER in its failure:
+  the first traceback did not, and whether the curve died at its second point or
+  its eighth is the only thing that decides what is reportable. See
+  `docs/memory.md` 2026-10-23 (later still).
+
+
 ### A variance route reports a constant floor instead of a collapsing variance, in the flattering direction
 - **[2026-10-23] `haplotype_variance` cancels below ~1e-33**
   **[Symptom]** `scripts/eta_sweep.py --validate` printed `var_q_u` =

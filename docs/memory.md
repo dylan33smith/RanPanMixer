@@ -104,6 +104,108 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-23 (later still) — B-THY-eta-response GENOME-WIDE: the trade-off is DOUBLY bad, and dilution is why
+
+**Goal.** Close what the chr21 curve left open. The entry below refused to extrapolate a
+genome-wide curve from one chromosome, because chr1 sits 1.0-1.4 points of ceiling
+fraction above chr21 at matched `eta` * mean(`beta_v`). This runs the real thing.
+
+**Method.** `scripts/eta_sweep.py --genome`, all 22 autosomes at decision-J shares
+summing to 1.000000 over T = 22,134,562, HG00096, ARM 2, diploid, exact via
+`ffbs.state_marginals`, 10 `eta` from 0 to 6.6566e7, with `kl_exact` and `acc_ceiling`.
+22 of 22 chromosomes, exit 0. Provenance `logs/B_eta_sweep/genome_curve.md` + `.json`.
+⚠⚠ EXPLORATORY, NOT PRE-REGISTERED.
+
+### ✅ THE CURVE, and a tie-back that validates it against a different script
+
+| `eta` | `e_q_u` * | % of the recoverable gap | `acc_ceiling` * | `kl_exact` | `e_differ` cells |
+|---|---|---|---|---|---|
+| 0 | 0.708967645998 | 0.000% | 0.500000000 | 0.0000e+00 | 5,277,239.8 |
+| 6.1030 (`tau` = 0.99999) | 0.708967838434 | 0.000% | 0.500540950 | 2.3410e-06 | 5,277,231.1 |
+| 10,000 | 0.709282789049 | 0.270% | 1.000000000 | 6.2829e+00 | 5,263,001.1 |
+| 57,247 | 0.710766335464 | 1.541% | 1.000000000 | 2.0545e+02 | 5,195,914.6 |
+| 665,660 | 0.728467041857 | 16.703% | 1.000000000 | 2.6060e+04 | 4,393,425.8 |
+| 6,656,600 | 0.790762109807 | 70.065% | 1.000000000 | 1.1085e+06 | 1,566,504.0 |
+| 66,566,000 | 0.819939610155 | **95.058%** | 1.000000000 | 1.6624e+07 | **245,943.2** |
+
+`u_ceiling` = 0.825708741 summed over 22 autosomes; recoverable gap = 0.116741095.
+
+✅✅ **THE TIE-BACK PASSES AND IT IS A REAL CROSS-CHECK.** At `eta` = arctanh(0.99999) =
+6.1030338228 this script gives `e_q_u` = **0.708967838434** and `acc_ceiling` =
+**0.500540950**, against **0.708967838** and **0.500540948** from
+`scripts/exact_utility.py` and `scripts/exact_kl_stable.py` driven by `tau` = 0.99999 —
+agreement to **4.3e-10** and **2.4e-09**. Three scripts, two parameterisations, one
+number.
+
+### ⚠⚠ THE GENOME-WIDE CROSSOVER IS FAR WORSE THAN chr21's
+
+The privacy bound goes vacuous (`kl` = 2, so `tv_pinsker` = 1) at **`eta` ~ 5,642**,
+where the mechanism has recovered **0.15%** of its recoverable utility. Reaching 95.1%
+needs `eta` = 6.6566e7, a factor of **11,798**. On chr21 at chromosome scope the same
+two points were `eta` ~ 860 with 1.14%, a factor of 3,488. **So the real, genome-wide
+release has a trade-off about 3.4x worse than the single-chromosome curve suggested.**
+
+### ⚠⚠ MY OWN PREDICTION WAS WRONG BY 10x, AND THE REASON IS THE FINDING
+
+I predicted the genome-wide crossover at `eta` ~ 5.7e4 by scaling chr21's 860 by the
+`beta_v` ratio 66.57. Measured: **5,642**, about **10x lower**. The error was applying
+the UTILITY scaling to the PRIVACY side, and the two do not scale alike:
+
+    utility movement ~ eta * Var_Q(u)        -> matched utility scales eta by Var^-1
+    kl_exact         ~ eta^2 * Var_Q(u) / 2  -> matched kl scales eta by Var^-1/2
+
+`Var_Q(u)` is **1.374102e-06** on chr21 at chromosome scope and **3.1531e-08**
+genome-wide, a ratio of **43.6** — the same 43.6 this project already measured between
+those two scopes. So:
+
+| quantity | predicted scaling | measured |
+|---|---|---|
+| `eta` for matched UTILITY | the `beta_v` ratio, 66.6x | 1e6 -> 6.6566e7 = **66.6x** |
+| `eta` for matched `kl` | sqrt(43.6) = **6.60x** | 860 -> 5,642 = **6.56x** |
+
+**SYNTHESIS, and it is the most general statement this project has about why the
+mechanism fails.** Privacy loss is SECOND order in the tilt and utility gain is FIRST
+order. So diluting `beta` over more positions lets you spend linearly more `eta` for the
+same utility, but only sqrt-more `eta` for the same privacy cost — **the gap between the
+useful regime and the private regime widens as the dilution grows.** Genome scale is
+66.6x harder on utility while being only 6.56x more forgiving on privacy, so the gap
+between the two regimes widens by the ratio of those two factors.
+
+⚠ **WHAT IS MEASURED AND WHAT IS NOT.** The two scaling laws above are each confirmed
+to under 1% (66.6x against 66.57x predicted; 6.56x against 6.60x predicted). The
+resulting worsening of the gap is reported as MEASURED — **11,798/3,488 = 3.38** — and
+NOT derived: 66.6/6.56 = 10.2, which is not 3.38, because the two endpoints being
+compared are at different utility fractions (95.1% genome-wide against 97.8% on chr21)
+and the curve is no longer linear up there. A closed form for the quotient is not
+established and must not be asserted from these two runs.
+
+### ⚠ THE CURVE STOPS AT `eta` = 6.6566e7, AND THE REASON IS NAMED
+
+At `eta` = 1.997e8 **chr7 and chr10 dead-end in `ffbs.forward`** with "zero total mass":
+chr7 at chain position 1,154,456 (pos 142,603,528), chr10 at 676,991 (pos 79,896,712).
+Both probed individually and both succeed at every `eta` up to 6.6566e7, so the failure
+is at the top point alone. The mechanism is `eta`-DEPENDENT and distinct from decision
+K's structural exclusions: at a step with zero genetic distance the transition is the
+identity, so there is no mixing, and once the posterior concentrates hard enough the
+surviving donors are all excluded at that one position and the mass is exactly zero.
+⚠ The first genome run reported INCOMPLETE and refused to print a 21-chromosome curve,
+which is the completeness assertion working. Continuing past ~2e8 needs a LOG-SPACE
+forward pass, which is deliberately NOT attempted here: `ffbs.forward` is load-bearing
+for every release and every gate including the signed pre-registration's toy
+enumeration. ⚠ The worker now names the `eta` in any failure; the first traceback did
+not, and "which `eta` died" is the only thing that decides what is reportable.
+
+### What this does NOT establish
+
+Nothing releasable: at the cheapest genome-wide `eta` where anything measurable happens
+the guarantee is already `tau` = 1 - 10^-8686. ⚠ `acc_ceiling` = 1.000 means the PINSKER
+bound is vacuous, not that an attacker is provably certain — but `p_succ_bound` there is
+1 - 5e-8686, so no privacy statement survives either way. ⚠ Standing constraint 3: the
+`eta` -> infinity limit is argmax and is not a release procedure. ⚠ One target (HG00096);
+the curve is not known to be target-independent.
+
+---
+
 ## 2026-10-23 (later) — B-THY-eta-response: the mechanism DOES have a working regime, and it starts 3,488x past the point the guarantee dies
 
 **Goal.** Dylan, after the `tau` = 0.99999 run: stop treating `tau` as the knob, sweep
