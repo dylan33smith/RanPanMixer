@@ -250,3 +250,50 @@ def test_a_tampered_release_fails_verification(tmp_path: Path) -> None:
     (d / "release.json").write_text(json.dumps({"release_id": "forged"}) + "\n")
     with pytest.raises(Exception):
         R.load_release(d)
+
+
+# ---------------------------------------------------------------------------
+# the eta entry point into the sampler (2026-10-23)
+# ---------------------------------------------------------------------------
+
+def test_the_tau_and_eta_entry_points_are_the_same_sampler() -> None:
+    """⚠⚠ `ffbs.release` gained an `eta=` entry because `tau` cannot ADDRESS the high
+    end of the tilt -- `tanh(eta)` is exactly 1.0 in float64 past `eta` ~ 19. Two
+    entry points into one sampler is only safe if they are provably the same
+    sampler, so wherever `tau` IS representable the two must give the BIT-IDENTICAL
+    release at the same seed. If they ever diverge, one of them is wrong and every
+    eta-driven number in the project is unquotable."""
+    import numpy as np
+    from mechanism import calibration as C
+    from mechanism import ffbs, hmm, toy, utility
+    t = toy.toy_cohort()
+    m = hmm.from_arrays(t.haplotypes, t.genetic_pos, t.positions, cohort_id="toy")
+    beta = np.full(t.T, 1.0 / t.T)
+    util = utility.Utility(beta=beta, scope="chain", n_scope=t.T, n_chain=t.T)
+    tgt = np.column_stack([t.haplotypes[0], t.haplotypes[1]])
+    for tau in (0.0, 0.25, 0.5, 0.9, 0.99, 0.99999):
+        a = ffbs.release(m, t.haplotypes, tgt, util, tau, seed=4242, target_id="x")
+        b = ffbs.release(m, t.haplotypes, tgt, util, eta=C.eta_tau(tau),
+                         seed=4242, target_id="x")
+        assert np.array_equal(a.released_path, b.released_path), (
+            f"tau={tau:g}: the two entry points drew DIFFERENT paths")
+        assert a.log_z_p == b.log_z_p, f"tau={tau:g}: log_z_p differs"
+        assert a.eta_tau == b.eta_tau, f"tau={tau:g}: eta_tau differs"
+
+
+def test_the_sampler_refuses_an_ambiguous_or_negative_tilt() -> None:
+    """Exactly one of `tau`/`eta`. Accepting both would let a caller state one
+    privacy level and run another, which is the one error no reader could spot."""
+    import numpy as np
+    from mechanism import ffbs, hmm, toy, utility
+    t = toy.toy_cohort()
+    m = hmm.from_arrays(t.haplotypes, t.genetic_pos, t.positions, cohort_id="toy")
+    beta = np.full(t.T, 1.0 / t.T)
+    util = utility.Utility(beta=beta, scope="chain", n_scope=t.T, n_chain=t.T)
+    tgt = np.column_stack([t.haplotypes[0], t.haplotypes[1]])
+    with pytest.raises(ValueError, match="exactly one"):
+        ffbs.release(m, t.haplotypes, tgt, util, 0.5, eta=1.0, seed=1, target_id="x")
+    with pytest.raises(ValueError, match="exactly one"):
+        ffbs.release(m, t.haplotypes, tgt, util, seed=1, target_id="x")
+    with pytest.raises(ValueError, match="non-negative"):
+        ffbs.release(m, t.haplotypes, tgt, util, eta=-1.0, seed=1, target_id="x")

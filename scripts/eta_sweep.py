@@ -83,6 +83,8 @@ from mechanism import calibration as C                    # noqa: E402
 from mechanism import exact, ffbs, hmm, toy, utility       # noqa: E402
 
 from exact_utility import AUTOSOMES                        # noqa: E402
+from exact_utility import alt_totals, rarity_totals        # noqa: E402
+from exact_utility import rarity_weights                   # noqa: E402
 from exact_utility import shares as exact_utility_shares   # noqa: E402
 from exact_variance import haplotype_variance              # noqa: E402
 from exact_kl_stable import extremal, kl_stable            # noqa: E402
@@ -93,28 +95,65 @@ DEFAULT_ETAS = (0.0, 1.0, 2.6466524124, 6.1030338228, 20.0, 60.0, 200.0,
                 1e3, 1e4, 1e5, 1e6, 3e6)
 
 
+def build_betas(d, ic, p_chain, weights: str, *, share=None, chrom=None,
+                alt_tot=None):
+    """The per-haplotype `beta` pair for one chromosome, under either weighting.
+
+    `production` -- `w_v` = 1/support(v) over every chain position, normalised to this
+    chromosome's decision-J share. Target-INDEPENDENT, so both chains share one array.
+
+    `target_alt` -- uniform over the positions where THAT haplotype carries a NON-REF
+    allele, normalised by the GENOME-WIDE count of them (`alt_tot`), so the 22
+    chromosomes' weights still sum to one budget (standing constraint 4). The
+    expression is lifted from `scripts/alt_beta_sweep.py` so there is one definition.
+    ⚠ TARGET-DEPENDENT. Theorem 1 still holds -- `beta` >= 0, sums to 1, `u` stays in
+    [0,1] -- but the utility function is now a function of the target, so it is NOT
+    interchangeable with the production one and the two must never share a column.
+    """
+    if weights == "production":
+        b = utility.beta_v(np.load(d / "support.npy"), in_chain=ic,
+                           **({} if share is None else {"share": share,
+                                                        "chrom": chrom})).beta
+        return (b, b)
+    if weights == "target_alt":
+        if alt_tot is None:
+            raise ValueError("target_alt needs alt_tot, the genome-wide non-ref count")
+        return tuple((p_chain[:, k] > 0) / float(alt_tot[k]) for k in (0, 1))
+    if weights == "target_rarity":
+        # `w_v = -log f_v`, f_v the cohort frequency of the TARGET's allele. Downweights
+        # common alleles continuously instead of by the ref/non-ref cut, gives ZERO to
+        # an allele every donor carries, and gives zero to an allele NO donor carries
+        # (unmatchable, so budget there is wasted). See exact_utility.rarity_weights.
+        if alt_tot is None:
+            raise ValueError("target_rarity needs the genome-wide rarity total")
+        hap_all = np.asarray(np.load(d / "haplotypes.npy", mmap_mode="r"))[:, ic]
+        return tuple(rarity_weights(hap_all, p_chain[:, k]) / float(alt_tot[k])
+                     for k in (0, 1))
+    raise ValueError(f"unknown weights {weights!r}")
+
+
 def genome_chrom(args) -> dict:
     """One chromosome of the GENOME-WIDE curve, at its decision-J share.
 
     A worker body, so it takes one tuple and never raises into the pool: a fan-out
     that loses a chromosome silently would produce a complete-looking curve over 21.
     """
-    chrom, target, share, etas, with_kl = args
+    chrom, target, share, etas, with_kl, weights, alt_tot = args
     try:
         d = REPO / "data" / "cohort" / chrom
         ic = np.load(d / "in_chain.npy").astype(bool)
         hap = np.load(d / "haplotypes.npy")[:, ic]
         m = hmm.from_arrays(hap, np.load(d / "genetic_pos.npy")[ic],
                             np.load(d / "positions.npy")[ic], cohort_id=chrom)
-        beta = utility.beta_v(np.load(d / "support.npy"), in_chain=ic,
-                              share=share, chrom=chrom).beta
         p = np.load(REPO / "data" / "targets" / target / chrom / "path.npy")[ic]
-        wall = psi_wall(beta)
+        betas = build_betas(d, ic, p, weights, share=share, chrom=chrom,
+                            alt_tot=alt_tot)
+        wall = psi_wall(betas)
         over = [e for e in etas if e >= wall]
         if over:
             raise ValueError(f"{chrom}: eta {over} past its wall {wall:.3e}")
-        ceil = utility.diploid_utility(utility.u_ceiling(p[:, 0], beta),
-                                       utility.u_ceiling(p[:, 1], beta))
+        ceil = utility.diploid_utility(utility.u_ceiling(p[:, 0], betas[0]),
+                                       utility.u_ceiling(p[:, 1], betas[1]))
         rows = []
         for eta in etas:
             # ⚠ NAME THE `eta` IN ANY FAILURE. The forward pass can dead-end at a
@@ -123,7 +162,7 @@ def genome_chrom(args) -> dict:
             # the eta does not say whether the curve died at its second point or its
             # eighth -- which is the only thing that decides what is reportable.
             try:
-                r = one_eta(m, hap, p, beta, eta, with_kl=with_kl)
+                r = one_eta(m, hap, p, betas, eta, with_kl=with_kl)
             except Exception as e:
                 raise RuntimeError(
                     f"{chrom} FAILED AT eta={eta:g} (rows up to "
@@ -132,21 +171,25 @@ def genome_chrom(args) -> dict:
             r["chrom"] = chrom
             rows.append(r)
         return {"chrom": chrom, "share": share, "t_chain": int(ic.sum()),
-                "u_ceiling": ceil, "beta_mean": float(beta.mean()),
-                "beta_max": float(beta.max()), "wall": wall, "rows": rows}
+                "u_ceiling": ceil, "weights": weights,
+                "beta_sum": float(sum(b.sum() for b in betas) / 2.0),
+                "beta_max": max(float(b.max()) for b in betas),
+                "wall": wall, "rows": rows}
     except Exception as e:                  # a worker must report, never vanish
         import traceback
         return {"chrom": chrom, "error": f"{type(e).__name__}: {e}",
                 "traceback": traceback.format_exc()[-1200:]}
 
 
-def psi_wall(beta: np.ndarray) -> float:
+def psi_wall(betas) -> float:
     """The largest `eta` whose potentials stay finite: (`eta`/2)*max(`beta_v`) < 709.
 
     A property of `beta`'s SCOPE, not of the mechanism. Returned so the sweep can
-    refuse an out-of-range `eta` before spending a forward pass on it.
+    refuse an out-of-range `eta` before spending a forward pass on it. Takes the
+    per-haplotype pair and uses the WORST of the two.
     """
-    return 2.0 * 709.0 / float(beta.max())
+    b = betas if isinstance(betas, (tuple, list)) else (betas, betas)
+    return 2.0 * 709.0 / max(float(x.max()) for x in b)
 
 
 def log10_one_minus_tau(eta: float) -> float:
@@ -196,17 +239,25 @@ def enumerated_moments(base, u_vec: np.ndarray, eta: float) -> tuple[float, floa
     return e, float(q @ (u_vec - e) ** 2)
 
 
-def one_eta(m, hap: np.ndarray, p: np.ndarray, beta: np.ndarray, eta: float,
+def one_eta(m, hap: np.ndarray, p: np.ndarray, betas, eta: float,
             *, with_kl: bool = False) -> dict:
     """Exact `E_Q[u]`, `Var_Q(u)` and `E[differ]` for one `eta`, diploid.
 
     Two forward + state_marginals passes, one per haplotype chain, each at `eta`/2 as
-    the pre-registration's diploid aggregation requires. No sampling anywhere.
+    the diploid aggregation requires. No sampling anywhere.
+
+    ⚠ `betas` is a PER-HAPLOTYPE pair. The production weighting gives both chains the
+    same array, but `target_alt` does NOT: its support is the positions where THAT
+    haplotype carries a non-ref allele, and the two haplotypes differ there (2,493,299
+    against 2,501,582 for HG00096). Sharing one array across the chains would weight
+    each haplotype by the other's non-ref set.
     """
     h = eta / 2.0
     means, vars_, diffs, called = [], [], [], []
+    nonref, n_nonref = [], []
     for col in (0, 1):
         tgt = p[:, col]
+        beta = betas[col]
         psi = utility.tilt_potentials(m.allowed, hap, tgt, beta, h)
         if not np.isfinite(psi).all():
             raise AssertionError(
@@ -219,6 +270,16 @@ def one_eta(m, hap: np.ndarray, p: np.ndarray, beta: np.ndarray, eta: float,
         r = haplotype_variance(m, fwd.alpha, gam, match, beta)
         means.append(r["mean"])
         vars_.append(r["var"])
+        # ⚠⚠ THE ONE UTILITY NUMBER THAT IS COMPARABLE ACROSS WEIGHTINGS. `e_q_u` is
+        # beta-weighted, so production's and target_alt's are DIFFERENT quantities
+        # (constraint 8). `e_differ` counts every called cell, and is dominated by the
+        # ~19.6M REF positions a cohort mosaic matches by chance. Neither answers
+        # "how many of the target's NON-REF alleles did the release recover", which is
+        # the biologically interesting count and is weighting-INDEPENDENT. This is it:
+        # the expected number of non-ref positions where the release matches.
+        pm = (gam * match.T).sum(axis=1)
+        nonref.append(float(pm[tgt > 0].sum()))
+        n_nonref.append(int((tgt > 0).sum()))
         # E[differ] over CALLED cells, the same quantity ffbs.expected_mismatches gives
         diffs.append(float(ffbs.expected_mismatches(m, hap, tgt, gam)))
         called.append(int((tgt >= 0).sum()))
@@ -230,10 +291,12 @@ def one_eta(m, hap: np.ndarray, p: np.ndarray, beta: np.ndarray, eta: float,
            "log10_one_minus_tau": log10_one_minus_tau(eta),
            "e_q_u": e_q_u, "var_q_u": var, "sd_q_u": math.sqrt(max(var, 0.0)),
            "e_differ": diffs[0] + diffs[1], "called_cells": called[0] + called[1],
+           "e_match_nonref": nonref[0] + nonref[1],
+           "n_nonref": n_nonref[0] + n_nonref[1],
            "u_hap": means, "var_hap": vars_}
     if with_kl:
         # the SAME kl_stable the genome-wide ceiling uses, driven by eta
-        k = kl_stable(m, hap, beta, p, extremal(p), eta=eta)
+        k = kl_stable(m, hap, betas, p, extremal(p), eta=eta)
         tv = min(1.0, math.sqrt(max(k["kl"], 0.0) / 2.0))
         out |= {"kl_exact": k["kl"], "tv_pinsker": tv,
                 "acc_ceiling": 0.5 * (1.0 + tv)}
@@ -371,7 +434,24 @@ def run_genome(a) -> int:
           f"T = {tot:,}, shares by decision J summing to {sum(sh.values()):.6f}, "
           f"diploid, EXACT via state marginals.")
     print(f"{len(a.etas)} `eta` x 22 chromosomes, {a.workers} workers.\n")
-    jobs = [(c, a.target, sh[c], list(a.etas), a.with_kl) for c in AUTOSOMES]
+    alt_tot = (alt_totals(a.target) if a.weights == "target_alt"
+               else rarity_totals(a.target) if a.weights == "target_rarity"
+               else None)
+    if alt_tot is not None:
+        # ⚠ the normaliser means different things per weighting, so do NOT print one
+        # label for both: target_alt's is a COUNT of non-ref positions, rarity's is a
+        # SUM of -log f and is not a count of anything.
+        if a.weights == "target_alt":
+            print(f"`target_alt`: {alt_tot[0]:,.0f} and {alt_tot[1]:,.0f} non-ref "
+                  f"chain positions per haplotype, so beta_v = "
+                  f"{1.0/alt_tot[0]:.4e} there and 0 elsewhere.\n")
+        else:
+            print(f"`target_rarity`: sum(-log f) = {alt_tot[0]:,.1f} and "
+                  f"{alt_tot[1]:,.1f} per haplotype (a WEIGHT TOTAL, not a count); "
+                  f"beta_v = -log(f_v) / that, bounded by log(K)/total = "
+                  f"{__import__('math').log(88)/alt_tot[0]:.4e}.\n")
+    jobs = [(c, a.target, sh[c], list(a.etas), a.with_kl, a.weights, alt_tot)
+            for c in AUTOSOMES]
     out, t0 = {}, time.time()
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         futs = {ex.submit(genome_chrom, j): j[0] for j in jobs}
@@ -401,6 +481,8 @@ def run_genome(a) -> int:
                "e_q_u": math.fsum(x["e_q_u"] for x in cells),
                "var_q_u": math.fsum(x["var_q_u"] for x in cells),
                "e_differ": math.fsum(x["e_differ"] for x in cells),
+               "e_match_nonref": math.fsum(x["e_match_nonref"] for x in cells),
+               "n_nonref": sum(x["n_nonref"] for x in cells),
                "called_cells": sum(x["called_cells"] for x in cells),
                "u_ceiling": ceil}
         row["e_q_u_over_ceiling"] = row["e_q_u"] / ceil if ceil else float("nan")
@@ -429,6 +511,12 @@ def run_genome(a) -> int:
     print("| `var_q_u` | " + " | ".join(f"{r['var_q_u']:.4e}" for r in agg) + " |")
     print("| `e_differ` cells | " + " | ".join(
         f"{r['e_differ']:,.1f}" for r in agg) + " |")
+    print("| `e_match_nonref` * [COMPARABLE across weightings] | " + " | ".join(
+        f"{r['e_match_nonref']:,.1f}" for r in agg) + " |")
+    if base is not None:
+        n0 = agg[0]["e_match_nonref"]
+        print("| non-ref alleles RECOVERED vs `eta_tau` = 0 | " + " | ".join(
+            f"{r['e_match_nonref'] - n0:+,.1f}" for r in agg) + " |")
     if a.with_kl:
         print("| `kl_exact` | " + " | ".join(f"{r['kl_exact']:.4e}" for r in agg) + " |")
         print("| `acc_ceiling` * | " + " | ".join(
@@ -468,6 +556,13 @@ def main(argv=None) -> int:
     ap.add_argument("--share", type=float, default=None,
                     help="beta_share; default None = chromosome-scope (sums to 1), "
                          "which is 66.6x MORE generous per position than genome-wide")
+    ap.add_argument("--weights",
+                    choices=("production", "target_alt", "target_rarity"),
+                    default="production",
+                    help="production = w_v 1/support(v) over the whole chain; "
+                         "target_alt = uniform over the target haplotype's NON-REF "
+                         "positions only (target-dependent; a DIFFERENT utility "
+                         "function, never pooled with production)")
     ap.add_argument("--with-kl", action="store_true",
                     help="also compute kl_exact/acc_ceiling against D1_extremal "
                          "(doubles the passes)")
@@ -485,10 +580,14 @@ def main(argv=None) -> int:
     m = hmm.from_arrays(hap, np.load(d / "genetic_pos.npy")[ic],
                         np.load(d / "positions.npy")[ic], cohort_id=a.chrom)
     kw = {} if a.share is None else {"share": a.share, "chrom": a.chrom}
-    beta = utility.beta_v(np.load(d / "support.npy"), in_chain=ic, **kw).beta
     p = np.load(REPO / "data" / "targets" / a.target / a.chrom / "path.npy")[ic]
-    ceil = utility.diploid_utility(utility.u_ceiling(p[:, 0], beta),
-                                   utility.u_ceiling(p[:, 1], beta))
+    betas = build_betas(d, ic, p, a.weights,
+                        alt_tot=(alt_totals(a.target) if a.weights == "target_alt"
+                                 else rarity_totals(a.target)
+                                 if a.weights == "target_rarity" else None), **kw)
+    beta = betas[0]
+    ceil = utility.diploid_utility(utility.u_ceiling(p[:, 0], betas[0]),
+                                   utility.u_ceiling(p[:, 1], betas[1]))
 
     print(f"⚠⚠ EXPLORATORY, NOT PRE-REGISTERED, AND NOT AN OPERATING POINT. The "
           f"signed grid ends at `tau` = 0.99 (`eta` = 2.6467).")
@@ -500,7 +599,7 @@ def main(argv=None) -> int:
     # ⚠ REFUSE AN OUT-OF-RANGE `eta` UP FRONT. The wall is set by max(beta_v) and is
     # a property of beta's scope; discovering it after an hour of forward passes is
     # the avoidable version of this failure.
-    wall = psi_wall(beta)
+    wall = psi_wall(betas)
     print(f"`psi` wall for this scope: `eta` < {wall:.3e} "
           f"(max(beta_v) = {beta.max():.4e}, max/mean = {beta.max()/beta.mean():.1f}).")
     over = [e for e in a.etas if e >= wall]
@@ -513,7 +612,7 @@ def main(argv=None) -> int:
 
     rows, t0 = [], time.time()
     for eta in a.etas:
-        r = one_eta(m, hap, p, beta, eta, with_kl=a.with_kl)
+        r = one_eta(m, hap, p, betas, eta, with_kl=a.with_kl)
         r |= {"u_ceiling": ceil,
               "e_q_u_over_ceiling": r["e_q_u"] / ceil if ceil else float("nan")}
         rows.append(r)

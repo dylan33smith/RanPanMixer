@@ -10,7 +10,7 @@ with no `loo_id`, which is the machine-checked half of this.
 
 ⚠⚠ TWO CAVEATS TRAVEL WITH THE OUTPUT AND MUST REACH THE WRITE-UP.
  1. The `tau` grid is a declared EVALUATION DEVICE, never a release procedure
-    (`prereg_2026-10-10.md:345`). Seven releases of one genome COMPOSE; we report the
+    (standing constraint 5). Seven releases of one genome COMPOSE; we report the
     grid to characterise the mechanism, not as something a deployment would do.
  2. Arm 1's 44 releases have donor panels that are each other's TRUE HAPLOTYPES. The
     PER-RELEASE bound holds; the JOINT bound over the 44 does NOT (standing constraint 5).
@@ -54,8 +54,10 @@ import store                                              # noqa: E402
 from cohort import loo                                     # noqa: E402
 from mechanism import ffbs, hmm, utility                   # noqa: E402
 
-# ✅ FROZEN by prereg_2026-10-10.md section 1 under standing constraint 6, with each
-# point's declared role. Not a tunable: all seven run.
+# The seven points the pinned grid used. ⚠ NOT frozen any more -- the
+# pre-registration was deleted 2026-10-24 and `eta_tau` is the knob; these are
+# kept because 308 releases on disk were drawn at them and their seed indices
+# must not move (tests/test_arm1_release_seeding.py).
 PINNED_TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 # ⚠ EXPLORATORY, NOT PRE-REGISTERED (requested 2026-10-22, after the pinned grid's
 # outcomes were seen). Listed only so each point has a FIXED seed index; appending
@@ -118,8 +120,11 @@ def _axis_digest(chains: dict) -> str:
 
 
 def _inputs() -> dict[str, str]:
-    d = {"git_rev": store.git_rev(REPO),
-         "prereg": store.sha256_file(REPO / "paper" / "prereg_2026-10-10.md")}
+    # ⚠ The pre-registration was DELETED 2026-10-24 (Dylan): it was written before
+    # the mechanism was understood and was constraining the work to an inert
+    # regime. Releases are now stamped with the code revision alone; the live
+    # methodology is the direction block at the top of docs/plan.md Current state.
+    d = {"git_rev": store.git_rev(REPO)}
     for f in sorted((REPO / "paper").glob("addendum_*.md")):
         d[f"addendum:{f.stem}"] = store.sha256_file(f)
     for c in AUTOSOMES:

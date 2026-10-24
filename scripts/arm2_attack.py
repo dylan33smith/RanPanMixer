@@ -49,7 +49,8 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-import attacks as A  # noqa: E402
+import attacks as A
+import store  # noqa: E402
 import runner as R  # noqa: E402
 from mechanism import calibration as C  # noqa: E402
 from mechanism import ffbs, hmm, utility  # noqa: E402
@@ -66,6 +67,15 @@ TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 # these three alone would have reused the seeds of 0, 0.05 and 0.10.
 EXPLORATORY_TAUS = (0.999, 0.9999, 0.99999)
 SEED_GRID = TAUS + EXPLORATORY_TAUS
+# ⚠⚠ THE `eta` OPERATING POINTS (2026-10-23), for the window where the EXACT
+# `acc_ceiling` exceeds what this design can resolve (0.5 + delta = 0.556) but the
+# Pinsker bound has not yet gone vacuous: eta in [96, 855] at chr21 chromosome
+# scope. `tau` CANNOT address them -- tanh(96) is exactly 1.0 in float64 -- so the
+# sampler is driven by `eta` directly. Their seed indices are OFFSET past the tau
+# grid so an eta cell can never reuse a tau cell's stream (occurrence four of the
+# common-random-numbers defect was exactly that kind of index collision).
+ETA_GRID = (96.0, 200.0, 400.0, 600.0, 855.0)
+ETA_SEED_OFFSET = 1000
 CHROM = "chr21"
 DECOY_SEED = 20261010
 # the release-stream base; the per-cell seed is a SeedSequence over
@@ -153,6 +163,14 @@ def pick_decoys(target_id: str, st: dict, rng: np.random.Generator) -> dict:
     }
 
 
+def _tau_label(eta: float) -> str:
+    """The equivalent `tau`, printable at an `eta` where float64 cannot hold it."""
+    if eta == 0.0:
+        return "0"
+    g = math.log10(2.0) - (2.0 * eta) / math.log(10.0)
+    return f"{math.tanh(eta):.12f}" if g > -15 else f"1 - 1e{g:.4g}"
+
+
 def _one_trial(job: tuple) -> dict:
     """One release, scored against all three decoys.
 
@@ -161,9 +179,13 @@ def _one_trial(job: tuple) -> dict:
     conditions CORRELATED through the shared draw, so they must never be pooled into
     a single accuracy.
     """
-    target_id, tau, seed, one_sided = job
+    # ⚠ `point` is the COLUMN LABEL and `eta` is the tilt actually applied. In tau
+    # mode point == tau and eta == arctanh(tau); in eta mode point IS the eta and
+    # there is no representable tau. eta is passed rather than re-derived so a
+    # worker can never disagree with the driver about which tilt it ran.
+    target_id, point, eta, seed, one_sided = job
+    tau = point
     st = load_state()
-    eta = C.eta_tau(tau)
     p = st["paths"][target_id]
     # ⚠⚠ NOT `hash(target_id)`. Python's str hash is randomised per interpreter by
     # PYTHONHASHSEED, so the decoy choice was NOT REPRODUCIBLE -- measured,
@@ -178,7 +200,9 @@ def _one_trial(job: tuple) -> dict:
     rng = np.random.default_rng([DECOY_SEED, stable])
     decoys = pick_decoys(target_id, st, rng)
 
-    rel = ffbs.release(st["model"], st["hap"], p, st["util"], tau, seed=seed,
+    # ⚠ driven by `eta`, which the driver passed explicitly: in eta mode there is
+    # no representable tau to hand the sampler.
+    rel = ffbs.release(st["model"], st["hap"], p, st["util"], eta=eta, seed=seed,
                        target_id=target_id, graph_id=CHROM,
                        baseline_norm=st["base"])
     y = rel.released_path
@@ -186,7 +210,9 @@ def _one_trial(job: tuple) -> dict:
         *[float(utility.u_of_output(y[:, h], p[:, h], st["util"].beta)[0])
           for h in (0, 1)])
 
-    out = {"target": target_id, "tau": tau, "seed": seed,
+    # ⚠ the field stays named "tau" for back-compatibility with the pinned-grid
+    # JSONs that --from-json reads; "eta" is the unambiguous one.
+    out = {"target": target_id, "tau": tau, "eta": eta, "seed": seed,
            "log_z_p": rel.log_z_p, "u_p": u_p, "conditions": {}}
     for name, d in decoys.items():
         q = d["path"]
@@ -224,7 +250,7 @@ def _one_trial(job: tuple) -> dict:
             # an INDEPENDENT seed per (condition, hypothesis): reusing the Q_p seed
             # would correlate the two arms of the test and bias the balance.
             q_seed = int(seed) ^ (0x5EED * (1 + sorted(decoys).index(name)))
-            rel_q = ffbs.release(st["model"], st["hap"], q, st["util"], tau,
+            rel_q = ffbs.release(st["model"], st["hap"], q, st["util"], eta=eta,
                                  seed=q_seed, target_id=f"{target_id}~{name}",
                                  graph_id=CHROM, baseline_norm=st["base"])
             yq = rel_q.released_path
@@ -315,10 +341,23 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         for cond in ("D1_extremal", "D2_nearest", "D3_random"):
             print(f"| {cond} one-sided P_p(L>0) [diagnostic, NOT bounded] | " +
                   " | ".join(f"{table[cond][t]['tpr']:.4f}" for t in a.taus) + " |")
-    print("| `p_succ_bound` * | " +
-          " | ".join(f"{C.p_succ_bound(t):.4f}" for t in a.taus) + " |")
-    print("| experiment resolves below the bound? | " +
-          " | ".join("**yes**" if delta < t / 2 else "no" for t in a.taus) + " |")
+    if getattr(a, "etas", None):
+        # ⚠⚠ p_succ_bound = (1 + tanh(eta))/2 is 1.0 to float64 at every one of
+        # these points, so the bound comparison is UNFALSIFIABLE here and is not
+        # printed as if it were a test. The meaningful comparison is against the
+        # EXACT acc_ceiling (logs/B_eta_sweep/), which is far tighter.
+        print("| equivalent `tau` | " +
+              " | ".join(_tau_label(t) for t in a.taus) + " |")
+        print("| `epsilon_tau` | " +
+              " | ".join(f"{2*t:g}" for t in a.taus) + " |")
+        print("| `p_succ_bound` * | " + " | ".join("~1.0" for _ in a.taus) + " |")
+        print("| bound comparison meaningful? | " +
+              " | ".join("**no (vacuous)**" for _ in a.taus) + " |")
+    else:
+        print("| `p_succ_bound` * | " +
+              " | ".join(f"{C.p_succ_bound(t):.4f}" for t in a.taus) + " |")
+        print("| experiment resolves below the bound? | " +
+              " | ".join("**yes**" if delta < t / 2 else "no" for t in a.taus) + " |")
 
     # ⚠⚠ THE VIOLATION CHECK APPLIES ONLY TO THE BALANCED ACCURACY. (1 + tau)/2 bounds
     # the equal-prior quantity and nothing else; comparing the one-sided rate to it
@@ -381,7 +420,7 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
 
     if a.json:
         a.json.write_text(json.dumps(
-            {"prereg": prereg, "git_rev": rev, "draws": a.draws,
+            {"methodology": prereg, "git_rev": rev, "draws": a.draws,
              "targets": tids, "taus": a.taus, "trials_per_cell": n_per,
              "delta": delta, "accuracy": {c: {str(k): v for k, v in r.items()}
                                           for c, r in table.items()},
@@ -404,6 +443,13 @@ def main(argv=None) -> int:
                          "NO releases. ⚠ The releases cost ~110 CPU-hours, "
                          "so the reporting must be fixable without them.")
     ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))
+    ap.add_argument("--etas", type=float, nargs="+", default=None,
+                    help="drive the tilt by `eta` DIRECTLY instead of by `tau`, for "
+                         "the window where tau is not representable (tanh(eta) = 1.0 "
+                         "in float64 past eta ~ 19). ⚠ The p_succ_bound comparison is "
+                         "VACUOUS at these points and is reported as such; the "
+                         "meaningful bound is the exact acc_ceiling. Must come from "
+                         "ETA_GRID so every cell has a fixed, disjoint seed index.")
     ap.add_argument("--one-sided", action="store_true",
                     help="draw only from Q_p and report the one-sided rate "
                          "P_p(Lambda>0). ⚠ That quantity is NOT bounded by "
@@ -413,8 +459,9 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     # ⚠ FIRST, BEFORE ANYTHING IS COMPUTED.
-    prereg, rev = A.require_signed_prereg()
-    print(f"running under {prereg} (git_rev {rev or 'unrecorded'})\n")
+    rev = store.git_rev(REPO)
+    prereg = "docs/plan.md direction block, 2026-10-24"
+    print(f"methodology: {prereg} (git_rev {rev or 'unrecorded'})\n")
 
     if a.from_json:
         saved = json.loads(a.from_json.read_text())
@@ -460,10 +507,28 @@ def main(argv=None) -> int:
         print(f"⚠⚠ EXPLORATORY `tau` {[t for t in a.taus if t in EXPLORATORY_TAUS]}: "
               f"NOT in the signed grid {list(TAUS)}. Report apart from the "
               f"pre-registered result.\n")
-    jobs = [(t, tau, _cell_seed(ti, SEED_GRID.index(tau), i), a.one_sided)
-            for tau in a.taus
-            for ti, t in enumerate(tids)
-            for i in range(a.draws)]
+    if a.etas:
+        off = [e for e in a.etas if e not in ETA_GRID]
+        if off:
+            raise SystemExit(f"eta {off} is not in ETA_GRID {ETA_GRID}, so it has "
+                             f"no fixed seed index")
+        print(f"⚠⚠ ETA MODE: driving the tilt by eta {list(a.etas)} directly. The "
+              f"equivalent tau is 1.0 to float64 at every point, so p_succ_bound "
+              f"carries NO information here -- compare against the exact "
+              f"acc_ceiling in logs/B_eta_sweep/ instead.\n")
+        a.taus = list(a.etas)          # the eta values ARE the column labels
+        jobs = [(t, eta, eta,
+                 _cell_seed(ti, ETA_SEED_OFFSET + ETA_GRID.index(eta), i),
+                 a.one_sided)
+                for eta in a.etas
+                for ti, t in enumerate(tids)
+                for i in range(a.draws)]
+    else:
+        jobs = [(t, tau, C.eta_tau(tau),
+                 _cell_seed(ti, SEED_GRID.index(tau), i), a.one_sided)
+                for tau in a.taus
+                for ti, t in enumerate(tids)
+                for i in range(a.draws)]
     n_per = len(tids) * a.draws
     # ⚠⚠ THE CONSTANT DEPENDS ON THE ESTIMATOR, and using the wrong one misstates
     # what the experiment can conclude. For a ONE-SIDED Bernoulli rate at p ~ 0.5 the

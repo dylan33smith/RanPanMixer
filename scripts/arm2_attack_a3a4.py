@@ -67,7 +67,8 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 sys.path.insert(0, str(REPO / "scripts"))
 
-import attacks as A  # noqa: E402
+import attacks as A
+import store  # noqa: E402
 import runner as R  # noqa: E402
 from mechanism import calibration as C  # noqa: E402
 from mechanism import ffbs, utility  # noqa: E402
@@ -415,7 +416,7 @@ CONDS = ("D1_extremal", "D2_nearest", "D3_random")
 def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
             tids: list, n_per: int, pw: list | None = None) -> dict:
     table: dict = {"a3": {}, "a4": {}}
-    print(f"running under {prereg} (git_rev {rev})\n")
+    print(f"methodology: {prereg} (git_rev {rev})\n")
     print(f"ARM 2. {len(tids)} targets x {len(taus)} tau x {n_per} draws = "
           f"{n_per * len(tids)} trials per (tau, condition) PER HYPOTHESIS -- matching "
           f"A1's realised design of 250. chr21, scope chain, beta_share = 1.\n")
@@ -642,18 +643,19 @@ def main(argv=None) -> int:
               f"NOT in the signed grid {list(TAUS)}. Report apart from the "
               f"pre-registered result.\n")
 
-    prereg, rev = A.require_signed_prereg()
+    rev = store.git_rev(REPO)
+    prereg = "docs/plan.md direction block, 2026-10-24"
     st = load_state()
     tids = sorted(st["paths"])[: a.targets]
     a3_sites(st)
 
     if a.from_json:
         d = json.loads(a.from_json.read_text())
-        _report(d["trials"], d["controls"], tuple(d["taus"]), d["prereg"],
+        _report(d["trials"], d["controls"], tuple(d["taus"]), d.get("methodology", d.get("prereg", "unrecorded")),
                 d["git_rev"], d["targets"], d["n_per"])
         return 0
 
-    print(f"running under {prereg} (git_rev {rev})")
+    print(f"methodology: {prereg} (git_rev {rev})")
     print(f"A3 scores on {_A3['n_bi']:,} bi-allelic cohort sites of "
           f"{len(st['util'].beta):,} chain positions.")
     print("computing the positive controls first -- a failed control voids the "
@@ -701,7 +703,7 @@ def main(argv=None) -> int:
                                   for c, cell in r["conditions"].items()}}
                 for r in res]
         a.json.write_text(json.dumps(
-            {"prereg": prereg, "git_rev": rev, "taus": list(a.taus), "targets": tids,
+            {"methodology": prereg, "git_rev": rev, "taus": list(a.taus), "targets": tids,
              "n_per": a.draws, "block_sizes": list(BLOCK_SIZES),
              "n_bi_sites": _A3["n_bi"], "controls": ctl, "power": pw, "table": table,
              "trials": lean,

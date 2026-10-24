@@ -90,9 +90,14 @@ def kl_stable(m, hap, beta, p, q, tau: float | None = None, *,
         # tau = 0: Q_p == Q_q == R_D definitionally, so the KL is exactly 0.
         return {"kl": 0.0, "d_logz": 0.0, "d_eu": 0.0}
     h = eta / 2.0
+    # ⚠ `beta` may be a PER-HAPLOTYPE pair. `target_alt` weights each chain by the
+    # positions where THAT haplotype carries a non-ref allele, and the two sets
+    # differ, so sharing one array would weight each chain by the other's support.
+    betas = beta if isinstance(beta, (tuple, list)) else (beta, beta)
     d_logz_terms, d_eu = [], 0.0
     for col in (0, 1):
         pc, qc = p[:, col], q[:, col]
+        beta = betas[col]
         psi_p = utility.tilt_potentials(m.allowed, hap, pc, beta, h)
         psi_q = utility.tilt_potentials(m.allowed, hap, qc, beta, h)
         f_p = ffbs.forward(m, psi_p)

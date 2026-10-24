@@ -81,6 +81,17 @@ Computed by:          not computed — CHOSEN, and pre-registered before any att
                       git_rev b5a220f122ca. The grid is FROZEN under constraint 6 — it
                       does not change because a result is disappointing; a change
                       means a NEW dated file and this one is never edited.
+                      ⚠⚠⚠ **`tau` IS NO LONGER THE TOOL'S KNOB (Dylan, 2026-10-24).**
+                      It remains fully defined here and in the proof, and every
+                      relation below it holds unchanged — but the method, the tool
+                      and the results are parameterised by `eta_tau`, because
+                      `tau`'s whole usable range moves the release about four cells
+                      in 7.6 million and `tanh(eta)` is not representable below 1
+                      past `eta_tau` ~ 19. The pre-registered grid is SUPERSEDED
+                      (paper/superseded_2026-10-24_prereg_withdrawn.md); the seven
+                      points below are now history, not a constraint. `tau` is
+                      still the right quantity to DEFINE the guarantee with, and
+                      "the `tau` range buys nothing" is a reportable finding.
                       ⚠⚠ THREE FURTHER POINTS EXIST AND ARE **NOT** PRE-REGISTERED:
                       tau = 0.999, 0.9999 and 0.99999, run 2026-10-23 at the PI's
                       request and AFTER the signed grid's outcomes were seen. They
@@ -400,6 +411,24 @@ Aliases:              "local agreement". ⚠ RENAMED from `phi_t` 2026-09-29. Th
 Is:                   Non-negative per-position weights with sum_v beta_v = 1. They
                       decide which parts of the path the mechanism tries to preserve.
                       Under model C: beta_v = w_v / sum_u w_u with w_v = 1/support(v).
+                      ⚠⚠⚠ **THE TOOL'S WEIGHTING IS NOW `target_alt` (Dylan,
+                      2026-10-24)**: uniform over the positions where THAT haplotype
+                      carries a NON-REF allele, normalised by the genome-wide count
+                      of them per haplotype. Built by
+                      scripts/eta_sweep.py:build_betas and
+                      scripts/exact_utility.py:alt_totals, one definition shared
+                      with scripts/alt_beta_sweep.py. Worth **29.7x** the endpoint
+                      movement of 1/support(v) at matched tau
+                      (logs/B_alt_beta_genome_10targets.md). ⚠ It is
+                      TARGET-DEPENDENT. Theorem 1 still holds -- beta >= 0, sums to
+                      1, u stays in [0,1] -- but it is a DIFFERENT utility function
+                      from the production one and constraint 8 forbids them sharing
+                      a column. w_v = 1/support(v) is retained as the comparison.
+                      ⚠⚠ **CONTIGUOUS-WINDOW AND TOP-n WEIGHTINGS ARE DEAD**
+                      (Dylan, 2026-10-24): dropped as a tool direction, absent from
+                      the paper. logs/B_beta_concentration.md and
+                      logs/B_topn_sweep_10targets.md are ARCHIVED records of what
+                      was measured, cited only to explain why they were dropped.
                       ✅ **THE SUM IS GENOME-WIDE (decision B, 2026-10-08).** beta_v
                       sums to 1 over the whole scope tau covers — the 22 AUTOSOMES
                       TOGETHER (decision D: no chrX, no chrY) — and each chromosome
@@ -532,7 +561,10 @@ Is:                   WHICH POSITION SET beta_v's normaliser runs over, and ther
                       something fixed and public (G itself, or a named public callset
                       pinned in advance), never of the target's own VCF — that is
                       deferred decision R4, and it is ARM 2's open question (R1/R4).
-                      **window** — a contiguous-window scope for decision A's
+                      **window** — ⚠⚠ RETIRED 2026-10-24, contiguous windows are
+                      dropped as a tool direction and are not in the paper; the
+                      value is documented below only so an old artifact naming it
+                      remains readable. Was: a contiguous-window scope for decision A's
                       SECONDARY utility arm. ⚠ NOT IMPLEMENTED: BETA_SCOPES at
                       src/mechanism/utility.py:51 is ("chain", "chain_readable") only,
                       so this value is a glossary placeholder until the code admits it.
@@ -779,6 +811,96 @@ Status:               REQUIRED throughout ARM 1 and absent throughout ARM 2. Ver
 Aliases:              none. Never "held out" bare in a table -- the field name is this.
 ```
 
+### e_match_nonref  [utility] [evaluation]
+```
+Is:                   The EXPECTED number of the target's NON-REF positions at which
+                      the released path carries the target's allele. A count, not a
+                      weighted average: sum over positions with target allele index
+                      > 0 of P(release matches there) under the posterior.
+                      ✅ **THE ONLY UTILITY NUMBER THAT MAY BE COMPARED ACROSS
+                      WEIGHTINGS**, which is why it exists (2026-10-24). e_q_u is
+                      beta-weighted and therefore weighting-SPECIFIC, so comparing
+                      two weightings' e_q_u is the constraint-7 error and gave an
+                      artifactual 5.44x; e_differ counts every called cell and is
+                      dominated by the ~19.6M REF positions a cohort mosaic matches
+                      by chance, so it FAVOURS whichever weighting recovers common
+                      alleles. This one is independent of beta entirely.
+Computed by:          scripts/eta_sweep.py:one_eta, from the same posterior state
+                      marginals as e_q_u and e_differ -- no extra forward pass, zero
+                      Monte-Carlo error. Summed over the 22 autosomes by
+                      scripts/eta_sweep.py:run_genome.
+CHANGES MEANING WITH: the TARGET (its non-ref set is its own) and the cohort (which
+                      alleles are callable at all). NOT with beta -- that is the
+                      point. ⚠ Report the MOVEMENT from eta_tau = 0, never the level:
+                      the untilted mosaic already matches 2,357,272 of 4,994,881
+                      non-ref positions (47.19%, HG00096, genome-wide) carrying zero
+                      target information.
+Valid vs:             the same quantity under another weighting at MATCHED
+                      acc_ceiling. ⚠ Never at matched eta_tau -- two weightings at
+                      one eta_tau are at different privacy levels.
+Status:               PRIMARY for choosing a weighting.
+Aliases:              none. ⚠ NOT "informativeness": it counts non-ref alleles
+                      equally, and an allele 80 of 88 donors carry is nearly as
+                      uninformative as a reference one. It is a better comparison
+                      metric than e_q_u or e_differ, not a biological utility
+                      measurement.
+```
+
+### target_alt  [utility] [mechanism]
+```
+Is:                   A beta_v weighting: UNIFORM over the positions where THAT
+                      haplotype carries a non-ref allele, zero elsewhere,
+                      normalised by the GENOME-WIDE count of them per haplotype.
+                      ✅ **THE TOOL'S WEIGHTING (Dylan, 2026-10-24.)** Recovers
+                      1.633x the non-ref alleles of the production weighting at
+                      matched acc_ceiling, altering 0.613x the cells -- 2.67x more
+                      efficient per altered cell -- with 98.1% of what it recovers
+                      being non-ref against production's 36.8%.
+Computed by:          scripts/eta_sweep.py:build_betas with
+                      scripts/exact_utility.py:alt_totals for the normaliser; the
+                      same expression as scripts/alt_beta_sweep.py, one definition.
+                      HG00096: 2,493,299 and 2,501,582 positions per haplotype, so
+                      beta_v = 4.0108e-07 there.
+CHANGES MEANING WITH: the TARGET. ⚠ It is TARGET-DEPENDENT, unlike w_v = 1/support(v).
+                      Theorem 1 still holds -- beta >= 0, sums to 1, u stays in
+                      [0,1] -- but it is a DIFFERENT utility function from the
+                      production one and constraint 7 forbids them sharing a column.
+                      Per-haplotype: the two haplotypes' non-ref sets differ, so the
+                      two chains get DIFFERENT beta arrays.
+Valid vs:             production and target_rarity, via e_match_nonref at matched
+                      acc_ceiling only.
+Status:               PRIMARY -- the tool's default.
+Aliases:              "the non-ref weighting". ⚠ Never "the informative weighting":
+                      it does not distinguish a singleton from an allele 80 of 88
+                      donors carry.
+```
+
+### target_rarity  [utility] [evaluation]
+```
+Is:                   A beta_v weighting: w_v = -log f_v, with f_v the COHORT
+                      frequency of the target's own allele (carriers / called over
+                      the donor panel). Zero where the target has no call, zero
+                      where no donor carries the allele (unmatchable at any eta_tau,
+                      so budget there is wasted), and zero where every donor carries
+                      it (-log 1 = 0). Bounded by log(K) = 4.4773 at K = 88, which
+                      is what keeps u inside [0,1] for standing constraint 2.
+Computed by:          scripts/exact_utility.py:rarity_weights, normalised by
+                      rarity_totals over all 22 autosomes;
+                      scripts/eta_sweep.py:build_betas.
+CHANGES MEANING WITH: the TARGET and the COHORT (f_v is a cohort frequency, so the
+                      same target against a different panel gives different weights).
+Valid vs:             production and target_alt, via e_match_nonref at matched
+                      acc_ceiling only.
+Status:               ⚠ TRIED AND REJECTED 2026-10-24, retained as the comparison.
+                      It recovers only 1.060x production and **0.649x target_alt**.
+                      Better TARGETED than a ref/non-ref cut and still worse, because
+                      it is less CONCENTRATED: effective support 48,700 positions
+                      against target_alt's 33,303 on chr21, var_q_u 4.7268e-07
+                      against 9.3736e-07, and the exchange rate goes as
+                      sqrt(var_q_u). **Concentration beats targeting here.**
+Aliases:              "the rarity weighting", "-log f weighting".
+```
+
 ### e_q_u  [utility] [theory] [evaluation]
 ```
 Is:                   E_Q[u], the EXACT expected utility of a release under Q^tau_p —
@@ -787,8 +909,9 @@ Is:                   E_Q[u], the EXACT expected utility of a release under Q^ta
                       ✅ **THE PRIMARY PRE-REGISTERED ENDPOINT (decision A, 2026-10-08)
                       IS THIS QUANTITY, GENOME-WIDE**, reported exactly. The sampled
                       average (`utility_retained`) is its DIAGNOSTIC counterpart, not
-                      the endpoint. A contiguous-window version is a clearly-labelled
-                      SECONDARY arm (see `beta_scope`'s `window` value).
+                      the endpoint. ⚠ The contiguous-window version that this line
+                      once called a labelled SECONDARY arm is RETIRED (2026-10-24);
+                      the live comparison is production vs `target_alt` weighting.
 Computed by:          scripts/results_table.py:var_and_mean — three forward passes of
                       src/mechanism/ffbs.py:log_z_p at eta - h, eta, eta + h, central
                       difference, with the step PINNED at H_STEP = 0.05

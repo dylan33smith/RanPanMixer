@@ -53,7 +53,8 @@ sys.path.insert(0, str(REPO / "src"))
 
 import numpy as np                                        # noqa: E402
 
-import attacks as A                                       # noqa: E402
+import attacks as A
+import store                                       # noqa: E402
 from mechanism import calibration as C                    # noqa: E402
 from mechanism import ffbs, hmm, utility                  # noqa: E402
 
@@ -152,8 +153,9 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     # ⚠ FIRST, BEFORE ANYTHING IS COMPUTED. Same lock as the sampled attack.
-    prereg, rev = A.require_signed_prereg()
-    print(f"running under {prereg} (git_rev {rev or 'unrecorded'})")
+    rev = store.git_rev(REPO)
+    prereg = "docs/plan.md direction block, 2026-10-24"
+    print(f"methodology: {prereg} (git_rev {rev or 'unrecorded'})")
     print("✅ decision L (2026-10-11): `kl_exact` and `acc_ceiling` are their OWN named "
           "quantities, NOT a substitute for A2. A2 is exact enumeration over all "
           "admissible input pairs — the TOY check, where it already passes — and it is "
@@ -214,7 +216,7 @@ def main(argv=None) -> int:
           "closer to 0.5 than shown.")
     if a.json:
         a.json.write_text(json.dumps(
-            {"prereg": prereg, "git_rev": rev, "chrom": CHROM,
+            {"methodology": prereg, "git_rev": rev, "chrom": CHROM,
              "T": int(st["ic"].sum()), "K": int(st["hap"].shape[0]),
              "method": "exact KL via state marginals; TV bounded by Pinsker",
              "substitutes_for_a2": False,

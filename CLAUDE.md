@@ -69,18 +69,15 @@ no numbers**; those live in `docs/`.
    device, never a release procedure. ⚠ Arm 1 releases 44 correlated paths whose
    donor panels are each other's true haplotypes: the per-release bound holds and
    the JOINT bound does not. Report that; do not quietly design around it.
-6. **`tau`, the utility function, the endpoints, the attacker set and the attack
-   database are pre-registered before any attack outcome is inspected.** They do
-   not change mid-phase, and the file is dated and committed.
-7. **An attacker that fails is not evidence the bound holds.** Measured attacker
+6. **An attacker that fails is not evidence the bound holds.** Measured attacker
    accuracy is a LOWER bound on distinguishability. Only the proof gives the upper
    bound; a weak attacker proves nothing about the mechanism.
-8. **Never mix two `tau` values, two utility functions, or two cohorts in one
+7. **Never mix two `tau` values, two utility functions, or two cohorts in one
    comparison.** Utility is comparable only at matched `tau`, privacy only at
    matched utility. ⚠ Leave-one-out gives each Arm 1 target its own `beta_v`, so
    its 44 releases carry 44 utility functions — pool measured attack outcomes,
    never utilities.
-9. **The guarantee covers the released path only.** Not the raw target genome, the
+8. **The guarantee covers the released path only.** Not the raw target genome, the
    graph, or any other released statistic about the same person.
 
 ## Agent Behavior & Prohibitions

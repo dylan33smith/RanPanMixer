@@ -101,8 +101,8 @@ def main(argv=None) -> int:
         ep = {r["target"]: r for r in json.loads(a.endpoint.read_text())["results"]
               if "error" not in r}
 
-    print(f"running under prereg_2026-10-10.md + addendum_2026-10-11_decision_K.md + "
-          f"addendum_2026-10-12_chain_rebuild.md (git_rev {store.git_rev(REPO)})")
+    print("methodology: docs/plan.md direction block, 2026-10-24 "
+          "(the pre-registration was deleted that day; see the direction block)")
     print(f"✅ verified on read: {len(cells)} genome records, each arm1 / genome scope / "
           f"22 autosomes / `loo_id` == target / `log_z_p` in [0, `eta_tau`].\n")
     print(f"ARM 1 releases. **ARM 1**, K = 86, per-target leave-one-out, diploid, "

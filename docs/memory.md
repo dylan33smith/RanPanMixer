@@ -104,6 +104,203 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-24 (later) — B-EVL-weightings: three `beta_v` weightings at MATCHED privacy, and the hard non-ref cut wins
+
+**Goal.** Decide the tool's utility function. Dylan, 2026-10-24: the contiguous/top-n
+weightings are dropped; compare the production weighting against the non-ref one, then
+against a rarity-weighted one, and pick.
+
+**Method.** `scripts/eta_sweep.py --genome`, all 22 autosomes at decision-J shares,
+HG00096, ARM 2, T = 22,134,562, diploid, exact via `ffbs.state_marginals`, with
+`kl_exact` and `acc_ceiling`. Provenance `logs/B_eta_sweep/genome_targetalt.md`,
+`matched_production.md`, `matched_targetalt.md`, `genome_rarity.md`. ⚠ EXPLORATORY.
+
+### ⚠⚠ FIRST, THE METRIC PROBLEM THAT HAD TO BE SOLVED BEFORE ANY COMPARISON WAS VALID
+
+Neither existing utility number can compare two weightings:
+- **`e_q_u` is weighting-SPECIFIC.** It is `beta`-weighted, so production's and
+  `target_alt`'s are different quantities wearing one name — standing constraint 7
+  (was 8) forbids them sharing a column. Comparing them gave an apparent **5.44x** win
+  for `target_alt`, which is an artifact: `sqrt(Var ratio)` by the exponential-family
+  identity, not a measurement.
+- **`e_differ` counts every called cell** and is dominated by the ~19.6M REF positions a
+  cohort mosaic matches by luck, so it FLATTERS a weighting that recovers common
+  alleles. On it, production looks BETTER (712.2 cells against 436.6 at matched
+  privacy).
+
+So **`e_match_nonref`** was added to `scripts/eta_sweep.py:one_eta` — the expected count
+of the target's NON-REF positions where the release matches. Exact from the same
+marginals, no extra passes, and **weighting-INDEPENDENT**, so it is the only one of the
+three that may be compared across weightings.
+
+### THE RESULT, at matched `acc_ceiling` (not matched `eta_tau`, which would be unfair)
+
+`Var_Q(u)` genome-wide: production **3.1531e-08**, `target_alt` **9.3736e-07** (29.73x),
+`target_rarity` **4.7268e-07** (14.99x). Every quantity is linear in `eta_tau` in this
+regime (ratios constant to 3 decimals over `acc_ceiling` 0.544 to 0.750), so matching is
+exact rather than approximate.
+
+| `acc_ceiling` | production | `target_alt` | `target_rarity` |
+|---|---|---|---|
+| 0.544318 | +262.3 | **+428.5** | +278.0 |
+| 0.611857 | +662.1 | **+1,081.4** | +701.6 |
+| 0.750033 | +1,479.9 | **+2,417.2** | +1,568.3 |
+
+(non-ref alleles recovered above the untilted mosaic, genome-wide, HG00096)
+
+**`target_alt` is the choice: 1.633x production. `target_rarity` is only 1.060x
+production and 0.649x `target_alt`.**
+
+**AND THE COMPOSITION IS THE REST OF THE ARGUMENT.** At matched privacy `target_alt`
+alters **0.613x** as many cells as production while recovering 1.633x the non-ref
+alleles — **2.67x more efficient per altered cell**. Of what each recovers,
+**98.1%** of `target_alt`'s is non-ref against production's **36.8%**: production spends
+about two thirds of its effect recovering REFERENCE alleles, which almost every human
+already carries.
+
+### ⚠⚠ WHY RARITY LOSES, AND IT IS THE INSTRUCTIVE PART
+
+`w_v = -log f_v` is better TARGETED than a ref/non-ref cut — it downweights a common
+non-ref allele continuously and gives exactly 0 to an allele every donor carries — and
+it still loses, because it is less CONCENTRATED. On chr21 its effective support
+(participation ratio) is **48,700 positions against `target_alt`'s 33,303**, and `Var`
+follows concentration: 4.7268e-07 against 9.3736e-07. Since the exchange rate goes as
+`sqrt(Var)`, spreading the budget over 77% of positions costs more than the better
+targeting buys. **Concentration beats informativeness-targeting here**, which is the
+opposite of the intuition the experiment was run on.
+⚠ It also zeroes positions no donor carries (unmatchable at any `eta_tau`, so budget
+there is wasted); `target_alt` does not. On chr21 that is **2 positions**, so it is a
+real but negligible advantage and must not be quoted as a reason.
+
+### What this does NOT establish
+
+⚠ **The free-lunch rule still applies and it is large here.** The untilted mosaic
+already matches **2,357,272 of 4,994,881** non-ref positions — **47.19%** — at
+`eta_tau` = 0, carrying zero target information. The recoveries above are the MOVEMENT
+on top of that, and +428 sits against 2,637,609 the mosaic misses.
+⚠ One target (HG00096), one cohort. Not shown to be target-independent.
+⚠ `e_match_nonref` counts non-ref alleles equally. A non-ref allele 80 of 88 donors
+carry is nearly as uninformative as a reference one, so this is a BETTER metric than
+`e_q_u` or `e_differ` for cross-weighting comparison, not a biological utility
+measurement. That measurement is still the largest gap in the package.
+
+---
+
+## 2026-10-24 — DIRECTION CHANGE (Dylan): the knob is `eta_tau`, the pre-registration is superseded, contiguity is dead
+
+**This entry exists because the project's framing changed, not because a measurement
+came in.** Recorded here because `docs/plan.md` carries the live direction and
+`docs/memory.md` carries why it changed.
+
+### The six decisions, all Dylan's, all 2026-10-24
+
+1. **THE KNOB IS `eta_tau`, NOT `tau`.** `tau`'s usable range is too weak to do
+   anything: the signed grid sits at `eta_tau` <= 2.6467 and moves the release about
+   four cells in 7,630,132. `tau`, `epsilon_tau` and `p_succ_bound` stay fully defined
+   in the theory and the proof — no relation changes — and "the `tau` range buys
+   nothing" is itself a reportable finding. But the method, tool and results are
+   parameterised by `eta_tau`.
+2. **THE REPORTED REGIME IS `acc_ceiling` FROM 0.5 TO 1.0.** It is exact, where
+   `p_succ_bound` is ~1 everywhere in this regime and so carries no information.
+3. **THE PRE-REGISTRATION IS SUPERSEDED** —
+   a superseding note (itself **removed** later the same day when Dylan deleted the pre-registration outright). Signed 2026-10-10, BEFORE the
+   mechanism was understood, and it was pinning the work to an inert regime. ⚠ The
+   signed file is kept UNEDITED, as its own closing instruction requires. Constraint 6
+   retired; **1, 2, 3, 4, 5, 7, 8, 9 stand**, and 7 and 8 matter MORE now.
+4. **THE TOOL'S UTILITY FUNCTION IS `target_alt`** — uniform over the positions where
+   that haplotype carries a non-ref allele, normalised genome-wide per haplotype.
+   Already measured at **29.7x** the production weighting's endpoint movement at matched
+   `tau` (`logs/B_alt_beta_genome_10targets.md`, HG00096 +2.481e-06 against +8.345e-08).
+   The production weighting stays as the comparison; a paper section may discuss how the
+   `beta_v` choice moves utility and privacy.
+5. **CONTIGUOUS-WINDOW AND TOP-n WEIGHTINGS ARE DEAD.** Not in the paper, not a
+   secondary arm, not mentioned. A 10-position window is a different and far narrower
+   quantity than a genome release. `logs/B_beta_concentration.md` and
+   `logs/B_topn_sweep_10targets.md` are ARCHIVED in `docs/data.md` — cited only to
+   explain why they were dropped.
+6. **THIS IS AN EMPIRICAL TOOL BUILT ON THEORY.** Findings may change the design. What
+   may not change: the free-lunch rule and constraint 7.
+
+### ⚠⚠ TWO ARITHMETIC CORRECTIONS THAT CHANGE HOW THE RESULT READS
+
+Both found 2026-10-24 by a 27-agent adversarial review of the framing (6 evidence
+readers, 5 candidate framings, 3 hostile lenses each, 1 synthesis).
+
+**(1) `epsilon_tau` IS NOT LARGE FOR A GENOME-SCALE RELEASE, AND THE DIRECTION OF WORRY
+WAS INVERTED.** `epsilon_tau` = 5.2933 at `tau` = 0.99 spread over T = 22,134,562
+positions is **2.39e-07 nats per released position**. The published genomic band is
+**7.7e-03 to 7.7 nats per released variant**: Genome Research 33(7):1113-1123 publishes
+a Laplace grid of 1e4..1e7 for a 1.3M-SNV release and prints the justification that
+`epsilon` of 1-10 "would essentially void the system of any utility"; arXiv:2406.01811
+runs its DP baseline at `epsilon` = 600; the only prior pangenome DP attempt
+(bioRxiv 2024.09.18.612131) ran `epsilon` = 9, reported no satisfactory generation, ran
+no attack, and remains an unreviewed preprint. **We are 3.2e04 to 3.2e07 times MORE
+conservative per released unit.** Low published genomic epsilons (LD 0.7, HWE 3.3,
+TDT 7, top-k 1-2) all release a handful of numbers, and the Laplace scale is
+`m/(n*epsilon)`, so `epsilon` must scale with the dimension of the released object.
+⚠ Any earlier note treating our `epsilon_tau` as disqualifying is wrong on this point.
+
+**(2) PINSKER IS NEARLY TIGHT HERE, NOT LOOSE BY ORDERS OF MAGNITUDE.** The
+privacy-loss variable is a sum of ~22M tiny contributions and is Gaussian to CLT order,
+so `TV = 2*Phi(sqrt(kl/2)) - 1` and Pinsker's overstatement is **sqrt(pi/2) =
+1.25331**, a CONSTANT at every logged `kl`. The true `acc_ceiling` at `tau` = 0.99 is
+**0.500187248**, not "unquantifiably closer to 0.5".
+[INCORRECT] - **the bound is loose by 1,128x at `epsilon_tau` = 10** (stated 2026-10-23)
+[CORRECTION - 2026-10-24]: that multiple is `(permitted advantage)/(realised advantage)`
+= 0.49995/0.000443 — the gap between what the CALIBRATION permits and what the realised
+`kl` delivers. That is the **UNSPENT BUDGET**, which is this project's own central
+finding, and NOT a looseness of Pinsker's inequality. Naming it "a loose bound" reads as
+an instrument defect and hands a reviewer an escape hatch that does not exist. Pinsker's
+own looseness is the constant 1.25331. Replacing Pinsker with the Gaussian form moves
+the vacuity point by ~1.25x in TV terms, not by orders of magnitude — which STRENGTHENS
+the result.
+
+### ⚠ AND ONE OVERCLAIM OF MINE, WITHDRAWN
+
+[INCORRECT] - **utility per unit of privacy risk scales as sqrt(Var), confirmed on
+measured rows to 0.12%** (stated 2026-10-24, earlier the same day)
+[CORRECTION - 2026-10-24]: the relation is ALGEBRA, not a measurement. From
+`dE_Q[u]/d eta = Var` (an exponential-family identity) plus `kl ~ 2*eta^2*Var` plus
+Pinsker, `acc_ceiling - 0.5 = 0.5*eta*sd` follows with no data at all, so both sides of
+the "collapse" are `0.5*eta*sd` and the 0.12% agreement was guaranteed rather than
+evidence. The eta-independence of the ratio is real and worth stating, but as a
+derivation. ⚠ The genuinely informative content is which POSITIONS carry weight — the
+2.2679 vs 1.3014 split already recorded in `docs/data.md` — not the ratio itself.
+
+### What the same review says the real bar is, and it is not `epsilon`
+
+Four things, none about `epsilon`, each called a standalone reject by at least one
+reviewer: **(a)** no downstream BIOLOGICAL utility measurement (PanMixer ships AF
+Wasserstein, LD on 5 kb R^2 matrices, and read mapping at 77.82% against a 77.83%
+baseline; our `af_loss`/`ld_loss` are exploratory and our read-mapping pipeline has
+reproduced only the UNOBFUSCATED baseline, and not to their published value);
+**(b)** the 44-path joint release against a single-path theorem, which constraint 5
+already concedes; **(c)** benchmarking against PanMixer at `capacity` 0.01-0.10, which
+is BELOW their own recommended operating point (`eps_private` = 0.002 near capacity
+0.28) — so "identified at 3 of 8 capacities" counts settings their authors disavow and
+must stop being a headline; **(d)** publishing "useful and private do not overlap" as
+THE result while `logs/B_beta_concentration.md` sits in the repo showing a 4,549.6x
+movement spread at IDENTICAL `tau`, `eta_tau`, `epsilon_tau` and `p_succ_bound`. (d) is
+the single largest rejection risk in the package and is exactly what decision 4 above
+addresses: the non-overlap was a property of ONE weighting known to be improvable at
+zero formal privacy cost.
+
+✅ **AND THE STRONGEST AXIS IS CONCEDED IN THEIR OWN PAPER.** PanMixer's Discussion
+(p.7): *"the privacy guarantees provided by PanMixer are empirical"*, *"an attacker
+could perform stronger attacks than those PanMixer protects against"*, and *"Providing
+formal, worst-case guarantees against membership inference remains a distinct and
+important direction for future work."* We hold `TV(Q_p, Q_q) <= tau` over every pair of
+admissible input paths. That is a difference in KIND, needs no measurement, and is
+uncontested.
+
+### What this entry does NOT establish
+
+No new measurement. The `target_alt` genome-wide `eta_tau` response curve was launched
+the same day and is recorded separately. ⚠ The free-lunch rule and constraint 7 survive
+the direction change untouched, and the four bars above are now the open work.
+
+---
+
 ## 2026-10-23 (later still) — B-THY-eta-response GENOME-WIDE: the trade-off is DOUBLY bad, and dilution is why
 
 **Goal.** Close what the chr21 curve left open. The entry below refused to extrapolate a
@@ -337,7 +534,7 @@ cheapest point where the mechanism does anything measurable the guarantee is alr
 result. Both arms re-run at `tau` = 0.999, 0.9999, 0.99999, with the full metric set and
 every runnable attack.
 
-⚠⚠ **EXPLORATORY, NOT PRE-REGISTERED.** `paper/prereg_2026-10-10.md` section 1 freezes the
+⚠⚠ **EXPLORATORY, NOT PRE-REGISTERED.** `paper/prereg_2026-10-10.md` section 1 freezes the ⚠ [path note, added 2026-10-24: that file was **removed** that day; the claim above stood when written.]
 grid at seven points ending at 0.99, SIGNED, under standing constraint 6, and these three
 were requested after the pinned grid's outcomes were seen. They live in
 `logs/B_tau_0p999_0p9999_0p99999/`, every script printed a non-pinned warning, and they are

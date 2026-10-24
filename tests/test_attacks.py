@@ -248,87 +248,6 @@ def test_POSITIVE_CONTROL_the_attacker_wins_against_an_untilted_release(toy_pair
         f"rather than 1.0 — it cannot win even when the answer is handed to it")
 
 
-# ---------------------------------------------------------------------------
-# The pre-registration lock
-# ---------------------------------------------------------------------------
-
-def test_an_unsigned_prereg_blocks_an_attack(tmp_path):
-    """⚠ Constraint 6, enforced in code rather than remembered.
-
-    What the constraint guards against is the one failure a person cannot
-    self-police: having seen a result, you cannot PROVE you did not pick the
-    analysis to suit it. So the guard has to be something other than good
-    intentions.
-    """
-    (tmp_path / "prereg_2026-10-10.md").write_text(
-        "**Status: ⚠ ALL EIGHT FIELDS FILLED — AWAITING SIGNATURE.**\n")
-    with pytest.raises(RuntimeError, match="NOT SIGNED"):
-        A.require_signed_prereg(str(tmp_path))
-
-
-def test_the_refusal_names_what_is_unfilled(tmp_path):
-    """The useful response to the refusal is to go and fill the fields, so it has
-    to say which ones are missing."""
-    (tmp_path / "prereg_x.md").write_text(
-        "**Status: DRAFT**\n\n[OPEN] the tau grid\n\n- [ ] 1. something\n- [ ] 2. else\n")
-    with pytest.raises(RuntimeError) as e:
-        A.require_signed_prereg(str(tmp_path))
-    msg = str(e.value)
-    assert "[OPEN] marker" in msg and "unchecked checklist item" in msg
-    assert "deliberate act" in msg
-
-
-def test_a_signed_prereg_allows_it_and_hands_back_its_identity(tmp_path):
-    """A result must be stampable with the exact pre-registration it ran under.
-    Two experiments under different pre-registrations are not comparable, and the
-    stamp is how anyone finds that out."""
-    (tmp_path / "prereg_2026-10-10.md").write_text(
-        "**Status: SIGNED** git_rev `deadbee`\n\n- [x] 1. done\n")
-    name, rev = A.require_signed_prereg(str(tmp_path))
-    assert name == "prereg_2026-10-10.md" and rev == "deadbee"
-
-
-def test_a_missing_prereg_is_refused_too(tmp_path):
-    """No file at all must not read as 'nothing to check'."""
-    with pytest.raises(RuntimeError, match="no pre-registration found"):
-        A.require_signed_prereg(str(tmp_path))
-
-
-def test_the_real_prereg_is_signed_and_opens_the_lock():
-    """⚠ A LIVE CHECK ON THIS REPOSITORY, not a fixture. ✅ THE EXPECTATION FLIPPED ON
-    2026-10-10, in the signing commit, which is what the previous version of this test
-    demanded: it asserted the lock was HOLDING and said "when it is signed this test's
-    expectation flips, and that flip should be a deliberate edit made in the signing
-    commit -- not something discovered later." This is that edit.
-
-    What it now guards is the opposite failure, and it is the one that matters from
-    here: a signed pre-registration being silently UNSIGNED, reverted, renamed or
-    emptied, which would let an attack run against a design nobody committed to. The
-    `git_rev` is asserted non-empty because a signature with no code state attached
-    cannot tell anyone WHAT was pre-registered.
-    """
-    name, rev = A.require_signed_prereg()          # must NOT raise
-    assert name == "prereg_2026-10-10.md", name
-    assert rev and len(rev) >= 7 and all(c in "0123456789abcdef" for c in rev), (
-        f"the signature records no usable git_rev ({rev!r}); a result stamped with a "
-        f"pre-registration that names no code state is not traceable")
-
-
-def test_the_signed_prereg_has_no_open_fields_left():
-    """⚠ Belt and braces on the lock's own crudeness. `require_signed_prereg` refuses
-    on any `[OPEN]` marker or unticked box, so this asserts the file genuinely has
-    none rather than trusting that the refusal logic is the only reader. All eight
-    checklist items must be ticked -- seven filled plus field 6, reopened and re-closed
-    on 2026-10-10 at the balanced 25-draw design.
-    """
-    text = (Path(__file__).resolve().parents[1] / "paper" / "prereg_2026-10-10.md").read_text()
-    assert "[OPEN]" not in text
-    assert "\n- [ ] " not in text
-    assert text.count("\n- [x] ") == 8, (
-        f"expected all 8 checklist items ticked, found {text.count(chr(10) + '- [x] ')}")
-    assert "25 draws" in text and "7,000 releases" in text, (
-        "the signed design must state the pinned draw count and release total")
-
 
 # ---------------------------------------------------------------------------
 # ⚠⚠ THE ONE-SIDED TRAP. `p_succ_bound` = (1 + tau)/2 bounds the EQUAL-PRIOR
@@ -386,25 +305,6 @@ def test_one_sided_rate_can_exceed_the_bound_without_violating_it() -> None:
 # the lock would silently fall through to the addendum and report it as the
 # pre-registration. So the addendum is deliberately NOT named `prereg_*`.
 # ---------------------------------------------------------------------------
-
-def test_the_lock_resolves_to_the_prereg_not_an_addendum() -> None:
-    name, rev = A.require_signed_prereg()
-    assert name == "prereg_2026-10-10.md", (
-        f"the lock resolved to {name!r}. Only the pre-registration itself may be the "
-        f"document a result is stamped with; an addendum records what changed after "
-        f"it was signed and is not a substitute for it.")
-    assert rev
-
-
-def test_no_addendum_matches_the_prereg_glob() -> None:
-    """⚠ Structural, not behavioural: it fails the moment someone adds
-    `prereg_addendum_*.md`, which would be inside the glob and could shadow the real
-    file depending on sort order."""
-    papers = sorted((Path(__file__).resolve().parents[1] / "paper").glob("prereg_*.md"))
-    assert [p.name for p in papers] == ["prereg_2026-10-10.md"], (
-        f"more than one file matches the prereg glob: {[p.name for p in papers]}. "
-        f"Name addenda `addendum_<date>_<slug>.md` so they cannot shadow it.")
-
 
 def test_the_decision_k_addendum_exists_and_is_signed() -> None:
     """Decision K post-dates the signature and changed the released object, so the
@@ -515,19 +415,49 @@ def test_the_attack_does_not_seed_from_the_draw_index_alone() -> None:
     # so its output is not parseable Python at all.
     calls = [n for n in ast.walk(ast.parse(path.read_text()))
              if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "_cell_seed"]
-    assert len(calls) == 1, f"{len(calls)} _cell_seed call sites, expected exactly 1"
-    assert len(calls[0].args) == 3, (
-        f"_cell_seed takes {len(calls[0].args)} argument(s); the seed must depend on "
-        f"the target index, the tau index AND the draw index")
-    names = {n.id for a in calls[0].args for n in ast.walk(a) if isinstance(n, ast.Name)}
-    for want, role in (("ti", "target index"), ("i", "draw index")):
-        assert want in names, (
-            f"the per-cell seed does not mention the {role} ({want!r}); every cell "
-            f"would share a stream over that axis (common random numbers)")
-    assert names & {"tau", "taui"}, (
-        "the per-cell seed does not mention the tau index; all seven tau would reuse "
-        "one set of streams, which is the defect measured on 2026-10-10 -- the "
-        "released path was bit-identical across tau at a fixed seed")
+    # ⚠ EVERY call site, not the first. The eta-driven mode added a second one on
+    # 2026-10-23, and a gate that checked only `calls[0]` would have passed while the
+    # new branch seeded however it liked.
+    assert calls, "no _cell_seed call site at all; the per-cell seed derivation is gone"
+    for k, call in enumerate(calls):
+        assert len(call.args) == 3, (
+            f"call site {k}: _cell_seed takes {len(call.args)} argument(s); the seed "
+            f"must depend on the target index, the operating-point index AND the draw "
+            f"index")
+        names = {n.id for a in call.args for n in ast.walk(a) if isinstance(n, ast.Name)}
+        for want, role in (("ti", "target index"), ("i", "draw index")):
+            assert want in names, (
+                f"call site {k}: the per-cell seed does not mention the {role} "
+                f"({want!r}); every cell would share a stream over that axis "
+                f"(common random numbers)")
+        assert names & {"tau", "taui", "eta", "SEED_GRID", "ETA_GRID"}, (
+            f"call site {k}: the seed does not mention the operating point; all "
+            f"columns would reuse one set of streams, which is the defect measured "
+            f"on 2026-10-10 -- the released path was bit-identical across tau at a "
+            f"fixed seed")
+
+
+def test_the_eta_mode_cannot_reuse_a_tau_cell_stream() -> None:
+    """⚠⚠ The eta-driven points are a SECOND axis of operating points, and indexing
+    them from 0 would have handed eta = 96 the stream of tau = 0. That is precisely
+    occurrence four of this project's common-random-numbers defect
+    (`docs/bugs.md`, 2026-10-22), so the offset is pinned here rather than trusted."""
+    import importlib
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    M = importlib.import_module("arm2_attack")
+    assert M.ETA_SEED_OFFSET >= len(M.SEED_GRID), (
+        f"ETA_SEED_OFFSET {M.ETA_SEED_OFFSET} does not clear the tau grid "
+        f"({len(M.SEED_GRID)} points), so an eta cell can collide with a tau cell")
+    tau_idx = {M.SEED_GRID.index(t) for t in M.SEED_GRID}
+    eta_idx = {M.ETA_SEED_OFFSET + M.ETA_GRID.index(e) for e in M.ETA_GRID}
+    assert not (tau_idx & eta_idx), (
+        f"the two operating-point axes share seed indices {sorted(tau_idx & eta_idx)}")
+    # and the realised streams must differ, not merely the indices
+    import numpy as np
+    def cell(ti, pi, i):
+        return int(np.random.SeedSequence([M.SEED_BASE, ti, pi, i]).generate_state(1)[0])
+    seeds = {cell(3, p, 5) for p in sorted(tau_idx | eta_idx)}
+    assert len(seeds) == len(tau_idx | eta_idx), "two operating points share a stream"
 
 
 def test_decoy_selection_uses_a_stable_hash() -> None:

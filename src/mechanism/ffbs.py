@@ -513,7 +513,8 @@ def _streams(seed: int, stream_key: str, n: int):
 
 
 def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarray,
-            util: utility.Utility, tau: float, *, seed: int, target_id: str,
+            util: utility.Utility, tau: float | None = None, *,
+            eta: float | None = None, seed: int, target_id: str,
             graph_id: str = "", loo_id: str | None = None,
             baseline_norm: float | None = None, stream_key: str = "",
             exact_out: dict | None = None) -> Release:
@@ -535,7 +536,25 @@ def release(hmm: CohortHMM, haplotypes_chain: np.ndarray, target_chain: np.ndarr
     It is reached by the identical code path, so the floor cannot drift away from
     the mechanism it is the floor of.
     """
-    eta = calibration.eta_tau(tau)
+    # ⚠⚠ DRIVEN BY `tau` OR BY `eta`, NEVER BOTH. The `eta` entry point exists
+    # because `tau` cannot ADDRESS the high end of the tilt: `tanh(eta)` is exactly
+    # 1.0 in float64 past `eta` ~ 19 and `calibration.eta_tau` rightly refuses
+    # `tau` = 1, so an eta-parameterised sweep (scripts/eta_sweep.py, and the
+    # eta-driven attack cells) could not call this function at all. It is ONE
+    # implementation with two entry points, never a second sampler.
+    # ⚠ THE RECORD'S `tau` IS THEN `tanh(eta)`, WHICH SATURATES TO 1.0. That is the
+    # true equivalent tau, and a release record carrying `tau` = 1 means the run was
+    # eta-driven and its guarantee is VACUOUS -- read `eta_tau` instead, which is
+    # exact at any magnitude. Nothing in this project persists an eta-driven release;
+    # they exist for characterisation and for attack trials held in memory.
+    if (tau is None) == (eta is None):
+        raise ValueError("pass exactly one of tau= or eta=")
+    if eta is None:
+        eta = calibration.eta_tau(tau)
+    else:
+        if eta < 0.0:
+            raise ValueError(f"eta must be non-negative, got {eta}")
+        tau = math.tanh(eta)
     base = baseline_log_norm(hmm) if baseline_norm is None else baseline_norm
     target_chain = np.asarray(target_chain)
 

@@ -65,6 +65,66 @@ def shares() -> dict:
     return {c: T[c] / tot for c in AUTOSOMES}, T, tot
 
 
+def alt_totals(target: str) -> np.ndarray:
+    """Per-haplotype count of chain positions carrying a NON-REF allele, over ALL 22
+    autosomes -- the genome-wide normaliser for `--weights target_alt`.
+
+    ⚠ Always all 22, whatever `--chroms` says: standing constraint 4 puts ONE budget on
+    the genome, so a chromosome's non-ref positions take their share of the genome's,
+    never 1 of their own. A `--chroms` subset just measures part of the genome-wide u.
+    """
+    tot = np.zeros(2, dtype=np.int64)
+    for c in AUTOSOMES:
+        ic = np.load(REPO / "data" / "cohort" / c / "in_chain.npy").astype(bool)
+        p = np.load(REPO / "data" / "targets" / target / c / "path.npy")[ic]
+        tot += (p > 0).sum(axis=0)
+    assert (tot > 0).all(), f"{target}: a haplotype with no non-ref allele genome-wide"
+    return tot
+
+
+def rarity_weights(hap, tgt):
+    """`w_v = -log f_v` for ONE haplotype on ONE chromosome's chain, else 0.
+
+    `f_v` is the COHORT FREQUENCY of the target's own allele at `v`: carriers / called,
+    over the donor panel. So an allele every donor carries gets weight -log(1) = 0 and
+    contributes nothing, while a singleton gets -log(1/88) = 4.477. The weight is
+    therefore BOUNDED by log(K), which matters -- an unbounded weight would break the
+    [0,1] utility range that standing constraint 2 requires.
+
+    ⚠ TWO CLASSES GET ZERO, both deliberately:
+      * the target has no call -- nothing to match;
+      * NO donor carries the target's allele (f = 0, so -log f is infinite) -- the
+        release CANNOT match there at any eta, so weight spent on it is wasted by
+        construction. `target_alt` does NOT do this and spends budget on unmatchable
+        positions; that is one of the two ways this weighting differs from it.
+    """
+    carriers = (hap == tgt[None, :]).sum(axis=0)
+    called = (hap >= 0).sum(axis=0)
+    usable = (tgt >= 0) & (carriers > 0)
+    f = np.ones_like(called, dtype=np.float64)
+    np.divide(carriers, np.maximum(called, 1), out=f, where=usable)
+    w = np.zeros(tgt.shape[0], dtype=np.float64)
+    w[usable] = -np.log(f[usable])
+    return w
+
+
+def rarity_totals(target: str) -> np.ndarray:
+    """Per-haplotype sum of `-log f_v` over ALL 22 autosomes, the genome-wide
+    normaliser for `--weights target_rarity`. Always all 22, for the same reason
+    `alt_totals` is: one budget on the genome (standing constraint 4).
+    """
+    tot = np.zeros(2, dtype=np.float64)
+    for c in AUTOSOMES:
+        d = REPO / "data" / "cohort" / c
+        ic = np.load(d / "in_chain.npy").astype(bool)
+        hap = np.load(d / "haplotypes.npy")[:, ic]
+        p = np.load(REPO / "data" / "targets" / target / c / "path.npy")[ic]
+        for k in (0, 1):
+            tot[k] += float(rarity_weights(hap, p[:, k]).sum())
+    assert (tot > 0).all(), f"{target}: a haplotype with zero rarity weight genome-wide"
+    return tot
+
+
 def chrom_eu(chrom: str, target: str, tau: float, share: float) -> tuple:
     """`E_Q[u]` and `u_ceiling` for one chromosome at its share. Exact."""
     d = REPO / "data" / "cohort" / chrom
