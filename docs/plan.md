@@ -68,6 +68,32 @@ Where an older passage conflicts with these six points, **these win.**
   looseness — it is `(permitted advantage)/(realised advantage)`, i.e. the UNSPENT
   BUDGET, which is the paper's own central finding and should be named as such.
 
+### ⚠ LIMITATIONS THAT MUST REACH THE WRITEUP — the home of retired constraints 4 and 5
+
+Standing constraints 4 and 5 were removed from `CLAUDE.md` on 2026-10-24 because they
+are **facts about the release, not rules the tool enforces**, and as hard rules they
+were producing scope warnings on tables that did not need them. The facts survive here
+and each is a required line in the paper.
+
+1. **`beta_v` sums to 1 over the 22 autosomes together, each chromosome taking a share
+   by variant count (decision J).** ⚠ This is a SCOPING choice, not a privacy
+   requirement — the bound depends only on `u` being in [0,1], so a per-chromosome
+   normalisation would still satisfy Theorem 1. What it would do is make 22 independent
+   releases of one person instead of one, which is a different released object. The
+   consequence that matters for reading tables: a chromosome-scope number (chr21 at
+   `beta_share` = 1) is **66.6x more generous per position** than the genome-wide
+   release and the two are different quantities. Definition lives in `docs/terms.md`
+   under `beta_v` and `beta_scope`.
+2. **Independent re-releases of the same genome COMPOSE and degrade the guarantee.** A
+   sweep over `eta_tau` is an evaluation device; a deployment releases once. Nothing in
+   the code enforces this and nothing should — it is a statement about what a user may
+   do with the tool, and it belongs in the paper's limitations, not in a gate.
+3. **The 44 Arm 1 releases are JOINTLY correlated and the joint bound does NOT hold.**
+   Each release's donor panel is the other 43 members' true haplotypes. The per-release
+   bound holds; the joint one over the set does not. ⚠⚠ This is the limitation a privacy
+   venue checks FIRST, and it was previously a parenthetical inside constraint 5. It
+   gets its own line because a pangenome reference IS the joint release.
+
 - **Branches:** `main` (docs, the PanMixer investigation). `pipeline` — an ORPHAN
   branch started 2026-09-28 holding the build, with `scripts/ configs/ logs/` and a
   gitignored `data/` symlink to `/data/ds85/RanPanMixer/data`. Remote `origin` ->

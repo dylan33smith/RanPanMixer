@@ -61,24 +61,24 @@ no numbers**; those live in `docs/`.
    unnormalized utility does not weaken the bound — it removes it.
 3. **Sample; never argmax.** Viterbi/MAP decoding is not a draw from the release
    distribution and carries no guarantee. The canonical decoder is `ffbs`.
-4. **`beta_v` sums to 1 over the whole scope `tau` covers — the 22 autosomes,
-   genome-wide.** Each chromosome takes a SHARE of the budget. Normalising per
-   chromosome silently makes 22 independent releases of one person.
-5. **One release per genome, cached and reused.** Independent re-releases of the
-   same path compose and degrade the guarantee. A `tau` grid is an evaluation
-   device, never a release procedure. ⚠ Arm 1 releases 44 correlated paths whose
-   donor panels are each other's true haplotypes: the per-release bound holds and
-   the JOINT bound does not. Report that; do not quietly design around it.
-6. **An attacker that fails is not evidence the bound holds.** Measured attacker
+4. **An attacker that fails is not evidence the bound holds.** Measured attacker
    accuracy is a LOWER bound on distinguishability. Only the proof gives the upper
    bound; a weak attacker proves nothing about the mechanism.
-7. **Never mix two `tau` values, two utility functions, or two cohorts in one
+5. **Never mix two `tau` values, two utility functions, or two cohorts in one
    comparison.** Utility is comparable only at matched `tau`, privacy only at
    matched utility. ⚠ Leave-one-out gives each Arm 1 target its own `beta_v`, so
    its 44 releases carry 44 utility functions — pool measured attack outcomes,
    never utilities.
-8. **The guarantee covers the released path only.** Not the raw target genome, the
+6. **The guarantee covers the released path only.** Not the raw target genome, the
    graph, or any other released statistic about the same person.
+7. **A utility comparison ACROSS WEIGHTINGS uses `e_match_nonref`.** `e_q_u` is
+   `beta`-weighted and therefore weighting-SPECIFIC — two weightings' `e_q_u` are
+   different quantities wearing one name, and comparing them produced an artifactual
+   5.44x. `e_differ` counts every called cell and is dominated by the ~19.6M REFERENCE
+   positions a cohort mosaic matches by chance, so it flatters whichever weighting
+   recovers common alleles. Only `e_match_nonref` is independent of `beta`. ⚠ And
+   compare at matched `acc_ceiling`, never at matched `eta_tau`: two weightings at one
+   `eta_tau` sit at different privacy levels.
 
 ## Agent Behavior & Prohibitions
 
