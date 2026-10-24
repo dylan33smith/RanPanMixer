@@ -65,11 +65,20 @@ PINNED_TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 # on disk still reproduce bit-for-bit from their recorded seed.
 EXPLORATORY_TAUS = (0.999, 0.9999, 0.99999)
 SEED_GRID = PINNED_TAUS + EXPLORATORY_TAUS
+# ⚠⚠ THE ETA GRID (Dylan, 2026-10-24: `eta_tau` is the knob, not `tau`). Spans the
+# reported regime `acc_ceiling` 0.5 -> 1.0 genome-wide, where the vacuity point is
+# `eta_tau` ~ 5642 (logs/B_eta_sweep/genome_frontier.md). Seed indices are OFFSET
+# past the tau grid so an eta cell can NEVER reuse a tau cell's stream -- that is
+# occurrence four of this project's common-random-numbers defect, and the offset is
+# what stops occurrence five.
+ETA_GRID = (0.0, 250.0, 500.0, 1262.0, 2821.0, 5642.0)
+ETA_SEED_OFFSET = 1000
 SEED_BASE = 20261012
 AUTOSOMES = loo.AUTOSOMES
 
 
-def genome_seed(target: str, tau: float) -> int:
+def genome_seed(target: str, tau: float | None = None, *,
+                eta: float | None = None) -> int:
     """A distinct, reproducible seed per (target, `tau`) cell.
 
     ⚠ hashlib, NEVER `hash()`: Python's is PYTHONHASHSEED-salted and already made a
@@ -89,6 +98,14 @@ def genome_seed(target: str, tau: float) -> int:
     utility result survived. Guarded by tests/test_arm1_release_seeding.py.
     """
     h = int.from_bytes(hashlib.sha256(target.encode()).digest()[:4], "big")
+    if eta is not None:
+        if float(eta) not in ETA_GRID:
+            raise ValueError(
+                f"eta={eta!r} has no fixed place in ETA_GRID {ETA_GRID}, so it has "
+                f"no reproducible seed. Append it rather than passing a bare index.")
+        ss = np.random.SeedSequence(
+            [SEED_BASE, h, ETA_SEED_OFFSET + ETA_GRID.index(float(eta))])
+        return int(ss.generate_state(1, dtype=np.uint32)[0])
     if float(tau) not in SEED_GRID:
         raise ValueError(
             f"tau={tau!r} has no fixed place in SEED_GRID {SEED_GRID}, so it has no "
@@ -133,14 +150,15 @@ def _inputs() -> dict[str, str]:
     return d
 
 
-def run_target(target: str, taus, root: str | None) -> dict:
+def run_target(target: str, taus, root: str | None, eta_mode: bool = False) -> dict:
     """All seven `tau` for one held-out individual. Chromosome-outer, so each
     chromosome's arrays and its `baseline_log_norm` are computed ONCE and reused
     across the grid -- `baseline_log_norm` is target-independent but the HMM is not,
     since K = 86 and the chain are both per-target."""
     t0 = time.time()
     todo = [(i, t) for i, t in enumerate(taus)
-            if not R.existing_seeds(target, t, "arm1", root)]
+            if not (R.existing_seeds(target, None, "arm1", root, eta=t) if eta_mode
+                    else R.existing_seeds(target, t, "arm1", root))]
     if not todo:
         return {"target": target, "skipped": True, "cells": len(taus),
                 "seconds": 0.0}
@@ -183,10 +201,17 @@ def run_target(target: str, taus, root: str | None) -> dict:
             utility.u_ceiling(tgt[:, 1], util.beta))
         for i, tau in todo:
             box: dict = {}
-            parts[i].append(ffbs.release(
-                m, panel, tgt, util, tau, seed=genome_seed(target, tau),
-                target_id=target, loo_id=target, baseline_norm=base,
-                stream_key=c, exact_out=box))
+            if eta_mode:
+                parts[i].append(ffbs.release(
+                    m, panel, tgt, util, eta=tau,
+                    seed=genome_seed(target, eta=tau),
+                    target_id=target, loo_id=target, baseline_norm=base,
+                    stream_key=c, exact_out=box))
+            else:
+                parts[i].append(ffbs.release(
+                    m, panel, tgt, util, tau, seed=genome_seed(target, tau),
+                    target_id=target, loo_id=target, baseline_norm=base,
+                    stream_key=c, exact_out=box))
             assert len(box["u_haps"]) == 2, (
                 f"{target}/{c}/tau={tau:g}: {len(box['u_haps'])} haplotype "
                 f"contribution(s), expected 2 -- a diploid release must give two")
@@ -204,6 +229,7 @@ def run_target(target: str, taus, root: str | None) -> dict:
     for i, tau in todo:
         gr = ffbs.GenomeRelease(parts=tuple(parts[i]))
         p = R.save_genome_release(gr, arm="arm1", axis_digest=axis, inputs=inputs,
+                                  point_name=R.eta_dir(tau) if eta_mode else None,
                                   root=root, scope="genome")
         written.append(str(p))
         e = ex[i]
@@ -221,9 +247,9 @@ def run_target(target: str, taus, root: str | None) -> dict:
 
 
 def _one(args):
-    target, taus, root = args
+    target, taus, root, eta_mode = args
     try:
-        return run_target(target, taus, root)
+        return run_target(target, taus, root, eta_mode)
     except Exception as e:                      # a worker must report, never vanish
         return {"target": target, "error": f"{type(e).__name__}: {e}",
                 "traceback": traceback.format_exc()[-1500:]}
@@ -233,6 +259,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--targets", nargs="+", default=None)
     ap.add_argument("--taus", type=float, nargs="+", default=list(PINNED_TAUS))
+    ap.add_argument("--etas", type=float, nargs="+", default=None,
+                    help="drive the tilt by `eta_tau` directly (the knob since "
+                         "2026-10-24) and file the releases under eta_<v>/ rather "
+                         "than tau_<v>/. Must come from ETA_GRID so every cell has "
+                         "a fixed seed index disjoint from the tau grid's.")
     ap.add_argument("--workers", type=int, default=24)
     ap.add_argument("--root", default=None)
     ap.add_argument("--json", type=Path, default=None)
@@ -241,7 +272,17 @@ def main(argv=None) -> int:
                          "scripts/arm1_results.py --endpoint expects")
     a = ap.parse_args(argv)
 
-    if set(a.taus) != set(PINNED_TAUS):
+    eta_mode = bool(a.etas)
+    if eta_mode:
+        off = [e for e in a.etas if e not in ETA_GRID]
+        if off:
+            raise SystemExit(f"eta {off} is not in ETA_GRID {ETA_GRID}, so it has "
+                             f"no fixed seed index")
+        a.taus = list(a.etas)      # the eta values ARE the grid for this run
+        print(f"ETA MODE: {list(a.etas)}. Releases land in eta_<v>/ directories, "
+              f"a namespace disjoint from tau_<v>/ -- tanh(eta) saturates to 1.0 "
+              f"past eta ~ 19, so naming these by tau would collide.\n")
+    elif set(a.taus) != set(PINNED_TAUS):
         print(f"⚠⚠ RUNNING A NON-PINNED `tau` SET {a.taus}. The pre-registration freezes "
               f"{list(PINNED_TAUS)} under standing constraint 6. This is legitimate only "
               f"as a PILOT and its output must not be reported as the arm 1 result.\n")
@@ -265,7 +306,7 @@ def main(argv=None) -> int:
     t0 = time.time()
     out = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(_one, (t, a.taus, a.root)): t for t in targets}
+        futs = {ex.submit(_one, (t, a.taus, a.root, eta_mode)): t for t in targets}
         for n, f in enumerate(as_completed(futs), 1):
             r = f.result()
             out.append(r)
@@ -284,7 +325,8 @@ def main(argv=None) -> int:
     # ⚠ ASSERT COMPLETENESS FROM THE DISK, not from this loop's bookkeeping: a fan-out
     # that reports its own success cannot tell "wrote nothing" from "ran nothing".
     missing = [(t, tau) for t in targets for tau in a.taus
-               if not R.existing_seeds(t, tau, "arm1", a.root)]
+               if not (R.existing_seeds(t, None, "arm1", a.root, eta=tau) if eta_mode
+                       else R.existing_seeds(t, tau, "arm1", a.root))]
     print(f"\n{len(out) - len(errs)}/{len(targets)} targets completed, "
           f"{len(errs)} failed, {len(missing)} of {n_cells} cells missing on disk.")
     if errs:

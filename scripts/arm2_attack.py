@@ -387,10 +387,38 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         # that is not significant is reported as a NOTE and does not fail the run.
         cells = [(c, t, v) for c, row in table.items() for t, v in row.items()
                  if v.get("balanced") is not None]
+        ceilings = {}
+        for spec in (getattr(a, "acc_ceiling", None) or []):
+            k, _, val = spec.partition("=")
+            ceilings[float(k)] = float(val)
+        if getattr(a, "etas", None):
+            if ceilings:
+                print(f"\n⚠ Bound check is against the EXACT `acc_ceiling` supplied "
+                      f"for {sorted(ceilings)}, NOT `p_succ_bound` (which is 1.0 to "
+                      f"float64 at every one of these eta and so cannot fail).")
+            else:
+                print(f"\n⚠⚠ NO BOUND CHECK RUN. In eta mode `p_succ_bound` is "
+                      f"vacuous, and no --acc-ceiling was given, so the accuracies "
+                      f"above stand as MEASUREMENTS against no bound. Pass "
+                      f"--acc-ceiling eta=value from an eta_sweep run at this beta "
+                      f"scope to make the comparison.")
         z_crit = _z_for_one_sided(0.05 / max(1, len(cells)))
         violations, notes = [], []
+        # ⚠⚠ IN ETA MODE THE BOUND IS NOT `p_succ_bound`. It would be
+        # (1 + tanh(eta))/2, which is 1.0 to float64 at every eta we run here -- so
+        # `C.p_succ_bound(t)` RAISES (t is an eta, not a tau) and, if it did not, the
+        # comparison would be unfalsifiable. The meaningful bound is the EXACT
+        # `acc_ceiling`, supplied by --acc-ceiling as eta=value pairs from an
+        # eta_sweep run at THIS beta scope. Without it, no bound check is attempted
+        # and the accuracies stand as measurements, which is said out loud.
         for c, t, v in cells:
-            bal, bound = v["balanced"], C.p_succ_bound(t)
+            if getattr(a, "etas", None):
+                bound = (ceilings or {}).get(float(t))
+                if bound is None:
+                    continue
+            else:
+                bound = C.p_succ_bound(t)
+            bal = v["balanced"]
             if bal <= bound + 1e-9:
                 continue
             se = v.get("se_balanced") or 0.0
@@ -409,11 +437,19 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         print("⚠⚠ MEASURED ACCURACY ABOVE p_succ_bound — this falsifies the "
               "IMPLEMENTATION, not the theorem:")
         for c, t, v in violations:
-            print(f"    {c} at tau={t}: {v:.4f} > {C.p_succ_bound(t):.4f}")
+            print(f"    {c} at point={t:g}: {v:.4f} > bound")
     else:
-        print("no condition exceeded p_succ_bound at any tau")
-    print(f"\n⚠ tau = 0.05 and 0.10 do NOT resolve below the bound at delta = "
-          f"{delta:.4f}; those rows are reported, not claimed. The PROOF carries them.")
+        print(f"no condition exceeded "
+              f"{'the exact acc_ceiling' if ceilings else 'p_succ_bound'} at any "
+              f"{'eta' if getattr(a, 'etas', None) else 'tau'}")
+    if not getattr(a, "etas", None):
+        print(f"\n⚠ tau = 0.05 and 0.10 do NOT resolve below the bound at delta = "
+              f"{delta:.4f}; those rows are reported, not claimed. The PROOF carries "
+              f"them.")
+    else:
+        print(f"\n⚠ delta = {delta:.4f}, so a cell resolves only where the exact "
+              f"acc_ceiling exceeds {0.5 + delta:.4f}. Below that the CEILING is the "
+              f"stronger statement and the attack adds nothing.")
     print("⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample "
           "panel, so it is a LOWER BOUND on decoy difficulty and flatters us.")
     print("⚠ The three conditions share each release and must not be pooled.")
@@ -443,6 +479,11 @@ def main(argv=None) -> int:
                          "NO releases. ⚠ The releases cost ~110 CPU-hours, "
                          "so the reporting must be fixable without them.")
     ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))
+    ap.add_argument("--acc-ceiling", nargs="+", default=None, metavar="ETA=VAL",
+                    help="the EXACT acc_ceiling at each eta, from an eta_sweep "
+                         "run at the SAME beta scope, e.g. 200=0.616930. In eta "
+                         "mode this is the only meaningful bound; p_succ_bound "
+                         "is 1.0 everywhere there.")
     ap.add_argument("--etas", type=float, nargs="+", default=None,
                     help="drive the tilt by `eta` DIRECTLY instead of by `tau`, for "
                          "the window where tau is not representable (tanh(eta) = 1.0 "

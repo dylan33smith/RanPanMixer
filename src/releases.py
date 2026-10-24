@@ -87,6 +87,60 @@ def tau_dir(tau: float) -> str:
     return name
 
 
+def eta_dir(eta: float) -> str:
+    """`500.0` -> `eta_500`, the directory for an ETA-DRIVEN release.
+
+    ⚠⚠ WHY THIS CANNOT REUSE `tau_dir`. An eta-driven release has
+    `tau = tanh(eta)`, which is exactly 1.0 in float64 past `eta` ~ 19 -- so EVERY
+    high-eta release would land in one `tau_1p00` directory and overwrite the last.
+    That is the same silent-collision failure `tau_dir`'s round-trip guard exists
+    to stop, one level up, and it is why the eta grid gets its own namespace.
+
+    The name is the shortest exact decimal of `eta` (so `eta_0`, `eta_500`,
+    `eta_2821`, `eta_1p5`), and it must read back as exactly `eta` or this raises.
+    `tau_*` and `eta_*` directories can never collide: the prefixes differ.
+    """
+    f = float(eta)
+    if f < 0.0:
+        raise ValueError(f"eta must be non-negative, got {eta!r}")
+    num = repr(int(f)) if f == int(f) else repr(f)
+    name = "eta_" + num.replace(".", "p")
+    back = float(name.removeprefix("eta_").replace("p", "."))
+    if back != f:
+        raise ValueError(
+            f"eta={eta!r} does not survive its directory name {name!r} (it reads "
+            f"back as {back!r}). Two eta values would share a directory.")
+    return name
+
+
+def _name_for(rel) -> str:
+    """The directory for a Release record, inferred when no name was given.
+
+    ⚠ THIS IS THE FALLBACK. A caller that ran an `eta` grid should pass
+    `point_name=eta_dir(eta)` explicitly, because the record does not store WHICH
+    knob drove it and inference splits the namespace by accident: at `eta` = 1 the
+    equivalent `tau` is representable, so inference would file it under `tau_*`
+    while `eta` = 500 lands under `eta_*`. The inference below only stops the worst
+    case -- every saturated release silently sharing `tau_1p00`.
+
+    ⚠ `tau` == 1.0 is the tell: `ffbs.release(eta=...)` records `tanh(eta)`, which
+    saturates to exactly 1.0 past `eta` ~ 19. `tau_dir(1.0)` is a legal name, so
+    without this every eta-driven release would silently share `tau_1p00`.
+    """
+    eta = getattr(rel, "eta_tau", None)
+    if eta is not None and float(rel.tau) >= 1.0:
+        return eta_dir(float(eta))
+    return tau_dir(float(rel.tau))
+
+
+def point_dir(tau: float | None = None, *, eta: float | None = None) -> str:
+    """The release directory for ONE operating point, named by whichever knob drove
+    it. Exactly one of `tau` / `eta`, mirroring `ffbs.release`."""
+    if (tau is None) == (eta is None):
+        raise ValueError("pass exactly one of tau= or eta=")
+    return tau_dir(tau) if eta is None else eta_dir(eta)
+
+
 def _check_arm(arm: str, loo_id: str | None) -> None:
     if arm not in ARMS:
         raise ValueError(f"arm must be one of {ARMS}, not {arm!r}")
@@ -107,15 +161,20 @@ def _check_arm(arm: str, loo_id: str | None) -> None:
             f"hold out and a loo_id means this is an arm 1 release mislabelled.")
 
 
-def _dir_for(rel, arm: str, root: str | Path | None = None) -> Path:
-    return (release_root(root) / arm / rel.target_id / tau_dir(rel.tau)
+def _dir_for(rel, arm: str, root: str | Path | None = None,
+             point_name: str | None = None) -> Path:
+    # ⚠ A record whose `tau` is 1.0 was driven by `eta` (tanh saturates), so it must
+    # be named in the eta namespace or every high-eta release lands in one directory.
+    return (release_root(root) / arm / rel.target_id / (point_name or _name_for(rel))
             / rel.release_id)
 
 
-def existing_seeds(target_id: str, tau: float, arm: str,
-                   root: str | Path | None = None) -> list[int]:
+def existing_seeds(target_id: str, tau: float | None, arm: str,
+                   root: str | Path | None = None, *,
+                   eta: float | None = None) -> list[int]:
     """Seeds already written for this (target, `tau`, arm). The constraint-5 counter."""
-    d = release_root(root) / arm / target_id / tau_dir(tau)
+    d = release_root(root) / arm / target_id / (
+        eta_dir(eta) if eta is not None else tau_dir(tau))
     if not d.is_dir():
         return []
     seeds = set()
@@ -127,7 +186,8 @@ def existing_seeds(target_id: str, tau: float, arm: str,
 
 
 def save_release(rel, *, arm: str, axis_digest: str, inputs: dict[str, str],
-                 root: str | Path | None = None, note: str = "") -> Path:
+                 root: str | Path | None = None, note: str = "",
+                 point_name: str | None = None) -> Path:
     """Write one `Release` -- both arrays and its record -- each with provenance.
 
     Returns the directory. ⚠ RAISES if that directory already exists.
@@ -143,7 +203,7 @@ def save_release(rel, *, arm: str, axis_digest: str, inputs: dict[str, str],
             "inputs is empty. An artifact with no recorded inputs cannot be shown to "
             "be stale, which is the whole purpose of the sidecar.")
 
-    d = _dir_for(rel, arm, root)
+    d = _dir_for(rel, arm, root, point_name)
     # ⚠ THE COLLISION CHECK, and it is the reason this function exists rather than a
     # bare np.save. The key is (target, tau, utility, seed, chrom); two releases with
     # that key are the SAME release, so a second write is either a redundant recompute
@@ -185,7 +245,8 @@ def save_release(rel, *, arm: str, axis_digest: str, inputs: dict[str, str],
 
 def save_genome_release(gr, *, arm: str, axis_digest: str, inputs: dict[str, str],
                         root: str | Path | None = None,
-                        scope: str = "genome") -> Path:
+                        scope: str = "genome",
+                        point_name: str | None = None) -> Path:
     """Write every part of a `GenomeRelease`, then the genome-level record.
 
     ⚠ `scope` IS REQUIRED TO BE EXPLICIT because `GenomeRelease` cannot tell the
@@ -214,12 +275,19 @@ def save_genome_release(gr, *, arm: str, axis_digest: str, inputs: dict[str, str
                 f"partial set is a chromosome-scope release -- pass "
                 f"scope='chromosome' and say so in every table.")
 
+    # ⚠⚠ THE PARTS MUST INHERIT `point_name`. Without it each part falls back to
+    # `_name_for`, and at `eta` = 0 the equivalent `tau` is 0.0 -- representable --
+    # so the 22 parts would land in `tau_0p00/` (mixing with the pinned-grid
+    # releases already there) while the genome record went to `eta_0/`. A release
+    # split across two namespaces, with the genome record pointing at parts that
+    # are not beside it. Measured 2026-10-24, before the 264-cell run.
     paths = [save_release(p, arm=arm, axis_digest=axis_digest, inputs=inputs,
-                          root=root) for p in gr.parts]
+                          root=root, point_name=point_name) for p in gr.parts]
     rec = dict(gr.record())
     rec["scope"] = scope
     rec["arm"] = arm
-    out = (release_root(root) / arm / first.target_id / tau_dir(first.tau)
+    out = (release_root(root) / arm / first.target_id
+           / (point_name or _name_for(first))
            / f"{gr.release_id}.json")
     if out.exists():
         raise FileExistsError(

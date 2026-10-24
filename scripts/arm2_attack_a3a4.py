@@ -77,8 +77,9 @@ from mechanism import ffbs, utility  # noqa: E402
 # `pick_decoys` and `concordance` define the cohort, the model, the decoy conditions
 # and the seeding discipline; a second copy would drift and then the two attacks
 # would no longer be running on the same experiment.
-from arm2_attack import (CHROM, DECOY_SEED, EXPLORATORY_TAUS, SEED_GRID,  # noqa: E402
-                         TAUS, load_state, pick_decoys)
+from arm2_attack import (CHROM, DECOY_SEED, ETA_GRID, ETA_SEED_OFFSET,  # noqa: E402
+                         EXPLORATORY_TAUS, SEED_GRID, TAUS, load_state,
+                         pick_decoys)
 
 SEED_BASE = 70_000           # disjoint from A1's 50_000
 BLOCK_SIZES = (512, 4096, 32768)
@@ -240,16 +241,19 @@ def _one_trial(job: tuple) -> dict:
     ⚠ The two hypotheses get INDEPENDENT seeds, as in A1: reusing the `Q_p` seed would
     correlate the two arms of the test and bias the balance.
     """
-    target_id, tau, seed = job
+    # ⚠ `point` is the COLUMN LABEL, `eta` is the tilt applied. In tau mode they are
+    # tau and arctanh(tau); in eta mode point IS the eta and there is no
+    # representable tau, so eta is PASSED rather than re-derived.
+    target_id, point, eta, seed = job
+    tau = point
     st = load_state()
     s3 = a3_sites(st)
-    eta = C.eta_tau(tau)
     beta = st["util"].beta
     p = st["paths"][target_id]
     stable = int.from_bytes(hashlib.sha256(target_id.encode()).digest()[:4], "big")
     decoys = pick_decoys(target_id, st, np.random.default_rng([DECOY_SEED, stable]))
 
-    rel = ffbs.release(st["model"], st["hap"], p, st["util"], tau, seed=seed,
+    rel = ffbs.release(st["model"], st["hap"], p, st["util"], eta=eta, seed=seed,
                        target_id=target_id, graph_id=CHROM,
                        baseline_norm=st["base"])
     y = rel.released_path
@@ -266,7 +270,7 @@ def _one_trial(job: tuple) -> dict:
 
         # ---- the second hypothesis: a release from Q_q, independent seed
         q_seed = int(seed) ^ (0x5EED * (1 + sorted(decoys).index(name)))
-        rel_q = ffbs.release(st["model"], st["hap"], qd, st["util"], tau,
+        rel_q = ffbs.release(st["model"], st["hap"], qd, st["util"], eta=eta,
                              seed=q_seed, target_id=f"{target_id}~{name}",
                              graph_id=CHROM, baseline_norm=st["base"])
         yq = rel_q.released_path
@@ -500,8 +504,9 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
                 "n_per_arm": len(lp)}
             cells.append(f"{bal:.4f}")
         print(f"| {cond} balanced accuracy * | " + " | ".join(cells) + " |")
-    print("| `p_succ_bound` * | " +
-          " | ".join(f"{C.p_succ_bound(t):.4f}" for t in taus) + " |")
+    print("| `p_succ_bound` * | " + " | ".join(
+        ("~1.0 (vacuous)" if t >= 1.0 else f"{C.p_succ_bound(t):.4f}")
+        for t in taus) + " |")
 
     # ---------------- A4
     print("\n### A4 — segment-restricted likelihood ratio, maximised over blocks\n")
@@ -537,14 +542,15 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
                 cells.append(f"{accs[b_max]:.4f}")
             print(f"| block {size}: {cond} MAX over blocks | " +
                   " | ".join(cells) + " |")
-    print("| `p_succ_bound` * | " +
-          " | ".join(f"{C.p_succ_bound(t):.4f}" for t in taus) + " |")
+    print("| `p_succ_bound` * | " + " | ".join(
+        ("~1.0 (vacuous)" if t >= 1.0 else f"{C.p_succ_bound(t):.4f}")
+        for t in taus) + " |")
 
     # ---------------- the bound check, Bonferroni over every cell examined
     a3_cells = len(CONDS) * len(taus)
     z_a3 = _z_for_one_sided(0.05 / a3_cells)
     z_a4 = _z_for_one_sided(0.05 / n_cells)
-    print(f"\n**THE BOUND CHECK.** One-sided on the excess over `p_succ_bound`, "
+    print(f"\n**THE BOUND CHECK.** ⚠ SKIPPED where the point is an `eta_tau` (p_succ_bound is 1.0 to float64 there and cannot fail; compare against the exact `acc_ceiling` in logs/B_eta_sweep/). Otherwise one-sided on the excess over `p_succ_bound`, "
           f"Bonferroni-corrected across the cells actually examined: A3 over "
           f"{a3_cells} cells (z_crit = {z_a3:.2f}), A4 over {n_cells:,} "
           f"block-cells (z_crit = {z_a4:.2f}).\n")
@@ -552,6 +558,8 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
     for cond in CONDS:
         for tau in taus:
             c = table["a3"][cond][tau]
+            if tau >= 1.0:
+                continue
             bound = C.p_succ_bound(tau)
             if c["balanced"] <= bound:
                 continue
@@ -563,6 +571,9 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
         for cond in CONDS:
             for tau in taus:
                 c = table["a4"][str(size)][cond][tau]
+                # ⚠ an eta_tau point: p_succ_bound is 1.0 to float64 and cannot fail
+                if tau >= 1.0:
+                    continue
                 bound = C.p_succ_bound(tau)
                 if c["max_balanced"] <= bound:
                     continue
@@ -633,6 +644,12 @@ def main(argv=None) -> int:
     # the `tau` index in the seed is its place in SEED_GRID, NOT in `--taus`, so a
     # subset run draws the same streams as the full grid (see arm2_attack.SEED_GRID)
     ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))
+    ap.add_argument("--etas", type=float, nargs="+", default=None,
+                    help="drive the tilt by `eta_tau` directly (the knob since "
+                         "2026-10-24). ⚠ p_succ_bound is vacuous at these points; "
+                         "the meaningful bound is the exact acc_ceiling. Must come "
+                         "from arm2_attack.ETA_GRID so each cell has a fixed seed "
+                         "index disjoint from the tau grid's.")
     a = ap.parse_args(argv)
     off = [t for t in a.taus if t not in SEED_GRID]
     if off:
@@ -680,10 +697,26 @@ def main(argv=None) -> int:
             print(f"JSON -> {a.json}")
         return 0
 
-    jobs = [(t, tau, SEED_BASE + i * 10_000 + SEED_GRID.index(tau) * 1_000 + k)
-            for i, t in enumerate(tids)
-            for tau in a.taus
-            for k in range(a.draws)]
+    if a.etas:
+        off = [e for e in a.etas if e not in ETA_GRID]
+        if off:
+            raise SystemExit(f"eta {off} is not in arm2_attack.ETA_GRID "
+                             f"{ETA_GRID}, so it has no fixed seed index")
+        print(f"⚠⚠ ETA MODE: {list(a.etas)}. p_succ_bound is 1.0 to float64 at "
+              f"every one of these, so no bound comparison is printed; compare "
+              f"against the exact acc_ceiling in logs/B_eta_sweep/.\n")
+        a.taus = list(a.etas)
+        jobs = [(t, eta, eta, SEED_BASE + i * 10_000
+                 + (ETA_SEED_OFFSET + ETA_GRID.index(eta)) * 1_000 + k)
+                for i, t in enumerate(tids)
+                for eta in a.etas
+                for k in range(a.draws)]
+    else:
+        jobs = [(t, tau, C.eta_tau(tau),
+                 SEED_BASE + i * 10_000 + SEED_GRID.index(tau) * 1_000 + k)
+                for i, t in enumerate(tids)
+                for tau in a.taus
+                for k in range(a.draws)]
     plan = R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(jobs))
     print(f"\n{len(jobs):,} trials, each drawing 1 release under Q_p and 3 under "
           f"Q_q (one per condition) = {4*len(jobs):,} releases")

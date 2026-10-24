@@ -297,3 +297,55 @@ def test_the_sampler_refuses_an_ambiguous_or_negative_tilt() -> None:
         ffbs.release(m, t.haplotypes, tgt, util, seed=1, target_id="x")
     with pytest.raises(ValueError, match="non-negative"):
         ffbs.release(m, t.haplotypes, tgt, util, eta=-1.0, seed=1, target_id="x")
+
+
+def test_eta_directories_cannot_collide_with_each_other_or_with_tau() -> None:
+    """⚠⚠ THE COLLISION THIS EXISTS TO STOP. An eta-driven release has
+    `tau = tanh(eta)`, which is exactly 1.0 in float64 past `eta` ~ 19 — so routing
+    eta releases through `tau_dir` would put EVERY high-eta release in one
+    `tau_1p00` directory, each overwriting the last. That is the same silent
+    overwrite between two different privacy levels that `tau_dir`'s round-trip
+    guard exists to prevent, one level up."""
+    etas = [0.0, 1.5, 250.0, 500.0, 1262.0, 2821.0, 5642.0, 66566000.0]
+    names = [R.eta_dir(e) for e in etas]
+    assert len(set(names)) == len(etas), names
+    assert names[:4] == ["eta_0", "eta_1p5", "eta_250", "eta_500"]
+    for e, n in zip(etas, names):
+        assert float(n.removeprefix("eta_").replace("p", ".")) == e
+    # and the two namespaces are disjoint, which is what makes them safe to mix
+    taus = [R.tau_dir(t) for t in (0.0, 0.05, 0.5, 0.99, 0.99999)]
+    assert not (set(names) & set(taus))
+    assert all(n.startswith("eta_") for n in names)
+    assert all(t.startswith("tau_") for t in taus)
+    with pytest.raises(ValueError, match="non-negative"):
+        R.eta_dir(-1.0)
+
+
+def test_point_dir_takes_exactly_one_knob() -> None:
+    assert R.point_dir(0.99) == "tau_0p99"
+    assert R.point_dir(eta=500.0) == "eta_500"
+    with pytest.raises(ValueError, match="exactly one"):
+        R.point_dir(0.99, eta=500.0)
+    with pytest.raises(ValueError, match="exactly one"):
+        R.point_dir()
+
+
+def test_a_genome_release_keeps_its_parts_in_one_namespace(tmp_path) -> None:
+    """⚠⚠ THE SPLIT-NAMESPACE BUG, caught 2026-10-24 before a 264-cell run.
+
+    `save_genome_release` writes the 22 parts and then a genome-level record that
+    NAMES them. If the parts do not inherit `point_name`, each falls back to
+    inference, and at `eta` = 0 the equivalent `tau` is 0.0 — representable — so the
+    parts land in `tau_0p00/` (beside the unrelated pinned-grid releases) while the
+    record lands in `eta_0/`. The record would then point at parts that are not
+    beside it, across two namespaces, with nothing raising.
+    """
+    import inspect
+    import releases as Rmod
+    src = inspect.getsource(Rmod.save_genome_release)
+    # the parts call must forward the override
+    assert "point_name=point_name" in src, (
+        "save_genome_release writes its parts without forwarding point_name, so an "
+        "eta-driven release splits across the tau_* and eta_* namespaces")
+    # and the two names must differ exactly where the bug would hide: eta = 0
+    assert Rmod.eta_dir(0.0) == "eta_0" and Rmod.tau_dir(0.0) == "tau_0p00"
