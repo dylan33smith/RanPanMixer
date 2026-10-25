@@ -189,16 +189,51 @@ this confusion.
 metrics and against the mapping rates — the argument that the proxy predicts real
 downstream damage. We have no counterpart on either half.
 
-**⚠⚠ THE STATUS OF WHAT WE HAVE IS THE PROBLEM, NOT THE COMPUTATION.** Decision H
-(`docs/plan.md:478`) declared `af_loss`/`ld_loss` NOT adopted; both were run 2026-10-15
-AFTER outcomes were inspected, so both are stamped EXPLORATORY and promotion needs a
-NEW dated pre-registration. Two facts a referee must be told rather than find: **they
-beat us on `af_loss` at every capacity** (ours 0.003668..0.003698, theirs
-0.000220..0.002734) and that metric is close to their own optimiser's objective; and
-`af_loss` **FAILS the per-target direction check** (20/44 down, 24/44 up), so its
-movement is draw noise — the first metric here to fail it, against 44/44 for
-`target_fidelity` and `e_q_u`. `paper/draft_2026-10-13.md` has NO biological-utility
-section; its `### Utility` at :441 does not cover it.
+[INCORRECT] - **⚠⚠ THE STATUS OF WHAT WE HAVE IS THE PROBLEM, NOT THE COMPUTATION.** Decision H (`docs/plan.md:478`) declared `af_loss`/`ld_loss` NOT adopted; both were run 2026-10-15 AFTER outcomes were inspected, so both are stamped EXPLORATORY and promotion needs a NEW dated pre-registration. Two facts a referee must be told rather than find: **they beat us on `af_loss` at every capacity** (ours 0.003668..0.003698, theirs 0.000220..0.002734) and that metric is close to their own optimiser's objective; and `af_loss` **FAILS the per-target direction check** (20/44 down, 24/44 up), so its movement is draw noise — the first metric here to fail it, against 44/44 for `target_fidelity` and `e_q_u`. `paper/draft_2026-10-13.md` has NO biological-utility section; its `### Utility` at :441 does not cover it.
+
+[CORRECTION - 2026-10-25]: **THE TWO "FACTS A REFEREE MUST BE TOLD" ARE BOTH ARTEFACTS
+OF THE DEAD `tau` REGIME AND ARE WITHDRAWN.** Caught by Dylan the same day: "the 'they
+beat us on af_loss' is from the tau regime not the eta regime. Everything should be the
+eta regime." He is right, and I had quoted a superseded measurement as a current
+property of the tool.
+
+`logs/B_arm1_af_ld.md` is dated 2026-10-14 and its columns are the PINNED TAU GRID
+(0, 0.05, 0.1, 0.25, 0.5, 0.9, 0.99), so it is superseded twice over:
+- **Wrong knob.** Across that whole grid `acc_ceiling` moves 0.500000 -> 0.500234 — the
+  mechanism is INERT there. Our `af_loss` [all] reads 0.003668, 0.003698, 0.003685,
+  0.003688, 0.003685, 0.003680, 0.003680: a span of **3.0e-06, 0.08%**.
+- **Wrong weighting.** It pre-dates the 2026-10-24 switch to `uniform`, so it is at
+  `inv_support`. Even its zero-tilt anchor is not quotable.
+
+So: "they beat us at every capacity" contrasted their LIVE capacity sweep (0.000220 ->
+0.002734, moving 12.4x) against our DEAD tau sweep (flat to 0.08%). It is a comparison
+of a working knob with a non-working one, and says nothing about the `eta` regime, which
+is UNMEASURED. ⚠ One component might survive and must be CHECKED not assumed: at zero
+tilt we read 0.003668 against their best 0.000220, a 16.7x gap that would be a release-
+FORM difference (we substitute a whole cohort mosaic; they make minimal edits) rather
+than a knob effect — but that figure is at `inv_support` too.
+
+And "FAILS the per-target direction check, 20/44 down, 24/44 up" was a direction check
+across a knob range that moves nothing. A quantity varying by 0.08% cannot have a
+direction. That line was a restatement of "`tau` does nothing" wearing the clothes of a
+finding about `af_loss`, and calling it "the FIRST metric in the project to fail" the
+check gave it a significance it never had.
+
+✅ WHAT IS TRUE: the `eta`-regime measurement needs no new work — it is **step 5 of 8**
+of the Arm 1 downstream chain already running on the 264 uniform `eta` releases. Until
+it lands, this project has NO biological utility number at the current knob and
+weighting, and that is the only honest statement available.
+
+⚠ The decision-H / EXPLORATORY half of the struck passage stands and is regime-
+independent, as does the observation that `paper/draft_2026-10-13.md` has no
+biological-utility section (its `### Utility` at :441 does not cover it).
+
+⚠ STALE COPIES HUNTED THE SAME DAY, since corrections do not propagate themselves. The
+withdrawn claims also sit, correctly stamped with their tau grid, in the 2026-10-15
+ledger row at `docs/plan.md:1273`, in this file's own 2026-10-15 entry (around :955 and
+:1231-1249), in `docs/terms.md` under `af_loss` (~:2538, :2544) and in `docs/data.md:394`.
+Those are not being rewritten — they are accurate records of a tau-grid run — but each
+now carries a pointer here so none of them can be quoted as a current result.
 
 **Docketed** as `B-EVL-bio-utility`, `B-EVL-readmap-release` and
 `B-EVL-utility-correlation` in `docs/plan.md`'s Backlog. Not scheduled; Dylan asked for
@@ -1235,6 +1270,8 @@ releases (`exp_5`) and on their own 8 capacity releases (`exp_6`). 0 failures. P
 These were computed AFTER outcomes were inspected. They are reported in their own labelled
 subsection of the briefing and stay OUT of the endpoint tables; promoting them needs a NEW
 dated pre-registration, not an addendum.
+
+⚠⚠ SUPERSEDED AS A STATEMENT ABOUT THIS TOOL [2026-10-25]: this is a `tau`-grid, `inv_support` measurement. `tau` stopped being the knob 2026-10-24 and `acc_ceiling` moves only 0.500000 -> 0.500234 across that whole grid, so our side is FLAT to 0.08% and the comparison contrasts their live knob with our dead one. The direction check across an inert range measured nothing. Both claims are WITHDRAWN as properties of the tool; see `docs/memory.md` 2026-10-25 (later still). The `eta_tau`-regime numbers are step 5 of 8 of the running Arm 1 chain and do not exist yet. 
 
 **⚠⚠ THEY BEAT US ON `af_loss` AT EVERY CAPACITY** — their saturated worst (0.002734) is
 below our best (0.003668). This is close to their optimiser's OWN objective:

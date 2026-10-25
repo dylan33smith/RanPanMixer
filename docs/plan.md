@@ -1270,7 +1270,7 @@ segment count is set by the chromosome's genetic length, not by T.
 | B-EVL-weightings | Pick the tool's `beta_v` by comparing production, non-ref (`target_alt`) and rarity (`target_rarity`) at MATCHED privacy | non-ref alleles recovered at matched `acc_ceiling`, exact | genome-wide, 22 autosomes, HG00096, ARM 2, T = 22,134,562 | ✅ **`target_alt` IS THE TOOL'S WEIGHTING: 1.633x production, and 2.67x more efficient per altered cell** (0.613x the cells for 1.633x the non-ref alleles; 98.1% of what it recovers is non-ref against production's 36.8%). `target_rarity` is only 1.060x production and **0.649x `target_alt`** — better TARGETED but less CONCENTRATED (effective support 48,700 against 33,303 on chr21; `var_q_u` 4.7268e-07 against 9.3736e-07), and since the exchange rate goes as sqrt(`var_q_u`), spreading over 77% of positions costs more than the targeting buys. ⚠⚠ **A NEW METRIC WAS REQUIRED FIRST:** `e_q_u` is weighting-specific (constraint 7 forbids the column) and gave an artifactual 5.44x; `e_differ` is dominated by the ~19.6M REF positions and FAVOURS production. `e_match_nonref` is exact, weighting-independent, and is the only valid cross-weighting comparison. ⚠ The untilted mosaic already matches 47.19% of non-ref positions, so these are MOVEMENTS. ⚠ One target; EXPLORATORY | done | 2026-10-24 |
 | B-EVL-hightau | Re-run BOTH arms at `tau` = 0.999, 0.9999, 0.99999 with the full metric set and every runnable attack, to answer whether a much higher allowed accuracy opens any range | the movement against `eta_tau`, and `acc_ceiling` against `p_succ_bound`, both exact | ARM 1 44 targets x 3 `tau` genome-wide; ARM 2 genome-wide exact + 10 targets x 25 draws x 3 `tau` chr21 | **NO RANGE, AND IT IS A LAW NOT A TREND.** `eta_tau = arctanh(tau)` is logarithmic: `1 - tau` shrinking **1000x** multiplies the tilt only **2.3059x**, and the measured `e_q_u` movement matches the `eta_tau` ratio **to three decimals at all nine points** of a ten-point grid. The whole extra range buys **ten cells of 7,630,132** (ARM 1, 44/44 targets the useful way); genome-wide ARM 2 `e_q_u` moves **+1.924e-07** across `tau` 0 -> 0.99999, matching a first-order prediction written down BEFORE the run. ⚠⚠ **AND THE BUDGET GOES UNSPENT:** genome-wide `acc_ceiling` **0.500541** at `tau` = 0.99999 against a `p_succ_bound` of **0.999995**. All four attacks null with PASSING controls; PanMixer's evaluators link 0 of 44 at every `tau` against theirs at 3 of 8 capacities. ⚠⚠ **OCCURRENCE FOUR of the common-random-numbers defect, mine:** the seed keyed on the `tau`'s POSITION in `--taus`, so the first 132 releases redrew with the `tau` = 0/0.05/0.10 seeds and the chr21 slices were BIT-IDENTICAL; all drawn-path tables withdrawn and re-run. ✅ The exact endpoint was untouched and that is MEASURED — 792/792 values identical after the redraw. ⚠ EXPLORATORY: the signed grid ends at 0.99 | done | 2026-10-23 |
 | B-THY-variance | Measure `var_q_u` EXACTLY and settle whether covariance explains the 43.6x, and give every single-draw column its standard deviation | the recursion must match brute-force enumeration, match real draws, and PREDICT the logged `e_q_u` movement from `d E_Q[u]/d eta = Var_Q(u)` | toy: 2 inputs x 3 `tau`; chr21: 1 target, 2 `tau`, both arms; 30 real draws | ✅ **THE PREDICTION HOLDS TO FIVE SIGNIFICANT FIGURES**: `eta_tau * Var(tau=0)` = 3.636770e-06 against a measured movement of 3.636777e-06 (chr21, share 1, ARM 2, HG00096). **`cov_share` = 0.948111 — 94.8% of the variance is between-position COVARIANCE**, so the independence argument is low by 19.3x and that is why sum(`beta_v`^2)'s 128.6x overshoots. ⚠ The 94.8% is NOT new — `docs/terms.md` has carried it since 2026-09-30 — this is an INDEPENDENT reproduction (different estimator, different build, 0.948906 matched). ⚠⚠ **"NEEDS PAIR MARGINALS" WAS WRONG ABOUT THE METHOD**: all-pairs is O(T^2 K^2), but `u` is ADDITIVE so one centred O(TK) sweep is exact; the stale wording is still in `scripts/exact_utility.py` and `paper/draft_2026-10-13.md`. ✅ **ARM 1 SD DELIVERED: `sd_q_differ` = 1,061.9 cells** (HG00438, K = 86, chr21 at its own share) against the head-to-head's 7-column empirical 1,312 — ratio 1.24 where a 7-draw estimate carries ±29%, so **that row's `tau` wiggle is draw noise**, and its exact expected cost moves 0.0007 across the whole grid. ⚠⚠ **A BUG THE TOY COULD NOT CATCH**: the backward kernel's normaliser hits exactly 0 where a zero-distance step meets an unavailable donor (7 of chr21's 1,058), returning nan for all 332,521 positions while the toy gate passed — the toy has both features but never together. Fixed, and gated by a 4x5 fixture where they coincide. ⚠ GENOME-WIDE CLOSED: `var_q_u` = 3.153126468e-08, `cov_share` = 0.960128, `sd_q_differ` = 8,041.9 cells, and `eta_tau * Var` = 8.345230e-08 against the logged 8.345e-08 (relative 3e-05). **THE 43.6x IS A PRODUCT OF THREE MEASURED FACTORS**: `sum beta_v^2` 128.6181 / 2.2679 (`beta_v^2`-weighted mean p(1-p) rises) = 56.7130 diagonal / 1.3014 (covariance multiplier rises) = **43.5790**, reproducing the measured ratio to 1.6e-16. ⚠⚠ The standing correlation hypothesis is only 1.30x of the 2.95x discrepancy; the larger 2.27x is WHICH positions carry weight at each scope, which no correlation argument touches. ⚠ Not an endpoint — it explains and predicts one. ⚠ n = 1 target per arm. | done | 2026-10-22 |
-| B-EVL-arm1-ingraph | Compute PanMixer's `af_loss` and `ld_loss` on both tools' releases, the two metrics decision H declined | their evaluators run UNMODIFIED on ours and theirs; every number stamped exploratory | 308 ours (experiment dir exp_5) + 8 theirs (experiment dir exp_6), 0 failures | **THEY BEAT US ON `af_loss` AT EVERY CAPACITY** — theirs 0.000220..0.002734, ours 0.003668..0.003698, their saturated worst below our best. ⚠ `af_loss` is close to their optimiser's OWN objective (`utility_loss_panmixer` = induced L1 AF change, their Supp. Remark 1), so this scores them on what they minimise. ✅ **WE BEAT THEM ON `ld_loss` ~7.4x FROM `capacity` 0.05 UP** (ours 0.00542 flat, theirs 0.0380..0.0401); at 0.01 they are ~130x better, altering 7,687 cells against our ~107,797. ⚠⚠ **`af_loss` FAILS THE DIRECTION CHECK — 20/44 down, 24/44 up** — the FIRST metric in the project to do so; its movement is noise, not a small signal. ⚠⚠ **THEIR LD WINDOW IS 5 POSITION UNITS, NOT 5 KB**: 2.92% of SNP positions, ~7,450 pairs, vs 10,588,565 for a true 5 kb window. Run as shipped. ⚠⚠ EXPLORATORY — decision H declared both NOT adopted and these ran AFTER outcomes were seen; promoting them needs a NEW dated pre-registration | done | 2026-10-15 |
+| B-EVL-arm1-ingraph | Compute PanMixer's `af_loss` and `ld_loss` on both tools' releases, the two metrics decision H declined | their evaluators run UNMODIFIED on ours and theirs; every number stamped exploratory | 308 ours (experiment dir exp_5) + 8 theirs (experiment dir exp_6), 0 failures | ⚠⚠ SUPERSEDED AS A STATEMENT ABOUT THIS TOOL [2026-10-25]: this is a `tau`-grid, inv_support-weighting measurement. `tau` stopped being the knob 2026-10-24 and `acc_ceiling` moves only 0.500000 -> 0.500234 across that whole grid, so our side is FLAT to 0.08% and the comparison contrasts their live knob with our dead one. The direction check across an inert range measured nothing. Both claims are WITHDRAWN as properties of the tool; see `docs/memory.md` 2026-10-25 (later still). The `eta_tau`-regime numbers are step 5 of 8 of the running Arm 1 chain and do not exist yet. **THEY BEAT US ON `af_loss` AT EVERY CAPACITY** — theirs 0.000220..0.002734, ours 0.003668..0.003698, their saturated worst below our best. ⚠ `af_loss` is close to their optimiser's OWN objective (`utility_loss_panmixer` = induced L1 AF change, their Supp. Remark 1), so this scores them on what they minimise. ✅ **WE BEAT THEM ON `ld_loss` ~7.4x FROM `capacity` 0.05 UP** (ours 0.00542 flat, theirs 0.0380..0.0401); at 0.01 they are ~130x better, altering 7,687 cells against our ~107,797. ⚠⚠ **`af_loss` FAILS THE DIRECTION CHECK — 20/44 down, 24/44 up** — the FIRST metric in the project to do so; its movement is noise, not a small signal. ⚠⚠ **THEIR LD WINDOW IS 5 POSITION UNITS, NOT 5 KB**: 2.92% of SNP positions, ~7,450 pairs, vs 10,588,565 for a true 5 kb window. Run as shipped. ⚠⚠ EXPLORATORY — decision H declared both NOT adopted and these ran AFTER outcomes were seen; promoting them needs a NEW dated pre-registration | done | 2026-10-15 |
 | B-EVL-pm-beagle | Close the one attack with no cross-tool number: run Beagle reconstruction on PanMixer's own releases | one row validated before eight; both xsol masks reported; the report refuses to print on a partial fan-out | 16 runs (8 x 2 masks), 0 failures | **THEIR MECHANISM HAS SETTINGS WHERE THE ATTACK SUCCEEDS; OURS HAS NONE.** By their own criterion, theirs **+0.0283 at `capacity` 0.01 and +0.0192 at 0.05**, ours **-0.045..-0.055 at every `tau`, 0 of 308 beaten**. `obfuscated_accuracy` explains it — at 0.01 their release is **99.88% identical to the truth**, altering 597 SNP cells. ✅ **THIRD INDEPENDENT ATTACK AGREEING `capacity` <= 0.1 IS UNPROTECTED** (Gap Score +2,453, MIA rank 1 of 44). ⚠⚠ **AT THEIR PROTECTED SETTINGS THE TOOLS ARE CLOSE** (-0.0478..-0.0490 vs our -0.045..-0.055); no advantage claimed. ⚠⚠ **VALIDATING ONE ROW CAUGHT A COMPARABILITY DECISION, NOT A MISSING FILE**: the xsol mask restricts which cells every metric sees, ours all-ones and theirs a real optimiser mask, and the crossover MOVES between the two. ⚠ HG00438 is rank 38 of 44 for us (-26,268 vs a median -53,280), so the like-for-like section compares it against itself rather than against our median | done | 2026-10-15 |
 | A-EVL-churn-across-tau | Does raising `tau` move a few positions or reshuffle many? | the mismatch SET, not just its size, at a fixed seed | 2 models, 7 `tau`, 3 seeds, common axis | **Both, and still tiny.** At `tau`=0.99 model C moves 40.7 positions to net −12.7 and model B 84.7 to net +23.3 — about 3x more movement than the net. Below `tau`=0.25 model C's churn is EXACTLY ZERO. ⚠ The changes CLUSTER: 12 of C's 23 and 51 of B's 64 fall in one 400-variant window, because a flip swaps a whole donor segment. Sampled nets are noise; exact is −3.30 (C) and −4.72 (B) | done | 2026-10-08 |
 | A-IMP-model-b | Build the LD-block chain so switching happens only between blocks | model C reproduced exactly by identity blocks; blocks from a panel that excludes the target | chr21, 8 capacities swept on the other arm | **BUILT.** 59,472 units, `expected_switches` 3,394.1 against 3,532 predicted independently; floor 14.5699% vs C's 14.8077%, slope −1.7738 vs −1.2381 — model B is a MILD contiguity lever, 1.43x, against 16x from re-scoping the utility. Cost: 1,222 positions dropped, 1,212-variant verbatim donor runs. ⚠ One bug, caught only by the prediction: transitions were start-to-start, not inter-unit gaps | done | 2026-10-07 |
@@ -1888,16 +1888,45 @@ Ordered. Each item names what must pass before it starts and what closes it.
    where a true 5 kb window is ~10.6M, about 1,400x more.
 3. **Read mapping on a RELEASED graph is the real gap.** See the item below.
 
-**⚠ AND THE STATUS OF WHAT WE HAVE IS THE PROBLEM, NOT THE COMPUTATION.** Decision H
-(2026-10-08, `docs/plan.md:478`) declared `af_loss` and `ld_loss` NOT adopted; they
-were run 2026-10-15 at Dylan's request AFTER outcomes were inspected, so both are
-stamped EXPLORATORY and promoting either to an endpoint needs a NEW dated
-pre-registration. Two further facts that must be stated and not discovered by a
-referee: **they beat us on `af_loss` at every capacity** (ours 0.003668..0.003698,
-theirs 0.000220..0.002734) and that metric is close to their own optimiser's objective
-(`utility_loss_panmixer`); and `af_loss` **FAILS the per-target direction check**
-(20/44 down, 24/44 up), so its movement is draw noise — the first metric in this
-project to fail it, against 44/44 for `target_fidelity` and `e_q_u`.
+**⚠⚠ WE HAVE NO VALID `af_loss` / `ld_loss` RESULT RIGHT NOW. THE ONLY ONE THAT EXISTS
+IS FROM THE DEAD `tau` REGIME.** Corrected 2026-10-25 after Dylan pointed out that the
+comparison being quoted was the wrong regime. `logs/B_arm1_af_ld.md` is dated
+2026-10-14 and its columns are the PINNED TAU GRID — 0, 0.05, 0.1, 0.25, 0.5, 0.9,
+0.99 — so it is superseded on BOTH axes:
+- **Wrong knob.** `tau` stopped being the knob on 2026-10-24. Across that whole grid
+  `acc_ceiling` moves 0.500000 -> 0.500234, i.e. the mechanism is INERT there, and our
+  `af_loss` [all] duly reads 0.003668, 0.003698, 0.003685, 0.003688, 0.003685,
+  0.003680, 0.003680 — a span of **3.0e-06, 0.08% variation**.
+- **Wrong weighting.** That run pre-dates the 2026-10-24 switch to `uniform`, so it is
+  at `inv_support`. Even its `eta` = 0 anchor has to be re-measured.
+
+⚠⚠ **TWO CLAIMS ARE WITHDRAWN AS CHARACTERISATIONS OF THIS TOOL**, and they must not be
+carried into the paper from the 2026-10-15 ledger row at `docs/plan.md:1273`,
+`docs/terms.md` under `af_loss`, or `docs/data.md:394`:
+1. "**They beat us on `af_loss` at every capacity**" compared THEIR capacity sweep
+   (0.000220..0.002734, which moves 12.4x) against OUR tau sweep (flat to 0.08%). It
+   contrasts a live knob with a dead one. Whether it survives in the `eta` regime is
+   UNKNOWN and unmeasured. ⚠ One part of it may well survive and should be checked
+   rather than assumed: at our `eta`/`tau` = 0 point we read 0.003668 against their
+   best 0.000220, a 16.7x gap at zero tilt, which would be a release-FORM difference
+   (we substitute a full cohort mosaic; they make minimal edits) and not a knob effect
+   at all — but that number is also at `inv_support`, so it is not quotable either.
+2. "**`af_loss` FAILS the per-target direction check, 20/44 down, 24/44 up**" was a
+   direction check across a knob range that moves nothing. A quantity varying by
+   0.08% cannot have a direction; this was a restatement of "`tau` does nothing",
+   never a property of `af_loss`. The check has to be re-run `eta` = 0 -> 5642, where
+   the knob actually moves, before anything is concluded.
+
+**✅ THE ETA-REGIME MEASUREMENT IS ALREADY QUEUED AND NEEDS NO NEW WORK.** It is
+**step 5 of 8** of the Arm 1 downstream chain on the 264 uniform `eta` releases
+(`af_loss` then `ld_loss`, `scripts/arm1_af_ld_run.sh`), behind the three
+linkage/MIA evaluators at step 4. Until it lands, the honest statement is that this
+project has no biological utility number at the current knob and weighting.
+
+**⚠ AND THE STATUS WILL STILL BE THE PROBLEM AFTER IT LANDS.** Decision H (2026-10-08,
+`docs/plan.md:478`) declared `af_loss` and `ld_loss` NOT adopted, and the 2026-10-15
+run happened AFTER outcomes were inspected, so both are stamped EXPLORATORY; promoting
+either to an endpoint needs a NEW dated pre-registration regardless of regime.
 
 **⚠ `scripts/map_coverage.py` IS NOT THIS.** It measures GENETIC (recombination) map
 coverage in cM/Mb, the input to decision C's declared rate. Unrelated to read mapping;
@@ -1969,11 +1998,18 @@ arm, knob value, denominator and n per the reporting contract.
   proxy predicts real downstream damage.
 - **Why we want it:** our analogue is `acc_ceiling` (or `eta_tau`) against the same
   downstream metrics. If our knob moves `af_loss`/`ld_loss`/mapping monotonically we
-  have their argument; if it does not, we should say so — and `af_loss` already fails
-  the direction check at 20/44 vs 24/44, which is itself the honest version of this
-  result rather than a reason to omit the panel.
-- **Prerequisite:** B-EVL-readmap-release for the mapping half. The AF/LD half can run
-  now on the 264 uniform `eta` releases.
+  have their argument; if it does not, we should say so — a flat panel is a result,
+  not a reason to omit it.
+  ⚠⚠ **[CORRECTED 2026-10-25]** This item previously asserted that "`af_loss` already
+  fails the direction check at 20/44 vs 24/44". That figure is from the DEAD `tau`
+  grid, where `acc_ceiling` moves 0.500000 -> 0.500234 and our `af_loss` varies by
+  0.08% — a quantity that flat cannot have a direction, so the check measured nothing
+  about `af_loss`. It is withdrawn, not inherited. The direction question is OPEN at
+  `eta` and is one of the things this item exists to answer.
+- **Prerequisite:** B-EVL-readmap-release for the mapping half. ⚠ The AF/LD half does
+  NOT need new compute — it is step 5 of 8 of the Arm 1 downstream chain already
+  running on the 264 uniform `eta` releases; this item is the CORRELATION panel built
+  on top of that output, not the measurement itself.
 - ⚠ Any metric promoted out of this needs a full `docs/terms.md` entry first (step 4
   of the Wrap-Up Protocol); `wd_af` and the three mapping rates have none today.
 

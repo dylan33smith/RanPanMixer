@@ -2540,6 +2540,18 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       equals the induced L1 AF change (their Supplementary Remark 1),
                       so this scores them on what they minimise and us on what we do
                       not optimise.
+                      ⚠⚠ SUPERSEDED AS A STATEMENT ABOUT THIS TOOL
+                      [2026-10-25]: this is a `tau`-grid, `inv_support`
+                      measurement. `tau` stopped being the knob 2026-10-24
+                      and `acc_ceiling` moves only 0.500000 -> 0.500234
+                      across that whole grid, so our side is FLAT to 0.08%
+                      and the comparison contrasts their live knob with our
+                      dead one. The direction check across an inert range
+                      measured nothing. Both claims are WITHDRAWN as
+                      properties of the tool; see `docs/memory.md`
+                      2026-10-25 (later still). The `eta_tau`-regime numbers are
+                      step 5 of 8 of the running Arm 1 chain and do not
+                      exist yet.
                       ⚠⚠ **IT FAILS THE DIRECTION CHECK THE PRE-REGISTERED ENDPOINTS
                       PASS: 20/44 targets down, 24/44 up** from `tau` 0 to 0.99, median
                       +6.478e-06. `target_fidelity` and `e_q_u` move 44/44 together.
