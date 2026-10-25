@@ -125,6 +125,27 @@ def extremal(p: np.ndarray) -> np.ndarray:
     return e
 
 
+def knob_key(v: float) -> str:
+    """The ONE spelling of a knob value used as a result-dict key, both sides.
+
+    ⚠⚠ THE 2026-10-25 DEFECT. The producer (`one_chrom`) keyed `f"{v:g}"` and the
+    consumer (`main`) asked for `str(v)`, so `eta` = 0.0 was WRITTEN '0' and READ
+    '0.0'. `KeyError: '0.0'` after 3.4 hours of compute, with every per-chromosome
+    result held in memory and the JSON write sitting downstream of the crash, so the
+    whole run was lost. One helper called from both sides is what makes that drift
+    impossible; a second spelling anywhere is the bug coming back.
+
+    ⚠ `f"{v:g}"` was also LOSSY — 6 significant figures, so two grid points agreeing
+    to 6 s.f. would silently collapse into ONE cell and one would overwrite the other.
+    `repr(float)` is the shortest round-trippable form in Python 3, and the assertion
+    makes the round-trip a gate rather than a hope. `src/releases.py:eta_dir` already
+    refuses this for release DIRECTORIES; this refuses it for result KEYS.
+    """
+    k = repr(float(v))
+    assert float(k) == float(v), f"knob key {k!r} does not round-trip to {v!r}"
+    return k
+
+
 def one_chrom(chrom: str, share: float | None, targets, taus, *,
               arm: str = "arm2", etas=None, weights: str = "inv_support") -> dict:
     """One chromosome's exact KL, for ARM 2 (K = 88) or ARM 1 (K = 86, leave-one-out).
@@ -151,7 +172,7 @@ def one_chrom(chrom: str, share: float | None, targets, taus, *,
         for t in targets:
             p = np.load(REPO / "data" / "targets" / t / chrom / "path.npy")[ic]
             q = extremal(p)
-            out[t] = {f"{v:g}": kl_stable(m, hap, beta, p, q,
+            out[t] = {knob_key(v): kl_stable(m, hap, beta, p, q,
                                           **({"eta": v} if k == "eta" else {"tau": v}))
                       for k, v in points}
         t_chain = int(ic.sum())
@@ -172,7 +193,7 @@ def one_chrom(chrom: str, share: float | None, targets, taus, *,
                                   weights=weights, **kw).beta
             p = hap_all[list(idx[t])][:, ic].T          # arm 1's target is its own rows
             q = extremal(p)
-            out[t] = {f"{v:g}": kl_stable(m, panel, beta, p, q,
+            out[t] = {knob_key(v): kl_stable(m, panel, beta, p, q,
                                           **({"eta": v} if k == "eta" else {"tau": v}))
                       for k, v in points}
             t_chain = int(ic.sum())
@@ -201,7 +222,7 @@ def validate(taus) -> None:
     print(f"|---|---|---|---|")
     worst = 0.0
     for k, v in known.items():
-        got = max(r["kl"][t][k]["kl"] for t in tids)
+        got = max(r["kl"][t][knob_key(float(k))]["kl"] for t in tids)
         rel = abs(got - v) / v
         worst = max(worst, rel)
         print(f"| {k} | {v:.3e} | {got:.3e} | {rel:.2e} |")
@@ -230,10 +251,27 @@ def main(argv=None) -> int:
     ap.add_argument("--weights", choices=("uniform", "inv_support"),
                     default="uniform")
     ap.add_argument("--workers", type=int, default=22)
+    ap.add_argument("--resume", action="store_true",
+                    help="reuse per-chromosome checkpoints beside --json; only\n"
+                         "those written for THIS arm, weighting, grid and\n"
+                         "target set are reused, the rest are recomputed")
     ap.add_argument("--json", type=Path, default=None)
     a = ap.parse_args(argv)
 
     if a.validate:
+        # ⚠⚠ `validate()` reproduces logged chr21 ARM 2 / inv_support figures and
+        # NOTHING ELSE, then prints "its genome-wide output may be reported". Under
+        # --arm arm1 or --etas it was gating a configuration it never ran, which is a
+        # gate that cannot fail — decoration, per CLAUDE.md. Refuse instead of
+        # passing: a missing reference must be reported, never silently become a pass.
+        if a.etas or a.arm != "arm2" or a.weights != "inv_support":
+            raise SystemExit(
+                f"--validate only has logged reference figures for arm2 / tau / "
+                f"inv_support (chr21, beta_share = 1). You asked for arm={a.arm}, "
+                f"weights={a.weights}, knob={'eta_tau' if a.etas else 'tau'}, which "
+                f"has no anchor on disk — so a PASS here would mean nothing. Run "
+                f"--validate bare to check the stable route, then run your real "
+                f"configuration without it.")
         validate(a.taus)
         return 0
 
@@ -253,6 +291,15 @@ def main(argv=None) -> int:
                       if p.is_dir() and (p / "chr1" / "path.npy").exists())[: a.targets]
 
     knob = "eta_tau" if a.etas else "tau"
+    # ⚠⚠ ONE grid object, built once, used everywhere. The 2026-10-25 failure was not
+    # one bug: `a.taus` was read at the aggregation loop, at the `p_succ_bound` call,
+    # at the `_report` call and in the JSON while the run was driven by `--etas`, so
+    # the aggregator walked a seven-point tau grid the workers had never evaluated.
+    # Five crash and mislabel sites, one cause. Two names for one thing is the cause.
+    grid = [float(e) for e in a.etas] if a.etas else [float(t) for t in a.taus]
+    if len({knob_key(v) for v in grid}) != len(grid):
+        raise SystemExit(f"duplicate knob values in {grid}: two grid points would "
+                         f"share one result key and silently overwrite each other")
     print(f"GENOME-WIDE `kl_exact`, STABLE ROUTE. "
           f"{'ARM 1, K = 86, per-target leave-one-out' if a.arm == 'arm1' else 'ARM 2, K = 88'}, "
           f"22 autosomes, T = {tot:,}, n = {len(tids)} target(s), D1_extremal, "
@@ -260,59 +307,176 @@ def main(argv=None) -> int:
     if a.arm == "arm1":
         print(f"⚠ ARM 1 uses ARM 2's decision-J shares. Arm 1's per-target chain "
               f"lengths span 22,129,531..22,136,532 against arm 2's {tot:,} "
-              f"(logs/B_loo_chain_survey.md), a 0.03% spread, so the share a "
-              f"chromosome takes differs by that much from its own. kl scales with "
-              f"share^2, so the effect is ~0.06% -- stated rather than engineered "
-              f"away, because a per-target share needs all 22 of THAT target's "
-              f"chain lengths and a per-chromosome worker cannot see them.")
+              f"(logs/B_loo_chain_survey.json), a 0.03164% spread, so the share a "
+              f"chromosome takes differs by that much from its own.")
+        print(f"  ⚠ [CORRECTION - 2026-10-25] The effect on kl is **0.00010%** at "
+              f"worst over all 44 targets, MEASURED, not the ~0.06% this line used "
+              f"to assert from 'kl scales with share^2'. That reasoning dropped the "
+              f"1/T_c factor: kl_c goes as share_c^2 / T_c, and a chromosome with a "
+              f"shorter chain has BOTH a smaller share and a smaller T, so the two "
+              f"errors very nearly cancel. The old figure was wrong by ~600x in the "
+              f"CONSERVATIVE direction (it overstated the error), so nothing "
+              f"previously reported was flattered by it.")
+        print(f"  ⚠ The old justification -- 'a per-chromosome worker cannot see "
+              f"them' -- was also FALSE: all 22 x 44 leave-one-out chain lengths are "
+              f"on disk in logs/B_loo_chain_survey.json under "
+              f"per_chrom[chrom][target]['t_chain'] and have been since 2026-10-12. "
+              f"The approximation is kept because it is accurate to 1e-6 relative, "
+              f"NOT because the data is unavailable.")
     print()
-    t0, per = time.time(), {}
-    with ProcessPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(_one, (c, sh[c], tids, a.taus),
-                          {"arm": a.arm, "etas": a.etas,
-                           "weights": a.weights}): c for c in AUTOSOMES}
-        for n, f in enumerate(as_completed(futs), 1):
-            r = f.result()
-            if "error" in r:
-                print(f"  [{n}/22] ❌ {r['chrom']}: {r['error']}\n{r['traceback']}")
-                raise SystemExit("a chromosome failed; the total would be wrong")
-            per[r["chrom"]] = r
-            print(f"  [{n}/22] ✅ {r['chrom']} [{time.time() - t0:.0f}s]", flush=True)
+    # ⚠⚠ CHECKPOINT PER CHROMOSOME. Each chromosome costs 1.5-3.5 hours of the ~3.4h
+    # wall time; holding 22 of them only in memory means ANY later fault -- a reporting
+    # bug, an OOM, a stray Ctrl-C -- throws all of it away, which is exactly what
+    # happened on 2026-10-25. Appending each result as it lands makes the run resumable
+    # with `--resume`, so a re-run pays only for what did not finish.
+    ckpt = (a.json.with_name(a.json.stem + ".perchrom.jsonl") if a.json else None)
+    per: dict = {}
+    if ckpt and a.resume and ckpt.exists():
+        for ln in ckpt.read_text().splitlines():
+            if not ln.strip():
+                continue
+            r = json.loads(ln)
+            # ⚠ Only reuse a checkpoint written for THIS configuration. A cached
+            # chromosome from another arm, weighting or grid is a silent wrong answer,
+            # which is worse than recomputing it.
+            if (r.get("_arm") == a.arm and r.get("_weights") == a.weights
+                    and r.get("_grid") == [knob_key(v) for v in grid]
+                    and r.get("_targets") == list(tids)):
+                per[r["chrom"]] = r
+        print(f"  resumed {len(per)} chromosome(s) from {ckpt.name}: "
+              f"{sorted(per)}\n", flush=True)
+
+    todo = [c for c in AUTOSOMES if c not in per]
+    t0 = time.time()
+    failed: dict = {}
+    if todo:
+        with ProcessPoolExecutor(max_workers=a.workers) as ex:
+            futs = {ex.submit(_one, (c, sh[c], tids, grid if not a.etas else a.taus),
+                              {"arm": a.arm, "etas": grid if a.etas else None,
+                               "weights": a.weights}): c for c in todo}
+            for n, f in enumerate(as_completed(futs), 1):
+                r = f.result()
+                if "error" in r:
+                    # ⚠ flush: the SUCCESS line flushed and the FAILURE line did not,
+                    # so a crash could leave the reason invisible in a buffered log.
+                    print(f"  [{n}/{len(todo)}] ❌ {r['chrom']}: {r['error']}\n"
+                          f"{r['traceback']}", flush=True)
+                    failed[r["chrom"]] = r
+                    # ⚠ Do NOT raise in here: `SystemExit` inside the `with` block
+                    # makes the executor's __exit__ wait out every queued future
+                    # first, so the abort takes as long as finishing would have.
+                    break
+                per[r["chrom"]] = r
+                if ckpt:
+                    with ckpt.open("a") as fh:
+                        fh.write(json.dumps({**r, "_arm": a.arm,
+                                             "_weights": a.weights,
+                                             "_grid": [knob_key(v) for v in grid],
+                                             "_targets": list(tids)}) + "\n")
+                print(f"  [{len(per)}/22] ✅ {r['chrom']} "
+                      f"[{time.time() - t0:.0f}s]", flush=True)
+            if failed:
+                ex.shutdown(wait=False, cancel_futures=True)
+    if failed:
+        raise SystemExit(f"{sorted(failed)} failed; the total would be wrong. "
+                         f"{len(per)} of 22 are checkpointed"
+                         + (f" in {ckpt.name} -- re-run with --resume." if ckpt else
+                            " NOWHERE (no --json given, so nothing was saved)."))
 
     missing = sorted(set(AUTOSOMES) - set(per))
     assert not missing, f"missing {missing}; a partial sum UNDERSTATES the KL"
 
     rows = []
     for t in tids:
-        for tau in a.taus:
-            kl = math.fsum(per[c]["kl"][t][str(tau)]["kl"] for c in AUTOSOMES)
-            neg = kl < -1e-15
-            kl = max(kl, 0.0)
+        for v in grid:
+            # ⚠ The per-chromosome parts stay in hand so the sign check can see THEM.
+            # Clamping only the 22-term SUM (what this did before) lets one genuinely
+            # negative chromosome hide inside a positive total.
+            parts = [per[c]["kl"][t][knob_key(v)]["kl"] for c in AUTOSOMES]
+            bad_parts = {c: x for c, x in zip(AUTOSOMES, parts) if x < -1e-15}
+            kl_raw = math.fsum(parts)
+            neg = kl_raw < -1e-15 or bool(bad_parts)
+            kl = max(kl_raw, 0.0)
             tv = min(1.0, math.sqrt(kl / 2.0))
-            rows.append({"target": t, "tau": tau, "kl_exact": kl, "tv_pinsker": tv,
+            # ⚠⚠ `p_succ_bound` REQUIRES tau in [0, 1) and raises otherwise. In eta
+            # mode the knob is an eta, and tanh(eta) is 1.0 to float64 past eta ~ 19,
+            # so for every point on a real eta grid the bound is VACUOUS rather than
+            # computable. Report that, do not crash on it -- and do not quietly pass
+            # the eta in as if it were a tau, which is how `p_succ_bound(96.0)` took
+            # down the A1 bound check once already.
+            tau_eq = math.tanh(v) if a.etas else v
+            psb = 1.0 if tau_eq >= 1.0 else C.p_succ_bound(tau_eq)
+            rows.append({"target": t, "knob": knob, "knob_value": v,
+                         # ⚠ "tau" is kept because every reader of these JSONs keys on
+                         # it (the repo's convention since arm2_attack.py), but in eta
+                         # mode it holds an ETA. "knob"/"knob_value" are the honest
+                         # fields; read those.
+                         "tau": v, "tau_equiv": tau_eq,
+                         "kl_exact": kl, "kl_raw": kl_raw, "tv_pinsker": tv,
                          "acc_ceiling": 0.5 * (1.0 + tv),
-                         "p_succ_bound": C.p_succ_bound(tau), "was_negative": neg})
-    _report(rows, a.taus, len(tids), tot)
+                         "p_succ_bound": psb, "bound_vacuous": tau_eq >= 1.0,
+                         "was_negative": neg,
+                         "negative_chroms": sorted(bad_parts)})
+
+    # ⚠⚠ THE JSON IS WRITTEN BEFORE THE REPORT, AND THAT ORDERING IS THE POINT.
+    # 2026-10-25: all 22 chromosomes finished, then `_report` raised, and because the
+    # write was downstream of it 3.4 hours of compute went in the bin. A report is a
+    # formatter; it must never be able to destroy a completed computation. `per_chrom`
+    # is included for the same reason -- the expensive part is then recoverable from
+    # disk whatever happens next.
     if a.json:
         a.json.write_text(json.dumps(
-            {"arm": "arm2", "scope": "genome", "route": "stable", "k_states": 88,
-             "T": tot, "taus": a.taus, "shares": sh, "rows": rows}, indent=1) + "\n")
+            {"arm": a.arm, "scope": "genome", "route": "stable",
+             "k_states": 86 if a.arm == "arm1" else 88,
+             "weights": a.weights, "knob": knob, "knob_values": grid,
+             "taus": grid if not a.etas else None,
+             "etas": grid if a.etas else None,
+             "T": tot, "T_is_arm2_reference": a.arm == "arm1",
+             "t_chain": {c: per[c]["t_chain"] for c in AUTOSOMES},
+             "shares": sh, "rows": rows,
+             "per_chrom": {c: per[c]["kl"] for c in AUTOSOMES}}, indent=1) + "\n")
         print(f"\nJSON -> {a.json}")
+
+    _report(rows, grid, len(tids), tot, knob=knob, weights=a.weights, arm=a.arm)
     return 0
 
 
-def _report(rows, taus, n, tot) -> None:
-    print(f"\nGENOME-WIDE privacy ceiling, EXACT. **ARM 2**, K = 88, 22 autosomes, "
-          f"T = {tot:,}, shares summing to 1.000000, n = {n} target(s), D1_extremal, "
-          f"zero Monte-Carlo error.\n")
-    hdr = ["metric"] + [f"{t:g}" for t in taus]
+def _report(rows, grid, n, tot, *, knob="tau", weights="inv_support",
+            arm="arm2") -> None:
+    # ⚠ The arm, K, weighting and knob were HARDCODED here as "ARM 2, K = 88" with no
+    # weighting at all, so an `--arm arm1 --weights uniform` run printed a table
+    # stamped as arm 2 — the reporting contract in CLAUDE.md requires every number to
+    # carry its arm, knob, denominator and n, and a wrong stamp makes a figure
+    # uninterpretable rather than imprecise.
+    k_states = 86 if arm == "arm1" else 88
+    print(f"\nGENOME-WIDE privacy ceiling, EXACT. "
+          f"**{arm.upper().replace('ARM', 'ARM ')}**, K = {k_states}, "
+          f"{'per-target leave-one-out, ' if arm == 'arm1' else ''}22 autosomes, "
+          f"T = {tot:,}{' (ARM 2 REFERENCE — arm 1 chains differ per target)' if arm == 'arm1' else ''}, "
+          f"shares summing to 1.000000, n = {n} target(s), weights {weights}, "
+          f"knob {knob}, D1_extremal, zero Monte-Carlo error.\n")
+    hdr = ["metric"] + [f"{knob} = {v:g}" for v in grid]
     print("| " + " | ".join(hdr) + " |"); print("|" + "---|" * len(hdr))
     for lab, k, f in (("`kl_exact` (max over targets)", "kl_exact", ".3e"),
                       ("`tv_pinsker` upper bound", "tv_pinsker", ".3e"),
                       ("`acc_ceiling` *", "acc_ceiling", ".9f"),
                       ("`p_succ_bound` *", "p_succ_bound", ".4f")):
-        print(f"| {lab} | " + " | ".join(
-            f"{max(r[k] for r in rows if r['tau'] == t):{f}}" for t in taus) + " |")
+        cells = []
+        for v in grid:
+            # ⚠ `max()` over an empty generator raises, and that is precisely how the
+            # grid mismatch destroyed a finished run. Name the missing cell instead.
+            vals = [r[k] for r in rows if r["knob_value"] == v]
+            if not vals:
+                raise AssertionError(
+                    f"no rows at {knob} = {v!r} for metric {k}; the grid passed to "
+                    f"_report does not match the grid the rows were built from")
+            cells.append(f"{max(vals):{f}}")
+        print(f"| {lab} | " + " | ".join(cells) + " |")
+    if any(r.get("bound_vacuous") for r in rows):
+        print(f"| bound comparison meaningful? | " + " | ".join(
+            "**no (vacuous)**" if any(r["knob_value"] == v and r.get("bound_vacuous")
+                                      for r in rows) else "yes"
+            for v in grid) + " |")
     bad = [r for r in rows if r["acc_ceiling"] > r["p_succ_bound"] + 1e-12]
     negs = [r for r in rows if r["was_negative"]]
     print(f"\n{'❌ GATE FAILED' if bad else '✅ gate passes'}: `acc_ceiling` <= "

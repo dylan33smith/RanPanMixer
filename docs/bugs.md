@@ -122,6 +122,41 @@ failure family as A3's positive control, which was also algebraically unable to 
 
 ## Our own run discipline
 
+### A finished 3.4-hour fan-out is destroyed by its own reporting step
+- **[2026-10-25] one knob, two names and two spellings, in `exact_kl_stable.py`**
+  **[Symptom]** All 22 autosomes print ✅ over 3.4 hours, then
+  `KeyError: '0.0'` at `kl = math.fsum(per[c]["kl"][t][str(tau)]["kl"] ...)`, and
+  NOTHING is saved — no JSON, no partial results.
+  **[Cause]** Two independent mismatches at one call. (1) The worker keyed its results
+  `f"{v:g}"` (`eta` 0.0 -> `'0'`) and the aggregator asked for `str(tau)` (`'0.0'`).
+  (2) The aggregator read `a.taus` while the run was driven by `--etas`, so it walked a
+  grid the workers had never evaluated. The results were lost rather than merely
+  unreported because they were held in MEMORY and `a.json.write_text(...)` sat
+  DOWNSTREAM of the crash — a formatter could destroy a finished computation.
+  **[What the wrong output looked like]** 22 green ticks and a traceback. Every
+  expensive thing had SUCCEEDED; only the cheap assembly failed, which is the most
+  expensive place for a bug to be.
+  **[⚠ The trap when fixing it]** Repairing the reported `KeyError` alone buys another
+  wasted 3.4 hours. An audit found the run would then die at `p_succ_bound(250.0)`
+  (`ValueError`, it requires `tau` in [0,1)), and after that at `_report`'s
+  `max()` over an empty generator — both still upstream of the JSON write. Three
+  crash sites, one cause, and the first two are invisible until hour three.
+  **[Proven fix]** `knob_key()` — ONE spelling (`repr(float)`), round-trip asserted,
+  called by producer and consumer so they cannot drift; `:g` was also lossy at 6 s.f.
+  and would have silently merged two near grid points into one cell. One `grid` object
+  used at every former `a.taus` site. `p_succ_bound` fed `tanh(eta)` with the saturated
+  case reported vacuous. **JSON write moved ABOVE the report**, carrying `per_chrom`.
+  Per-chromosome checkpoint JSONL with `--resume`, reusing a chromosome only when arm,
+  weighting, grid and target set all match.
+  **[Gate]** `tests/test_exact_kl_eta_mode.py`, 13 tests, 4 mutation-tested (each
+  injected defect fired the matching gate and was restored).
+  **[Generalisation]** Occurrence FIVE of one shape. Four CRN defects addressed a
+  knob's value by its POSITION; this addressed it by two SPELLINGS. A value written in
+  one place and read in another needs exactly one function that names it, and that
+  function needs an assertion. Separately: any fan-out over ~20 minutes must checkpoint
+  — the cost of a late bug is not the bug, it is the hours.
+
+
 ### A keyword default silently selected a different utility function for a whole attack suite
 - **[2026-10-25] `utility.beta_v(sup, in_chain=ic)` with no `weights=`**
   **[Symptom]** NONE. Nothing raised, nothing warned, the controls passed and the

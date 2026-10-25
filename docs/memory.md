@@ -104,6 +104,114 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-25 (later) — B-FIX-eta-aggregation: 3.4 hours of compute destroyed by a one-line key mismatch, and the 21 defects behind it
+
+**Goal.** Measure Arm 1's `kl_exact` directly at K = 86 (Dylan, 2026-10-25: "let's
+measure kl directly at K=86"), genome-wide, 10 targets, `uniform`, on the `eta` grid.
+
+**WHAT HAPPENED.** All 22 autosomes completed — chr9 first at 5,230 s, chr20 last at
+12,245 s — and then the run died in the aggregation step and **took every result with
+it.** 3.4 hours, nothing saved.
+
+    kl = math.fsum(per[c]["kl"][t][str(tau)]["kl"] for c in AUTOSOMES)
+    KeyError: '0.0'
+
+**ROOT CAUSE, in one sentence: the knob grid had two names and the knob key had two
+spellings.** The worker keyed `f"{v:g}"` (so `eta` 0.0 -> `'0'`); the aggregator asked
+for `str(tau)` (`'0.0'`). And the aggregator read `a.taus` while the run was driven by
+`--etas`, so it was walking a seven-point `tau` grid the workers had never evaluated.
+⚠ The `str` vs `:g` half also breaks plain TAU mode at `tau` = 0.0, so this was never
+specific to the eta route.
+
+**⚠⚠ WHY THE RESULTS WERE LOST AND NOT MERELY UNREPORTED:** the per-chromosome
+dictionaries were held in MEMORY and `a.json.write_text(...)` sat DOWNSTREAM of the
+crash. A formatter was able to destroy a completed computation.
+
+**THE AUDIT, because a re-run costs 3.4 hours.** Five parallel readers over distinct
+dimensions (knob plumbing, Arm 1 correctness, aggregation math, durability,
+provenance), every finding then handed to an independent agent told to REFUTE it:
+39 agents, **21 confirmed defects beyond the 6 already in hand** — 5 crash, 10
+mislabel, 3 wrong-number, 3 data-loss. ✅ **IT PAID FOR ITSELF ON THE FIRST FINDING.**
+All five dimensions independently found that `_report(rows, a.taus, ...)` would raise
+`ValueError: max() iterable argument is empty` **after another full 3.4 hours**, and
+that because the JSON write is downstream of `_report` the re-run would have been lost
+in exactly the same way. Fixing the reported `KeyError` alone would have bought one
+more wasted night.
+
+The crash order, had it been fixed one bug at a time: `p_succ_bound(250.0)` raises
+`ValueError` (it requires `tau` in [0,1)) at the SECOND row -> then `_report`'s empty
+`max()` -> then the JSON writes a file labelled `"arm": "arm2"`, `"k_states": 88` for a
+K = 86 Arm 1 run.
+
+**⚠⚠ ONE AUDIT FINDING WAS WRONG, AND I CHECKED IT RATHER THAN ACTING ON IT.** It was
+reported as `wrong-number`: "Arm 1's KL is computed at arm 2's shares and stamped as
+that release's ceiling." The premise is TRUE and worth recording — all 22 x 44
+leave-one-out chain lengths have been on disk in `logs/B_loo_chain_survey.json` under
+`per_chrom[chrom][target]['t_chain']` since 2026-10-12, so the script's own stated
+excuse ("a per-chromosome worker cannot see them") is FALSE. But the magnitude claim
+was not checked, and I measured it over all 44 targets:
+
+| quantity | script's claim | MEASURED |
+|---|---|---|
+| per-target chain-length spread | 0.03% | 0.03164% |
+| resulting error in `kl` | ~0.06% | **0.00010%** |
+| resulting error in `acc_ceiling` excess | — | 0.00005% |
+
+**The script's own ~0.06% was wrong by ~600x, in the CONSERVATIVE direction.** The
+reasoning behind it ("kl scales with share^2") dropped the `1/T_c` factor: `kl_c` goes
+as `share_c^2 / T_c`, and a chromosome with a shorter chain has BOTH a smaller share
+AND a smaller `T`, so the two errors very nearly cancel. The approximation is accurate
+to 1e-6 relative. ✅ So the shares were NOT re-derived — changing them would have been
+a mid-flight edit buying a 1e-6 correction — and the docstring was corrected in place
+instead. ⚠ Nothing previously reported was flattered by the old figure, because it
+overstated the error.
+
+**Fixes, all gated.** `knob_key()` — one spelling, `repr(float)`, with a round-trip
+assertion, called by both producers and the consumer so they cannot drift; `:g` was
+additionally LOSSY at 6 s.f., so two grid points agreeing to 6 figures would have
+silently collapsed into one cell. One `grid` object built once beside `knob` and used
+at all four former `a.taus` sites, with an up-front duplicate-key refusal.
+`p_succ_bound` now takes `tanh(eta)` with the saturated case reported as vacuous
+instead of raised on. **The JSON write moved ABOVE `_report`**, and now carries
+`per_chrom`, `arm`, `k_states`, `weights`, `knob` and the grid actually swept.
+**Per-chromosome checkpointing to a sidecar JSONL with `--resume`**, where a cached
+chromosome is reused only if its arm, weighting, grid AND target set all match — a
+foreign checkpoint is a silent wrong answer and worse than recomputing. Plus:
+`flush=True` on the failure print (the success print had it and the failure print did
+not, so a crash could leave its reason invisible), `SystemExit` moved OUTSIDE the
+executor block with `cancel_futures` (raising inside made `__exit__` wait out the whole
+queue, so aborting cost as much as finishing), a per-CHROMOSOME negative-KL check
+(clamping only the 22-term sum let one negative chromosome hide inside a positive
+total), `_report` stamped with arm/K/weights/knob, and `--validate` now REFUSES
+`--arm arm1`, `--etas` or `--weights uniform` rather than vouching for a configuration
+it never ran — it only has logged chr21/ARM 2/`inv_support` anchors, so a pass there
+meant nothing.
+
+**Gate — `tests/test_exact_kl_eta_mode.py`, 13 tests, 4 MUTATION-TESTED.** Injected
+defects and the gate that fired, each restored after:
+- producer back to `f"{v:g}"` -> `test_both_producers_and_the_consumer_use_the_one_helper` ✅
+- JSON write back below `_report` -> `test_the_json_is_written_before_the_report` ✅
+- `p_succ_bound(v)` on the raw knob -> `test_p_succ_bound_is_not_handed_an_eta` ✅
+- `_report` back to the bare `max()` -> `test_report_names_a_grid_mismatch_instead_of_raising_empty_max` ✅
+13/13 pass restored.
+
+**What this does NOT establish.** No Arm 1 K = 86 privacy number has been produced yet.
+The fix is gated and smoke-tested, not validated against a logged Arm 1 reference —
+none exists, which is itself why `--validate` now refuses that configuration rather
+than passing. ⚠ The eta route through this script had never been exercised end to end
+before 2026-10-25; the earlier "K = 86 path verified, kl scaled as eta^2 at ratio 127.4
+against a predicted 127.3" was a single-chromosome check that never reached the
+aggregator.
+
+**GENERALISATION, the fifth occurrence of this shape.** Four common-random-numbers
+defects came from a knob's VALUE being addressed by its POSITION; this one came from a
+knob's value being addressed by two SPELLINGS. Same lesson, one level down: a quantity
+that is written in one place and read in another needs exactly one function that names
+it, and that function needs an assertion. And a long fan-out must checkpoint, because
+the cost of a late bug is not the bug, it is the hours.
+
+---
+
 ## 2026-10-25 — B-FIX-attack-weighting: the Arm 2 attack suite was running at the WRONG `beta_v` weighting, by omission
 
 **Goal.** Before building the final Arm 2 table, confirm that every row in it was
