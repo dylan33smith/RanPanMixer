@@ -2562,7 +2562,25 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       Our own utility axes remain `target_fidelity` (always against
                       its OWN ARM's ceiling), `utility_retained` and, as the
                       pre-registered endpoint, `e_q_u`.
-Aliases:              "U_AF"
+Aliases:              "U_AF". ⚠⚠ AND "AF Wasserstein" / "Wasserstein divergence",
+                      which is the SAME QUANTITY TIMES TWO and not a different metric.
+                      Established 2026-10-25:
+                      external/PanMixer/tools/common/gather_results.py:84-90 defines
+                      `wd_af = 2 * af_loss` (plus the six stratum variants), and
+                      external/PanMixer/plot_util/utility_in.py:135 puts the y-label
+                      "Wasserstein divergence" on that column. Their Methods Eq. (8)
+                      is U_AF = 2 * (1/m) * sum_j |p_j - q_j| — twice the mean
+                      absolute AF change, the 2 arising because each allele is counted
+                      on both sides. A grep for wasserstein|earth_mover|emd over their
+                      whole resolved tree returns TWO hits, both axis labels: there is
+                      no Wasserstein or earth-mover computation in PanMixer at all.
+                      For a bi-allelic site this is exact rather than loose naming —
+                      W1 between two Bernoulli(p), Bernoulli(q) is |p-q|, and the L1
+                      distance between the two-category vectors is 2|p-q|.
+                      ⚠ SO OUR COLUMN IS OFF THEIR PUBLISHED SCALE BY 2x UNTIL
+                      RESCALED: `scripts/arm1_af_ld_results.py` prints raw `af_loss`,
+                      while their figures report `wd_af` (0.006 / 0.006 / 0.005).
+                      Never put the two side by side without the factor.
 ```
 
 ### donor_coherence  [utility] [evaluation]

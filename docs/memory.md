@@ -104,6 +104,113 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-25 (later still) — B-EVL-bio-utility SURVEY: two of the three "missing" biological metrics we already have, and one does not exist
+
+**Goal.** Dylan, 2026-10-25: "do we have any downstream biological utility measurement
+like how PanMixer ships AF Wasserstein, LD decay and read-mapping rates... if we don't
+have it I want it on the docket." Answer accurately before putting work on a docket.
+
+**Method.** Four parallel surveys — our code, PanMixer's shipped code, PanMixer's
+paper, our own docs — with every claim of ABSENCE and every claim of ALREADY-RUN handed
+to an independent agent to refute. 45 agents, 52 metrics inventoried. ⚠ `external/PanMixer`
+is a SYMLINK: a plain `find` returns ZERO files there and reads as "they ship nothing".
+Two of my own earlier statements to Dylan were wrong because of exactly this class of
+error, and the survey corrected them.
+
+**RESULT 1 — "AF WASSERSTEIN" IS `af_loss`, TIMES TWO.** There is no Wasserstein or
+earth-mover computation anywhere in PanMixer.
+`external/PanMixer/tools/common/gather_results.py:84-90` defines
+`df["wd_af"] = 2 * np.array(df["af_loss"])`; `external/PanMixer/plot_util/utility_in.py:135` puts the
+y-label "Wasserstein divergence" on that column. Their Methods Eq. (8) is
+`U_AF = 2 * (1/m) * sum_j |p_j - q_j|`. A grep for `wasserstein|earth_mover|emd` over
+the whole resolved tree returns TWO hits, BOTH axis labels. Cross-checked on
+magnitudes: their published AF figures are 0.006/0.006/0.005 and their measured
+`af_loss` spans 0.000220..0.002734, so 2x gives 0.00044..0.005468 — same scale. ✅ For a
+bi-allelic site the name is defensible rather than loose: W1 between Bernoulli(p) and
+Bernoulli(q) is |p-q|, and the L1 distance between the two-category vectors is 2|p-q|.
+✅ **We already run their `af_loss.py` unmodified on all 308 releases, 0 failures.**
+⚠ What is missing is a FACTOR OF 2 in `scripts/arm1_af_ld_results.py` so our column
+sits on their published scale — one line, not a work item. Recorded in `docs/terms.md`
+under `af_loss`, because the absence of that identity in our own definitions file is
+what let me tell Dylan the opposite.
+
+**RESULT 2 — LD DECAY DOES NOT EXIST IN PANMIXER EITHER.** Their Fig 4A panel 4 is
+`ld_loss`, ONE SCALAR: mean |delta r^2| over SNP pairs in a sliding window (Methods
+Eq. 9, `U_LD = ||d_obf - d_original||_1`). No distance axis anywhere —
+`grep -rinE 'decay|distance_bin|r2_vs|ld_curve'` over the resolved tree returns zero,
+and `ld_loss.py` emits two lines, a sum and a count. "LD decay" appears in their paper
+only as loose prose. ✅ **So we are not behind on LD; we run their own implementation
+and therefore have exactly what they have.** ⚠ A real decay curve would be a NEW
+contribution, not parity — and it would expose that their window is 5 POSITION UNITS,
+not 5 kb (`ld_loss.py:8` declared, `:107` applied against a raw position difference),
+reaching ~2.9% of chr21 SNP positions and ~7,450 pairs where a true 5 kb window is
+~10.6M, about 1,400x more.
+
+**RESULT 3 — READ MAPPING ON A RELEASED GRAPH IS THE REAL GAP, and it is three
+pipelines, not one.** Theirs, all under `external/PanMixer/tools/downstream/utility_out/`:
+`vg_prep.py` + `quick_align.py` (full graph), `filtered_read_mapping.py` (AF >= 0.1),
+`personalized_read_mapping.py` (per-donor haplotype-sampled subgraph via `vg gbwt -Z -r`,
+`vg haplotypes -H`, `kmc -k29`). `giraffe_parser.py:read_stats_file()` parses
+`vg stats -a` into 24 fields. Fig 5A plots percent perfect / gapless / MAPQ60 as
+fractions of `total_aligned` across those three constructions. ⚠ A mapping RATE proper
+(aligned / submitted) is reported by NEITHER tool — `total_alignments` is parsed and
+never used as a denominator.
+
+Ours: `scripts/run_vg_baseline.sh` reproduces the UNOBFUSCATED baseline only, ran
+2026-09-18 exit 0. `grep -rln 'giraffe|vg autoindex|vg stats' scripts/ src/ tests/`
+returns it, `get_read_data.sh`, and `src/target/path.py` (which only records that we
+AVOID giraffe). **Nothing maps reads to a release.**
+
+⚠⚠ **THE BLOCKING PREREQUISITE IS CONCRETE AND WAS PROVEN, NOT ASSUMED:** all four
+`utility_out` tools read
+`{EXPERIMENT_PATH}/exp_N/data/chr21/$ROW_ID/new_haplotypes.vcf.gz`, and
+`find -L /data/ds85/RanPanMixer/runs -name 'new_haplotypes.vcf.gz' | wc -l` = **0**.
+Our `exp_5` row dirs hold only `af_loss.json`, `ld_loss.txt` and a
+`new_haplotypes.npy` symlink; the npy -> VCF conversion
+(`external/PanMixer/tools/common/npy_2_vcf.py` or `convert_2_vcf.py`, both present) has
+never run on our output, and no `.gam` exists under any experiment dir. Everything else
+IS on disk: vg v1.68.0 (`docs/data.md:151`, "Needed for read-mapping utility only"),
+donor FASTQs (`docs/data.md:153`, 4.3 GB), references (`:154`).
+
+⚠ **EXPECTATION SET BEFORE THE WORK IS SCHEDULED:** their obfuscated figures are
+77.82/95.61/77.01 against a baseline of 77.83/95.62/77.01 — their obfuscation costs
+~**0.01 percentage point**. This is a DO-NO-HARM check, not a differentiator. And our
+own baseline reproduction already MISMATCHES theirs (79.05/95.96/79.23,
+`docs/plan.md:988`), so any obfuscated number must be quoted against OUR baseline,
+never their published one.
+
+**⚠ `scripts/map_coverage.py` IS NOT READ MAPPING.** It is GENETIC (recombination) map
+coverage in cM/Mb, the input to decision C's declared rate. The name invites exactly
+this confusion.
+
+**AND TWO PANELS WE HAD NOT NOTICED WE LACK.** Their Fig 4B
+(`plot_correlations` in `external/PanMixer/plot_util/utility_in.py`) and Fig 5B (`plot_B` in
+`external/PanMixer/plot_util/utility_out.py`) regress their cheap utility proxy against the fidelity
+metrics and against the mapping rates — the argument that the proxy predicts real
+downstream damage. We have no counterpart on either half.
+
+**⚠⚠ THE STATUS OF WHAT WE HAVE IS THE PROBLEM, NOT THE COMPUTATION.** Decision H
+(`docs/plan.md:478`) declared `af_loss`/`ld_loss` NOT adopted; both were run 2026-10-15
+AFTER outcomes were inspected, so both are stamped EXPLORATORY and promotion needs a
+NEW dated pre-registration. Two facts a referee must be told rather than find: **they
+beat us on `af_loss` at every capacity** (ours 0.003668..0.003698, theirs
+0.000220..0.002734) and that metric is close to their own optimiser's objective; and
+`af_loss` **FAILS the per-target direction check** (20/44 down, 24/44 up), so its
+movement is draw noise — the first metric here to fail it, against 44/44 for
+`target_fidelity` and `e_q_u`. `paper/draft_2026-10-13.md` has NO biological-utility
+section; its `### Utility` at :441 does not cover it.
+
+**Docketed** as `B-EVL-bio-utility`, `B-EVL-readmap-release` and
+`B-EVL-utility-correlation` in `docs/plan.md`'s Backlog. Not scheduled; Dylan asked for
+the docket entry, not the work.
+
+**What this does NOT establish.** No biological utility number has been produced at a
+reportable status. And the survey is a code/paper reading, not a measurement: the claim
+"we already have AF and LD" means the EVALUATOR runs and has output, not that the output
+is in a state the paper can quote.
+
+---
+
 ## 2026-10-25 (later) — B-FIX-eta-aggregation: 3.4 hours of compute destroyed by a one-line key mismatch, and the 21 defects behind it
 
 **Goal.** Measure Arm 1's `kl_exact` directly at K = 86 (Dylan, 2026-10-25: "let's

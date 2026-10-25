@@ -1851,6 +1851,132 @@ real map plateaus and are correct to leave; the telomeric run is not and needs a
 
 Ordered. Each item names what must pass before it starts and what closes it.
 
+### ⚠⚠ [B-EVL-bio-utility] DOWNSTREAM BIOLOGICAL UTILITY — REQUIRED FOR THE PAPER
+
+- **Raised by Dylan 2026-10-25:** "do we have any downstream biological utility
+  measurement like how PanMixer ships AF Wasserstein, LD decay and read-mapping
+  rates... if we don't have it I want it on the docket as something that has to get
+  done for the paper." NOT to be done immediately; this is the docket entry.
+- **Surveyed the same day** (both trees + their paper + our docs, 45 agents, claims
+  of absence and of already-run both independently re-checked): 52 metrics
+  inventoried. ⚠ Use `find -L` / the resolved path for `external/PanMixer` — it is a
+  symlink, and a plain `find` returns ZERO files there, which reads as "they ship
+  nothing" and is the wrong answer.
+
+**⚠⚠ TWO OF THE THREE NAMED METRICS WE ALREADY HAVE, AND ONE DOES NOT EXIST.**
+
+1. **"AF Wasserstein" IS `af_loss`.** There is no Wasserstein or earth-mover
+   computation anywhere in PanMixer: `external/PanMixer/tools/common/gather_results.py:84-90`
+   defines `df["wd_af"] = 2 * np.array(df["af_loss"])`, and
+   `plot_util/utility_in.py:135` puts the y-label "Wasserstein divergence" on that
+   column. Their Methods Eq. (8) is `U_AF = 2 * (1/m) * sum_j |p_j - q_j|` — exactly
+   twice the mean absolute AF change, the 2 arising because each allele is counted on
+   both sides. A grep for `wasserstein|earth_mover|emd` over their whole resolved tree
+   returns 2 hits, BOTH axis labels. ✅ We run their `af_loss.py` unmodified on all 308
+   releases, 0 failures (`logs/B_arm1_af_ld.md`, `docs/data.md:394`).
+   ⚠ **What is missing is a factor of 2**, so our column is on their published scale
+   (0.006 / 0.006 / 0.005). One line in `scripts/arm1_af_ld_results.py`, not a work item.
+2. **LD decay does not exist in PanMixer either.** Their Fig 4A panel 4 is `ld_loss`,
+   ONE SCALAR: mean |delta r^2| over SNP pairs in a sliding window (Methods Eq. 9,
+   `U_LD = ||d_obf - d_original||_1`). No distance axis anywhere —
+   `grep -rinE 'decay|distance_bin|r2_vs|ld_curve'` over the resolved tree returns
+   zero. "LD decay" appears in their paper only as loose prose. ✅ We run their
+   `ld_loss.py` unmodified. **So we are not behind on LD; we have exactly what they
+   have.** ⚠ If we WANT a real decay curve it is a new contribution, not parity — and
+   it would expose that their window is 5 POSITION UNITS, not 5 kb
+   (`ld_loss.py:8` vs `:107`), reaching ~2.9% of chr21 SNP positions and ~7,450 pairs
+   where a true 5 kb window is ~10.6M, about 1,400x more.
+3. **Read mapping on a RELEASED graph is the real gap.** See the item below.
+
+**⚠ AND THE STATUS OF WHAT WE HAVE IS THE PROBLEM, NOT THE COMPUTATION.** Decision H
+(2026-10-08, `docs/plan.md:478`) declared `af_loss` and `ld_loss` NOT adopted; they
+were run 2026-10-15 at Dylan's request AFTER outcomes were inspected, so both are
+stamped EXPLORATORY and promoting either to an endpoint needs a NEW dated
+pre-registration. Two further facts that must be stated and not discovered by a
+referee: **they beat us on `af_loss` at every capacity** (ours 0.003668..0.003698,
+theirs 0.000220..0.002734) and that metric is close to their own optimiser's objective
+(`utility_loss_panmixer`); and `af_loss` **FAILS the per-target direction check**
+(20/44 down, 24/44 up), so its movement is draw noise — the first metric in this
+project to fail it, against 44/44 for `target_fidelity` and `e_q_u`.
+
+**⚠ `scripts/map_coverage.py` IS NOT THIS.** It measures GENETIC (recombination) map
+coverage in cM/Mb, the input to decision C's declared rate. Unrelated to read mapping;
+do not let the name mislead.
+
+**Closes when:** the paper has a biological-utility subsection (currently ABSENT from
+`paper/draft_2026-10-13.md`; its `### Utility` at :441 does not cover it) carrying
+`wd_af` on their scale, `ld_loss`, and the read-mapping item below, each stamped with
+arm, knob value, denominator and n per the reporting contract.
+
+### ⚠⚠ [B-EVL-readmap-release] READ-MAPPING RATES ON THE RELEASED GRAPH — the real gap
+
+- **The one thing of the three we genuinely do not have.** We reproduce the
+  UNOBFUSCATED baseline and nothing else: `scripts/run_vg_baseline.sh`
+  (`vg autoindex --workflow giraffe` :34, `vg giraffe` + `vg stats -a` :49-50, five
+  donors :44) ran 2026-09-18, exit 0 (`logs/pm_vg2.log`, `logs/pm_vg2.status`).
+  `grep -rln 'giraffe|vg autoindex|vg stats' scripts/ src/ tests/` returns that file,
+  `scripts/get_read_data.sh` and `src/target/path.py` (which only records that we
+  AVOID giraffe) — nothing maps reads to a release.
+- **What they ship, and it is three pipelines not one** (all under
+  `external/PanMixer/tools/downstream/utility_out/`): `vg_prep.py` + `quick_align.py`
+  (full graph), `filtered_read_mapping.py` (AF >= 0.1 common-variant graph), and
+  `personalized_read_mapping.py` (per-donor haplotype-sampled subgraph via
+  `vg gbwt -Z -r`, `vg haplotypes -H` and `kmc -k29` k-mer counting).
+  `giraffe_parser.py:read_stats_file()` parses `vg stats -a` into 24 fields
+  (schema mirrored at `external/PanMixer/constants.py:48-65`). Their Fig 5A plots
+  percent **perfect / gapless / MAPQ60** as fractions of `total_aligned`, across those
+  three graph constructions. ⚠ A mapping RATE proper (aligned / submitted) is NOT
+  reported by either tool — `total_alignments` is parsed and never used as a
+  denominator — so "mapping rates" means those three fractions, and our column must
+  say so rather than quietly redefining it.
+- **⚠⚠ THE BLOCKING PREREQUISITE, and it is concrete.** All four of their
+  `utility_out` tools read
+  `{EXPERIMENT_PATH}/exp_N/data/chr21/$ROW_ID/new_haplotypes.vcf.gz`, and
+  `find -L /data/ds85/RanPanMixer/runs -name 'new_haplotypes.vcf.gz' | wc -l` = **0**.
+  Our `exp_5` row dirs hold only `af_loss.json`, `ld_loss.txt` and a
+  `new_haplotypes.npy` symlink: the npy -> VCF conversion
+  (their `external/PanMixer/tools/common/npy_2_vcf.py` or `external/PanMixer/tools/common/convert_2_vcf.py`, both present) has NEVER been run on our
+  output, and no `.gam` or `vg stats` file exists under any experiment dir. That
+  conversion is the first task; the mapping run cannot start before it.
+- **Everything else is already on disk:** the vg v1.68.0 binary
+  (`docs/data.md:151`, recorded "Needed for read-mapping utility only"), the donor
+  FASTQs (`docs/data.md:153`, 4.3 GB), the references (`docs/data.md:154`).
+- **⚠ KNOWN HEADWIND.** `docs/data.md:192` records that Arm 2 target selection
+  deliberately AVOIDS `vg giraffe`, because HPRC marks short-read mapping "untested"
+  for the PGGB graph. The design has been steering around this tool, which is part of
+  why it was never wired. That has to be confronted or scoped, not ignored.
+- **⚠ SET EXPECTATIONS BEFORE RUNNING IT.** Their published obfuscated figures are
+  **77.82 / 95.61 / 77.01** against a baseline of **77.83 / 95.62 / 77.01** — their
+  obfuscation costs ~**0.01 percentage point**. This is a DO-NO-HARM check, not a
+  differentiator: the expected result is that nothing moves, and the finding would be
+  if ours moved. ⚠ Our own baseline reproduction already MISMATCHES theirs
+  (79.05 / 95.96 / 79.23 against 77.83 / 95.62 / 77.01, `docs/plan.md:988`), so the
+  comparison must be ours-obfuscated against OURS-baseline, never against their
+  published number.
+- **Closes when:** perfect / gapless / MAPQ60 are reported for our releases across the
+  knob grid against our own baseline, on at least the full-graph construction, with
+  the filtered and personalized variants either run or explicitly declined with a
+  reason.
+
+### [B-EVL-utility-correlation] Does our knob predict downstream distortion? — their Fig 4B / 5B
+
+- **Their validation argument, which we have no counterpart for.** `plot_correlations`
+  in `external/PanMixer/plot_util/utility_in.py` (Fig 4B) regresses their cheap
+  graph-property utility proxy against each fidelity metric
+  (`DOWNSTREAM_COLUMNS`, which is `ld_loss`, `wd_af`, `wd_af_snp_only` and `wd_af_snps_0_05`) as a
+  20-bin binned mean with an R^2 annotation; `plot_B` in `external/PanMixer/plot_util/utility_out.py`
+  (Fig 5B) does the same against the three mapping rates. The claim is that their
+  proxy predicts real downstream damage.
+- **Why we want it:** our analogue is `acc_ceiling` (or `eta_tau`) against the same
+  downstream metrics. If our knob moves `af_loss`/`ld_loss`/mapping monotonically we
+  have their argument; if it does not, we should say so — and `af_loss` already fails
+  the direction check at 20/44 vs 24/44, which is itself the honest version of this
+  result rather than a reason to omit the panel.
+- **Prerequisite:** B-EVL-readmap-release for the mapping half. The AF/LD half can run
+  now on the 264 uniform `eta` releases.
+- ⚠ Any metric promoted out of this needs a full `docs/terms.md` entry first (step 4
+  of the Wrap-Up Protocol); `wd_af` and the three mapping rates have none today.
+
 ### [B-IMP-ceiling-calculator] An `acc_ceiling` calculator for the released tool — NICE TO HAVE
 - **Raised by Dylan 2026-10-24, explicitly as a possible nice-to-have, NOT scheduled.**
 - **Why:** a practitioner choosing an operating point should not have to read our
