@@ -665,7 +665,12 @@ def utility_id(util: utility.Utility) -> str:
     an open decision -- so a number that does not carry it cannot be compared to
     anything later.
     """
-    base = f"indicator/w=inv_support/beta={util.scope}"
+    # ⚠⚠ THE WEIGHTING IS PART OF THE IDENTITY. This was hardcoded to
+    # `inv_support` until 2026-10-24, so a uniform-weighted release would have
+    # carried the same stamp as an inv_support one -- two different utility
+    # functions indistinguishable in provenance, which is the one thing this
+    # function exists to prevent (standing constraint 5 forbids comparing them).
+    base = f"indicator/w={getattr(util, 'weights', 'inv_support')}/beta={util.scope}"
     # ⚠ The share belongs in the ID. A chromosome released at share 1 and the same
     # chromosome released at its genome-wide share are DIFFERENT utility functions
     # -- different weights, different ceiling, different reachable log_z -- and

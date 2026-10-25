@@ -110,8 +110,11 @@ def build_betas(d, ic, p_chain, weights: str, *, share=None, chrom=None,
     [0,1] -- but the utility function is now a function of the target, so it is NOT
     interchangeable with the production one and the two must never share a column.
     """
-    if weights == "production":
-        b = utility.beta_v(np.load(d / "support.npy"), in_chain=ic,
+    if weights in ("uniform", "production"):
+        # "production" is the legacy name for inv_support; "uniform" is the
+        # released tool's weighting as of 2026-10-24 (argued in docs/terms.md)
+        w = "uniform" if weights == "uniform" else "inv_support"
+        b = utility.beta_v(np.load(d / "support.npy"), in_chain=ic, weights=w,
                            **({} if share is None else {"share": share,
                                                         "chrom": chrom})).beta
         return (b, b)
@@ -154,6 +157,7 @@ def genome_chrom(args) -> dict:
             raise ValueError(f"{chrom}: eta {over} past its wall {wall:.3e}")
         ceil = utility.diploid_utility(utility.u_ceiling(p[:, 0], betas[0]),
                                        utility.u_ceiling(p[:, 1], betas[1]))
+        base = ffbs.baseline_log_norm(m)
         rows = []
         for eta in etas:
             # ⚠ NAME THE `eta` IN ANY FAILURE. The forward pass can dead-end at a
@@ -162,7 +166,7 @@ def genome_chrom(args) -> dict:
             # the eta does not say whether the curve died at its second point or its
             # eighth -- which is the only thing that decides what is reportable.
             try:
-                r = one_eta(m, hap, p, betas, eta, with_kl=with_kl)
+                r = one_eta(m, hap, p, betas, eta, with_kl=with_kl, base=base)
             except Exception as e:
                 raise RuntimeError(
                     f"{chrom} FAILED AT eta={eta:g} (rows up to "
@@ -240,7 +244,7 @@ def enumerated_moments(base, u_vec: np.ndarray, eta: float) -> tuple[float, floa
 
 
 def one_eta(m, hap: np.ndarray, p: np.ndarray, betas, eta: float,
-            *, with_kl: bool = False) -> dict:
+            *, with_kl: bool = False, base: float | None = None) -> dict:
     """Exact `E_Q[u]`, `Var_Q(u)` and `E[differ]` for one `eta`, diploid.
 
     Two forward + state_marginals passes, one per haplotype chain, each at `eta`/2 as
@@ -255,6 +259,16 @@ def one_eta(m, hap: np.ndarray, p: np.ndarray, betas, eta: float,
     h = eta / 2.0
     means, vars_, diffs, called = [], [], [], []
     nonref, n_nonref = [], []
+    # ⚠⚠ PMI IS PANMIXER'S OWN PRIVACY METRIC and we can report it in CLOSED FORM.
+    # PMI(p, y) = log[P(y|p)/P(y)] = log[Q_p(y)/R_D(y)] = eta*u(p,y) - log Z_p,
+    # because Z_p = E_{R_D}[exp(eta u)] by construction. So
+    #     E_Q[PMI] = eta*E_Q[u] - log Z_p = KL(Q_p || R_D),
+    # the divergence from the release distribution to the UNTILTED baseline. They
+    # estimate it blockwise (their Supplementary Lemma 1); this is exact from the
+    # same forward pass as e_q_u. ⚠ It is a DIFFERENT question from acc_ceiling:
+    # acc_ceiling asks whether an attacker can tell WHICH INPUT produced an output;
+    # PMI asks how statistically DEPENDENT the output is on the input. Report both.
+    log_z = 0.0 if base is not None else None
     for col in (0, 1):
         tgt = p[:, col]
         beta = betas[col]
@@ -267,6 +281,8 @@ def one_eta(m, hap: np.ndarray, p: np.ndarray, betas, eta: float,
         fwd = ffbs.forward(m, psi)
         gam = ffbs.state_marginals(m, fwd, psi)
         match = (hap == tgt[None, :]) & (tgt[None, :] >= 0)
+        if base is not None:
+            log_z += ffbs.log_z_p(fwd, base, h, budget=h * float(beta.sum()))
         r = haplotype_variance(m, fwd.alpha, gam, match, beta)
         means.append(r["mean"])
         vars_.append(r["var"])
@@ -294,6 +310,11 @@ def one_eta(m, hap: np.ndarray, p: np.ndarray, betas, eta: float,
            "e_match_nonref": nonref[0] + nonref[1],
            "n_nonref": n_nonref[0] + n_nonref[1],
            "u_hap": means, "var_hap": vars_}
+    if log_z is not None:
+        # the diploid tilt is exp(eta*u_mean) = exp((eta/2)u_0)*exp((eta/2)u_1), so
+        # log Z is the SUM of the two chains' and PMI uses the full eta on u_mean
+        out["log_z_p"] = log_z
+        out["pmi"] = eta * e_q_u - log_z
     if with_kl:
         # the SAME kl_stable the genome-wide ceiling uses, driven by eta
         k = kl_stable(m, hap, betas, p, extremal(p), eta=eta)
@@ -482,6 +503,8 @@ def run_genome(a) -> int:
                "var_q_u": math.fsum(x["var_q_u"] for x in cells),
                "e_differ": math.fsum(x["e_differ"] for x in cells),
                "e_match_nonref": math.fsum(x["e_match_nonref"] for x in cells),
+               "pmi": math.fsum(x.get("pmi", 0.0) for x in cells),
+               "log_z_p": math.fsum(x.get("log_z_p", 0.0) for x in cells),
                "n_nonref": sum(x["n_nonref"] for x in cells),
                "called_cells": sum(x["called_cells"] for x in cells),
                "u_ceiling": ceil}
@@ -513,6 +536,11 @@ def run_genome(a) -> int:
         f"{r['e_differ']:,.1f}" for r in agg) + " |")
     print("| `e_match_nonref` * [COMPARABLE across weightings] | " + " | ".join(
         f"{r['e_match_nonref']:,.1f}" for r in agg) + " |")
+    if any(r.get("pmi") for r in agg):
+        print("| `pmi` * [PanMixer's OWN privacy metric, exact] | " + " | ".join(
+            f"{r['pmi']:.4e}" for r in agg) + " |")
+        print("| `log_z_p` | " + " | ".join(
+            f"{r['log_z_p']:.4e}" for r in agg) + " |")
     if base is not None:
         n0 = agg[0]["e_match_nonref"]
         print("| non-ref alleles RECOVERED vs `eta_tau` = 0 | " + " | ".join(
@@ -557,8 +585,9 @@ def main(argv=None) -> int:
                     help="beta_share; default None = chromosome-scope (sums to 1), "
                          "which is 66.6x MORE generous per position than genome-wide")
     ap.add_argument("--weights",
-                    choices=("production", "target_alt", "target_rarity"),
-                    default="production",
+                    choices=("uniform", "production", "target_alt",
+                             "target_rarity"),
+                    default="uniform",
                     help="production = w_v 1/support(v) over the whole chain; "
                          "target_alt = uniform over the target haplotype's NON-REF "
                          "positions only (target-dependent; a DIFFERENT utility "
@@ -612,7 +641,8 @@ def main(argv=None) -> int:
 
     rows, t0 = [], time.time()
     for eta in a.etas:
-        r = one_eta(m, hap, p, betas, eta, with_kl=a.with_kl)
+        r = one_eta(m, hap, p, betas, eta, with_kl=a.with_kl,
+                    base=ffbs.baseline_log_norm(m))
         r |= {"u_ceiling": ceil,
               "e_q_u_over_ceiling": r["e_q_u"] / ceil if ceil else float("nan")}
         rows.append(r)
@@ -634,6 +664,9 @@ def main(argv=None) -> int:
     print("| `var_q_u` | " + " | ".join(f"{r['var_q_u']:.4e}" for r in rows) + " |")
     print("| `e_differ` cells | " + " | ".join(
         f"{r['e_differ']:,.1f}" for r in rows) + " |")
+    if any(r.get("pmi") for r in rows):
+        print("| `pmi` * [PanMixer's OWN privacy metric, exact] | " + " | ".join(
+            f"{r['pmi']:.4e}" for r in rows) + " |")
     if a.with_kl:
         print("| `kl_exact` | " + " | ".join(
             f"{r['kl_exact']:.4e}" for r in rows) + " |")

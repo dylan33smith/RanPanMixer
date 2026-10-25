@@ -1,6 +1,6 @@
 # plan.md — the board
 
-**Last updated:** 2026-10-24 (**DIRECTION CHANGE BY DYLAN — the knob is `eta_tau`, not `tau`; the regime is `acc_ceiling` 0.5 to 1.0; the pre-registration is SUPERSEDED; the tool's utility function is the NON-REF weighting; the contiguous-window and top-n weightings are DEAD**). Read the direction block at the top of Current state before anything else — everything below it predates the change. ⚠⚠ Two arithmetic corrections the same day: `epsilon_tau` = 5.2933 over T = 22,134,562 is **2.39e-07 nats per released position**, which is 3.2e04 to 3.2e07 times MORE conservative than the published genomic band, so earlier notes treating our `epsilon_tau` as disqualifying had the direction of worry INVERTED; and Pinsker is nearly tight here (overstatement **sqrt(pi/2) = 1.25331**, a constant), so the "loose by 1,128x" figure of 2026-10-23 is the UNSPENT BUDGET, not an instrument defect. 2026-10-23 (**THE MECHANISM HAS A WORKING REGIME AND IT IS UNREACHABLE — the `eta` response curve, and it reframes the negative result**). ✅✅ **GENOME-WIDE CONFIRMED (22/22 autosomes):** vacuous at `eta_tau` ~ **5,642** with **0.15%** of the utility recovered, 95.1% needing **11,798x** more — and the scaling is ASYMMETRIC, utility linear in the tilt but privacy loss QUADRATIC, so budget dilution makes the trade-off strictly worse. Pushed past `tau` entirely: at `eta` = 3e6 the tilt recovers **97.8%** of the recoverable utility and takes `e_differ` from 76,040 cells to **1,350**, so "the tilt does nothing" was never the right statement. ⚠⚠ **THE RIGHT STATEMENT IS THAT THE USEFUL AND PRIVATE REGIMES DO NOT OVERLAP:** `acc_ceiling` reaches 1.000 at `eta` ~ **860** with **1.14%** of the utility recovered, and 97.8% needs **3,488x** more `eta`. ✅ `var_q_u` constant to `eta` ~ 2000 explains why the `tau` sweep was exactly linear in `eta_tau`: the whole grid lives at `eta` <= 6.1. ⚠⚠ Both are EXPLORATORY and outside the signed grid. 2026-10-23 (**`tau` PUSHED TO 0.99999 AT THE PI'S REQUEST — THERE IS NO RANGE, AND THE REASON IS STRUCTURAL**). `eta_tau = arctanh(tau)` is logarithmic, so `1 - tau` shrinking **1000x** multiplies the tilt only **2.3059x**; the measured `e_q_u` movement matches the `eta_tau` ratio **to three decimals at all nine points** of a ten-point grid, so the movement is a LINEAR function of `eta_tau` and of nothing else. The whole extra range buys **ten cells of 7,630,132**. ⚠⚠ **AND THE BUDGET GOES ALMOST ENTIRELY UNSPENT:** genome-wide `acc_ceiling` is **0.500541** at `tau` = 0.99999 where `p_succ_bound` PERMITS **0.999995** — the sharpest form of this project's central result. All four attacks null with passing controls. ⚠⚠ EXPLORATORY: the signed grid ends at 0.99 and these three were chosen after its outcomes were seen, so they are reported APART and promoting them needs a NEW dated pre-registration. ⚠⚠ **OCCURRENCE FOUR of the common-random-numbers defect, and I caused it** — the `tau` seed keyed on list POSITION, so 132 releases redrew with the `tau` = 0/0.05/0.10 seeds and came out bit-identical on chr21; withdrawn, fixed with a `SEED_GRID`, gated, re-run. ✅ The exact endpoint never moved and that is measured (792/792). 2026-10-22 (**`var_q_u` MEASURED EXACTLY IN O(TK) AT BOTH SCOPES, AND THE 43.6x IS CLOSED.** `d E_Q[u]/d eta = Var_Q(u)` PREDICTS the logged movement at chr21 (3.636770e-06 against 3.636777e-06) and genome-wide (8.345230e-08 against 8.345e-08). **`cov_share` = 0.948111 chr21 at share 1 and 0.960128 genome-wide** — covariance is 93-97% of the variance at every scope measured, which is a LEVEL statement and not by itself the 43.6x. ⚠ "Needs pair marginals" was wrong about the METHOD: one centred O(TK) sweep is exact; stale wording remains in `scripts/exact_utility.py` and `paper/draft_2026-10-13.md`. ✅ **EVERY SINGLE-DRAW COLUMN NOW HAS AN EXACT SD** — ARM 1 `sd_q_differ` = 1,061.9 cells against the head-to-head's 7-column empirical 1,312 (ratio 1.24 at ±29%), so **the `tau` wiggle in that table is draw noise** and its exact expected cost moves 0.0007 across the whole grid. ✅✅ **THE 43.6x IS NOW FULLY ACCOUNTED FOR**: `sum beta_v^2` 128.6181 / 2.2679 / 1.3014 = **43.5790**, matching the measured ratio to 1.6e-16, and the prediction holds genome-wide too (8.345230e-08 against a logged 8.345e-08). ⚠⚠ The standing correlation hypothesis is only 1.30x of the 2.95x gap — the larger 2.27x is which positions carry `beta_v` weight at each scope. Genome-wide `cov_share` = 0.960128, `sd_q_differ` = 8,041.9 cells. ⚠ A NaN bug the toy gate could not catch is fixed and newly gated — see `docs/bugs.md`. PRIOR STATE: 2026-10-15 (**ALL TEN CHUNKS DONE**; ARM 2's attacker set complete; **ARM 1's PanMixer comparison now covers ALL FOUR of their runnable evaluators plus BOTH in-graph utility metrics**). ⚠⚠ **No attack beats `p_succ_bound` significantly in any arm**; largest excess z = +2.65 against z_crit 4.51. ⚠⚠ **Two nulls prove less than they look like and both are written up as such:** PanMixer's evaluators are defeated by our `tau` = 0 release too (release FORM, not the tilt), and A3's pre-registered control was ALGEBRAICALLY UNABLE TO FAIL. ⚠⚠ **A3's `D1_extremal` row is DEGENERATE — TPR 1.0000 / FPR 1.0000 over 1,750 trials, a constant answer, not a null.** ✅ **THREE INDEPENDENT ATTACKS NOW AGREE `capacity` <= 0.1 IS UNPROTECTED FOR THEM** (Gap Score +2,453; MIA rank 1 of 44; Beagle +0.0283) **while ours is never identified and never reconstructed at any `tau`**. ⚠⚠ **BUT AT THEIR PROTECTED SETTINGS THE TOOLS ARE CLOSE** on every axis measured, and **THEY BEAT US ON `af_loss` AT EVERY CAPACITY** — which is near their own optimiser's objective. ⚠⚠ The open scientific question remains UTILITY: genome-wide `e_q_u` moves +8.345e-08, and the 0.8586 level is reached at `tau` = 0 so it is not ours to quote. ✅ The dilution is UNIFORM (A4). ⚠ **NEXT: A3 and A4 on ARM 1 and on PanMixer's output** (the pre-registration admits both in both arms; neither has run there). ⚠ Standing gap: decision F — nothing of PanMixer's MECHANISM has run on our vg-1.68 build. ⚠ `af_loss`/`ld_loss` are EXPLORATORY, added after outcomes were seen.
+**Last updated:** 2026-10-25 (**THE ARM 2 ATTACK SUITE WAS RUNNING AT THE WRONG `beta_v` WEIGHTING AND IS RE-RUNNING**). ⚠⚠ `scripts/arm2_attack.py` called `utility.beta_v` without `weights=` and so took the dataclass default `inv_support`, while every metric it was to share a table with had been re-run at `uniform` — standing constraint 5, and `arm2_attack_a3a4.py` inherited it through `load_state`. **Nothing raised and nothing looked wrong**; the tell was arithmetic, the retired `ETA_GRID`'s top point of 855 being 1/sqrt(1.3741e-06) = `inv_support`'s own chr21 `eta*` where `uniform`'s is 756. ✅ Fixed at one source with a `--weights` flag on both entry points, a `load_state` guard that REFUSES a stale cached weighting, and an AST-walk gate (`tests/test_beta_weighting_explicit.py`, 8 tests) that fails for the NEXT caller that forgets — mutation-tested twice. ⚠ The walk found **54 omitting call sites in 23 files**: 5 production fixed, 23 legacy frozen in a census that may shrink but never grow. ✅ `ETA_GRID` re-pinned to the six chr21 `eta` that realise the SAME `acc_ceiling` as the genome-wide release grid (matched on `acc_ceiling` per constraint 7, measured to 4 s.f. on both `acc_ceiling` and `kl_exact`), now including `eta` = 0 as the untilted negative control. ⚠ The 2026-10-24/25 attack numbers are not wrong as measurements of an `inv_support` release — they are UNPOOLABLE with a `uniform` table, and are withdrawn from it, not from the record. PRIOR STATE: 2026-10-24 (**DIRECTION CHANGE BY DYLAN — the knob is `eta_tau`, not `tau`; the regime is `acc_ceiling` 0.5 to 1.0; the pre-registration is SUPERSEDED; the tool's utility function is `uniform` [CORRECTED 2026-10-25; it was recorded as the NON-REF weighting and that was superseded the same day]; the contiguous-window and top-n weightings are DEAD**). Read the direction block at the top of Current state before anything else — everything below it predates the change. ⚠⚠ Two arithmetic corrections the same day: `epsilon_tau` = 5.2933 over T = 22,134,562 is **2.39e-07 nats per released position**, which is 3.2e04 to 3.2e07 times MORE conservative than the published genomic band, so earlier notes treating our `epsilon_tau` as disqualifying had the direction of worry INVERTED; and Pinsker is nearly tight here (overstatement **sqrt(pi/2) = 1.25331**, a constant), so the "loose by 1,128x" figure of 2026-10-23 is the UNSPENT BUDGET, not an instrument defect. 2026-10-23 (**THE MECHANISM HAS A WORKING REGIME AND IT IS UNREACHABLE — the `eta` response curve, and it reframes the negative result**). ✅✅ **GENOME-WIDE CONFIRMED (22/22 autosomes):** vacuous at `eta_tau` ~ **5,642** with **0.15%** of the utility recovered, 95.1% needing **11,798x** more — and the scaling is ASYMMETRIC, utility linear in the tilt but privacy loss QUADRATIC, so budget dilution makes the trade-off strictly worse. Pushed past `tau` entirely: at `eta` = 3e6 the tilt recovers **97.8%** of the recoverable utility and takes `e_differ` from 76,040 cells to **1,350**, so "the tilt does nothing" was never the right statement. ⚠⚠ **THE RIGHT STATEMENT IS THAT THE USEFUL AND PRIVATE REGIMES DO NOT OVERLAP:** `acc_ceiling` reaches 1.000 at `eta` ~ **860** with **1.14%** of the utility recovered, and 97.8% needs **3,488x** more `eta`. ✅ `var_q_u` constant to `eta` ~ 2000 explains why the `tau` sweep was exactly linear in `eta_tau`: the whole grid lives at `eta` <= 6.1. ⚠⚠ Both are EXPLORATORY and outside the signed grid. 2026-10-23 (**`tau` PUSHED TO 0.99999 AT THE PI'S REQUEST — THERE IS NO RANGE, AND THE REASON IS STRUCTURAL**). `eta_tau = arctanh(tau)` is logarithmic, so `1 - tau` shrinking **1000x** multiplies the tilt only **2.3059x**; the measured `e_q_u` movement matches the `eta_tau` ratio **to three decimals at all nine points** of a ten-point grid, so the movement is a LINEAR function of `eta_tau` and of nothing else. The whole extra range buys **ten cells of 7,630,132**. ⚠⚠ **AND THE BUDGET GOES ALMOST ENTIRELY UNSPENT:** genome-wide `acc_ceiling` is **0.500541** at `tau` = 0.99999 where `p_succ_bound` PERMITS **0.999995** — the sharpest form of this project's central result. All four attacks null with passing controls. ⚠⚠ EXPLORATORY: the signed grid ends at 0.99 and these three were chosen after its outcomes were seen, so they are reported APART and promoting them needs a NEW dated pre-registration. ⚠⚠ **OCCURRENCE FOUR of the common-random-numbers defect, and I caused it** — the `tau` seed keyed on list POSITION, so 132 releases redrew with the `tau` = 0/0.05/0.10 seeds and came out bit-identical on chr21; withdrawn, fixed with a `SEED_GRID`, gated, re-run. ✅ The exact endpoint never moved and that is measured (792/792). 2026-10-22 (**`var_q_u` MEASURED EXACTLY IN O(TK) AT BOTH SCOPES, AND THE 43.6x IS CLOSED.** `d E_Q[u]/d eta = Var_Q(u)` PREDICTS the logged movement at chr21 (3.636770e-06 against 3.636777e-06) and genome-wide (8.345230e-08 against 8.345e-08). **`cov_share` = 0.948111 chr21 at share 1 and 0.960128 genome-wide** — covariance is 93-97% of the variance at every scope measured, which is a LEVEL statement and not by itself the 43.6x. ⚠ "Needs pair marginals" was wrong about the METHOD: one centred O(TK) sweep is exact; stale wording remains in `scripts/exact_utility.py` and `paper/draft_2026-10-13.md`. ✅ **EVERY SINGLE-DRAW COLUMN NOW HAS AN EXACT SD** — ARM 1 `sd_q_differ` = 1,061.9 cells against the head-to-head's 7-column empirical 1,312 (ratio 1.24 at ±29%), so **the `tau` wiggle in that table is draw noise** and its exact expected cost moves 0.0007 across the whole grid. ✅✅ **THE 43.6x IS NOW FULLY ACCOUNTED FOR**: `sum beta_v^2` 128.6181 / 2.2679 / 1.3014 = **43.5790**, matching the measured ratio to 1.6e-16, and the prediction holds genome-wide too (8.345230e-08 against a logged 8.345e-08). ⚠⚠ The standing correlation hypothesis is only 1.30x of the 2.95x gap — the larger 2.27x is which positions carry `beta_v` weight at each scope. Genome-wide `cov_share` = 0.960128, `sd_q_differ` = 8,041.9 cells. ⚠ A NaN bug the toy gate could not catch is fixed and newly gated — see `docs/bugs.md`. PRIOR STATE: 2026-10-15 (**ALL TEN CHUNKS DONE**; ARM 2's attacker set complete; **ARM 1's PanMixer comparison now covers ALL FOUR of their runnable evaluators plus BOTH in-graph utility metrics**). ⚠⚠ **No attack beats `p_succ_bound` significantly in any arm**; largest excess z = +2.65 against z_crit 4.51. ⚠⚠ **Two nulls prove less than they look like and both are written up as such:** PanMixer's evaluators are defeated by our `tau` = 0 release too (release FORM, not the tilt), and A3's pre-registered control was ALGEBRAICALLY UNABLE TO FAIL. ⚠⚠ **A3's `D1_extremal` row is DEGENERATE — TPR 1.0000 / FPR 1.0000 over 1,750 trials, a constant answer, not a null.** ✅ **THREE INDEPENDENT ATTACKS NOW AGREE `capacity` <= 0.1 IS UNPROTECTED FOR THEM** (Gap Score +2,453; MIA rank 1 of 44; Beagle +0.0283) **while ours is never identified and never reconstructed at any `tau`**. ⚠⚠ **BUT AT THEIR PROTECTED SETTINGS THE TOOLS ARE CLOSE** on every axis measured, and **THEY BEAT US ON `af_loss` AT EVERY CAPACITY** — which is near their own optimiser's objective. ⚠⚠ The open scientific question remains UTILITY: genome-wide `e_q_u` moves +8.345e-08, and the 0.8586 level is reached at `tau` = 0 so it is not ours to quote. ✅ The dilution is UNIFORM (A4). ⚠ **NEXT: A3 and A4 on ARM 1 and on PanMixer's output** (the pre-registration admits both in both arms; neither has run there). ⚠ Standing gap: decision F — nothing of PanMixer's MECHANISM has run on our vg-1.68 build. ⚠ `af_loss`/`ld_loss` are EXPLORATORY, added after outcomes were seen.
 
 Read at session start. This file exists so a new session never has to grep
 `docs/memory.md` to know where things stand.
@@ -27,18 +27,59 @@ Where an older passage conflicts with these six points, **these win.**
    real `acc_ceiling`, not `p_succ_bound`, which is ~1 everywhere in this regime and
    therefore carries no information. ⚠ `acc_ceiling` = 1.000 means the bound is vacuous,
    never "identification is certain".
-3. **THE PRE-REGISTRATION NO LONGER GOVERNS SCOPE.** Superseded 2026-10-24; see
-   `paper/superseded_2026-10-24_prereg_withdrawn.md`. It was signed before the mechanism ⚠ That file was **removed** 2026-10-24 (see the direction block in `docs/plan.md`).
-   was understood and was pinning the work to an inert regime. The file is KEPT,
-   unedited, as the dated record. Standing constraint 6 is retired; **1, 2, 3, 4, 5, 7,
-   8 and 9 all stand**, and 7 and 8 matter MORE now, not less.
-4. **THE TOOL'S UTILITY FUNCTION IS THE NON-REF WEIGHTING (`target_alt`) — now CONFIRMED at matched privacy, not just at matched `tau`.** It recovers **1.633x** the non-ref alleles of the production weighting at matched `acc_ceiling` and is **2.67x** more efficient per altered cell; the rarity weighting `-log f` was tried and LOSES (0.649x `target_alt`) because it is less concentrated. The cross-weighting comparison must use **`e_match_nonref`** — `e_q_u` is weighting-specific and `e_differ` favours whichever weighting recovers common alleles. See `docs/memory.md` 2026-10-24 (later). Uniform over
-   the positions where that haplotype carries a non-ref allele, normalised genome-wide
-   per haplotype. Worth **29.7x** the endpoint movement of the production weighting at
-   matched `tau` (`logs/B_alt_beta_genome_10targets.md`). The production weighting
-   `w_v = 1/support(v)` stays as the comparison, and the paper may have a section on how
-   the `beta_v` CHOICE moves utility and privacy. ⚠ They are different utility functions:
-   constraint 8 forbids sharing a column.
+3. **THE PRE-REGISTRATION NO LONGER GOVERNS SCOPE, AND ITS FILE IS GONE.** Superseded
+   2026-10-24: it was signed before the mechanism was understood and was pinning the
+   work to an inert regime. ⚠⚠ **[CORRECTION - 2026-10-25]** This item used to say the
+   file was "KEPT, unedited, as the dated record" and in the same breath that it was
+   "removed" — both, in one sentence. The truth is the second: Dylan asked for the
+   pre-registration to be **deleted outright** ("get rid of that entirely because I
+   don't want it confusing your context"), so the pre-registration file itself (paper/prereg_2026-10-10.md,
+   un-backticked here because it no longer exists) and `src/attacks.py` 's
+   require_signed_prereg are gone along with 8 tests, and there is no
+   `paper/superseded_*` file either — all three VERIFIED absent 2026-10-25.
+   ⚠ **STALE REFERENCES SURVIVE, and they are prose, not live code paths** — listed here
+   because the cleanup pass has to find them (verified 2026-10-25):
+   `paper/addendum_2026-10-11_decision_K.md` and
+   `paper/addendum_2026-10-12_chain_rebuild.md` (two addenda to a file that no longer
+   exists, both still calling themselves signed) · `tests/test_attacks.py:296-306`
+   (a comment block reasoning about `require_signed_prereg`'s globbing, and a test that
+   the addendum is signed) · `scripts/arm1_exact_endpoint.py:4` and
+   `scripts/arm1_symmetric_compare.py:16` (docstrings citing prereg sections) ·
+   `docs/terms.md:71` · `docs/data.md:360-362`, which still carries a row for the
+   DELETED prereg file (paper/prereg_2026-10-10.md). None of these can fail a run — nothing imports
+   a prereg path any more — but every one of them will read as authority to a future
+   reader, so they are cleanup items, not bugs.
+   ⚠ **CONSTRAINT NUMBERING CHANGED WITH IT.** `CLAUDE.md` now carries **SEVEN**
+   constraints, not nine — the three pre-registration constraints (old 4, 5, 6) were
+   removed and the rest renumbered. Any note in this file citing "constraint 8" or
+   "constraint 9" predates that and means old numbering. The current set is:
+   1 support/baseline from `G` and `D` only · 2 utility bounded in [0,1] ·
+   3 sample never argmax · 4 a failed attacker is not evidence ·
+   5 never mix two knob values, utility functions or cohorts · 6 the guarantee covers
+   the released path only · 7 cross-weighting comparisons use `e_match_nonref` at
+   matched `acc_ceiling`.
+4. **THE TOOL'S UTILITY FUNCTION IS `uniform` — `beta_v` = 1/T, FLAT OVER THE CHAIN.**
+   Chosen by Dylan 2026-10-24 ("not any weight sharing for the final version, just even
+   weighting... just production"), then kept with an ARGUED reason rather than by
+   default; the argument is in `src/mechanism/utility.py:173` and `docs/terms.md` under
+   `beta_v`. The short form: `1/support(v)` weights a property of OUR DATA — our
+   cohort's genotyping completeness — not a property of the position, so it makes the
+   released object a function of our call rate and is not reproducible by anyone with a
+   different panel. `uniform` is the only weighting that is a statement about the
+   RELEASE rather than about us.
+   ⚠⚠ **[CORRECTION - 2026-10-25]** This item previously read "THE TOOL'S UTILITY
+   FUNCTION IS THE NON-REF WEIGHTING (`target_alt`)", carrying the 1.633x-at-matched-
+   `acc_ceiling` and 29.7x-at-matched-`tau` findings. That was SUPERSEDED the same day
+   by Dylan's decision above and should not have survived in the direction block. The
+   measurement itself stands and is preserved verbatim in `docs/memory.md` 2026-10-24
+   (later) — `target_alt` does recover 1.633x the non-ref alleles — but it is NOT the
+   tool's weighting, it is target-dependent, and it is not in the paper. `target_rarity`
+   (0.649x `target_alt`) is likewise dead. The live comparison is `uniform` against
+   `inv_support` only.
+   ⚠ `e_q_u` is weighting-SPECIFIC, so any cross-weighting comparison uses
+   **`e_match_nonref`** at matched `acc_ceiling` — constraint 7.
+   ⚠ **`eta_sweep.py` still spells `inv_support` as `production`** and still offers the
+   dead `target_alt`/`target_rarity` choices. Namespace pass, not yet done.
 5. **THE CONTIGUOUS-WINDOW AND TOP-n WEIGHTINGS ARE DEAD.** Dropped as a tool direction
    by Dylan 2026-10-24, not in the paper, not a secondary arm, not mentioned. They are
    not useful as a tool: a window of 10 contiguous positions is a different and far
@@ -67,6 +108,37 @@ Where an older passage conflicts with these six points, **these win.**
   magnitude. The "loose by 1,128x" figure quoted on 2026-10-23 is NOT Pinsker's
   looseness — it is `(permitted advantage)/(realised advantage)`, i.e. the UNSPENT
   BUDGET, which is the paper's own central finding and should be named as such.
+
+### ⚠⚠ REQUIRED IN THE CLEANUP: `tau` IS BAKED INTO PATHS, NAMES AND PARSERS
+
+Dylan, 2026-10-25: finding and fixing every namespace/label collision, and the `tau`
+naming generally, is **part of the code-cleaning task**, not optional polish. `tau`
+stopped being the knob on 2026-10-24 but the name is still load-bearing in at least
+these places, and FOUR collisions have already been caused by it:
+
+1. **`releases.tau_dir` refused any `tau` past two decimals** (2026-10-22) — the three
+   exploratory points were unreleasable until it was made lossless.
+2. **`arm1_release.genome_seed` keyed on the `tau`'s POSITION in `--taus`** (2026-10-22)
+   — 132 releases redrew with the `tau` = 0/0.05/0.10 seeds, bit-identical on chr21.
+3. **`eta`-driven releases would all have shared `tau_1p00/`** (2026-10-24) — `tanh(eta)`
+   saturates past `eta` ~ 19. Fixed with the `eta_*` namespace, and the per-chromosome
+   PARTS had to inherit it separately or the release split across two namespaces.
+4. **`beagle_attack_setup` hardcoded a `tau_` prefix**, so the label `eta_0` became
+   `tau_eta_0` and the stage aborted; both results scripts would have parsed `eta_250`
+   as a tau (2026-10-25).
+
+Still outstanding, to be swept in the cleanup:
+- `Release.stem` is `f"{target}_tau{tau:g}_..."`, so every eta-driven release file is
+  named `..._tau1_...`. Dir-scoped, so safe, but self-evidently wrong in provenance and
+  two different `eta` produce the same stem.
+- `arm2_attack` and `arm2_attack_a3a4` still name their column label `tau` in the
+  trial record and the JSON, with the eta carried beside it for back-compatibility.
+- `--taus` is the flag name on several scripts that now take `eta_*` directory labels.
+- `PINNED_TAUS` / `SEED_GRID` / `TAU_LABEL` / `TAU_LBL` identifiers throughout.
+- `docs/terms.md` entries phrased as "at matched `tau`" that now mean "at matched
+  `eta_tau`" or "at matched `acc_ceiling`".
+⚠ The rule that keeps catching these: a knob's name must not appear in a PATH, a
+FILENAME STEM or a PARSER. Only in a declared field.
 
 ### ⚠ LIMITATIONS THAT MUST REACH THE WRITEUP — the home of retired constraints 4 and 5
 

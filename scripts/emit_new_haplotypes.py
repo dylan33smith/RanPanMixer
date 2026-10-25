@@ -95,7 +95,8 @@ def alignment_control(oi, ti, their_pos, target: str, hap: np.ndarray) -> dict:
             "n_compared": int(both.sum())}
 
 
-def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
+def emit(target: str, tau: float, out_root: Path, force: bool = False,
+         eta_mode: bool = False) -> dict:
     our_pos, their_pos, shared, oi, ti = axis_map()
     hap = np.asarray(np.load(REPO / "data" / "cohort" / CHROM / "haplotypes.npy",
                              mmap_mode="r"))
@@ -113,8 +114,9 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
 
     # our per-target chain, and the release on it
     ic = loo.loo_chain(REPO / "data" / "cohort" / CHROM, target, haplotypes=hap).in_chain
-    tdir = (REPO / "data" / "releases" / "arm1" / target
-            / R.tau_dir(tau))
+    # ⚠ eta-driven releases live in eta_<v>/, a namespace disjoint from tau_<v>/
+    pname = R.eta_dir(tau) if eta_mode else R.tau_dir(tau)
+    tdir = REPO / "data" / "releases" / "arm1" / target / pname
     hits = sorted(tdir.glob(f"*chrom{CHROM}_*_{CHROM}/released_path.npy"))
     if len(hits) != 1:
         raise AssertionError(f"{target}/{tau:g}: {len(hits)} chr21 parts, expected 1")
@@ -144,7 +146,7 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False) -> dict:
     n_oor = int(oor.sum())
     out[oor] = -1
 
-    d = out_root / "arm1" / target / R.tau_dir(tau) / CHROM
+    d = out_root / "arm1" / target / pname / CHROM
     d.mkdir(parents=True, exist_ok=True)
     np.save(d / "new_haplotypes.npy", out)
     # ⚠ the sidecar docs/terms.md requires: "Ship a `sites.tsv` beside any emitted copy
@@ -167,6 +169,9 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", default="HG00438")
     ap.add_argument("--tau", type=float, nargs="+", default=list(PINNED_TAUS))
+    ap.add_argument("--eta", type=float, nargs="+", default=None,
+                    help="emit the ETA-driven releases instead, reading and "
+                         "writing eta_<v>/ rather than tau_<v>/")
     ap.add_argument("--out", type=Path, default=OUT_ROOT)
     ap.add_argument("--force", action="store_true",
                     help="write even if the alignment control fails (do not use)")
@@ -175,8 +180,12 @@ def main(argv=None) -> int:
     print(f"emitting `new_haplotypes` for {a.target}, {CHROM}, "
           f"{len(a.tau)} `tau` value(s)\n")
     rows = []
-    for tau in a.tau:
-        r = emit(a.target, tau, a.out, a.force)
+    eta_mode = bool(a.eta)
+    points = list(a.eta) if eta_mode else list(a.tau)
+    if eta_mode:
+        print(f"ETA MODE: reading and writing eta_<v>/ for {points}")
+    for tau in points:
+        r = emit(a.target, tau, a.out, a.force, eta_mode=eta_mode)
         rows.append(r)
         print(f"  tau = {tau:<5g} -> {r['shape']}, {r['released_rows']:,} released rows, "
               f"{r['missing_rows']:,} at -1"

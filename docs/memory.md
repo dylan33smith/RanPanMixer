@@ -104,6 +104,100 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-25 — B-FIX-attack-weighting: the Arm 2 attack suite was running at the WRONG `beta_v` weighting, by omission
+
+**Goal.** Before building the final Arm 2 table, confirm that every row in it was
+computed under the SAME utility function. Arm 2 comes first in the paper and its
+metrics were re-run at `uniform` on 2026-10-24; the attacks were not re-run, so the
+question was whether they needed to be.
+
+**Method.** Read the call sites rather than the outputs. `utility.beta_v` takes
+`weights=` and its dataclass default is `"inv_support"`. An AST walk over `scripts/`,
+`src/` and `tests/` found every `beta_v(...)` call and whether it passes the keyword.
+
+**Result — IT WAS WRONG, AND NOTHING LOOKED WRONG.** `scripts/arm2_attack.py:99`
+called `utility.beta_v(sup, in_chain=ic)` with no `weights=`, so it took the
+`inv_support` default. `scripts/arm2_attack_a3a4.py` imports `load_state` from that
+module, so BOTH ran at `inv_support`:
+
+| run | file | date | weighting |
+|---|---|---|---|
+| A1 at `eta` | `logs/B_eta_sweep/a1_eta.json` | 2026-10-24 16:45 | `inv_support` ⚠ |
+| A3/A4 at `eta` | `logs/B_eta_sweep/a34_eta.json` | 2026-10-25 11:20 | `inv_support` ⚠ |
+| Arm 2 metrics | `logs/B_eta_sweep/genome_uniform.json` | 2026-10-24 20:42 | `uniform` |
+| Arm 1 releases | `logs/B_eta_arm1/release.json` | 2026-10-24 23:47 | `uniform` |
+
+`eta_sweep.py`, `exact_kl_stable.py` and `arm1_release.py` all declare `--weights` with
+default `uniform`. The two attack scripts were the ONLY production callers that passed
+nothing. Standing constraint 5 forbids two utility functions in one comparison.
+
+**THE FINGERPRINT THAT CONFIRMS IT, rather than my reading of the code.** chr21
+`var_q_u` at chromosome scope is **1.3741e-06** at `inv_support` and **1.7500e-06** at
+`uniform` (measured, `logs/B_eta_sweep/chr21_uniform_attackgrid.json` and
+`chr21_refine.json`). `eta*` = 1/sqrt(var) is therefore **853** against **756** — and
+the retired `ETA_GRID` top point was **855**. That grid had been built from
+`inv_support`'s `eta*`, which is independent evidence of the weighting it ran under.
+The mismatch is not cosmetic: one `eta` sits at two different `acc_ceiling`, which is
+exactly what constraint 7 says must never share a column.
+
+**Fix.** A module-level `arm2_attack.WEIGHTS`, set from a new `--weights` on both entry
+points (default `uniform`), threaded into the one `beta_v` call, plus a guard in
+`load_state` that REFUSES a cached state built under a different weighting instead of
+serving it. A3/A4 sets `arm2_attack.WEIGHTS` through the module object, because
+`load_state` reads A1's global and rebinding a local name there would have left the
+attack on the stale default — the same class of mistake one level up.
+
+**Gate — `tests/test_beta_weighting_explicit.py`, 8 tests, MUTATION-TESTED TWICE.**
+Checking the two fixed scripts would be decoration, so the gate is the AST walk: every
+call site in a frozen `PRODUCTION` set must pass `weights=`, and no file outside a
+frozen `LEGACY` census may omit it, so the NEXT script that forgets fails. Injected
+defects and the gates that fired:
+- restored `beta_v(sup, in_chain=ic)` in `arm2_attack.py` ->
+  `test_every_production_beta_v_caller_passes_weights_explicitly` FAILED, naming
+  `('scripts/arm2_attack.py', 119)`. ✅
+- flipped A3/A4's `--weights` default to `inv_support` ->
+  `test_attack_cli_defaults_to_the_released_weighting[arm2_attack_a3a4.py]` FAILED. ✅
+Both restored; 8/8 pass. Functional check beyond the static gate: `load_state()` now
+returns `util.weights == 'uniform'` with a CONSTANT `beta` of one unique value and
+`sum(beta^2)` = 3.007329e-06, which is exactly 1/332,521 = 1/T as uniform requires, and
+the cache guard raises on a weighting change.
+
+**⚠ THE CENSUS, stated rather than quietly fixed.** The walk found **54 omitting call
+sites in 23 files**. Five production scripts are fixed; the other **23 files are frozen
+in `LEGACY`** — `tau`-era scripts slated for removal in the paper-branch cleanup, and
+tests that exercise the default deliberately. The list may shrink, never grow.
+
+**ETA_GRID re-pinned, and the match MEASURED.** The attack grid is now the chr21 `eta`
+that realise the same `acc_ceiling` as the genome-wide release grid
+(0, 250, 500, 1262, 2821, 5642), scaled by
+sqrt(3.3000e-08/1.7500e-06) = **0.13732**:
+
+| `eta` chr21 | 0 | 34.33 | 68.66 | 173.3 | 387.39 | 774.78 |
+|---|---|---|---|---|---|---|
+| `acc_ceiling` chr21, uniform | 0.500000 | 0.522670 | 0.545342 | 0.614453 | 0.755875 | 1.000000 |
+| `acc_ceiling` genome-wide | 0.500000 | 0.522670 | 0.545339 | 0.614434 | 0.755795 | 1.000000 |
+| `kl_exact` chr21 | 0 | 4.1116e-03 | 1.6447e-02 | 1.0480e-01 | 5.2378e-01 | 2.0957e+00 |
+| `kl_exact` genome-wide | 0 | 4.1113e-03 | 1.6445e-02 | 1.0476e-01 | 5.2345e-01 | 2.0936e+00 |
+
+They agree to four significant figures, so the columns are matched on `acc_ceiling` as
+constraint 7 requires, not on `eta_tau`. ⚠ `eta` = 0 is now a column, which the retired
+grid lacked: it is the untilted release and the suite's negative control.
+
+**What this does NOT establish.** The 2026-10-24/25 attack numbers are not "wrong" as
+measurements — they are a faithful attack on an `inv_support` release. They are
+UNPOOLABLE with a `uniform` metric table, which is a different and narrower claim. They
+are withdrawn from the Arm 2 table, not from the record. And the re-run is still an
+attack result, so constraint 4 stands: a null remains a LOWER bound on
+distinguishability, and `acc_ceiling` is the only upper bound.
+
+**⚠ A NAMING COLLISION FOUND IN PASSING, for the cleanup.** `eta_sweep.py --weights`
+calls the 1/support(v) weighting **`production`**, while `arm1_release.py`,
+`exact_kl_stable.py` and the two attack scripts call it **`inv_support`**. Same
+quantity, two names, and `eta_sweep` additionally still offers the DEAD `target_alt`
+and `target_rarity` choices. Recorded for the paper-branch pass Dylan asked for.
+
+---
+
 ## 2026-10-24 (later) — B-EVL-weightings: three `beta_v` weightings at MATCHED privacy, and the hard non-ref cut wins
 
 **Goal.** Decide the tool's utility function. Dylan, 2026-10-24: the contiguous/top-n

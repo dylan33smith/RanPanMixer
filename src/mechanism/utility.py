@@ -65,6 +65,8 @@ class Utility:
     n_scope: int            # positions the normaliser ran over
     n_chain: int            # chain positions in total
     share: float = 1.0      # this chromosome's share of the ONE genome-wide budget
+    weights: str = "inv_support"   # which w_v; see beta_v. "uniform" is the default
+                                   # for the released tool as of 2026-10-24
     chrom: str = ""         # which chromosome, for the genome-level completeness check
 
     @property
@@ -99,7 +101,8 @@ def support_weights(support: np.ndarray) -> np.ndarray:
 
 def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
            readable: np.ndarray | None = None, scope: str = "chain",
-           share: float = 1.0, chrom: str = "") -> Utility:
+           share: float = 1.0, chrom: str = "",
+           weights: str = "inv_support") -> Utility:
     """`beta_v` over the chain positions, summing to `share` across the chosen scope.
 
     ⚠ `share` IS THIS CHROMOSOME'S PORTION OF ONE GENOME-WIDE BUDGET (decision B,
@@ -167,7 +170,36 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
         raise ValueError(
             f"in_chain has {len(in_chain)} entries, support has {len(support)}")
 
-    w = support_weights(support[in_chain])
+    # ⚠⚠ `weights="uniform"` IS THE RELEASED TOOL'S CHOICE AS OF 2026-10-24, AND IT
+    # IS ARGUED FOR RATHER THAN INHERITED. The full argument is in docs/terms.md
+    # under `beta_v`; the four load-bearing parts:
+    #  (1) It gives `u` a one-sentence meaning -- the FRACTION of the target's
+    #      called positions the release reproduces -- which is comparable across
+    #      targets, cohorts and tools. Under 1/support(v), `u` is a weighted
+    #      average whose weights encode OUR cohort's genotyping completeness and
+    #      which nobody can state the meaning of in a sentence.
+    #  (2) 1/support(v) weights a property of OUR DATA, not of the position. It
+    #      directs the budget at the positions where the cohort knows LEAST --
+    #      measured genome-wide: 75,998 positions (0.343% of the chain) with
+    #      support < 40 carry 2.491% of the weight, 7.3x their positional share,
+    #      and a support-1 position carries 85.5x the mean.
+    #  (3) It matches how a release is CONSUMED. A path is read positionally; no
+    #      downstream tool reweights by our call rate.
+    #  (4) It is the NEUTRAL INSTRUMENT for a claim about the mechanism.
+    #      Concentration is the lever that moves the exchange rate (as sqrt(Var)),
+    #      so a non-uniform default would conflate "the tilt does X" with "we
+    #      chose a narrow utility". Uniform is the control; the weighting
+    #      comparison reports the headroom separately.
+    # ⚠ AND IT COSTS SOMETHING, which is the right direction to err: uniform is the
+    # LEAST concentrated weighting, sum(beta^2) 4.5178e-08 against inv_support's
+    # 7.3440e-08, so the headline result is CONSERVATIVE by about sqrt(1.63) = 1.27x.
+    if weights == "uniform":
+        w = np.ones(int(np.asarray(in_chain).sum()), dtype=np.float64)
+    elif weights == "inv_support":
+        w = support_weights(support[in_chain])
+    else:
+        raise ValueError(
+            f"unknown weights {weights!r}; expected 'uniform' or 'inv_support'")
 
     if scope == "chain":
         keep = np.ones(len(w), dtype=bool)
@@ -202,7 +234,8 @@ def beta_v(support: np.ndarray, *, in_chain: np.ndarray | None = None,
         raise AssertionError("negative beta_v")
 
     return Utility(beta=beta, scope=scope, n_scope=int(keep.sum()),
-                   n_chain=int(in_chain.sum()), share=float(share), chrom=str(chrom))
+                   n_chain=int(in_chain.sum()), share=float(share),
+                   chrom=str(chrom), weights=str(weights))
 
 
 def assert_shares_complete(utils: "list[Utility]", *, tol: float = 1e-12) -> float:

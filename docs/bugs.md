@@ -122,6 +122,39 @@ failure family as A3's positive control, which was also algebraically unable to 
 
 ## Our own run discipline
 
+### A keyword default silently selected a different utility function for a whole attack suite
+- **[2026-10-25] `utility.beta_v(sup, in_chain=ic)` with no `weights=`**
+  **[Symptom]** NONE. Nothing raised, nothing warned, the controls passed and the
+  tables printed plausible numbers. `logs/B_eta_sweep/a1_eta.md` and `a34_eta.md`
+  looked like finished results for the released tool and were not.
+  **[Cause]** `utility.beta_v` has `weights: str = "inv_support"`. `arm2_attack.py:99`
+  called it positionally and never passed the keyword, so the whole Arm 2 attack suite
+  ran at `inv_support` while every metric it was to share a table with had been re-run
+  at `uniform` on 2026-10-24. `arm2_attack_a3a4.py` imports `load_state` from that
+  module, so one omission took out BOTH attacks.
+  **[What the wrong output looked like]** Identical in FORM to a correct run. The only
+  visible tell was arithmetic: `ETA_GRID`'s top point was 855, and 1/sqrt(1.3741e-06)
+  = 853 is `inv_support`'s chr21 `eta*` while `uniform`'s is 756. A grid built from the
+  wrong weighting's `eta*` is the fingerprint; the accuracies themselves gave nothing
+  away.
+  **[Why it matters]** chr21 `var_q_u` is 1.3741e-06 against 1.7500e-06, so one `eta`
+  sits at two different `acc_ceiling`. Constraint 5 forbids two utility functions in a
+  comparison and constraint 7 requires matched `acc_ceiling`, so the attack rows and
+  the privacy rows could not have gone in one table.
+  **[Proven fix]** `arm2_attack.WEIGHTS`, set from `--weights` on both entry points
+  (default `uniform`), threaded into the single `beta_v` call; `load_state` now RAISES
+  if its cached state was built under a different weighting rather than serving it.
+  A3/A4 sets the global through the module object (`A1.WEIGHTS = a.weights`) because
+  `load_state` reads A1's global, not its own.
+  **[Gate]** `tests/test_beta_weighting_explicit.py` — an AST walk asserting every
+  PRODUCTION `beta_v` call passes `weights=`, plus a frozen `LEGACY` census so a NEW
+  omitting file fails. Mutation-tested twice (restored the omission; flipped the CLI
+  default) and both named the right test. ⚠ The walk found **54 omitting sites in 23
+  files**; 5 production fixed, 23 legacy frozen.
+  **[Generalisation]** A keyword default is a silent wrong answer whenever two values
+  are both valid and name DIFFERENT quantities. Grep for callers, not for errors.
+
+
 ### An index array read as a boolean mask, so a results table never ran at all
 - **[2026-10-22] `pangenome_mask.npy` is site INDICES, not a boolean**
   **[Symptom]** `scripts/arm1_attacks_results.py` raised `ValueError: operands could

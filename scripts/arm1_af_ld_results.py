@@ -79,7 +79,9 @@ def main(argv=None) -> int:
     ap.add_argument("--root", type=Path, default=ROOT)
     ROOT = ap.parse_args(argv).root
     TAUS = tuple(json.loads((ROOT / "manifest.json").read_text())["taus"])
-    TAU_LBL = [f"{float(t.replace('p', '.')):g}" for t in TAUS]
+    # ⚠ a label may be "eta_250" (the eta namespace) or "0p99" (legacy tau)
+    TAU_LBL = [(f"{float(t[4:].replace('p', '.')):g}" if t.startswith("eta_")
+                else f"{float(t.replace('p', '.')):g}") for t in TAUS]
     af, ld, per_target = ours()
     n = [len(af["all"][t]) for t in TAUS]
     if set(n) != {44}:

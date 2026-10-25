@@ -77,6 +77,7 @@ from mechanism import ffbs, utility  # noqa: E402
 # `pick_decoys` and `concordance` define the cohort, the model, the decoy conditions
 # and the seeding discipline; a second copy would drift and then the two attacks
 # would no longer be running on the same experiment.
+import arm2_attack as A1  # noqa: E402  -- for the WEIGHTS global, which must be SET
 from arm2_attack import (CHROM, DECOY_SEED, ETA_GRID, ETA_SEED_OFFSET,  # noqa: E402
                          EXPLORATORY_TAUS, SEED_GRID, TAUS, load_state,
                          pick_decoys)
@@ -631,6 +632,21 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
     return table
 
 
+def _cap(plan, n):
+    """Lower a worker plan to `n`. ⚠ May only LOWER: the plan's bound is memory or
+    cores, not a preference, so raising it is how a run gets OOM-killed at hour three.
+    See the note beside `arm2_attack`'s --workers."""
+    if not n:
+        return plan
+    if n > plan.workers:
+        raise SystemExit(f"--workers {n} exceeds the planned {plan.workers} "
+                         f"({plan.reason}); that bound is memory or cores")
+    return R.Plan(workers=n, per_job_bytes=plan.per_job_bytes,
+                  headroom_bytes=plan.headroom_bytes,
+                  reason=f"CAPPED by --workers {n} (planned {plan.workers}: "
+                         f"{plan.reason})")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     # ⚠ 25 draws x 10 targets = 250 trials per (tau, condition) per hypothesis,
@@ -640,6 +656,13 @@ def main(argv=None) -> int:
     ap.add_argument("--targets", type=int, default=10)
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--controls-only", action="store_true")
+    ap.add_argument("--workers", type=int, default=0,
+                    help="cap the worker pool (0 = the memory/core plan). May only LOWER\n"
+                         "the plan; use it to share the box with another run.")
+    ap.add_argument("--weights", choices=("uniform", "inv_support"), default="uniform",
+                    help="beta_v weighting; 'uniform' is the released tool's choice as "
+                         "of 2026-10-24. Must match the weighting of every metric it "
+                         "shares a table with (constraint 5).")
     ap.add_argument("--from-json", type=Path, default=None)
     # the `tau` index in the seed is its place in SEED_GRID, NOT in `--taus`, so a
     # subset run draws the same streams as the full grid (see arm2_attack.SEED_GRID)
@@ -651,6 +674,13 @@ def main(argv=None) -> int:
                          "from arm2_attack.ETA_GRID so each cell has a fixed seed "
                          "index disjoint from the tau grid's.")
     a = ap.parse_args(argv)
+
+    # ⚠ BEFORE THE FIRST `load_state()`. `load_state` lives in A1's module, so the
+    # global that it reads is A1's, not this module's -- rebinding a local name here
+    # would leave the attack running at the stale default. See the 2026-10-25 defect
+    # note beside `arm2_attack.WEIGHTS`.
+    A1.WEIGHTS = a.weights
+
     off = [t for t in a.taus if t not in SEED_GRID]
     if off:
         raise SystemExit(f"tau {off} is in neither the pinned grid nor "
@@ -684,7 +714,7 @@ def main(argv=None) -> int:
           f"({ctl['a4']['n_correct']}/{ctl['a4']['n']})", flush=True)
     pw_jobs = [(t, POWER_SEED_BASE + i * 100 + k)
                for i, t in enumerate(tids) for k in range(POWER_SEEDS)]
-    pplan = R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(pw_jobs))
+    pplan = _cap(R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(pw_jobs)), a.workers)
     print(f"\nA3 power curve: {len(pw_jobs)} jobs x 4 untilted releases "
           f"= {4*len(pw_jobs)} releases ({pplan.workers} workers)", flush=True)
     pw = R.run_jobs(_power_trial, pw_jobs, workers=pplan.workers, label="power",
@@ -717,7 +747,7 @@ def main(argv=None) -> int:
                 for i, t in enumerate(tids)
                 for tau in a.taus
                 for k in range(a.draws)]
-    plan = R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(jobs))
+    plan = _cap(R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(jobs)), a.workers)
     print(f"\n{len(jobs):,} trials, each drawing 1 release under Q_p and 3 under "
           f"Q_q (one per condition) = {4*len(jobs):,} releases")
     print(f"{plan}\n", flush=True)

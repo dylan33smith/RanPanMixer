@@ -164,7 +164,10 @@ def main(argv=None) -> int:
     ROOT = a.root
     man = json.loads((a.root / "manifest.json").read_text())
     TAUS = tuple(man["taus"])
-    TAU_LABEL.update({t: f"{float(t.replace('p', '.')):g}" for t in TAUS})
+    # ⚠ "eta_250" vs legacy "0p99": parse by namespace, never blindly
+    TAU_LABEL.update({
+        t: (f"{float(t[4:].replace('p', '.')):g}" if t.startswith("eta_")
+            else f"{float(t.replace('p', '.')):g}") for t in TAUS})
     changed = load_changed(man)
     per = collect(man, changed)
     curve = published_curve()

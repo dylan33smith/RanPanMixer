@@ -68,6 +68,22 @@ EXPERIMENT = "1"
 TAUS = ("0p00", "0p05", "0p10", "0p25", "0p50", "0p90", "0p99")
 
 
+def point_label(label: str) -> tuple:
+    """A `--taus` entry -> (directory name, knob, numeric value).
+
+    ⚠ ACCEPTS THREE FORMS because the release tree now has two namespaces:
+      "0p99"      legacy bare suffix -> tau_0p99, knob "tau",  0.99
+      "tau_0p99"  explicit           -> tau_0p99, knob "tau",  0.99
+      "eta_250"   the eta namespace  -> eta_250,  knob "eta",  250.0
+    The old code hardcoded an "tau_" prefix, so an eta label became `tau_eta_0`
+    and the stage aborted on a missing release -- measured 2026-10-25.
+    """
+    if label.startswith("eta_"):
+        return label, "eta", float(label[4:].replace("p", "."))
+    name = label if label.startswith("tau_") else f"tau_{label}"
+    return name, "tau", float(name[4:].replace("p", "."))
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT)
@@ -111,7 +127,8 @@ def main(argv=None) -> int:
 
     for t in targets:
         for tau in a.taus:
-            src = OURS / t / f"tau_{tau}" / f"chr{CHROM}" / "new_haplotypes.npy"
+            pname, knob, pval = point_label(tau)
+            src = OURS / t / pname / f"chr{CHROM}" / "new_haplotypes.npy"
             if not src.exists():
                 raise SystemExit(f"missing release: {src}")
             arr = np.load(src)
@@ -126,8 +143,8 @@ def main(argv=None) -> int:
             np.save(rd / "new_haplotypes.npy", arr)
             np.save(rd / "xsol.npy", xsol)
             rows.append({"row_id": i, "subject": t, "tau": tau,
-                         "tau_value": float(tau.replace("p", ".").lstrip("0") or 0)
-                         if tau != "0p00" else 0.0})
+                         "knob": knob, "point_value": pval,
+                         "tau_value": pval if knob == "tau" else None})
 
     with (ed / f"data_chr{CHROM}.csv").open("w", newline="") as f:
         w = csv.writer(f)

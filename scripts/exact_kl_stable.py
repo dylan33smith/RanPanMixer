@@ -125,25 +125,64 @@ def extremal(p: np.ndarray) -> np.ndarray:
     return e
 
 
-def one_chrom(chrom: str, share: float | None, targets, taus) -> dict:
+def one_chrom(chrom: str, share: float | None, targets, taus, *,
+              arm: str = "arm2", etas=None, weights: str = "inv_support") -> dict:
+    """One chromosome's exact KL, for ARM 2 (K = 88) or ARM 1 (K = 86, leave-one-out).
+
+    ⚠⚠ ARM 1 IS NOT ARM 2 WITH A FLAG. Its target IS a cohort member, so the
+    guarantee holds ONLY with BOTH of the target's haplotypes out of the donor panel
+    (standing constraint 1), which means a DIFFERENT chain, a different K and a
+    different beta per target -- and `logs/B_loo_chain_survey.md` measured that the
+    untraversable-block set is NOT monotone in the panel, so arm 1's chain can never
+    be built by subsetting arm 2's. Everything is therefore rebuilt per target here.
+    Arm 1's target path is its OWN two haplotype rows; no target VCF exists for it.
+    """
     d = REPO / "data" / "cohort" / chrom
-    ic = np.load(d / "in_chain.npy").astype(bool)
-    hap = np.load(d / "haplotypes.npy")[:, ic]
-    m = hmm.from_arrays(hap, np.load(d / "genetic_pos.npy")[ic],
-                        np.load(d / "positions.npy")[ic], cohort_id=chrom)
-    kw = {} if share is None else {"share": share, "chrom": chrom}
-    beta = utility.beta_v(np.load(d / "support.npy"), in_chain=ic, **kw).beta
+    points = [("eta", float(e)) for e in etas] if etas else [("tau", float(t)) for t in taus]
     out = {}
-    for t in targets:
-        p = np.load(REPO / "data" / "targets" / t / chrom / "path.npy")[ic]
-        q = extremal(p)
-        out[t] = {str(tau): kl_stable(m, hap, beta, p, q, tau) for tau in taus}
-    return {"chrom": chrom, "kl": out, "t_chain": int(ic.sum())}
+    if arm == "arm2":
+        ic = np.load(d / "in_chain.npy").astype(bool)
+        hap = np.load(d / "haplotypes.npy")[:, ic]
+        m = hmm.from_arrays(hap, np.load(d / "genetic_pos.npy")[ic],
+                            np.load(d / "positions.npy")[ic], cohort_id=chrom)
+        kw = {} if share is None else {"share": share, "chrom": chrom}
+        beta = utility.beta_v(np.load(d / "support.npy"), in_chain=ic,
+                              weights=weights, **kw).beta
+        for t in targets:
+            p = np.load(REPO / "data" / "targets" / t / chrom / "path.npy")[ic]
+            q = extremal(p)
+            out[t] = {f"{v:g}": kl_stable(m, hap, beta, p, q,
+                                          **({"eta": v} if k == "eta" else {"tau": v}))
+                      for k, v in points}
+        t_chain = int(ic.sum())
+    else:
+        hap_all = np.asarray(np.load(d / "haplotypes.npy", mmap_mode="r"))
+        ids = np.load(d / "haplotype_ids.npy", allow_pickle=True)
+        idx = loo.sample_index(ids)
+        t_chain = 0
+        for t in targets:
+            lc = loo.loo_chain(d, t, haplotypes=hap_all)
+            ic = lc.in_chain
+            panel = loo.masked_haplotypes(d, t, haplotypes=hap_all)[:, ic]
+            m = hmm.from_arrays(panel, np.load(d / "genetic_pos.npy")[ic],
+                                np.load(d / "positions.npy")[ic],
+                                cohort_id=f"{chrom}_loo_{t}")
+            kw = {} if share is None else {"share": share, "chrom": chrom}
+            beta = utility.beta_v(lc.support, in_chain=ic,
+                                  weights=weights, **kw).beta
+            p = hap_all[list(idx[t])][:, ic].T          # arm 1's target is its own rows
+            q = extremal(p)
+            out[t] = {f"{v:g}": kl_stable(m, panel, beta, p, q,
+                                          **({"eta": v} if k == "eta" else {"tau": v}))
+                      for k, v in points}
+            t_chain = int(ic.sum())
+            del panel, m, beta
+    return {"chrom": chrom, "kl": out, "t_chain": t_chain, "arm": arm}
 
 
-def _one(args):
+def _one(args, kw=None):
     try:
-        return one_chrom(*args)
+        return one_chrom(*args, **(kw or {}))
     except Exception as e:
         return {"chrom": args[0], "error": f"{type(e).__name__}: {e}",
                 "traceback": traceback.format_exc()[-1200:]}
@@ -179,8 +218,17 @@ def validate(taus) -> None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--validate", action="store_true")
-    ap.add_argument("--targets", type=int, default=1)
+    ap.add_argument("--targets", type=int, default=1,
+                    help="how many targets; arm1 draws from the 44 cohort members, "
+                         "arm2 from the external test set")
     ap.add_argument("--taus", type=float, nargs="+", default=list(PINNED_TAUS))
+    ap.add_argument("--etas", type=float, nargs="+", default=None,
+                    help="drive by eta_tau instead of tau (the knob since 2026-10-24)")
+    ap.add_argument("--arm", choices=("arm1", "arm2"), default="arm2",
+                    help="arm1 = K = 86 per-target leave-one-out, target is its own "
+                         "haplotype rows; arm2 = K = 88, external target")
+    ap.add_argument("--weights", choices=("uniform", "inv_support"),
+                    default="uniform")
     ap.add_argument("--workers", type=int, default=22)
     ap.add_argument("--json", type=Path, default=None)
     a = ap.parse_args(argv)
@@ -194,15 +242,35 @@ def main(argv=None) -> int:
     tot = sum(T.values())
     sh = {c: T[c] / tot for c in AUTOSOMES}
     assert abs(sum(sh.values()) - 1.0) < 1e-12
-    tids = sorted(p.name for p in (REPO / "data" / "targets").iterdir()
-                  if p.is_dir() and (p / "chr1" / "path.npy").exists())[: a.targets]
+    if a.arm == "arm1":
+        # ARM 1's targets are the 44 COHORT MEMBERS, not the external test set --
+        # its target IS a cohort member and its path is its own haplotype rows.
+        ids = np.load(REPO / "data" / "cohort" / "chr1" / "haplotype_ids.npy",
+                      allow_pickle=True)
+        tids = sorted(loo.sample_index(ids))[: a.targets]
+    else:
+        tids = sorted(p.name for p in (REPO / "data" / "targets").iterdir()
+                      if p.is_dir() and (p / "chr1" / "path.npy").exists())[: a.targets]
 
-    print(f"GENOME-WIDE `kl_exact`, STABLE ROUTE. ARM 2, K = 88, 22 autosomes, "
-          f"T = {tot:,}, shares summing to 1.000000, n = {len(tids)} target(s), "
-          f"D1_extremal.\n")
+    knob = "eta_tau" if a.etas else "tau"
+    print(f"GENOME-WIDE `kl_exact`, STABLE ROUTE. "
+          f"{'ARM 1, K = 86, per-target leave-one-out' if a.arm == 'arm1' else 'ARM 2, K = 88'}, "
+          f"22 autosomes, T = {tot:,}, n = {len(tids)} target(s), D1_extremal, "
+          f"weights {a.weights}, knob {knob}.")
+    if a.arm == "arm1":
+        print(f"⚠ ARM 1 uses ARM 2's decision-J shares. Arm 1's per-target chain "
+              f"lengths span 22,129,531..22,136,532 against arm 2's {tot:,} "
+              f"(logs/B_loo_chain_survey.md), a 0.03% spread, so the share a "
+              f"chromosome takes differs by that much from its own. kl scales with "
+              f"share^2, so the effect is ~0.06% -- stated rather than engineered "
+              f"away, because a per-target share needs all 22 of THAT target's "
+              f"chain lengths and a per-chromosome worker cannot see them.")
+    print()
     t0, per = time.time(), {}
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(_one, (c, sh[c], tids, a.taus)): c for c in AUTOSOMES}
+        futs = {ex.submit(_one, (c, sh[c], tids, a.taus),
+                          {"arm": a.arm, "etas": a.etas,
+                           "weights": a.weights}): c for c in AUTOSOMES}
         for n, f in enumerate(as_completed(futs), 1):
             r = f.result()
             if "error" in r:

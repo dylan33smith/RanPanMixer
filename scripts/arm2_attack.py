@@ -74,7 +74,25 @@ SEED_GRID = TAUS + EXPLORATORY_TAUS
 # sampler is driven by `eta` directly. Their seed indices are OFFSET past the tau
 # grid so an eta cell can never reuse a tau cell's stream (occurrence four of the
 # common-random-numbers defect was exactly that kind of index collision).
-ETA_GRID = (96.0, 200.0, 400.0, 600.0, 855.0)
+# ⚠⚠ RE-PINNED 2026-10-25 FOR THE `uniform` WEIGHTING. The old grid
+# (96, 200, 400, 600, 855) was derived from `inv_support`'s chr21 `var_q_u` of
+# 1.3741e-06, whose `eta*` = 1/sqrt(var) is 853 -- which is where the 855 came from.
+# The released tool is `uniform`, where chr21 `var_q_u` is 1.7500e-06 and `eta*` is 756,
+# so that grid sat at the WRONG privacy levels for the weighting now being reported.
+#
+# These six are the chr21 `eta` that realise the SAME `acc_ceiling` as the genome-wide
+# release grid (0, 250, 500, 1262, 2821, 5642), scaled by
+# sqrt(var_genome/var_chr21) = sqrt(3.3000e-08/1.7500e-06) = 0.13732, and the match is
+# MEASURED, not assumed -- logs/B_eta_sweep/chr21_uniform_attackgrid.json:
+#     eta       0     34.33    68.66    173.3    387.39   774.78
+#     acc  0.500000 0.522670 0.545342 0.614453 0.755875 1.000000   (chr21, uniform)
+#     acc  0.500000 0.522670 0.545339 0.614434 0.755795 1.000000   (genome-wide)
+#     kl   0.00e+00 4.11e-03 1.64e-02 1.05e-01 5.24e-01 2.10e+00   (agree to 4 s.f.)
+# ⚠ The columns are matched on `acc_ceiling`, which constraint 7 requires, NOT on
+# `eta_tau` -- one `eta` is two different privacy levels at two different scopes.
+# ⚠ The attack release is CHROMOSOME-scope on chr21; the metric table is a genome-wide
+# release. Same privacy level per release, DIFFERENT released objects. Never pool them.
+ETA_GRID = (0.0, 34.33, 68.66, 173.3, 387.39, 774.78)
 ETA_SEED_OFFSET = 1000
 CHROM = "chr21"
 DECOY_SEED = 20261010
@@ -84,10 +102,30 @@ SEED_BASE = 50_000
 
 _STATE: dict = {}
 
+# ⚠⚠ THE RELEASED TOOL'S `beta_v` WEIGHTING. Set from `--weights` BEFORE the first
+# `load_state()`; A3/A4 imports this module and sets it the same way.
+#
+# ⚠⚠ THIS EXISTS BECAUSE OF THE 2026-10-25 DEFECT. These two attack scripts were the
+# ONLY callers of `utility.beta_v` that did not pass `weights=`, so they silently took
+# the dataclass default (`inv_support`) while every metric in the Arm 2 table was
+# computed at `uniform`. That puts the attack rows and the privacy rows of one table on
+# two different utility functions, which standing constraint 5 forbids, and it is not a
+# cosmetic mismatch: chr21 `var_q_u` is 1.3741e-06 at `inv_support` against 1.7500e-06
+# at `uniform`, so `eta*` = 1/sqrt(var) is 853 against 756 and ONE `eta` sits at two
+# different `acc_ceiling`. Constraint 7 is explicit that weightings are compared at
+# matched `acc_ceiling`, never at matched `eta_tau`.
+WEIGHTS = "uniform"
+
 
 def load_state(chrom: str = CHROM) -> dict:
     """Cohort arrays, the model, and every prepared target's path, once."""
     if _STATE:
+        # ⚠ A cached state built under a DIFFERENT weighting is the silent-wrong-answer
+        # path this guard exists to close: fail instead of serving it.
+        if _STATE["util"].weights != WEIGHTS:
+            raise RuntimeError(
+                f"load_state() cached a {_STATE['util'].weights!r} utility but WEIGHTS "
+                f"is now {WEIGHTS!r}. Set --weights before the first load_state().")
         return _STATE
     d = REPO / "data" / "cohort" / chrom
     hap = np.load(d / "haplotypes.npy")
@@ -96,7 +134,7 @@ def load_state(chrom: str = CHROM) -> dict:
     gp = np.load(d / "genetic_pos.npy")
     pos = np.load(d / "positions.npy")
     m = hmm.from_arrays(hap[:, ic], gp[ic], pos[ic], cohort_id=chrom)
-    util = utility.beta_v(sup, in_chain=ic)       # scope 'chain', share 1 on one chrom
+    util = utility.beta_v(sup, in_chain=ic, weights=WEIGHTS)  # scope 'chain', share 1
 
     paths = {}
     for t in sorted((REPO / "data" / "targets").iterdir()):
@@ -491,6 +529,13 @@ def main(argv=None) -> int:
                          "VACUOUS at these points and is reported as such; the "
                          "meaningful bound is the exact acc_ceiling. Must come from "
                          "ETA_GRID so every cell has a fixed, disjoint seed index.")
+    ap.add_argument("--workers", type=int, default=0,
+                    help="cap the worker pool (0 = the memory/core plan). May only "
+                         "LOWER the plan; use it to share the box with another run.")
+    ap.add_argument("--weights", choices=("uniform", "inv_support"), default="uniform",
+                    help="beta_v weighting; 'uniform' is the released tool's choice as "
+                         "of 2026-10-24. Must match the weighting of every metric it "
+                         "shares a table with (constraint 5).")
     ap.add_argument("--one-sided", action="store_true",
                     help="draw only from Q_p and report the one-sided rate "
                          "P_p(Lambda>0). ⚠ That quantity is NOT bounded by "
@@ -498,6 +543,10 @@ def main(argv=None) -> int:
                          "bound and cannot support a privacy claim. It costs a "
                          "quarter of the compute and is a tilt diagnostic only.")
     a = ap.parse_args(argv)
+
+    # ⚠ BEFORE THE FIRST `load_state()`, which caches the utility.
+    global WEIGHTS
+    WEIGHTS = a.weights
 
     # ⚠ FIRST, BEFORE ANYTHING IS COMPUTED.
     rev = store.git_rev(REPO)
@@ -584,6 +633,19 @@ def main(argv=None) -> int:
 
     plan = R.plan_workers(R.array_bytes(st["model"].T, st["model"].K, n_arrays=4),
                           n_jobs=len(jobs))
+    # ⚠ `plan_workers` sizes against an IDLE machine -- it reads free RAM and total
+    # cores and knows nothing about other runs. `--workers` caps it so this can share a
+    # box with a long Arm 1 chain instead of oversubscribing it. It may only LOWER the
+    # plan: raising it past the memory bound is how a run gets OOM-killed at hour three.
+    if a.workers:
+        if a.workers > plan.workers:
+            raise SystemExit(
+                f"--workers {a.workers} exceeds the planned {plan.workers} "
+                f"({plan.reason}); that bound is memory or cores, not a preference")
+        plan = R.Plan(workers=a.workers, per_job_bytes=plan.per_job_bytes,
+                      headroom_bytes=plan.headroom_bytes,
+                      reason=f"CAPPED by --workers {a.workers} (planned "
+                             f"{plan.workers}: {plan.reason})")
     # ⚠ the balanced design draws from BOTH hypotheses: one Q_p release shared across
     # the three conditions, plus one Q_q release PER condition. So 4 releases a trial,
     # not 1, and the cost the pre-registration quotes must say which design it is for.

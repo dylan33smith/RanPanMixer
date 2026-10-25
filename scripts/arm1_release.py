@@ -150,7 +150,8 @@ def _inputs() -> dict[str, str]:
     return d
 
 
-def run_target(target: str, taus, root: str | None, eta_mode: bool = False) -> dict:
+def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
+               weights: str = "uniform") -> dict:
     """All seven `tau` for one held-out individual. Chromosome-outer, so each
     chromosome's arrays and its `baseline_log_norm` are computed ONCE and reused
     across the grid -- `baseline_log_norm` is target-independent but the HMM is not,
@@ -191,7 +192,8 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False) -> d
         m = hmm.from_arrays(panel, np.load(d / "genetic_pos.npy")[ic],
                             np.load(d / "positions.npy")[ic],
                             cohort_id=f"{c}_loo_{target}")
-        util = utility.beta_v(lc.support, in_chain=ic, share=shares[c], chrom=c)
+        util = utility.beta_v(lc.support, in_chain=ic, share=shares[c], chrom=c,
+                              weights=weights)
         base = ffbs.baseline_log_norm(m)
         # ⚠ `u_ceiling` is `tau`-INDEPENDENT, so it is accumulated once per chromosome.
         # Adding it inside the `tau` loop would multiply it by len(taus) and still print
@@ -247,9 +249,9 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False) -> d
 
 
 def _one(args):
-    target, taus, root, eta_mode = args
+    target, taus, root, eta_mode, weights = args
     try:
-        return run_target(target, taus, root, eta_mode)
+        return run_target(target, taus, root, eta_mode, weights)
     except Exception as e:                      # a worker must report, never vanish
         return {"target": target, "error": f"{type(e).__name__}: {e}",
                 "traceback": traceback.format_exc()[-1500:]}
@@ -259,6 +261,14 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--targets", nargs="+", default=None)
     ap.add_argument("--taus", type=float, nargs="+", default=list(PINNED_TAUS))
+    ap.add_argument("--weights", choices=("uniform", "inv_support"),
+                    default="uniform",
+                    help="UNIFORM is the released tool's weighting as of "
+                         "2026-10-24 and is argued for in docs/terms.md under "
+                         "beta_v; inv_support is retained as the comparison. ⚠ The "
+                         "two are DIFFERENT utility functions -- the utility_id "
+                         "distinguishes them, but the eta_<v>/ directory does NOT, "
+                         "so never release both at one eta into one tree.")
     ap.add_argument("--etas", type=float, nargs="+", default=None,
                     help="drive the tilt by `eta_tau` directly (the knob since "
                          "2026-10-24) and file the releases under eta_<v>/ rather "
@@ -296,6 +306,8 @@ def main(argv=None) -> int:
         raise SystemExit(f"not cohort members: {unknown}")
 
     n_cells = len(targets) * len(a.taus)
+    print(f"weighting: {a.weights}"
+          f"{' (the released default, argued in docs/terms.md)' if a.weights == 'uniform' else ' (the COMPARISON weighting)'}")
     print(f"ARM 1 releases. {len(targets)} held-out individuals x {len(a.taus)} `tau` "
           f"= {n_cells} genome-wide releases, K = 86, diploid, 22 autosomes.")
     print(f"{a.workers} workers, one held-out individual each; chromosome-outer so each "
@@ -306,7 +318,8 @@ def main(argv=None) -> int:
     t0 = time.time()
     out = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(_one, (t, a.taus, a.root, eta_mode)): t for t in targets}
+        futs = {ex.submit(_one, (t, a.taus, a.root, eta_mode, a.weights)): t
+                for t in targets}
         for n, f in enumerate(as_completed(futs), 1):
             r = f.result()
             out.append(r)

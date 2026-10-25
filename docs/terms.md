@@ -410,7 +410,81 @@ Aliases:              "local agreement". ⚠ RENAMED from `phi_t` 2026-09-29. Th
 ```
 Is:                   Non-negative per-position weights with sum_v beta_v = 1. They
                       decide which parts of the path the mechanism tries to preserve.
-                      Under model C: beta_v = w_v / sum_u w_u with w_v = 1/support(v).
+                      Under model C: beta_v = w_v / sum_u w_u.
+                      ✅✅ **w_v = 1 (UNIFORM) IS THE RELEASED TOOL'S WEIGHTING AS OF
+                      2026-10-24, AND IT IS ARGUED FOR, NOT INHERITED.** The previous
+                      default, w_v = 1/support(v), came from PanMixer where it was a
+                      COST weight doing an unrelated job, and this entry recorded it
+                      as "INHERITED rather than argued". Six reasons for uniform, the
+                      first four positive and the last two the costs:
+                      (1) **`u` GETS A ONE-SENTENCE MEANING.** With uniform weights
+                          u is the FRACTION of the target's called positions that the
+                          release reproduces — directly interpretable, and comparable
+                          across targets, cohorts and tools. Under 1/support(v) u is
+                          a weighted average whose weights encode OUR cohort's
+                          genotyping completeness, and nobody can state in a sentence
+                          what it measures.
+                      (2) **1/support(v) WEIGHTS A PROPERTY OF OUR DATA, NOT OF THE
+                          POSITION.** support(v) counts how many of the 88 cohort
+                          haplotypes have a CALLED allele at v, so upweighting it
+                          directs the privacy budget at the positions where the cohort
+                          knows LEAST — where the release is least trustworthy and a
+                          downstream user has least reason to care. MEASURED
+                          genome-wide: 75,998 positions (0.343% of the chain) with
+                          support < 40 carry **2.491%** of the weight, 7.3x their
+                          positional share, and a support-1 position carries **85.5x**
+                          the mean. 94.18% of positions sit at support == 88 exactly,
+                          so the two weightings agree almost everywhere and differ
+                          precisely on the worst-genotyped tail.
+                      (3) **IT MATCHES HOW A RELEASE IS CONSUMED.** A released path is
+                          read POSITIONALLY, base by base; no downstream tool reweights
+                          by our cohort's call rate. Uniform is the weighting that
+                          matches the consumption model.
+                      (4) **IT IS THE NEUTRAL INSTRUMENT FOR A CLAIM ABOUT THE
+                          MECHANISM.** Concentration is the lever that moves the
+                          privacy/utility exchange rate (it goes as sqrt(var_q_u)), so
+                          any non-uniform default would conflate "the tilt achieves X"
+                          with "we chose a narrow utility". Uniform is the CONTROL
+                          condition; the weighting comparison reports the available
+                          headroom separately instead of smuggling it into the
+                          headline.
+                      (5) ✅ **IT COSTS NOTHING — MEASURED, after a prediction of
+                          mine failed in DIRECTION.**
+                          [INCORRECT] - Uniform is the LEAST concentrated weighting:
+                          sum(beta_v^2) is 4.5178e-08 against inv_support's
+                          7.3440e-08, a ratio of 1.626, so the headline result is
+                          CONSERVATIVE by about sqrt(1.626) = 1.27x.
+                          [CORRECTION - 2026-10-25]: measured genome-wide,
+                          `var_q_u` is **3.3000e-08 under uniform against 3.1531e-08
+                          under inv_support** — uniform is 1.047x HIGHER, so its
+                          exchange rate is 1.023x BETTER, not 1.27x worse. The
+                          prediction used sum(beta_v^2), which is only the DIAGONAL
+                          term, and this project has already measured that **94.8% of
+                          Var_R(u) is between-position COVARIANCE** from the mosaic's
+                          segment structure — so concentrating weight does not raise
+                          Var the way the diagonal implies. ⚠ `docs/memory.md`
+                          2026-09-30 records this same error ("sum beta_v^2 was the
+                          wrong statistic") and it was repeated here. **Never predict
+                          var_q_u from sum(beta_v^2); measure it.** The practical
+                          consequence is that uniform has no utility cost at all and
+                          reason (4) stands alone and unqualified.
+                      (6) ⚠ **IT IS NOT A CLAIM THAT POSITIONS ARE EQUALLY
+                          INFORMATIVE.** They are not. Uniform asserts NO preference,
+                          which is the honest default once the two principled
+                          alternatives have been tested and rejected as defaults:
+                          target_alt is a different (and target-dependent) utility
+                          function, and target_rarity loses on its own metric. If a
+                          defensible claim about relative importance is ever made, it
+                          belongs in a declared weighting, not in the default.
+                      ⚠ The weighting is part of `utility_id`
+                      (`indicator/w=uniform/beta=chain`), so a uniform release can
+                      never be confused in provenance with an inv_support one —
+                      that string was HARDCODED to inv_support until 2026-10-24.
+                      ⚠⚠ But the release DIRECTORY (`eta_<v>/`) does NOT carry the
+                      weighting, and `releases.existing_seeds` globs the directory to
+                      decide what to skip on a resume — so two weightings released at
+                      one eta into one tree would make a resumed run silently skip
+                      cells. Never do it; see the PARTIAL_arm1_eta_inv_support README.
                       ⚠⚠⚠ **THE TOOL'S WEIGHTING IS NOW `target_alt` (Dylan,
                       2026-10-24)**: uniform over the positions where THAT haplotype
                       carries a NON-REF allele, normalised by the genome-wide count
