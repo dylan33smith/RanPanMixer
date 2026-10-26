@@ -235,6 +235,57 @@ ledger row at `docs/plan.md:1273`, in this file's own 2026-10-15 entry (around :
 Those are not being rewritten — they are accurate records of a tau-grid run — but each
 now carries a pointer here so none of them can be quoted as a current result.
 
+### ✅ FOLLOW-UP THE SAME EVENING [2026-10-25 20:48] — THE `eta`-REGIME MEASUREMENT LANDED, AND BOTH WITHDRAWN CONCLUSIONS SURVIVE
+
+Step 5 of 8 completed: `af_loss` and `ld_loss` ran on all 264 uniform `eta` releases,
+264 launched / 264 ok / 0 failed, tabled by `scripts/arm1_af_ld_results.py` against the
+`eta` mirror. So the two statements above that this was "UNKNOWN and unmeasured" and
+that the direction question was "OPEN at `eta`" are now ANSWERED — not wrong when
+written, but superseded by measurement rather than by argument.
+
+**OUR `af_loss` [all] ACROSS THE FULL `eta` GRID (0, 250, 500, 1262, 2821, 5642):**
+
+| 0 | 250 | 500 | 1262 | 2821 | 5642 |
+|---|---|---|---|---|---|
+| 0.003685 | 0.003680 | 0.003665 | 0.003677 | 0.003682 | 0.003673 |
+
+Range **0.003665..0.003685**, a span of **2.0e-05 = 0.54%**, while `acc_ceiling` goes
+0.500000 -> 1.000000. ⚠⚠ **THE LIVE KNOB DOES NOT MOVE `af_loss` EITHER.** The flatness
+was never a `tau` artefact.
+
+**BOTH WITHDRAWN CONCLUSIONS ARE REINSTATED, NOW PROPERLY SOURCED:**
+1. **They still beat us at every capacity.** Theirs 0.000220..0.002734; their WORST
+   (0.002734) is below our BEST (0.003665). Still close to their own optimiser's
+   objective (`utility_loss_panmixer`), so it still scores them on what they minimise.
+2. **The direction check still fails at `eta`.** 28/44 down, 16/44 up, median
+   **-1.327e-05**, `eta` 0 -> 5642. The script's own criterion (`min(down, up) >
+   n // 4`) reports NO systematic direction, and a binomial check puts 28/44 at
+   z = 1.81, p ~ 0.07 — not significant. ⚠ So this is a REAL property of `af_loss`
+   under our mechanism, not an artefact of an inert knob as the withdrawal supposed.
+
+**⚠ AND THE TWO FACTS ARE CONSISTENT, WHICH IS THE POINT.** Our knob moves
+`e_match_nonref` by **+3,041 non-ref alleles of 2,357,272 = 0.13%** of the recoverable
+gap (`logs/B_eta_sweep/genome_uniform.md`). `af_loss` is a mean |delta AF| over the
+whole cohort axis and is far too coarse to resolve a 0.13% change in recovered alleles.
+Flat `af_loss` and a moving `e_match_nonref` are a RESOLUTION limit, not a
+contradiction — and saying so is better than quoting either number alone.
+
+**`ld_loss` per pair, where we DO win:** ours 0.005352, 0.005387, 0.005495, 0.005703,
+0.005331, 0.005455 (range 0.005331..0.005703, also flat and noisy) against theirs
+0.0380..0.0401 from `capacity` 0.05 up — roughly **7x better**. ⚠ But at `capacity`
+0.01 theirs is **0.000042**, about **130x better than us**.
+
+⚠ UNCHANGED CAVEATS: chr21 only; EXPLORATORY under decision H, so promotion needs a new
+dated pre-registration; not same-build; their `ld_loss` window is 5 POSITION UNITS, not
+5 kb, and we run it as shipped. ⚠ Table emitted to
+`logs/B_eta_arm1/af_ld_ETA_PREVIEW.md` ahead of the chain's own step 7, which will write
+`af_ld.md` from the identical 264/264 inputs; verify the two agree and drop the preview.
+
+**⚠ WHAT IS STILL MISSING, so this is not read as the biological-utility question
+closed:** read mapping on a released graph (`B-EVL-readmap-release`) has not run and is
+still blocked on the npy -> VCF step, and `wd_af` (their published scale, = 2 x
+`af_loss`) is still not emitted by our tabler.
+
 **Docketed** as `B-EVL-bio-utility`, `B-EVL-readmap-release` and
 `B-EVL-utility-correlation` in `docs/plan.md`'s Backlog. Not scheduled; Dylan asked for
 the docket entry, not the work.

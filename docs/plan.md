@@ -1917,11 +1917,27 @@ carried into the paper from the 2026-10-15 ledger row at `docs/plan.md:1273`,
    never a property of `af_loss`. The check has to be re-run `eta` = 0 -> 5642, where
    the knob actually moves, before anything is concluded.
 
-**✅ THE ETA-REGIME MEASUREMENT IS ALREADY QUEUED AND NEEDS NO NEW WORK.** It is
-**step 5 of 8** of the Arm 1 downstream chain on the 264 uniform `eta` releases
-(`af_loss` then `ld_loss`, `scripts/arm1_af_ld_run.sh`), behind the three
-linkage/MIA evaluators at step 4. Until it lands, the honest statement is that this
-project has no biological utility number at the current knob and weighting.
+**✅✅ THE ETA-REGIME MEASUREMENT LANDED 2026-10-25 20:48, AND IT REINSTATES BOTH
+WITHDRAWN CONCLUSIONS.** `af_loss` and `ld_loss` ran on all 264 uniform `eta` releases
+(264 launched / 264 ok / 0 failed, step 5 of 8). Our `af_loss` [all] reads
+0.003685, 0.003680, 0.003665, 0.003677, 0.003682, 0.003673 across `eta` 0 -> 5642 — a
+span of **2.0e-05, 0.54%**, while `acc_ceiling` goes 0.500000 -> 1.000000.
+⚠⚠ **THE LIVE KNOB DOES NOT MOVE `af_loss` EITHER**, so the flatness was never a `tau`
+artefact and the withdrawal above was right about the PROVENANCE and wrong to imply the
+conclusion might change:
+- **They still beat us at every capacity.** Theirs 0.000220..0.002734; their worst
+  (0.002734) is below our best (0.003665).
+- **The direction check still fails at `eta`:** 28/44 down, 16/44 up, median
+  -1.327e-05; the script's own criterion reports no systematic direction and a binomial
+  check gives z = 1.81, p ~ 0.07.
+- **`ld_loss`: we win from `capacity` 0.05 up** (ours 0.005331..0.005703 against theirs
+  0.0380..0.0401, ~7x) but theirs is **~130x better at `capacity` 0.01** (0.000042).
+⚠ **AND THE TWO FACTS ARE CONSISTENT:** our knob moves `e_match_nonref` by +3,041
+non-ref alleles of 2,357,272 = **0.13%** of the recoverable gap, and `af_loss` is a mean
+|delta AF| over the whole cohort axis — far too coarse to resolve that. Flat `af_loss`
+beside a moving `e_match_nonref` is a RESOLUTION limit, not a contradiction. Report it
+that way; quoting either number alone misleads. Full record: `docs/memory.md`
+2026-10-25 (later still), follow-up block.
 
 **⚠ AND THE STATUS WILL STILL BE THE PROBLEM AFTER IT LANDS.** Decision H (2026-10-08,
 `docs/plan.md:478`) declared `af_loss` and `ld_loss` NOT adopted, and the 2026-10-15
