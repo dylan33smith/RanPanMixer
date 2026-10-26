@@ -2595,6 +2595,53 @@ Aliases:              "U_AF". ⚠⚠ AND "AF Wasserstein" / "Wasserstein diverge
                       Never put the two side by side without the factor.
 ```
 
+### giraffe_mapping_rates  [utility] [evaluation] [external]
+```
+Is:                   THE UMBRELLA NAME for the three read-mapping fractions PanMixer's
+                      Fig 5A reports, which we now quote because we run their pipeline
+                      on our releases. Their names and DEFINITIONS, verbatim from
+                      external/PanMixer/plot_util/plot_helpers.py:15-19, each a
+                      fraction of `total_aligned`:
+                        * `perfect` = total_perfect / total_aligned
+                        * `gapless` = total_gapless_softclips_allowed / total_aligned
+                        * `mapq60`  = mapping_quality_max_60_reads / total_aligned
+                      ⚠⚠ THE DENOMINATOR IS ALIGNED READS, NOT SUBMITTED READS. A
+                      mapping RATE proper (aligned / submitted) is reported by NEITHER
+                      tool: `total_alignments` is parsed and never used as a
+                      denominator. Calling these "mapping rates" without saying so
+                      redefines the quantity.
+                      ⚠ UTILITY, not privacy. It asks whether a graph carrying an
+                      obfuscated member is still a usable alignment reference for an
+                      unrelated donor -- a DO-NO-HARM check, not a differentiator:
+                      PanMixer's own obfuscation moves these by 0.01 points.
+Computed by:          THEIR pipeline, ours only as orchestration:
+                      external/PanMixer/downloaded_tools/vg (`autoindex --workflow
+                      giraffe`, `giraffe`, `stats -a`), the npy -> VCF step by
+                      external/PanMixer/tools/common/npy_2_vcf.py unmodified; driven by
+                      the orchestration in `logs/B_readmap_eta/run.log` and tabled by
+                      `scripts/readmap_results.py`.
+CHANGES MEANING WITH: the vg VERSION, and this is not a small effect. Ours is 1.68.0,
+                      theirs 1.36; our unobfuscated baseline sits +1.2 to +2.2 points
+                      above their published one and the reference-build hypothesis for
+                      that was TESTED AND REFUTED (docs/memory.md 2026-09-18,
+                      correction 6). So ABSOLUTE levels are not comparable across the
+                      two tools and only the DELTA against each tool's OWN baseline is.
+                      Also with the donor set: ours is the paper's five, their
+                      constants.py:42 substitutes HG01600 for NA18853, and NA18853
+                      (AFR) is the lowest donor on every metric.
+                      Also with how many members are obfuscated: ours substitutes ONE
+                      target into a 44-member graph, as their Fig 5A does.
+Valid vs:             the same tool's own baseline, built through the SAME code path.
+                      ⚠ Not against the other tool's absolute level.
+Status:               REPORTED as the biological-utility counterpart to their Fig 5A.
+                      ⚠ EXPLORATORY in the same sense as `af_loss`/`ld_loss`: decision
+                      H declined both of those, and this axis was likewise not
+                      pre-registered.
+Aliases:              "read mapping rates" in prose IF the aligned-read denominator is
+                      stated. ⚠ NEVER just "mapping rate", which means aligned over
+                      submitted and is a different number nobody reports.
+```
+
 ### donor_coherence  [utility] [evaluation]
 ```
 Is:                   The mean, over random windows of W consecutive positions, of the

@@ -104,6 +104,89 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-26 — B-EVL-readmap-release: the release does NO HARM to the graph's day job, at the same order as PanMixer
+
+**Goal.** Close the one genuine gap in the biological-utility set: read mapping on a
+RELEASED graph. Dylan, 2026-10-26: run the full construction across the `eta_tau` grid.
+
+**Why it had never run.** All four of their `utility_out` tools read
+`new_haplotypes.vcf.gz`; we only ever wrote `.npy`, and the npy -> VCF step had never
+been run on our output. That was the whole blocker — the vg binary, the donor FASTQs
+and the references had been on disk since September.
+
+**⚠⚠ THE CONVERSION IS NOT A DROP-IN, AND THE SHAPE IS WHY.** Their
+`external/PanMixer/tools/common/npy_2_vcf.py` expects `(num_samples, num_variants, 2)` and replaces EVERY
+genotype column. Our `new_haplotypes.npy` is `(340824, 2)` — ONE target's two
+haplotypes. So each graph needs the full `(44, T, 2)` cohort array assembled with only
+the target's row swapped for our release. ✅ Verified before use: the VCF's sample order
+matches `pangenome_subjects.npy` exactly (44, same order), so genotypes cannot land on
+the wrong sample; and the converter already writes `./.` for our `-1`.
+
+**Method.** SEVEN graphs through ONE code path — an unobfuscated baseline plus HG00438's
+release at each of the six `eta_tau` — each: assemble the cohort array, their converter
+unmodified, the same bcftools chain as `scripts/run_vg_baseline.sh`,
+`vg autoindex --workflow giraffe`, then `vg giraffe` + `vg stats -a` for five external
+donors. 35 of 35 stats files, completeness asserted. ~7 min per graph, 48 min total.
+
+**⚠ WHY THE BASELINE WAS RE-RUN RATHER THAN REUSED, and it mattered more than expected.**
+Building through the converter yields **280,989** graph records where the September run
+building straight from `pangenome.vcf.gz` got **287,147** — the round trip is slightly
+lossy. Reusing September's baseline would have put a ~6,000-record confound inside every
+delta. Sanity check that the pipeline itself reproduces: HG00138 aligned **11,269,377**
+reads here against **11,268,778** in September, a difference of 599.
+
+**RESULT — FLAT. The worst degradation anywhere on the grid is -0.063 points.**
+
+| metric | baseline | `eta_tau` 0 | 250 | 500 | 1262 | 2821 | 5642 |
+|---|---|---|---|---|---|---|---|
+| `perfect` % | 76.451 | 76.452 | 76.453 | 76.456 | 76.448 | 76.453 | 76.455 |
+| `gapless` % | 95.947 | 95.953 | 95.952 | 95.954 | 95.950 | 95.950 | 95.953 |
+| `mapq60` % | 79.191 | 79.192 | 79.190 | 79.128 | 79.189 | 79.191 | 79.190 |
+
+Deltas against our own baseline: `perfect` -0.003..+0.004, `gapless` +0.003..+0.007,
+`mapq60` -0.063..+0.000. **PanMixer's own delta is -0.01 points**, so we are the same
+order of magnitude. ✅ This is the FIRST positive biological-utility result in the
+project.
+
+**⚠ AND IT IS NOT A NULL EDIT, which is what makes the flatness worth anything.** The
+substituted row differs from the original in **137,359 to 139,327 of 681,648 cells**
+(~20%) at every `eta_tau`. The graph really is being perturbed; alignment simply does
+not care.
+
+**⚠ THE ONE MOVEMENT ABOVE NOISE IS GRAPH-LEVEL, NOT DONOR-LEVEL.** At `eta_tau` = 500
+ALL FIVE donors drop together (-0.038 to -0.063 pts each: 81.241->81.182,
+78.291->78.248, 79.191->79.128, 81.009->80.953, 77.826->77.788), so that graph does
+align slightly worse for everyone — not one noisy donor. ⚠ But it is NOT monotone
+(1262, 2821, 5642 return to -0.001/-0.002), so it is draw-to-draw variation in WHICH
+variants the released row carries, not an effect of the knob. With **n = 1 graph per
+column** that spread cannot be separated from sampling, and quoting -0.063 as the
+knob's cost would overstate it. More releases per point is the fix if the number is
+ever load-bearing.
+
+**What this does NOT establish.** Only the FULL-graph construction ran; their Fig 5A
+also reports an AF >= 0.1 FILTERED graph and a per-donor PERSONALIZED graph
+(`vg gbwt -Z -r`, `vg haplotypes -H`, `kmc -k29`) — neither was run, and they are
+declined for now rather than attempted. ⚠ ONE target substituted into 44, as their
+figure does, so this is the cost of obfuscating ONE member and must not be read as the
+cost of obfuscating all. ⚠ Absolute levels are NOT comparable to their published
+77.83/95.62/77.01: ours is vg 1.68 against their 1.36, and that offset was measured in
+September and survives the refutation of the build hypothesis. Only the deltas compare.
+⚠ Not pre-registered, so EXPLORATORY in the same sense decision H made `af_loss` and
+`ld_loss` exploratory.
+
+**⚠ A DONOR CORRECTION I OWE THE RECORD.** On 2026-10-25 I proposed that our donor set
+(NA18853 where their `constants.py:42` runs HG01600) explained the September baseline
+offset, and I had the DIRECTION WRONG. This file's own 2026-09-18 entry records that
+NA18853 (AFR) is the LOWEST donor on every metric, so substituting it IN depresses our
+aggregate — yet ours sits ABOVE theirs. Matching their code would move us further from
+their figures, not closer. The donor swap was therefore NOT run, and the likeliest
+remaining cause of the offset is the vg version. ⚠ Also: the choice was never ours to
+answer for — `scripts/get_read_data.sh:26` documents that the paper's METHODS name
+NA18853 and their shipped code substitutes HG01600, so it is THEIR code that disagrees
+with THEIR paper, and we followed the paper deliberately.
+
+---
+
 ## 2026-10-25 (later still) — B-EVL-bio-utility SURVEY: two of the three "missing" biological metrics we already have, and one does not exist
 
 **Goal.** Dylan, 2026-10-25: "do we have any downstream biological utility measurement
