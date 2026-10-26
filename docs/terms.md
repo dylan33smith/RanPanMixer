@@ -2589,10 +2589,22 @@ Aliases:              "U_AF". ⚠⚠ AND "AF Wasserstein" / "Wasserstein diverge
                       For a bi-allelic site this is exact rather than loose naming —
                       W1 between two Bernoulli(p), Bernoulli(q) is |p-q|, and the L1
                       distance between the two-category vectors is 2|p-q|.
-                      ⚠ SO OUR COLUMN IS OFF THEIR PUBLISHED SCALE BY 2x UNTIL
-                      RESCALED: `scripts/arm1_af_ld_results.py` prints raw `af_loss`,
-                      while their figures report `wd_af` (0.006 / 0.006 / 0.005).
-                      Never put the two side by side without the factor.
+                      ✅ [2026-10-26] WE NOW EMIT `wd_af` TOO.
+                      `scripts/arm1_af_ld_results.py` prints the whole `wd_af`
+                      family beside the raw `af_loss` rows, mapped stratum for
+                      stratum off their gather_results.py and gated by
+                      `tests/test_wd_af_rescale.py`. ⚠ It is a RESCALE, not a
+                      second measurement: it adds no information to `af_loss`
+                      and inherits all of its caveats.
+                      ⚠⚠ TWO DIFFERENT AF COMPARISONS EXIST AND THEY DISAGREE.
+                      Against their STAGED capacity sweep (exp_6, same
+                      evaluator) their worst beats our best ~1.34x -- that is
+                      the matched comparison for the head-to-head. Against
+                      their PUBLISHED eps_private point it is mixed: 1.23x on
+                      all alleles, 1.11x on SNPs only, and 0.88x on the
+                      [0.01, 0.05) MAF bin, where WE distort less. The second
+                      is cross-build and cross-operating-point, so it is a
+                      SCALE REFERENCE only. Always say which one is quoted.
 ```
 
 ### giraffe_mapping_rates  [utility] [evaluation] [external]

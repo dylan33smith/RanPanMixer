@@ -104,6 +104,85 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-26 (later) — B-EVL-wdaf: our AF column put on PanMixer's published scale, and on the rare-variant panel we WIN
+
+**Goal.** Close the last named item on the biological-utility docket: emit `wd_af`, the
+number PanMixer's figures actually report, so our column is directly readable against
+their published values instead of being off by a factor of two.
+
+**Method.** `wd_af = 2 x af_loss`, per stratum, straight off
+`external/PanMixer/tools/common/gather_results.py:84-90`. Their Fig 4A plots three AF
+panels (`wd_af`, `wd_af_snp_only`, `wd_af_snps_0_05`) plus `ld_loss`
+(`plot_util/utility_in.py:49`). Emitted by `scripts/arm1_af_ld_results.py` beside the
+raw `af_loss` rows so nothing is replaced.
+
+**RESULT — ON THEIR PUBLISHED SCALE, AND IT IS MIXED RATHER THAN A LOSS.** Our worst
+column (the least flattering reading of our own sweep) against their published
+`eps_private` point:
+
+| their Fig 4A panel | ours, worst column | theirs published | ratio |
+|---|---|---|---|
+| AF (all alleles) | 0.007370 | 0.006 | **1.23x** |
+| AF (SNPs only) | 0.006681 | 0.006 | **1.11x** |
+| AF (MAF in [0.01, 0.05)) | 0.004387 | 0.005 | **0.88x — WE DISTORT LESS** |
+
+✅ So "they beat us on AF" is not the whole picture. On the rare-variant panel we are
+**12% better than their published value**, and on SNPs-only we are within 11%.
+
+**⚠⚠ BUT THERE ARE TWO DIFFERENT AF COMPARISONS AND THEY GIVE DIFFERENT ANSWERS. Say
+which one is being quoted, every time.**
+1. **Against their STAGED capacity sweep** (`exp_6`, their releases, our mirror, the
+   same evaluator run unmodified): their `wd_af` spans 0.00044..0.005468 and our best
+   is 0.007329, so **their worst still beats our best, ~1.34x**. This is the
+   matched-evaluator comparison and it is the one that belongs in the head-to-head.
+2. **Against their PUBLISHED `eps_private` point** (the table above): mixed, and we win
+   the rare-variant panel. This is a SCALE REFERENCE — it is what a reader of their
+   paper has in mind — and it is **cross-build and cross-operating-point**, so it is
+   not a matched comparison.
+
+⚠ The two are visibly not the same object, which is why conflating them would be a
+real error: their published `ld_loss` at `eps_private` is 0.003 while `exp_6`'s staged
+rows measure 0.0380..0.0401 (a **13x** gap), and their published `wd_af` of 0.006 is
+ABOVE 2x their own staged maximum (0.005468). Decision F is unsatisfied here.
+
+**⚠ A MISLABEL IN THEIR OWN FIGURE, found while mapping the strata.** The MAF subsets
+in `af_loss.py:42-46` are DISJOINT HALF-OPEN BINS, not cumulative thresholds:
+maf_0.01 is MAF < 0.01, maf_0.05 is **[0.01, 0.05)**, maf_0.1 is [0.05, 0.1),
+maf_0.5 is [0.1, 0.5]. Their figure labels `wd_af_snps_0_05` as "AF (SNPs MAF $<$
+0.05)", which is wrong about their own data — that panel is the MIDDLE BIN, not every
+SNP below 0.05 (that would be the union of two bins). Our labels state the bin, and a
+gate pins it so we cannot inherit the mislabel.
+
+**Gate — `tests/test_wd_af_rescale.py`, 6 tests, 2 MUTATION-TESTED.** The transform is
+one line, so the failure mode is a silently wrong column rather than a crash. The gate
+checks OUR map against THEIR source rather than against our belief about it: it parses
+`df["wd_af_x"] = 2 * np.array(df["af_loss_y"])` and the `results[...]` fills out of
+`gather_results.py` and asserts every pairing agrees, that we cover every column they
+derive, that a published reference is attached ONLY to panels they actually plot, and
+end-to-end that each emitted row really is twice its `af_loss` row. Injected defects
+and the gate that fired, both restored:
+- factor `2.0` -> `1.0` in the emitter -> `test_the_emitted_table_really_doubles` ✅
+- strata behind `wd_af_snp_only` and `wd_af_complex` swapped ->
+  `test_our_map_matches_their_source_stratum_for_stratum` ✅
+⚠ One tolerance note so it is not mistaken for a weakened gate: both rows print at 6
+dp, so doubling a ROUNDED `af_loss` can differ from the rounded DOUBLE by up to 1.5e-6
+with the arithmetic exactly right. The bound is 2e-6; a missing factor of 2 is off by
+~3.7e-3 and a mis-mapped stratum by ~1e-3, so the two are cleanly separated.
+
+**⚠ A BUG MY OWN EDIT INTRODUCED AND THE INTERPRETER CAUGHT.** The synthesis block used
+`ours` as a loop variable inside `main()`, which shadows the module-level `ours()`
+function and made Python treat the name as local for the whole body — so the `ours()`
+call at the top of `main()` raised `UnboundLocalError`. Renamed to `stratum`. Worth
+recording because it would have been invisible in review: the loop was correct, the
+collision was with a name 50 lines away.
+
+**What this does NOT establish.** `wd_af` is a RESCALE, not a new measurement — it adds
+no information to `af_loss` and must not be presented as a second result. And it
+inherits every `af_loss` caveat: EXPLORATORY under decision H, chr21 only, not
+same-build, and flat across our knob (0.54% span while `acc_ceiling` goes 0.5 -> 1.0).
+
+---
+
 ## 2026-10-26 — B-EVL-readmap-release: the release does NO HARM to the graph's day job, at the same order as PanMixer
 
 **Goal.** Close the one genuine gap in the biological-utility set: read mapping on a
