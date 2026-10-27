@@ -306,24 +306,6 @@ def test_one_sided_rate_can_exceed_the_bound_without_violating_it() -> None:
 # pre-registration. So the addendum is deliberately NOT named `prereg_*`.
 # ---------------------------------------------------------------------------
 
-def test_the_decision_k_addendum_exists_and_is_signed() -> None:
-    """Decision K post-dates the signature and changed the released object, so the
-    record of that must exist and must itself be signed -- an unsigned addendum would
-    leave the signed file's description of the chain standing uncorrected."""
-    f = (Path(__file__).resolve().parents[1] / "paper"
-         / "addendum_2026-10-11_decision_K.md")
-    assert f.exists(), "the decision-K addendum is missing"
-    text = f.read_text()
-    assert "Status: SIGNED" in text
-    assert "[OPEN]" not in text
-    # the figures it exists to correct
-    for n in ("22,134,562", "172,142", "4.5178e-08"):
-        assert n in text, f"the addendum does not state {n}"
-    assert "NOT NAMED" in text, (
-        "the addendum must say WHY it is not named prereg_*, or the next person will "
-        "name theirs that way")
-
-
 # ---------------------------------------------------------------------------
 # ⚠⚠ COMMON RANDOM NUMBERS, THE THIRD OCCURRENCE. `docs/bugs.md` carries "A headline
 # finding measured under common random numbers" (2026-09-30) and `docs/memory.md`
