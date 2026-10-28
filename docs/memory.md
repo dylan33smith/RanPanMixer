@@ -104,6 +104,149 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-27 (latest, 5) — B-ATK-arm1-spec: the acc_ceiling LABEL is the D1_extremal ceiling ONLY, and a PRE-RUN prediction
+
+**Status: SPEC AND INSTRUMENT CHECK ONLY. No powered attack has run in Arm 1.** This
+entry exists so the findings are not lost; the driver scripts/arm1_attack.py is NOT written.
+
+**Goal.** Run A1 (the optimal distinguisher) and A3 on Arm 1's 308 chr21 releases, and
+on PanMixer's, since A1 is `lrt_pair` and well-posed in both arms.
+
+⚠⚠ **THE DECISIVE FINDING: `acc_ceiling` IS A PER-PAIR QUANTITY AND THE DIRECTORY LABEL
+IS THE D1_extremal CEILING ALONE.** `kl_fit_verified.json` was solved with
+`q = extremal(p)`, and `docs/terms.md:3191` already says `acc_ceiling` is valid only
+against "the same pair, arm, tau and cohort". MEASURED on HG00438:
+
+| condition | pair ceiling at the acc_0p80 label | at acc_0p55 |
+|---|---|---|
+| D1_extremal | 0.800000 | 0.550000 |
+| D2_nearest | **0.678293** | 0.529669 |
+| D3_random | **0.696243** | 0.532644 |
+
+So comparing a D2 or D3 measured accuracy to the 0.80 column header tests it against a
+bound **~0.12 too loose**. Any Arm 1 attack table MUST carry `acc_ceiling` as a PER-PAIR
+ROW computed from `kl_stable` per (target, label, condition), never as a column label.
+✅ D1 is confirmed the max-TV decoy at both labels, so the label IS conservative -- but
+that is now measured rather than assumed, and it should be asserted per cell.
+
+⚠⚠ **THE PANEL ASYMMETRY UNBALANCES THE TEST, and it is not a bug.** In Arm 1 the target
+is HELD OUT while every D2/D3 decoy is IN the panel, so the decoy is exactly reproducible
+by the mosaic and the target is not. MEASURED `d_logz` at acc_0p80: **+253.148 (D1),
++0.949 (D2), -5.119 (D3)** -- negative precisely for the in-panel decoy. That offset is a
+legitimate part of the Neyman-Pearson statistic and sits inside the TV Theorem 1 bounds,
+but it drives TPR and TNR apart (0.60/1.00 at D2, 0.20/0.60 at D3 on n = 5). A driver must
+print TPR and TNR as their OWN rows and auto-label a row DEGENERATE when
+min(TPR, TNR) < 0.05 -- an unbalanced test landing near 0.5 is the constant-answer
+artefact of `docs/bugs.md:43-61` wearing a clean-null face.
+
+⚠⚠ **ONE CELL ALREADY EXCEEDS ITS OWN PAIR CEILING BY POINT ESTIMATE.** D2_nearest at
+acc_0p80: balanced **0.80 against a pair ceiling of 0.678293**, +0.1217 at SE 0.1095 =
+1.11 SE on n = 5. Nowhere near significant, but Pinsker runs CONSERVATIVE, so a
+SIGNIFICANT excess over `acc_ceiling` would falsify the IMPLEMENTATION, not the theorem.
+At the powered n an excess that size would be significant. **This is the cell to watch.**
+
+**A PREDICTION, WRITTEN DOWN BEFORE THE RUN.** A3's `D1_extremal` row will come back
+DEGENERATE in Arm 1 -- TPR -> 1.0000, TNR -> 0.0000 -- at every `acc_ceiling` label, and
+WORSE than in Arm 2. The cause is the PAIR (statistic, condition), not either alone: A3's
+score credits only agreement with non-negative weights and never penalises disagreement,
+while D1_extremal differs from the target at 100% of called positions. In Arm 1 the D2/D3
+decoys are cohort members IN the panel, so their score rises while D1's stays near zero.
+⚠ A1 is NOT degenerate in Arm 1: Lambda straddles 0 under both hypotheses in all six
+cells measured.
+
+**Four more hazards, each a silent-wrong-answer path:**
+1. `a3_sites` caches in the UNKEYED module global `_A3`. Arm 1's bi-allelic axis is per
+   target, and measured `t_chain` spans only 332,516..332,521, so many targets SHARE a T
+   -- where they do, the wrong mask is served silently and every A3 number for that
+   target is computed on another target's site axis. The same shape applies to
+   `arm2_attack._STATE`, which is why a driver must never call `load_state()`.
+2. **TWO POSINGS, ONLY ONE BOUNDED.** (i) FIXED MECHANISM: one mechanism (p's panel,
+   chain, beta, eta) with two input paths. Theorem 1 bounds exactly this and
+   `acc_ceiling` is computed for exactly this. (ii) PROCEDURE POSING: `Q_q` from q's OWN
+   leave-one-out panel, which is what the real release procedure does -- TWO mechanisms,
+   NOT bounded by Theorem 1. An accuracy from (ii) compared to `acc_ceiling` would report
+   a violation with the theorem intact. A driver must implement (i).
+3. `calibration.p_succ_bound` RAISES on every Arm 1 cell: ceiling-mode releases record
+   `tau` = 1.0 because tanh(25492) saturates, and it requires tau in [0,1). So neither
+   `_report` is reusable -- and a3a4's does `if tau >= 1.0: continue`, which would skip
+   every cell and print "no condition exceeded p_succ_bound" having checked NOTHING.
+4. The fit has no '0.50' key (six labels, 0.55..0.80). `acc_ceiling` 0.50 is `eta` = 0,
+   where `Q_p = Q_q = R_D` identically and the true balanced accuracy is EXACTLY 0.5 for
+   every attacker. That column cannot be a violation; its job is to catch a harness bug.
+
+✅ **THE INSTRUMENT VERIFIES EXACTLY** on ONE real Arm 1 release (HG00438, n = 1 cell,
+at that cell's own recorded `acc_ceiling` label, K = 86): recomputed
+`u_p` = 0.012186230462144355 against the record's 0.012186230462144355, and a fresh
+forward pass reproduces the record's `log_z_p` to all 17 digits. `pick_decoys` runs unchanged and now draws D2 from 43
+cohort members rather than 9 prepared targets.
+
+⚠ A stale figure found in passing: `arm2_attack.py:30-33` says "10 targets x 50 draws per
+tau, giving a minimum detectable advantage of 0.056". 0.056 is the 25-DRAW figure
+(0.879/sqrt(250) = 0.0556); 50 draws would give 0.0393. The realised design is 25.
+
+**What a measured A1 accuracy WILL license when it is run:** a LOWER bound on that pair's
+distinguishability, and the BEST such bound available since the statistic is the exact
+Neyman-Pearson ratio -- which is the answer to a reviewer asking whether a null came from
+a weak attack. It can FALSIFY the implementation. It CANNOT validate the mechanism and is
+not evidence the bound holds (standing constraint 4).
+
+---
+
+## 2026-10-27 (latest, 4) — B-EVL-matched-fidelity: a matched-fidelity capacity EXISTS for 33 of 44, and the plan's contradiction is settled with data
+
+**Goal.** Standing constraint 5: privacy is comparable only at MATCHED UTILITY. So where
+does PanMixer's capacity frontier cross our `target_fidelity`? `docs/plan.md` has carried
+BOTH "a matched-fidelity capacity exists at `capacity` ~0.17" and "no matched-fidelity
+capacity exists"; the 2026-10-27 reconciliation showed both were true of DIFFERENT
+releases of ours. This settles it against the live chr21 release.
+
+**Method.** `scripts/matched_fidelity_capacity.py`. Their 5-draw mean per (subject,
+capacity), our exact `target_fidelity` per (target, `acc_ceiling`), linear interpolation
+between the bracketing capacities. n = 44, same individuals, same build.
+
+**Result — at our `acc_ceiling` 0.80:**
+
+| | value |
+|---|---|
+| subjects with a crossing | **33 / 44** |
+| matched-fidelity `capacity`, median | **0.2524** |
+| range | 0.1982 .. 0.2966 |
+| subjects with NO crossing | 11 |
+
+And it moves with our ceiling exactly as it should: 22/44 crossings at `acc_ceiling` 0.50
+(median capacity 0.2639), 27/44 at 0.65 (0.2608), 33/44 at 0.80 (0.2524). Tightening our
+privacy makes us more faithful, so more subjects cross and they cross earlier.
+
+✅✅ **AN INTERNAL CONSISTENCY CHECK THAT COULD HAVE FAILED AND DID NOT.** A subject has no
+crossing exactly when PanMixer's WHOLE frontier sits below our fidelity -- i.e. when they
+are more faithful than us at every capacity. That set should be identical to the subjects
+where the paired test says we LOSE. Measured: both sets are the same 11 individuals, so
+**33/44 crossings = 33/44 paired wins**, computed by two independent routes. The 11 are
+HG00621, HG00673, HG01361, HG01928, HG01978, HG02080, HG02148, HG03486, HG03492, HG03540,
+NA20129.
+
+⚠⚠ **FOR 11 OF 44, PANMIXER IS MORE FAITHFUL AT EVERY SETTING IT OFFERS**, so no matched
+point exists for them and the comparison must be stated as such rather than omitted. This
+is a quarter of the cohort and it is not a rounding detail.
+
+⚠ **A CROSSING IS NOT A PRIVACY RESULT.** It is the capacity at which a privacy comparison
+becomes LEGITIMATE under constraint 5. Nothing about who is more private follows from it;
+that needs the attack numbers, which are the next piece of work.
+
+⚠ Their frontier SATURATES from `capacity` ~0.3, so above the plateau `capacity ->
+fidelity` is not invertible and no crossing can be interpolated there. Every crossing
+found sits in 0.198..0.297, i.e. below the plateau, which is why interpolation is defined
+at all.
+
+⚠ HG00438 is NOT one of the 11 (ours 0.165182 against their saturation 0.166097), so the
+old "no matched-fidelity capacity" claim was about our genome-sliced 16.7125% release, not
+about that subject being a no-crossing case. Both halves of the old contradiction are now
+superseded by this measurement.
+
+**Provenance** `logs/B_arm1_chr21/matched_fidelity.md`.
+
+---
+
 ## 2026-10-27 (latest, 3) — B-EVL-pm-draw-noise: five draws settle the split result, and the two tests now AGREE
 
 **Goal.** The paired head-to-head disagreed with itself: the sign test said p = 0.174

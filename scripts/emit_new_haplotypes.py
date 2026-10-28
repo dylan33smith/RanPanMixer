@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import pathlib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -52,7 +53,15 @@ import numpy as np                                        # noqa: E402
 import releases as R                                      # noqa: E402
 from cohort import loo                                     # noqa: E402
 
-PM_DATA = REPO / "external" / "PanMixer" / "starting_data" / "chr21"
+# ⚠⚠ THE AXIS THIS MAPS ONTO IS A DECISION, NOT A CONSTANT. PanMixer's ORIGINAL tree
+# carries 340,824 records from its vg-1.36 build; OUR rebuilt mirror carries 340,849 from
+# our vg-1.68 build. Decision F wants BOTH tools' releases on ONE build, and the 352
+# obfuscations of 2026-10-27 were produced on the mirror -- so a comparison that maps our
+# releases onto the ORIGINAL axis while their releases sit on the MIRROR axis is running
+# the evaluators on two different builds while looking like one. Settable for that reason.
+PM_DATA_DEFAULT = REPO / "external" / "PanMixer" / "starting_data" / "chr21"
+PM_DATA_OURBUILD = pathlib.Path("/home/ds85/pm_ourbuild/starting_data/chr21")
+PM_DATA = PM_DATA_DEFAULT
 OUT_ROOT = REPO / "data" / "panmixer_integration"
 PINNED_TAUS = (0.0, 0.05, 0.10, 0.25, 0.50, 0.90, 0.99)
 CHROM = "chr21"
@@ -96,7 +105,7 @@ def alignment_control(oi, ti, their_pos, target: str, hap: np.ndarray) -> dict:
 
 
 def emit(target: str, tau: float, out_root: Path, force: bool = False,
-         eta_mode: bool = False) -> dict:
+         eta_mode: bool = False, ceiling_mode: bool = False) -> dict:
     our_pos, their_pos, shared, oi, ti = axis_map()
     hap = np.asarray(np.load(REPO / "data" / "cohort" / CHROM / "haplotypes.npy",
                              mmap_mode="r"))
@@ -114,12 +123,17 @@ def emit(target: str, tau: float, out_root: Path, force: bool = False,
 
     # our per-target chain, and the release on it
     ic = loo.loo_chain(REPO / "data" / "cohort" / CHROM, target, haplotypes=hap).in_chain
-    # ⚠ eta-driven releases live in eta_<v>/, a namespace disjoint from tau_<v>/
-    pname = R.eta_dir(tau) if eta_mode else R.tau_dir(tau)
+    # ⚠ eta-driven releases live in eta_<v>/ and ceiling-driven ones in acc_<v>/, each
+    # a namespace disjoint from tau_<v>/ -- see src/releases.py for why acc_* must exist.
+    pname = (R.ceiling_dir(tau) if ceiling_mode
+             else R.eta_dir(tau) if eta_mode else R.tau_dir(tau))
     tdir = REPO / "data" / "releases" / "arm1" / target / pname
     hits = sorted(tdir.glob(f"*chrom{CHROM}_*_{CHROM}/released_path.npy"))
     if len(hits) != 1:
-        raise AssertionError(f"{target}/{tau:g}: {len(hits)} chr21 parts, expected 1")
+        # ⚠ NOT {tau}: in ceiling mode `tau` is a STRING label and :g raises
+        # ValueError inside the assertion message, reporting a real defect as a
+        # formatting crash. Same trap as scripts/arm1_release.py's diploid assertion.
+        raise AssertionError(f"{target}/{tau}: {len(hits)} chr21 parts, expected 1")
     rel = np.load(hits[0])                                  # (T_chain, 2) on OUR chain
 
     chain_of_site = np.full(our_pos.shape[0], -1, dtype=np.int64)
@@ -169,25 +183,49 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", default="HG00438")
     ap.add_argument("--tau", type=float, nargs="+", default=list(PINNED_TAUS))
+    ap.add_argument("--ceiling", nargs="+", default=None,
+                    help="ARM 1 chr21 mode: acc_ceiling LABELS ('0.50'..'0.80'), the "
+                         "reporting axis since 2026-10-27. Releases live in acc_<v>/.")
     ap.add_argument("--eta", type=float, nargs="+", default=None,
                     help="emit the ETA-driven releases instead, reading and "
                          "writing eta_<v>/ rather than tau_<v>/")
     ap.add_argument("--out", type=Path, default=OUT_ROOT)
+    ap.add_argument("--pm-data", type=Path, default=None,
+                    help="the axis to map ONTO. Default is PanMixer's ORIGINAL tree "
+                         "(340,824 records, their vg-1.36 build). Pass "
+                         "/home/ds85/pm_ourbuild/starting_data/chr21 (340,849, our "
+                         "vg-1.68 build) for the decision-F one-build comparison -- that "
+                         "is the axis the 352 obfuscations of 2026-10-27 were run on.")
     ap.add_argument("--force", action="store_true",
                     help="write even if the alignment control fails (do not use)")
     a = ap.parse_args(argv)
+    if a.pm_data is not None:
+        global PM_DATA
+        PM_DATA = a.pm_data
+        if not (PM_DATA / "pangenome_positions.npy").exists():
+            raise SystemExit(f"{PM_DATA} has no pangenome_positions.npy -- it is not a "
+                             f"PanMixer starting-data chromosome directory")
 
-    print(f"emitting `new_haplotypes` for {a.target}, {CHROM}, "
-          f"{len(a.tau)} `tau` value(s)\n")
-    rows = []
+    # ⚠ the mode must be resolved BEFORE the banner: the banner names the grid and the
+    # axis, and printing it first made it reference `points` before assignment.
+    ceiling_mode = bool(a.ceiling)
+    if ceiling_mode and a.eta:
+        raise SystemExit("--ceiling and --eta are two different grids; pass one")
     eta_mode = bool(a.eta)
-    points = list(a.eta) if eta_mode else list(a.tau)
+    points = (list(a.ceiling) if ceiling_mode
+              else list(a.eta) if eta_mode else list(a.tau))
+    print(f"emitting `new_haplotypes` for {a.target}, {CHROM}, {len(points)} "
+          f"{'acc_ceiling' if ceiling_mode else 'eta' if eta_mode else 'tau'} "
+          f"value(s), onto the axis at {PM_DATA} "
+          f"({np.load(PM_DATA / 'pangenome_positions.npy').shape[0]:,} records)\n")
+    rows = []
     if eta_mode:
         print(f"ETA MODE: reading and writing eta_<v>/ for {points}")
     for tau in points:
-        r = emit(a.target, tau, a.out, a.force, eta_mode=eta_mode)
+        r = emit(a.target, tau, a.out, a.force, eta_mode=eta_mode,
+                 ceiling_mode=ceiling_mode)
         rows.append(r)
-        print(f"  tau = {tau:<5g} -> {r['shape']}, {r['released_rows']:,} released rows, "
+        print(f"  tau = {tau} -> {r['shape']}, {r['released_rows']:,} released rows, "
               f"{r['missing_rows']:,} at -1"
               + (f"  ⚠ {r['out_of_range_masked']} cell(s) masked as OUT OF RANGE for "
                  f"their allele encoding" if r['out_of_range_masked'] else ""))
