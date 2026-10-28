@@ -53,6 +53,10 @@ import releases as R                                      # noqa: E402
 import store                                              # noqa: E402
 from cohort import loo                                     # noqa: E402
 from mechanism import ffbs, hmm, utility                   # noqa: E402
+# ⚠⚠ IMPORTED, NEVER COPIED. The chr21 `beta_share` used here MUST be bit-identical
+# to the one the per-target `eta` was calibrated against, or the directory's
+# `acc_ceiling` label is a lie. `arm1_chr21_kl.loo_share_for` is that one definition.
+from arm1_chr21_kl import loo_share_for                    # noqa: E402
 
 # The seven points the pinned grid used. ⚠ NOT frozen any more -- the
 # pre-registration was deleted 2026-10-24 and `eta_tau` is the knob; these are
@@ -74,11 +78,25 @@ SEED_GRID = PINNED_TAUS + EXPLORATORY_TAUS
 ETA_GRID = (0.0, 250.0, 500.0, 1262.0, 2821.0, 5642.0)
 ETA_SEED_OFFSET = 1000
 SEED_BASE = 20261012
+# ⚠⚠ AUTOSOMES STAYS THE 22 AUTOSOMES even though ARM 1 now releases chr21 only.
+# It is the share DENOMINATOR: chr21's `beta_share` is T_chr21 / T_genome under
+# decision J, so rebinding this to ('chr21',) would make the share 1.0 and put every
+# release at a privacy level ~4,430x different from its own directory name, with no
+# crash. CHROMS is what the release loop walks.
 AUTOSOMES = loo.AUTOSOMES
+CHROM = "chr21"
+CHROMS = (CHROM,)                    # ARM 1 IS chr21 ONLY (Dylan, 2026-10-27)
+# The reporting axis is `acc_ceiling`, carried as STRING LABELS because the label is
+# the seed index key: '0.5' and '0.50' must never become two cells.
+CEILINGS = ("0.50", "0.55", "0.60", "0.65", "0.70", "0.75", "0.80")
+# Disjoint from the tau grid's indices (0..9) and ETA_SEED_OFFSET's (1000..1005).
+CEILING_SEED_OFFSET = 2000
+FIT = REPO / "logs" / "B_eta_arm1_chr21" / "kl_fit_verified.json"
+SURVEY = REPO / "logs" / "B_loo_chain_survey.json"
 
 
 def genome_seed(target: str, tau: float | None = None, *,
-                eta: float | None = None) -> int:
+                eta: float | None = None, ceiling: str | None = None) -> int:
     """A distinct, reproducible seed per (target, `tau`) cell.
 
     ⚠ hashlib, NEVER `hash()`: Python's is PYTHONHASHSEED-salted and already made a
@@ -93,11 +111,31 @@ def genome_seed(target: str, tau: float | None = None, *,
     seeds of `tau` = 0, 0.05 and 0.10 from the pinned run. The chr21 slices came out
     BIT-IDENTICAL to those releases (0 cells differing of 681,648), so every
     drawn-path quantity -- PanMixer's evaluators, Beagle, `donor_switches` -- was the
-    pinned grid's number wearing a new `tau` label. The exact endpoint was untouched,
+    pinned grid's number wearing a new `tau` label.
+
+    ⚠⚠ IN CEILING MODE THE KEY IS THE LABEL'S INDEX IN `CEILINGS`, NEVER THE `eta`.
+    Arm 1's chr21 `eta` is FITTED per target and moves whenever the fit is refined --
+    it already moved once, between `kl_fit.json` and `kl_fit_verified.json`. Keying on
+    the value would silently redraw every cell on a refit, and two targets' "same"
+    cell would not be the same grid point. The label is fixed; the eta is not. The exact endpoint was untouched,
     because `ffbs.state_marginals` uses no RNG at all, which is the only reason the
     utility result survived. Guarded by tests/test_arm1_release_seeding.py.
     """
     h = int.from_bytes(hashlib.sha256(target.encode()).digest()[:4], "big")
+    if ceiling is not None:
+        if ceiling not in CEILINGS:
+            raise ValueError(
+                f"acc_ceiling {ceiling!r} has no fixed place in CEILINGS {CEILINGS}, "
+                f"so it has no reproducible seed. Append it rather than passing a "
+                f"bare index.")
+        # ⚠ The offset is what stops the 0.50 cell (eta = 0) from reusing the
+        # genome-wide eta grid's seed for eta = 0 -- MEASURED to be 3105194200 for
+        # HG00438, the seed of the chr21 part already on disk under eta_0/. Same
+        # seed and same stream_key would reproduce that release bit-for-bit under a
+        # new label: occurrence five of the common-random-numbers defect, avoided.
+        ss = np.random.SeedSequence(
+            [SEED_BASE, h, CEILING_SEED_OFFSET + CEILINGS.index(ceiling)])
+        return int(ss.generate_state(1, dtype=np.uint32)[0])
     if eta is not None:
         if float(eta) not in ETA_GRID:
             raise ValueError(
@@ -122,7 +160,7 @@ def _axis_digest(chains: dict) -> str:
     `in_chain` means a release can never be joined to a chain built for someone else.
     """
     h = hashlib.sha256()
-    for c in AUTOSOMES:
+    for c in CHROMS:
         man = json.loads((REPO / "data" / "cohort" / c / "manifest.json").read_text())
         seen = man.get("axis_digests_seen") or []
         if len(seen) != 1:
@@ -144,29 +182,59 @@ def _inputs() -> dict[str, str]:
     d = {"git_rev": store.git_rev(REPO)}
     for f in sorted((REPO / "paper").glob("addendum_*.md")):
         d[f"addendum:{f.stem}"] = store.sha256_file(f)
-    for c in AUTOSOMES:
+    for c in CHROMS:
         d[f"manifest:{c}"] = store.sha256_file(
             REPO / "data" / "cohort" / c / "manifest.json")
+    # ⚠⚠ chr21's `beta_share` is T_chr21 / T_genome, so it depends on ALL 22
+    # chromosomes' measured leave-one-out chain lengths, and the `eta` comes from the
+    # fit. Both files set the release's PRIVACY LEVEL while living outside its own
+    # chromosome, so both must be stamped -- otherwise the sidecar claims the release
+    # depends on chr21's manifest alone while its acc_ceiling can move underneath it.
+    if SURVEY.exists():
+        d["loo_chain_survey"] = store.sha256_file(SURVEY)
+    if FIT.exists():
+        d["eta_fit:arm1_chr21"] = store.sha256_file(FIT)
     return d
 
 
 def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
-               weights: str = "uniform") -> dict:
+               weights: str = "uniform", *, ceiling_mode: bool = False,
+               etas_by_ceiling: dict | None = None) -> dict:
     """All seven `tau` for one held-out individual. Chromosome-outer, so each
     chromosome's arrays and its `baseline_log_norm` are computed ONCE and reused
     across the grid -- `baseline_log_norm` is target-independent but the HMM is not,
     since K = 86 and the chain are both per-target."""
     t0 = time.time()
-    todo = [(i, t) for i, t in enumerate(taus)
-            if not (R.existing_seeds(target, None, "arm1", root, eta=t) if eta_mode
-                    else R.existing_seeds(target, t, "arm1", root))]
+    if ceiling_mode:
+        # ⚠ the directory is named by `acc_ceiling` while the knob passed to the
+        # sampler is this target's own fitted `eta`, so the namespace cannot be
+        # inferred -- it must be passed, or this queries a directory nothing writes.
+        todo = [(i, lab) for i, lab in enumerate(taus)
+                if not R.existing_seeds(target, None, "arm1", root,
+                                        point_name=R.ceiling_dir(lab))]
+    else:
+        todo = [(i, t) for i, t in enumerate(taus)
+                if not (R.existing_seeds(target, None, "arm1", root, eta=t) if eta_mode
+                        else R.existing_seeds(target, t, "arm1", root))]
     if not todo:
         return {"target": target, "skipped": True, "cells": len(taus),
                 "seconds": 0.0}
 
     chains = {c: loo.loo_chain(REPO / "data" / "cohort" / c, target)
-              for c in AUTOSOMES}
-    shares = loo.loo_shares({c: chains[c].t_chain for c in AUTOSOMES})
+              for c in CHROMS}
+    if ceiling_mode:
+        # ⚠⚠ THE SHARE IS NOT 1.0. chr21 carries its own GENOME-WIDE share (~0.01502),
+        # which is the scope the `eta` was calibrated at. share=1.0 would make beta per
+        # position 66.56x larger; since c = kl/eta^2 goes as share^2, the cell labelled
+        # acc_ceiling 0.55 would actually sit at kl ~ 88.6 instead of 0.0200 -- Pinsker
+        # vacuous, acc_ceiling 1.0 -- with NO crash and the right directory name.
+        # ⚠ `loo_shares` refuses a subset, so it is fed all 22 measured chain lengths
+        # from the survey rather than the one chain built above.
+        shares = {CHROM: loo_share_for(target, json.loads(SURVEY.read_text()))}
+    else:
+        chains = {c: loo.loo_chain(REPO / "data" / "cohort" / c, target)
+                  for c in AUTOSOMES}
+        shares = loo.loo_shares({c: chains[c].t_chain for c in AUTOSOMES})
     axis = _axis_digest(chains)
     inputs = _inputs()
 
@@ -178,7 +246,7 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
     # with respect to the draw by tests/test_exact_out.py.
     ex: dict[int, dict] = {i: {"e_differ": 0.0, "e_q_u": 0.0, "called": 0,
                                "u_ceiling": 0.0} for i, _ in todo}
-    for n_c, c in enumerate(AUTOSOMES, 1):
+    for n_c, c in enumerate(CHROMS, 1):
         d = REPO / "data" / "cohort" / c
         lc = chains[c]
         ic = lc.in_chain
@@ -203,7 +271,15 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
             utility.u_ceiling(tgt[:, 1], util.beta))
         for i, tau in todo:
             box: dict = {}
-            if eta_mode:
+            if ceiling_mode:
+                # stream_key=c STAYS: the (seed, chrom) replay contract in this
+                # script's docstring, and what every part on disk was drawn under.
+                parts[i].append(ffbs.release(
+                    m, panel, tgt, util, eta=etas_by_ceiling[tau],
+                    seed=genome_seed(target, ceiling=tau),
+                    target_id=target, loo_id=target, baseline_norm=base,
+                    stream_key=c, exact_out=box))
+            elif eta_mode:
                 parts[i].append(ffbs.release(
                     m, panel, tgt, util, eta=tau,
                     seed=genome_seed(target, eta=tau),
@@ -215,7 +291,7 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
                     target_id=target, loo_id=target, baseline_norm=base,
                     stream_key=c, exact_out=box))
             assert len(box["u_haps"]) == 2, (
-                f"{target}/{c}/tau={tau:g}: {len(box['u_haps'])} haplotype "
+                f"{target}/{c}/{tau}: {len(box['u_haps'])} haplotype "
                 f"contribution(s), expected 2 -- a diploid release must give two")
             ex[i]["e_differ"] += box["e_differ"]
             # the diploid utility is the MEAN of the two haplotypes, matching the
@@ -223,19 +299,30 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
             ex[i]["e_q_u"] += 0.5 * (box["u_haps"][0] + box["u_haps"][1])
             ex[i]["called"] += box["called"]
             ex[i]["u_ceiling"] += ceil_c
-        print(f"      {target} [{n_c}/22] {c} done ({time.time() - t0:.0f}s)",
+        print(f"      {target} [{n_c}/{len(CHROMS) if ceiling_mode else 22}] {c} "
+              f"done ({time.time() - t0:.0f}s)",
               flush=True)
         del panel, hap_all, m, util
 
     written, cells = [], {}
     for i, tau in todo:
-        gr = ffbs.GenomeRelease(parts=tuple(parts[i]))
-        p = R.save_genome_release(gr, arm="arm1", axis_digest=axis, inputs=inputs,
-                                  point_name=R.eta_dir(tau) if eta_mode else None,
-                                  root=root, scope="genome")
+        if ceiling_mode:
+            # ⚠⚠ NOT a GenomeRelease. Its share-sum invariant (ffbs.py:748-756) wants
+            # the parts to sum to 1, and this release deliberately carries only
+            # chr21's own genome-wide share. Making that assertion pass by setting
+            # share = 1.0 is the silent corruption described above; writing the single
+            # part directly is the honest shape. One part, one chromosome-scope record.
+            (one,) = parts[i]
+            p = R.save_release(one, arm="arm1", axis_digest=axis, inputs=inputs,
+                               root=root, point_name=R.ceiling_dir(tau))
+        else:
+            gr = ffbs.GenomeRelease(parts=tuple(parts[i]))
+            p = R.save_genome_release(gr, arm="arm1", axis_digest=axis, inputs=inputs,
+                                      point_name=R.eta_dir(tau) if eta_mode else None,
+                                      root=root, scope="genome")
         written.append(str(p))
         e = ex[i]
-        cells[str(tau)] = {
+        cells[tau if ceiling_mode else str(tau)] = {
             "e_differ": e["e_differ"], "called_cells": e["called"],
             "target_fidelity": e["e_differ"] / e["called"] if e["called"] else float("nan"),
             "e_q_u": e["e_q_u"], "u_ceiling": e["u_ceiling"],
@@ -243,15 +330,21 @@ def run_target(target: str, taus, root: str | None, eta_mode: bool = False,
         }
     return {"target": target, "skipped": False, "cells": len(todo),
             "written": written, "seconds": time.time() - t0,
-            "k_states": chains[AUTOSOMES[0]].k_states,
-            "t_total": sum(chains[c].t_chain for c in AUTOSOMES),
+            "k_states": chains[(CHROMS if ceiling_mode else AUTOSOMES)[0]].k_states,
+            # ⚠ NAMED BY SCOPE. In ceiling mode this is chr21's chain alone (~332,521),
+            # and a field called `t_total` holding it is how a chr21 number gets quoted
+            # as genome-wide in a table fed from this JSON.
+            **({"t_chr21": chains[CHROM].t_chain, "scope": CHROM} if ceiling_mode
+               else {"t_total": sum(chains[c].t_chain for c in AUTOSOMES)}),
             "exact": cells}
 
 
 def _one(args):
-    target, taus, root, eta_mode, weights = args
+    target, taus, root, eta_mode, weights, ceiling_mode, etas_by_ceiling = args
     try:
-        return run_target(target, taus, root, eta_mode, weights)
+        return run_target(target, taus, root, eta_mode, weights,
+                          ceiling_mode=ceiling_mode,
+                          etas_by_ceiling=etas_by_ceiling)
     except Exception as e:                      # a worker must report, never vanish
         return {"target": target, "error": f"{type(e).__name__}: {e}",
                 "traceback": traceback.format_exc()[-1500:]}
@@ -269,6 +362,13 @@ def main(argv=None) -> int:
                          "two are DIFFERENT utility functions -- the utility_id "
                          "distinguishes them, but the eta_<v>/ directory does NOT, "
                          "so never release both at one eta into one tree.")
+    ap.add_argument("--ceilings", nargs="+", default=None, choices=CEILINGS,
+                    help="ARM 1 chr21 MODE, the live arm 1 since 2026-10-27: the "
+                         "reporting axis is `acc_ceiling` and each target's OWN "
+                         "eta_tau for it is read from logs/B_eta_arm1_chr21/"
+                         "kl_fit_verified.json. LABELS, not floats -- the label is "
+                         "the seed index key. '0.50' is the seventh point at eta = 0 "
+                         "exactly and is NOT in the fit file.")
     ap.add_argument("--etas", type=float, nargs="+", default=None,
                     help="drive the tilt by `eta_tau` directly (the knob since "
                          "2026-10-24) and file the releases under eta_<v>/ rather "
@@ -282,6 +382,32 @@ def main(argv=None) -> int:
                          "scripts/arm1_results.py --endpoint expects")
     a = ap.parse_args(argv)
 
+    ceiling_mode = bool(a.ceilings)
+    etas: dict = {}
+    if ceiling_mode:
+        if a.etas:
+            raise SystemExit("--ceilings and --etas are two different grids; pass one")
+        fit = json.loads(FIT.read_text())
+        # ⚠⚠ THE FIT IS ONLY VALID FOR THE ARM, SCOPE, K AND WEIGHTING IT WAS SOLVED
+        # AT. One eta sits at two different acc_ceiling under two weightings, which is
+        # standing constraint 7 and the 2026-10-25 defect; a mismatch here would put
+        # every release at a different ceiling than its own directory name.
+        for k, want in (("arm", "arm1"), ("scope", CHROM), ("k_states", 86),
+                        ("weights", a.weights)):
+            if fit.get(k) != want:
+                raise SystemExit(
+                    f"{FIT.name} has {k}={fit.get(k)!r}, this run needs {want!r}. The "
+                    f"eta grid is only valid for the arm, scope, K and WEIGHTING it "
+                    f"was solved at (standing constraint 7).")
+        a.taus = list(a.ceilings)
+        etas = {tid: {"0.50": 0.0,
+                      **{lab: float(v["eta"]) for lab, v in r["refined"].items()}}
+                for tid, r in fit["per_target"].items()}
+        print(f"ARM 1 chr21 MODE: `acc_ceiling` {list(a.ceilings)}, one `eta_tau` PER "
+              f"TARGET from {FIT.name}, chromosome scope at each target's OWN "
+              f"leave-one-out `beta_share`.")
+        print(f"⚠ `acc_ceiling` is a PINSKER bound -- the true ceiling is closer to "
+              f"0.5 than the label.\n")
     eta_mode = bool(a.etas)
     if eta_mode:
         off = [e for e in a.etas if e not in ETA_GRID]
@@ -292,24 +418,39 @@ def main(argv=None) -> int:
         print(f"ETA MODE: {list(a.etas)}. Releases land in eta_<v>/ directories, "
               f"a namespace disjoint from tau_<v>/ -- tanh(eta) saturates to 1.0 "
               f"past eta ~ 19, so naming these by tau would collide.\n")
-    elif set(a.taus) != set(PINNED_TAUS):
+    elif not ceiling_mode and set(a.taus) != set(PINNED_TAUS):
         print(f"⚠⚠ RUNNING A NON-PINNED `tau` SET {a.taus}. The pre-registration freezes "
               f"{list(PINNED_TAUS)} under standing constraint 6. This is legitimate only "
               f"as a PILOT and its output must not be reported as the arm 1 result.\n")
 
-    ids = np.load(REPO / "data" / "cohort" / "chr1" / "haplotype_ids.npy",
+    ids = np.load(REPO / "data" / "cohort" /
+                  (CHROM if ceiling_mode else "chr1") / "haplotype_ids.npy",
                   allow_pickle=True)
     members = sorted(loo.sample_index(ids))
     targets = a.targets or members
     unknown = [t for t in targets if t not in members]
     if unknown:
         raise SystemExit(f"not cohort members: {unknown}")
+    if ceiling_mode:
+        gaps = [(tid, lab) for tid in targets for lab in a.ceilings
+                if lab not in etas.get(tid, {})]
+        if gaps:
+            raise SystemExit(
+                f"{len(gaps)} (target, acc_ceiling) pair(s) have no fitted eta, e.g. "
+                f"{gaps[:5]}. Run scripts/arm1_chr21_kl.py for them first -- an "
+                f"interpolated eta would put the cell at an unmeasured ceiling.")
 
     n_cells = len(targets) * len(a.taus)
     print(f"weighting: {a.weights}"
           f"{' (the released default, argued in docs/terms.md)' if a.weights == 'uniform' else ' (the COMPARISON weighting)'}")
-    print(f"ARM 1 releases. {len(targets)} held-out individuals x {len(a.taus)} `tau` "
-          f"= {n_cells} genome-wide releases, K = 86, diploid, 22 autosomes.")
+    if ceiling_mode:
+        print(f"ARM 1 releases. {len(targets)} held-out individuals x "
+              f"{len(a.taus)} `acc_ceiling` = {n_cells} CHROMOSOME-SCOPE chr21 "
+              f"releases, K = 86, diploid, chr21 ONLY, each at its OWN `eta_tau` and "
+              f"its OWN leave-one-out `beta_share`.")
+    else:
+        print(f"ARM 1 releases. {len(targets)} held-out individuals x {len(a.taus)} `tau` "
+              f"= {n_cells} genome-wide releases, K = 86, diploid, 22 autosomes.")
     print(f"{a.workers} workers, one held-out individual each; chromosome-outer so each "
           f"`baseline_log_norm` is computed once per (target, chromosome).")
     print(f"⚠ The `tau` grid is an EVALUATION DEVICE, not a release procedure, and the "
@@ -318,7 +459,12 @@ def main(argv=None) -> int:
     t0 = time.time()
     out = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(_one, (t, a.taus, a.root, eta_mode, a.weights)): t
+        # ⚠ the per-target eta map is passed IN, not re-read per worker: 44 processes
+        # re-reading the fit would split the run by process start time if the fit were
+        # refined mid-run -- the failure that already cost this project nine chromosomes.
+        futs = {ex.submit(_one, (t, a.taus, a.root, eta_mode, a.weights,
+                                 ceiling_mode,
+                                 etas.get(t) if ceiling_mode else None)): t
                 for t in targets}
         for n, f in enumerate(as_completed(futs), 1):
             r = f.result()
@@ -331,14 +477,17 @@ def main(argv=None) -> int:
                       flush=True)
             else:
                 print(f"  [{n}/{len(targets)}] ✅ {r['target']}: {r['cells']} release(s), "
-                      f"T = {r['t_total']:,} ({r['seconds'] / 60:.1f} min) "
+                      f"T = {r.get('t_total', r.get('t_chr21')):,} "
+                      f"({r['seconds'] / 60:.1f} min) "
                       f"[{(time.time() - t0) / 60:.0f} min elapsed]", flush=True)
 
     errs = [r for r in out if "error" in r]
     # ⚠ ASSERT COMPLETENESS FROM THE DISK, not from this loop's bookkeeping: a fan-out
     # that reports its own success cannot tell "wrote nothing" from "ran nothing".
     missing = [(t, tau) for t in targets for tau in a.taus
-               if not (R.existing_seeds(t, None, "arm1", a.root, eta=tau) if eta_mode
+               if not (R.existing_seeds(t, None, "arm1", a.root,
+                                        point_name=R.ceiling_dir(tau)) if ceiling_mode
+                       else R.existing_seeds(t, None, "arm1", a.root, eta=tau) if eta_mode
                        else R.existing_seeds(t, tau, "arm1", a.root))]
     print(f"\n{len(out) - len(errs)}/{len(targets)} targets completed, "
           f"{len(errs)} failed, {len(missing)} of {n_cells} cells missing on disk.")
@@ -358,7 +507,9 @@ def main(argv=None) -> int:
                 "t_total": r.get("t_total"), "k_states": r.get("k_states")}
                for r in out if "exact" in r and r.get("exact")]
         a.endpoint_json.write_text(json.dumps(
-            {"arm": "arm1", "taus": a.taus, "k_states": 86, "results": res},
+            {"arm": "arm1", "k_states": 86, "results": res,
+             **({"acc_ceilings": list(a.ceilings), "scope": CHROM}
+                if ceiling_mode else {"taus": a.taus})},
             indent=1) + "\n")
         skipped = [r["target"] for r in out if r.get("skipped")]
         print(f"ENDPOINT JSON -> {a.endpoint_json} ({len(res)} target(s))")

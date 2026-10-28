@@ -104,6 +104,81 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-27 (latest, 2) — B-EVL-arm1-chr21-headtohead: ONE BUILD, SAME 44 INDIVIDUALS, and the comparison finally has no build confound
+
+**Goal.** The decision-F head-to-head: both tools on OUR GRCh38 build, chr21, the same
+44 individuals in the same order, with `acc_ceiling` as our axis.
+
+**What ran.** 308 ARM 1 chr21 releases (`scripts/arm1_release.py --ceilings`, 44 targets
+x 7 ceilings, K = 86 per-target leave-one-out, each at its OWN fitted `eta_tau` and its
+OWN leave-one-out `beta_share`; exit 0, 9:38.88, 1.45 GB peak) and 352 PanMixer
+obfuscations on our mirror (44 subjects x 8 capacities, seed 123, exit 0, 16:13.71,
+1.75 GB peak, 0 failures). Both fan-outs asserted their own completeness from disk.
+
+**OURS — `target_fidelity`, EXACT expectation, median over 44:**
+
+| `acc_ceiling` | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|---|
+| median | 0.176250 | 0.176095 | 0.175940 | 0.175785 | 0.175631 | 0.175476 | 0.175321 |
+
+**THEIRS — `changed_frac`, ONE DRAW, median over the same 44:**
+
+| `capacity` | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.7 | 0.9 |
+|---|---|---|---|---|---|---|---|---|
+| median | 0.011632 | 0.050219 | 0.100303 | 0.173454 | 0.176759 | 0.176790 | 0.176790 | 0.176790 |
+
+✅ **THEIR SATURATION REPRODUCES ON OUR BUILD**: capacities 0.3, 0.5, 0.7 and 0.9 are
+BYTE-IDENTICAL per subject, the same four-settings plateau their own sweep showed.
+
+**THE PAIRED RESULT, which is the only one that uses the matched design.** Our
+`acc_ceiling` 0.80 against their saturation, same subject, same build, n = 44: we are
+more faithful in **27 of 44**, median difference **-0.001023 (-0.1023 points)**, mean
+-0.001197, sd 0.002437, range -0.005946..+0.004346.
+
+⚠⚠ **THE TWO TESTS DISAGREE AND BOTH ARE REPORTED.** The exact two-sided sign test gives
+**p = 0.174** -- NOT significant. The paired mean gives **z = -3.26** -- significant. They
+disagree because the differences are SKEWED: a few subjects where we are much more
+faithful carry the mean while the sign count stays a weak 61% majority. Quoting the z
+alone would be the flattering half of a split result.
+
+⚠⚠ **AND THE TWO COLUMNS ARE NOT THE SAME KIND OF NUMBER.** Ours is an EXACT expectation
+with zero draw error; theirs is ONE DRAW per subject. A paired test treats their noisy
+value as if it were fixed. Quantifying their draw noise needs repeated seeds, which is
+why 4 more seeds (124-127, 1,408 runs) were launched the same day.
+
+**OUR KNOB MOVES ALMOST NOTHING, BUT IT MOVES SYSTEMATICALLY.** Across the ENTIRE
+0.50 -> 0.80 range the median movement is **+0.000935 (+0.0935 points)** toward more
+faithful, and **44/44 targets move in that direction** (range +0.000877..+0.001054). The
+direction is systematic; the magnitude is not a utility story. ⚠⚠ And the LEVEL
+(0.176250) is reached at `acc_ceiling` 0.50, which is `eta` = 0 -- NO protection
+applied, ZERO target information. It is not ours to quote as a privacy result, and that
+column exists to make it visible.
+
+**THE BUILD EFFECT IS SMALL, and measuring it needed care.** The only like-for-like
+comparison available is HG00438 at capacity 0.3, because their own-build sweep is that
+ONE subject: **0.164090 on their build against 0.163284 on ours, a difference of
+-0.000806 (-0.08 points)**. ⚠⚠ I nearly set our 44-subject MEDIAN against their
+single-subject published figure, which would have manufactured a 1.27-point "build
+effect" out of a subject-versus-cohort mismatch. **HG00438 is the 12th most faithful of
+44 and sits 0.0135 BELOW the cohort median**, so it is not a stand-in for the cohort.
+Capacity is not the cause: HG00438 reads 0.163284 at 0.3 and 0.163313 at 0.9, the
+saturated plateau.
+
+⚠ **WHICH FIGURE GOES IN A TABLE: the 44-subject paired statistics, always.** HG00438
+alone appears ONLY in the build-effect footnote, labelled as one subject. The two numbers
+are the SAME quantity -- share of called cells altered, two-sided denominator -- under two
+SCOPES, and putting them adjacent without naming the scope is the mis-stamp the reporting
+contract exists to prevent. I did exactly that in a report before catching it.
+
+**Provenance** `logs/B_arm1_chr21/headtohead.md`, `logs/B_arm1_chr21/release.json`,
+`logs/B_arm1_chr21/endpoint.json`, `/home/ds85/pm_ourbuild/obf_out/<subject>/cap0p*/`.
+
+⚠ Three leftover `stats.json` from the timing investigation sat in a different layout and
+would have double-counted in a naive glob (355 against 352); removed. Usefully, one of
+them reproduced its grid point BYTE-IDENTICALLY, a free determinism check on seed 123.
+
+---
+
 ## 2026-10-27 (later still, 2) — B-EVL-arm1-chr21-grid: ARM 1 IS chr21 ONLY, and its grid is solved PER TARGET and verified by measurement
 
 **Scope change (Dylan, 2026-10-27).** Arm 1 exists to be directly comparable to

@@ -133,11 +133,47 @@ def _name_for(rel) -> str:
     return tau_dir(float(rel.tau))
 
 
-def point_dir(tau: float | None = None, *, eta: float | None = None) -> str:
+def ceiling_dir(acc: float | str) -> str:
+    """`'0.55'` -> `acc_0p55`, the directory for a CEILING-DRIVEN release.
+
+    ⚠⚠ WHY NEITHER `tau_dir` NOR `eta_dir` WILL DO. Arm 1's chr21 grid carries one
+    `eta_tau` PER TARGET at each `acc_ceiling` -- the per-target `c` spreads 35.7%,
+    so `eta` for a single column spans 24,743..28,825. Naming by `eta` would give 44
+    differently-named directories for ONE column: unpoolable, and the varying
+    parameter is no longer in a name the column shares.
+
+    ⚠⚠ AND `acc_ceiling` 0.50 IS `eta` = 0, whose `eta_dir` is `eta_0/` -- a
+    directory that ALREADY HOLDS the genome-wide eta grid's 22 parts and its genome
+    record. The chr21 cell would land inside another release's tree and nothing
+    would raise. That is the collision this namespace exists to prevent.
+
+    Two decimals, which is exact for every ceiling on the grid, and the name must
+    read back as exactly the label or this raises. `acc_*` can never collide with
+    `tau_*` or `eta_*`: the prefixes differ.
+    """
+    f = float(acc)
+    if not 0.5 <= f <= 1.0:
+        raise ValueError(
+            f"acc_ceiling must be in [0.5, 1.0], got {acc!r}. 0.5 is the untilted "
+            f"floor and 1.0 is a guaranteed attack; the released grid stops at 0.80.")
+    name = "acc_" + f"{f:.2f}".replace(".", "p")
+    back = float(name.removeprefix("acc_").replace("p", "."))
+    if back != f:
+        raise ValueError(
+            f"acc_ceiling={acc!r} does not survive its directory name {name!r} (it "
+            f"reads back as {back!r}). Two ceilings would share a directory.")
+    return name
+
+
+def point_dir(tau: float | None = None, *, eta: float | None = None,
+              ceiling: float | str | None = None) -> str:
     """The release directory for ONE operating point, named by whichever knob drove
-    it. Exactly one of `tau` / `eta`, mirroring `ffbs.release`."""
-    if (tau is None) == (eta is None):
-        raise ValueError("pass exactly one of tau= or eta=")
+    it. Exactly one of `tau` / `eta` / `ceiling`, mirroring `ffbs.release`."""
+    given = [x is not None for x in (tau, eta, ceiling)]
+    if sum(given) != 1:
+        raise ValueError("pass exactly one of tau=, eta= or ceiling=")
+    if ceiling is not None:
+        return ceiling_dir(ceiling)
     return tau_dir(tau) if eta is None else eta_dir(eta)
 
 
@@ -171,10 +207,22 @@ def _dir_for(rel, arm: str, root: str | Path | None = None,
 
 def existing_seeds(target_id: str, tau: float | None, arm: str,
                    root: str | Path | None = None, *,
-                   eta: float | None = None) -> list[int]:
-    """Seeds already written for this (target, `tau`, arm). The constraint-5 counter."""
-    d = release_root(root) / arm / target_id / (
-        eta_dir(eta) if eta is not None else tau_dir(tau))
+                   eta: float | None = None,
+                   point_name: str | None = None) -> list[int]:
+    """Seeds already written for this (target, point, arm). The constraint-5 counter.
+
+    ⚠ `point_name` is for a namespace this function cannot infer -- above all
+    `ceiling_dir`, where the directory is named by `acc_ceiling` while the knob
+    actually passed to the sampler is a per-target `eta`. Without it the caller
+    would query `eta_<that target's value>/`, a directory nothing ever writes, and
+    the resume check would report every cell missing while the completeness check
+    reported a run finished that wrote nothing.
+    """
+    if point_name is not None:
+        d = release_root(root) / arm / target_id / point_name
+    else:
+        d = release_root(root) / arm / target_id / (
+            eta_dir(eta) if eta is not None else tau_dir(tau))
     if not d.is_dir():
         return []
     seeds = set()
