@@ -53,6 +53,11 @@ REPO = Path(__file__).resolve().parents[1]
 ROOT = Path("/data/ds85/RanPanMixer/runs/beagle_attack/root")
 PUB = Path("/data/ds85/RanPanMixer/runs/beagle_attack/published")
 PM = REPO / "external" / "PanMixer"
+# ⚠ The truth arrays MUST come from the build the releases were sampled on. Pointed at
+#   PanMixer's tree while scoring our-build releases, `o != rel` compares a 340,824-site
+#   axis with a 340,849-site one -- a shape error if you are lucky and a silent
+#   misalignment if the two happen to match. `--starting-data` carries the axis.
+SD = PM / "starting_data"
 CHROM = "21"
 TAUS = ("0p00", "0p05", "0p10", "0p25", "0p50", "0p90", "0p99")
 TAU_LABEL = {"0p00": "0", "0p05": "0.05", "0p10": "0.1", "0p25": "0.25",
@@ -72,8 +77,8 @@ def load_changed(man: dict) -> dict:
     uncalled release row is not an obfuscation -- it is a position we never covered -- and
     counting it would inflate our x-coordinate against their curve.
     """
-    orig_all = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome.npy")
-    subs = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome_subjects.npy").tolist()
+    orig_all = np.load(SD / f"chr{CHROM}" / "pangenome.npy")
+    subs = np.load(SD / f"chr{CHROM}" / "pangenome_subjects.npy").tolist()
     # ⚠⚠ `pangenome_mask.npy` IS AN INDEX ARRAY, NOT A BOOLEAN MASK: 258,610 site
     # INDICES into the 340,824-site axis. This read it as `.astype(bool)`, which is
     # wrong twice -- it is True at every nonzero index (so 258,609 of 258,610 entries)
@@ -81,7 +86,7 @@ def load_changed(man: dict) -> dict:
     # `accuracy_stats.py:43` builds the boolean the way it is built below, and
     # `gap_score.py:101` uses it as indices. Nothing published came from this
     # function: it crashed before returning, and `--subset snp_only` is its default.
-    snp_idx = np.load(PM / "starting_data" / f"chr{CHROM}" / "pangenome_mask.npy")
+    snp_idx = np.load(SD / f"chr{CHROM}" / "pangenome_mask.npy")
     snp = np.zeros(orig_all.shape[1], dtype=bool)
     snp[snp_idx] = True
     out = {}
@@ -100,8 +105,12 @@ def load_changed(man: dict) -> dict:
     return out
 
 
-def collect(man: dict, changed: dict) -> dict:
-    """Read every result file. ⚠ A missing file RAISES: a partial table is worse than none."""
+def collect(man: dict, changed: dict, want=("beagle", "gap", "mia")) -> dict:
+    """Read every result file. ⚠ A missing file RAISES: a partial table is worse than none.
+
+    `want` names the evaluators this root was RUN for. An evaluator left out is reported as
+    `n/a` with a reason in every column -- never as an omitted row, and never as a zero.
+    """
     per = {}
     for r in man["rows"]:
         i, tau = r["row_id"], r["tau"]
@@ -116,14 +125,20 @@ def collect(man: dict, changed: dict) -> dict:
         rec["beagle_selfout"] = json.loads(f2.read_text()) if f2.exists() else None
 
         for name in ("gap_score", "diploid_gap_score"):
+            if "gap" not in want:
+                rec[name] = None
+                continue
             f = rowdir(EXP[name], i) / "gap_score_all.json"
             if not f.exists():
                 raise SystemExit(f"missing {f}")
             rec[name] = json.loads(f.read_text())
-        f = rowdir(EXP["MIA_privacy"], i) / "MIA_privacy.json"
-        if not f.exists():
-            raise SystemExit(f"missing {f}")
-        rec["MIA_privacy"] = json.loads(f.read_text())
+        if "mia" not in want:
+            rec["MIA_privacy"] = None
+        else:
+            f = rowdir(EXP["MIA_privacy"], i) / "MIA_privacy.json"
+            if not f.exists():
+                raise SystemExit(f"missing {f}")
+            rec["MIA_privacy"] = json.loads(f.read_text())
         per[i] = rec
     return per
 
@@ -150,26 +165,47 @@ def interp_published(x: float, curve: list) -> float:
 
 
 def main(argv=None) -> int:
-    global ROOT, TAUS
+    global ROOT, TAUS, SD
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path, default=ROOT)
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--subset", default="snp_only",
                     help="PRIMARY is snp_only -- the paper's 'SNPs overlapping with 1000G'")
+    ap.add_argument("--starting-data", type=Path, default=SD,
+                    help="the build the releases were SAMPLED on -- carries the site axis")
+    ap.add_argument("--only", default="beagle,gap,mia",
+                    help="evaluators this root was RUN for; the rest report n/a with a reason")
     a = ap.parse_args(argv)
+    want = tuple(x.strip() for x in a.only.split(",") if x.strip())
+    for w in want:
+        if w not in ("beagle", "gap", "mia"):
+            raise SystemExit(f"--only: unknown evaluator {w!r}")
+    if "beagle" not in want:
+        raise SystemExit("--only must include beagle: this table is built around it")
 
     # ⚠ `rowdir` reads the module-level ROOT, so `--root` used to change ONLY the
     # manifest: a second mirror's labels would have been printed over the FIRST
     # mirror's result files, with no error. ROOT and the grid now both come from it.
     ROOT = a.root
+    SD = a.starting_data
     man = json.loads((a.root / "manifest.json").read_text())
+    # ⚠ THE AXIS GUARD. The truth array and the releases must be the same build. Without
+    #   this, a mismatched `--starting-data` is caught only by luck.
+    _truth = np.load(SD / f"chr{CHROM}" / "pangenome.npy", mmap_mode="r")
+    if _truth.shape[1] != man["n_sites"]:
+        raise SystemExit(
+            f"AXIS MISMATCH: --starting-data {SD} has {_truth.shape[1]:,} sites but this "
+            f"root's releases have {man['n_sites']:,}. Point --starting-data at the build "
+            f"the releases were sampled on.")
     TAUS = tuple(man["taus"])
-    # ⚠ "eta_250" vs legacy "0p99": parse by namespace, never blindly
+    # ⚠ "eta_250" / "acc_0p50" / legacy "0p99": parse by namespace, never blindly.
+    #   `float("acc_0.50")` RAISES, which is how the acc_ grid first failed here.
     TAU_LABEL.update({
-        t: (f"{float(t[4:].replace('p', '.')):g}" if t.startswith("eta_")
+        t: (f"{float(t.split('_', 1)[1].replace('p', '.')):g}"
+            if t.startswith(("eta_", "acc_"))
             else f"{float(t.replace('p', '.')):g}") for t in TAUS})
     changed = load_changed(man)
-    per = collect(man, changed)
+    per = collect(man, changed, want)
     curve = published_curve()
     S = a.subset
 
@@ -179,6 +215,11 @@ def main(argv=None) -> int:
           f"{len(TAUS)} `tau` = {len(per)} releases, chr21, K = 86 release on their K = 88 axis.")
     print(f"Metrics are ROWS, `tau` is the COLUMN. Median over {n_t} targets unless stated.")
     print(f"⚠ PRIMARY subset `{S}` -- the paper's 'SNPs overlapping with 1000 Genomes'.")
+    print(f"⚠ Truth axis `{SD}` ({man['n_sites']:,} sites), asserted against the manifest.")
+    if set(want) != {"beagle", "gap", "mia"}:
+        print(f"⚠⚠ THIS ROOT WAS RUN FOR `{','.join(want)}` ONLY. Every row of a non-run "
+              f"evaluator reads `n/a (NOT RUN on this root)` -- that is an absence of "
+              f"measurement, NOT a null result, and must never be read as one.")
     print(f"⚠ Provenance `logs/B_arm1_attacks.md`; published values "
           f"`/data/ds85/RanPanMixer/runs/beagle_attack/published/PROVENANCE.md`.\n")
 
@@ -186,7 +227,12 @@ def main(argv=None) -> int:
     print("| " + " | ".join(hdr) + " |")
     print("|" + "---|" * len(hdr))
 
-    def row(label, fn, fmt="{:.6f}", pub=""):
+    NOTRUN = "n/a (NOT RUN on this root)"
+
+    def row(label, fn, fmt="{:.6f}", pub="", need=None):
+        if need is not None and need not in want:
+            print(f"| {label} | " + " | ".join([NOTRUN] * len(TAUS)) + f" | {pub} |")
+            return
         cells = []
         for t in TAUS:
             cells.append(fmt.format(fn(by_tau[t])) if by_tau[t] else "n/a")
@@ -242,29 +288,29 @@ def main(argv=None) -> int:
     print(f"| **GAP SCORE — rarity-weighted GENOTYPE linkage** | | | | | | | | |")
     row("`genotype_g_to_gstar`",
         lambda g: _med([v["gap_score"]["genotype_g_to_gstar"] for v in g]), fmt="{:,.1f}",
-        pub="no box statistic printed")
+        pub="no box statistic printed", need="gap")
     row("targets LINKED (Gap Score >= 0) of 44 *",
         lambda g: sum(1 for v in g if v["gap_score"]["genotype_g_to_gstar"] >= 0),
-        fmt="{:.0f}", pub="**55 of 100 Can Link** across their eps grid")
+        fmt="{:.0f}", pub="**55 of 100 Can Link** across their eps grid", need="gap")
     print(f"| **DIPLOID GAP SCORE — the HAPLOTYPE version** | | | | | | | | |")
     row("`haplotype_g_to_gstar`",
         lambda g: _med([v["diploid_gap_score"]["haplotype_g_to_gstar"] for v in g]),
-        fmt="{:,.1f}", pub="ablation, no numbers published")
+        fmt="{:,.1f}", pub="ablation, no numbers published", need="gap")
     row("targets LINKED (>= 0) of 44 *",
         lambda g: sum(1 for v in g if v["diploid_gap_score"]["haplotype_g_to_gstar"] >= 0),
-        fmt="{:.0f}", pub="")
+        fmt="{:.0f}", pub="", need="gap")
 
     # ---------------- MIA
     print(f"| **MEMBERSHIP INFERENCE** | | | | | | | | |")
     row("`hap_original_rank` of 44 *",
         lambda g: _med([v["MIA_privacy"]["hap_original_rank"] for v in g]), fmt="{:.1f}",
-        pub="**no number published**, either document")
+        pub="**no number published**, either document", need="mia")
     row("targets at rank 1 of 44 *",
         lambda g: sum(1 for v in g if v["MIA_privacy"]["hap_original_rank"] == 1),
-        fmt="{:.0f}", pub="'the red line falls within the bulk'")
+        fmt="{:.0f}", pub="'the red line falls within the bulk'", need="mia")
     row("`hap_bin_match_frac_vs_original`",
         lambda g: _med([v["MIA_privacy"]["hap_bin_match_frac_vs_original"] for v in g]),
-        pub="no number published")
+        pub="no number published", need="mia")
 
     # ---------------- the in-panel / out-of-panel control
     panel = set((PUB / "panel_samples.txt").read_text().split()) \

@@ -88,6 +88,52 @@ failure family as A3's positive control, which was also algebraically unable to 
   the region at 300 dpi and read the image before recording anything about it.
   **[Severity]** Would have produced a false claim about someone's manuscript.
 
+### A new directory namespace crashes every label parser that was taught only the LAST one
+
+**Symptom.** `ValueError: could not convert string to float: 'acc_0.50'`, raised from
+a label parser's `float(t.replace('p', '.'))`. THIRD occurrence of the same shape:
+the `tau_*` namespace was joined by `eta_*` and then by `acc_*`, and each parser was
+taught only the namespace that existed when it was written.
+
+**Where it has been found.** `scripts/beagle_attack_setup.py:point_label`,
+`scripts/arm1_af_ld_results.py:label_parts`, and
+`scripts/arm1_attacks_results.py:main`'s `TAU_LABEL` update (the third, found 2026-10-28
+when the Beagle grid was first aggregated). The `eta_` branch there was written as
+`t[4:]`, a fixed slice sized to `eta_` alone, so even the pattern of the previous fix
+did not generalise.
+
+**Proven fix.** Split on the FIRST underscore and match the namespace as a set, never a
+fixed slice. A bare `0p99` has no namespace and must keep the legacy branch:
+
+```python
+t.split("_", 1)[1] if t.startswith(("eta_", "acc_")) else t   # then replace p -> . and float()
+```
+
+⚠ This one is LOUD, which is the only reason it is cheap. The dangerous sibling is in
+the row below.
+
+### `--root` moved the manifest but NOT the result files, and a second mirror's labels printed over the first mirror's numbers
+
+**Symptom.** No error. A table whose COLUMN LABELS come from the root you asked for and
+whose NUMBERS come from a different root entirely. `scripts/arm1_attacks_results.py`
+read `ROOT` at module level inside `rowdir()`, so `--root` rebound only the local used
+for the manifest.
+
+**Proven fix.** `main` assigns the module-level `ROOT` (and now `SD`) from the parsed
+args before anything reads them, and the grid comes from the same manifest.
+
+**The same class, found and fixed 2026-10-28.** `load_changed` read the truth arrays from
+`external/PanMixer/starting_data` unconditionally while scoring OUR-build releases. Our
+chr21 axis is 340,849 sites and theirs is 340,824, so `o != rel` was comparing two
+different axes. **Fixed with a `--starting-data` flag AND an axis guard that asserts
+`truth.shape[1] == manifest["n_sites"]` before any row is read** — the guard was
+mutation-tested by pointing it at their tree, and it refuses with
+`AXIS MISMATCH: ... has 340,824 sites but this root's releases have 340,849`.
+⚠ Without the guard a flag like this is only caught by luck: two builds that HAPPENED to
+share a site count would have produced a full table of silently misaligned numbers. A
+path flag that selects an axis must assert the axis.
+
+
 ## The docs verifier itself
 
 ### A contract check reports SKIPPED when it should report FAILED

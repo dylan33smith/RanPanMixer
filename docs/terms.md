@@ -2786,6 +2786,94 @@ Aliases:              none. ⚠ NOT a measure of similarity to the TARGET -- tha
                       `target_fidelity`, and coherence is deliberately blind to it.
 ```
 
+### beagle_accuracy  [privacy] [evaluation]
+```
+Is:                   PanMixer's Beagle RECONSTRUCTION attack's accuracy: the share of
+                      xsol-selected called cells where the genotype Beagle imputes from
+                      the released row, against the 1000G reference panel, equals the
+                      TRUTH. It is THEIR field name. ⚠⚠ It is NOT a privacy figure on
+                      its own and must never be quoted alone -- the published statistic
+                      is the DIFFERENCE `beagle_accuracy` - `major_allele_accuracy`,
+                      because an imputer that merely guesses the common allele already
+                      scores high at every setting.
+Computed by:          external/PanMixer/tools/beagle/accuracy_stats.py:compute_accuracy,
+                      after external/PanMixer/tools/beagle/beagle_refinement.py runs
+                      Beagle 5.4. Driven here by scripts/beagle_attack_one.py (their
+                      code CALLED, never copied) and aggregated by
+                      scripts/arm1_attacks_results.py.
+CHANGES MEANING WITH: the REFERENCE PANEL, decisively. Their published Methods exclude
+                      the target from the panel; their own beagle_refinement.py passes
+                      no `excludesamples=` at all, so 39 of our 44 targets are IN the
+                      panel and Beagle may copy a target's own true row out of the
+                      reference. The two protocols are separate columns, never one
+                      number. Also with the xsol mask and the variant subset
+                      (`snp_only` is PRIMARY, per their Methods).
+Valid vs:             `major_allele_accuracy` on the SAME release, same mask, same
+                      subset -- that difference is the published statistic. ⚠ Never
+                      across builds without saying so (decision F).
+Status:               REPORTED, ARM 1. **Measured 2026-10-28 on all 308 Arm 1 chr21
+                      releases, our one build, `snp_only`, median over 44: the
+                      difference against the major-allele baseline is NEGATIVE at every
+                      point of the `acc_ceiling` 0.50-0.80 grid, -0.046384 to
+                      -0.044885.** ⚠⚠ The flatness across that grid is a POWER
+                      statement, not a null result: the per-position tilt there is
+                      `eta_tau` x `beta_v` ~ 0.00124, and the grid's whole fidelity
+                      movement is below single-draw noise. Provenance
+                      `logs/B_arm1_beagle_acc/beagle_acc.md`.
+Aliases:              none. ⚠ NOT `obfuscated_accuracy`, which is the RELEASE's own
+                      agreement with the truth before any attack runs.
+```
+
+### major_allele_accuracy  [privacy] [evaluation]
+```
+Is:                   The BASELINE Beagle is scored against: the accuracy of answering
+                      every scored cell with the panel's major allele, ignoring the
+                      release entirely. It is THEIR field name and THEIR choice of
+                      baseline, and it is the reason the published statistic is a
+                      difference.
+Computed by:          external/PanMixer/tools/beagle/accuracy_stats.py:compute_accuracy,
+                      reported per variant subset alongside `beagle_accuracy`.
+CHANGES MEANING WITH: the variant subset, very strongly -- a MAF-filtered subset has a
+                      more predictable major allele, so the baseline RISES and the
+                      published difference falls. `snp_only` is the PRIMARY subset. Also
+                      with the xsol mask.
+Valid vs:             `beagle_accuracy` on the same release, mask and subset. It is a
+                      floor, not an endpoint, and carries no privacy meaning alone.
+Status:               REPORTED, ARM 1, as the denominator of the published statistic.
+                      **Measured 2026-10-28, `snp_only`, median over 44 at
+                      `acc_ceiling` 0.50: 0.894229 against a `beagle_accuracy` of
+                      0.842233 on the same cells** -- the attack is 5.2 points BELOW
+                      the baseline that ignores our release. Provenance
+                      `logs/B_arm1_beagle_acc/beagle_acc.md`.
+Aliases:              "their baseline". Never "the null", which invites reading a
+                      failed attack as a passed bound (standing constraint 4).
+```
+
+### reconstruction_accuracy  [privacy] [evaluation]
+```
+Is:                   PanMixer's measure of how much of what the release CHANGED the
+                      attack puts back: the share of cells the release altered away
+                      from the truth at which Beagle's imputation restores the true
+                      genotype. Restricted to altered cells, so it is not comparable to
+                      `beagle_accuracy`, whose denominator is every scored cell.
+Computed by:          external/PanMixer/tools/beagle/accuracy_stats.py:compute_accuracy.
+CHANGES MEANING WITH: the reference panel (see `beagle_accuracy`) and the number of
+                      cells the release altered -- a release that changes almost
+                      nothing has a tiny, noisy denominator, which is what makes
+                      PanMixer's own low-`capacity` settings look fragile.
+Valid vs:             the same tool across its own knob at a matched subset. ⚠ Across
+                      tools only at a matched altered-cell count, which is why their
+                      Fig S2 is drawn against an obfuscated-variant x-axis.
+Status:               REPORTED, ARM 1. **Measured 2026-10-28 across the `acc_ceiling`
+                      0.50-0.80 grid, `snp_only`, median over 44: 0.225460-0.232528,
+                      flat.** ✅ The panel-membership control separates nothing
+                      (IN-panel 0.2254-0.2366 against OUT-of-panel 0.2165-0.2345 on
+                      n = 5), so none of it comes from Beagle copying an in-panel
+                      target's own row. Provenance
+                      `logs/B_arm1_beagle_acc/beagle_acc.md`.
+Aliases:              none.
+```
+
 ### obfuscated_accuracy  [utility] [evaluation]
 ```
 Is:                   PanMixer's own measure of how much of the TARGET a release still

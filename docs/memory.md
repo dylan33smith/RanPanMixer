@@ -104,6 +104,131 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-28 (latest, 3) — B-EVL-beagle-acc + B-ATK-arm2-a34: PanMixer's Beagle attack on the 0.50-0.80 grid, and WHY EVERY AGGREGATE STATISTIC ON THAT GRID IS FLAT
+
+**Goal.** Close the 0.50-0.80 re-run queue: Arm 2's A3/A4 at chr21 share 1.0, and
+PanMixer's Beagle reconstruction attack on all 308 Arm 1 chr21 releases, both on OUR
+one build. Queue `logs/B_acc_arm2/queue.log`, exit 0, fail=0; Beagle 308/308 asserted
+from disk, 0 nonzero sentinels, wall 8321.88 s at NPAR=8 x 6 threads.
+
+### Result 1 — Arm 2's A3/A4, and A3's control is the thing worth reporting
+
+`logs/B_acc_arm2/a34_acc.md` + `a34_acc.json`, 10 targets x 25 draws x 7 `eta`, 30 workers,
+2651 s. **No condition exceeded `p_succ_bound` significantly in either attack**
+(Bonferroni z_crit 2.82 over 21 A3 cells, 4.51 over 15,603 A4 block-cells); A3 peaks
+at 0.5980 and A4 at 0.5990.
+
+⚠⚠ **A3's PRE-REGISTERED POSITIVE CONTROL CANNOT FAIL, so its 1.0000 (30/30) is not a
+power statement.** Their score sums `-log P_HWE` only where genotypes AGREE, mismatches
+contribute zero and the weights are non-negative, so `score(p, q)` is a SUBSET SUM of
+`score(p, p)` and `Lambda > 0` is algebraically forced. The control verifies the site
+axis, the genotype encoding and the weights — the plumbing — and nothing about power.
+Same rule that retired my own unfalsifiable `_a3_for` gate earlier the same day.
+
+✅ **The power curve replaces it** and is the useful number. Verbatim-leak fraction `f`
+against A3 accuracy: `D1_extremal` 0.5000 at f = 0, 0.0001 and 0.001, then **0.9900 at
+f = 0.01**; `D2_nearest` 0.5700 / 0.5700 / 0.5900 / **0.8000**. So A3 resolves a >= 1%
+verbatim leak and is BLIND at 0.1%. That is what its null rules out, and no more.
+
+✅ **A4's control IS non-vacuous and passed properly**: a 4,096-position block copied
+verbatim from the target was the argmax block in 30 of 30 pairs.
+
+⚠ A3's `D1_extremal` row is exactly 0.5000 at all 7 labels — the same subset-sum
+degeneracy that makes Arm 1's A3 `D1_extremal` row TPR 1.0000 / TNR 0.0000. Two arms,
+one cause, and it is the condition A3 is constitutionally unable to discriminate.
+
+### Result 2 — Beagle on 308 Arm 1 releases: flat and NEGATIVE at every point
+
+`logs/B_arm1_beagle_acc/beagle_acc.md` + `beagle_acc.json`, 44 targets x 7 `acc_ceiling`, chr21,
+K = 86 leave-one-out release scored on their K = 88 axis, PRIMARY subset `snp_only`,
+median over 44. THE PUBLISHED STATISTIC, `beagle_accuracy` - `major_allele_accuracy`:
+
+| acc_ceiling | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|---|
+| ours | -0.046384 | -0.044739 | -0.045508 | -0.046010 | -0.045470 | -0.044975 | -0.044885 |
+
+✅ **Negative at every point: Beagle reconstructs our release WORSE than the trivial
+major-allele guess, by ~4.5 points, across the whole grid.** `reconstruction_accuracy`
+0.2255-0.2325; the panel-membership control separates nothing (IN-panel 0.2254-0.2366
+against OUT-of-panel 0.2165-0.2345 on n = 5), so none of the reconstruction is coming
+from Beagle copying an in-panel target's own row.
+
+⚠⚠ **BUT WE SIT ABOVE THEIR DIGITIZED CURVE AND THAT IS THE DIRECTION AGAINST US.** At
+our ~81,500 altered `snp_only` cells their Fig S2 digitization interpolates to -0.1491,
+and we measure -0.0449: Beagle recovers ~0.104 MORE from our release than their curve
+does at a matched obfuscated-variant count. ⚠ That compares OUR digitization of THEIR
+figure across different builds (decision F) and is not a table-to-table comparison.
+
+⚠ `exclude-self` NOT run, by Dylan's decision 2026-10-28, so the PAPER-FAITHFUL column
+is `n/a` and only their code's own no-exclusion protocol is reported. 39 of 44 targets
+are in the 1000G panel. The 44 per-target panels exist; ~2.2 h to add.
+
+### ⚠⚠ THE FINDING THAT MATTERS: THE WHOLE GRID IS WITHIN DRAW NOISE, AND THAT IS ARITHMETIC
+
+Every aggregate statistic measured on these 308 releases is flat across
+`acc_ceiling` 0.50-0.80, and this was chased to its cause rather than reported:
+
+| statistic, `snp_only`, median over 44 | 0.50 (`eta_tau` = 0) | 0.80 (`eta_tau` ~ 27,540) | paired sign test |
+|---|---|---|---|
+| `beagle_accuracy` - `major_allele_accuracy` | -0.046384 | -0.044885 | p = 0.2912 |
+| cells differing from the target | 81,486 | 81,304 | p = 0.1742 |
+| agreement where the target is NON-REFERENCE | 0.436534 | 0.440960 | p = 0.1742 |
+| agreement where the target is reference | 0.916225 | 0.916911 | p = 0.4512 |
+
+Ruled out, in order, each by measurement:
+
+1. **NOT a plateau bug / not the common-random-numbers defect.** Adjacent ceiling points
+   differ in ~72,000 `snp_only` cells per target — about as far apart as either is from
+   the truth (~74,000). The releases are genuinely re-drawn. (Occurrence five of that
+   defect would have looked exactly like this table, which is why it was checked first.)
+2. **NOT the donor panel.** Under Arm 1's leave-one-out the 86 donor haplotypes still
+   carry the target's own allele at a median **97.51%** of its non-reference `snp_only`
+   cells (range 0.9638-0.9872, n = 44, best-donor-per-position so a LOOSE upper bound).
+   The release reaches 44%. The wall is not reachability.
+3. **IT IS `eta_tau` * `beta_v`.** `utility.tilt_potentials` is
+   `psi_t(j) = exp(eta_tau * beta_v * phi_v)` — the per-position tilt is `eta_tau` TIMES
+   `beta_v`, not `eta_tau`. Arm 1's chr21 `beta_share` is ~0.0150249 over T = 332,521, so
+   mean `beta_v` ~ 4.52e-08 and the per-position log-odds boost at `acc_ceiling` 0.80
+   is `27,540 * 4.52e-08` ~ **0.00124**: a multiplicative preference of **1.0012** for
+   carrying the target's allele. Nothing per-cell can move at that tilt.
+
+✅ **AND IT RECONCILES WITH A1 RATHER THAN CONTRADICTING IT.** A1 climbs 0.500000 ->
+0.706818 on these same releases because the likelihood ratio AGGREGATES that
+infinitesimal per-position signal over 332,521 positions (`d_logz` median +261.243 at
+0.80). The privacy budget binds on the aggregate; every marginal, reconstruction and
+per-cell statistic sees essentially the untilted baseline. **An optimal aggregate test
+reaches 0.707 while no per-cell statistic moves at all.**
+
+✅✅ **THIS IS THE 2026-10-23 `eta` RESPONSE CURVE, CONFIRMED FROM THE SAMPLED SIDE.**
+That curve put the Pinsker bound going vacuous at chromosome-scope `eta` ~ 860 with
+**1.14%** of the recoverable utility recovered (genome-wide: `eta` ~ 5,642 and
+**0.15%**). The 0.50-0.80 grid lives entirely inside that regime. The useful and private
+regimes do not overlap, and this is the first time it has been shown on released objects
+rather than on exact expectations.
+
+⚠⚠ **SO EVERY "FLAT" AND "NO TREND" ABOVE IS A POWER STATEMENT, NOT A NULL RESULT, and
+must never be written up as one.** `docs/data.md` already records the exact posterior
+calculation on these same 308 releases moving `target_fidelity` **44/44 targets in the
+faithful direction**, median **+0.0935 points** across the whole 0.50-0.80 range. A
++0.09-point move cannot be resolved by one draw per cell against a within-target spread
+of 2,213 cells (**2.71%** of the differing-cell count). The mechanism moves fidelity
+monotonically; the measurement here is too coarse to see it, and the exact calculation
+is the instrument that can. Standing constraint 4 in its utility-side form.
+
+**What this does NOT establish.** Nothing about whether the grid is the right operating
+regime — that is a choice, and this entry gives it a price: across 0.50-0.80 the
+measurable fidelity gain is below single-draw noise while A1's attainable accuracy goes
+0.500 -> 0.707. Nor does it license any claim from Beagle's flatness: a statistic that
+cannot resolve the grid cannot certify it.
+
+**Provenance.** `scripts/arm1_attacks_results.py` (three fixes this session, below),
+root `/home/ds85/beagle_acc_ourbuild/root`, truth axis
+`/home/ds85/pm_ourbuild/starting_data` (340,849 sites, asserted against the manifest).
+Diagnostics were scratch scripts, not committed; their numbers are quoted here with
+their n and denominators so they can be re-derived.
+
+---
+
 ## 2026-10-27 (latest, 5) — B-ATK-arm1-spec: the acc_ceiling LABEL is the D1_extremal ceiling ONLY, and a PRE-RUN prediction
 
 **Status: SPEC AND INSTRUMENT CHECK ONLY. No powered attack has run in Arm 1.** This
