@@ -104,6 +104,64 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-27 (latest, 3) — B-EVL-pm-draw-noise: five draws settle the split result, and the two tests now AGREE
+
+**Goal.** The paired head-to-head disagreed with itself: the sign test said p = 0.174
+and the paired mean said z = -3.26. Our column is an EXACT expectation while theirs was
+ONE DRAW, so the obvious suspect was their draw noise, which the test was treating as
+zero. Measure it instead of arguing about it.
+
+**Method.** Four more seeds (124-127) over all 352 cells = 1,408 further PanMixer
+obfuscations on our build, giving **5 draws per (subject, capacity)**. exit 0 on all
+1,408, 48:20.67 wall at 40 thread-pinned workers. ⚠ The 37.9 MB `obfuscated.vcf.gz` was
+deleted per run: these draws exist only for `stats.json`, and keeping 1,408 of them
+would have cost 53 GB for nothing. The seed-123 tree keeps its VCFs -- that is the one
+the attacks consume.
+
+**THEIR DRAW NOISE, measured:**
+
+| | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.7 | 0.9 |
+|---|---|---|---|---|---|---|---|---|
+| within-cell sd, median | 6.80e-06 | 5.25e-05 | 1.20e-04 | 7.96e-04 | 9.86e-04 | 9.89e-04 | 9.89e-04 | 9.89e-04 |
+| between-subject sd | 3.24e-04 | 2.95e-03 | 5.53e-03 | 8.88e-03 | 1.01e-02 | 1.01e-02 | 1.01e-02 | 1.01e-02 |
+
+At saturation the draw sd is **9.888e-04 against a between-subject sd of 1.007e-02**, so
+draw noise is **9.8% of the biological spread** -- small, but it was not zero and the
+paired test had been assuming it was. The SEM of a 5-draw mean is 4.422e-04.
+
+**AND IT FLIPPED THE CONCLUSION FROM EQUIVOCAL TO UNAMBIGUOUS.** Our `acc_ceiling` 0.80
+against their saturation, same 44 subjects, same build:
+
+| | vs ONE draw (seed 123) | vs MEAN of 5 draws |
+|---|---|---|
+| we are more faithful in | 27/44 | **33/44** |
+| median difference | -0.001023 | -0.000972 |
+| mean difference | -0.001197 | -0.001528 |
+| sd of difference | 0.002437 | 0.001929 |
+| sign test (exact, two-sided) | p = 0.174 | **p = 0.00126** |
+| paired z | -3.26 | **-5.25** |
+
+✅ **THE SIGN TEST AND THE PAIRED TEST NOW AGREE.** The earlier split was their draw
+noise flipping marginal subjects' signs: the median difference barely moved (-0.001023
+-> -0.000972) while the sd fell and the sign count jumped 27 -> 33. That is the signature
+of removing noise rather than of changing the estimate -- the central value is stable and
+the dispersion shrinks.
+
+⚠ **STILL ASYMMETRIC, and it must be stated.** Ours remains an EXACT expectation with no
+draw error; theirs is now a 5-draw mean with SEM 4.422e-04 against a mean difference of
+1.528e-03. Residual noise is ~29% of the effect, down from ~66%. Not eliminated.
+
+⚠ The conclusion this licenses is narrow: at OUR STRONGEST setting against THEIR
+SATURATION we alter fewer called cells, in 33 of 44 subjects. It says nothing about the
+rest of their range, where they offer a frontier from 1.16% and we do not -- and our own
+level is reached at `eta` = 0, so the comparison is between two release FORMS, not
+between two privacy knobs.
+
+**Provenance** `/home/ds85/pm_ourbuild/obf_draws/<subject>/cap0p*/s12[4-7]/`,
+`/home/ds85/pm_ourbuild/logs/obf_draws.log`.
+
+---
+
 ## 2026-10-27 (latest, 2) — B-EVL-arm1-chr21-headtohead: ONE BUILD, SAME 44 INDIVIDUALS, and the comparison finally has no build confound
 
 **Goal.** The decision-F head-to-head: both tools on OUR GRCh38 build, chr21, the same
