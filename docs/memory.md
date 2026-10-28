@@ -7862,3 +7862,61 @@ across conditions.
 holds. A1's null is the strongest available because A1 is provably optimal FOR ITS PAIR --
 it says nothing about a pair we did not test, and D2's decoy pool is the other 43 cohort
 members rather than a wider panel, which flatters us.
+
+## 2026-10-28 — B-ATK-arm2-acc: ARM 2's A1 on the reported grid, and it lands where ARM 1 did
+
+**The run.** `scripts/arm2_attack.py --etas 0.0 75.7 151.4 227.1 302.8 378.5 454.19
+--acc-ceiling <7 measured pairs> --draws 25 --targets 10 --weights uniform --workers 30`.
+chr21, **K = 88, share 1.0, nothing held out** (arm 2's target is external by
+construction). 10 targets x 25 draws x 7 points = **1,750 trials, 7,000 releases**,
+exit 0, started 12:43 and done 13:36. Provenance `logs/B_acc_arm2/a1_acc.md` + `.json`.
+**The first ARM 2 attack evidence on the grid the paper reports** -- the 2026-10-25 run
+sat at `acc_ceiling` {0.500, 0.5227, 0.5453, 0.6145, 0.7559, **1.0000**}, whose top point
+is vacuous and only whose 0.50 point is shared with this grid.
+
+| `acc_ceiling` | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|---|
+| `eta` | 0.0 | 75.7 | 151.4 | 227.1 | 302.8 | 378.5 | 454.19 |
+| D1_extremal | 0.5000 | 0.5140 | 0.5660 | 0.6280 | 0.6540 | 0.7260 | **0.7080** |
+| D2_nearest | 0.5000 | 0.5120 | 0.5340 | 0.5520 | 0.5840 | 0.5900 | 0.6260 |
+| D3_random | 0.5000 | 0.5580 | 0.5500 | 0.5380 | 0.5860 | 0.6080 | 0.6080 |
+
+✅ **NO CONDITION SIGNIFICANTLY EXCEEDS ITS EXACT `acc_ceiling` AT ANY POINT.** Same
+verdict as Arm 1, now independently in the external-target arm, where nothing is held out.
+
+⚠⚠ **THE CROSS-ARM AGREEMENT, AND WHAT IT IS NOT.** The optimal attacker reaches
+**0.7080** at the 0.80 label here against **0.706818** in Arm 1 -- within 0.0012 of each
+other, against the same 0.800 bound. ⚠ This is NOT two measurements of one quantity
+agreeing. The two arms release **different objects**: Arm 1 is chr21 carrying the
+GENOME-NORMALISED share 0.0150249 under K = 86 leave-one-out; Arm 2 is chr21 at share
+**1.0** under the full K = 88 with nothing held out. What agrees is where the
+Neyman-Pearson optimum LANDS against a bound the two were matched on by `acc_ceiling` --
+which is exactly what matching on `acc_ceiling` rather than on `eta_tau` is supposed to
+buy (standing constraint 7). Report it as that, never as a reproduction.
+
+⚠ **ONE POINT-ESTIMATE EXCEEDANCE, IN THE ZONE THE DESIGN CANNOT RESOLVE.** D3_random at
+the 0.55 label reads 0.5580 against its ceiling of 0.5500: **+0.0080, z = +0.36**,
+nowhere near the Bonferroni z_crit of 2.82 over 21 cells. And `delta` = 0.0556 at
+250 trials per cell per arm, so a cell RESOLVES only where the ceiling exceeds 0.5556 --
+the 0.55 and 0.60 columns are below that and the CEILING is the stronger statement there;
+the attack adds nothing. The exceedance sits inside exactly that band.
+
+⚠ **TWO OF THE SCRIPT'S OWN OUTPUT LINES READ AS A CONTRADICTION AND ARE NOT ONE.** It
+prints the point-estimate exceedance above AND then "no condition exceeded the exact
+`acc_ceiling` at any eta". Checked against `arm2_attack.py:485-505` rather than assumed:
+a cell over the bound goes to `violations` only when z > z_crit and otherwise to `notes`,
+and the second line is the `else` of `if violations`. So it means "none exceeded
+SIGNIFICANTLY" and omits the word. Both facts are printed and nothing is hidden, but the
+wording will mislead a reader who sees only one line.
+⚠ The same message calls the bound `p_succ_bound` while the figure it compares is the
+supplied exact `acc_ceiling`. Harmless here only because `p_succ_bound` is ~1.0 at every
+one of these etas and so cannot fail -- which is why `--acc-ceiling` exists.
+
+⚠⚠ **A SCOPE SPLIT TO STAMP, NOT TO POOL (Dylan's 2026-10-28 decisions).** Arm 2's ATTACK
+evidence is chr21 at share 1.0 -- the only scope the attack driver implements -- while
+Arm 2's UTILITY sweep is to be GENOME-WIDE over all 10 targets. Those are two different
+released objects and **may never appear in one table**. Genome-wide attacks would need a
+chromosome axis in the driver, which does not exist.
+⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample panel, so it is a
+LOWER BOUND on decoy difficulty and flatters us. The three conditions share each release
+and must not be pooled.
