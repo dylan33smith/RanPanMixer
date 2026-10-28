@@ -7586,12 +7586,77 @@ num 297.584444050 / count 7463, both diff 0.000e+00 on numerator, denominator an
 r^2 is non-nan in BOTH the original and the substituted cohort, so it moves with the
 release (7,462 for ours against 7,463 for theirs on HG00438). "Per pair" is a ratio of sums
 over a varying n; never pool the numerators across rows.
-⚠ TWO SHIPPED QUIRKS, applied to both sides, so they do not bias the comparison but do
-bound what it means: the LD window is 5 POSITION UNITS and not 5 kb (`ld_loss.py:107`), and
-`p_AB` uses `(x == 1) & (y == 1)` on arrays where -1 became nan — `nan == 1` is False — so a
-missing cell counts as a non-AB observation while `p_A` and `p_Bs` exclude it via `nanmean`.
-The two terms of D use different denominators. Only allele code 1 counts, so multi-allelic
-sites are collapsed.
+[INCORRECT] - ⚠ TWO SHIPPED QUIRKS, applied to both sides, so they do not bias the comparison but do bound what it means: the LD window is 5 POSITION UNITS and not 5 kb (`ld_loss.py:107`), and `p_AB` uses `(x == 1) & (y == 1)` on arrays where -1 became nan — `nan == 1` is False — so a missing cell counts as a non-AB observation while `p_A` and `p_Bs` exclude it via `nanmean`. The two terms of D use different denominators. Only allele code 1 counts, so multi-allelic sites are collapsed.
+[CORRECTION - 2026-10-28]: **"APPLIED TO BOTH SIDES" IS NOT "DOES NOT BIAS THE
+COMPARISON", AND I WROTE THAT IN THE SAME ENTRY AS THE RESULT IT INVALIDATES.** An
+identical rule has an ASYMMETRIC effect whenever it keys on a property the two tools do
+not share. Both quirks do. Measured on the real arrays by
+`scripts/arm1_afld_sensitivity.py`, provenance `logs/B_arm1_afld_ourbuild/sensitivity.md`:
+
+⚠⚠ **`af_loss` AS SHIPPED CANNOT SETTLE THIS COMPARISON, AND THE REASON IS STRUCTURAL
+RATHER THAN A QUIRK.** `-1` is an ordinary allele key, so a cell whose called/uncalled
+status FLIPS scores exactly like an allele swap. What that penalises is **divergence from
+the master row, not the count of -1 cells**, and the two mechanisms differ there by
+construction:
+
+| release uncalled count | range | distinct values | correlation with the master row |
+|---|---|---|---|
+| ours | 16,656–16,666 | **5** | **-0.3190** |
+| theirs | 7,113–54,955 | 44 | **+0.9991** |
+| the master row itself | 7,561–55,191 | 44 | — |
+
+Our mechanism emits a **fixed-support path** — essentially the same uncalled set for every
+target — while PanMixer edits a **copy of the target's own row**, so its missingness
+tracks the master almost perfectly. Genuine allele swaps are within **1%** of each other
+(median 111,615 ours against 112,922 theirs); we flip the called/uncalled status of
+**10.9x** more cells, for **44/44** individuals. THREE DEFENSIBLE -1 POLICIES, AND THEY
+DISAGREE ABOUT WHO WINS:
+
+| -1 policy | ours | theirs | we are lower | sign p | z |
+|---|---|---|---|---|---|
+| `shipped` (-1 is an allele) | 0.003580 | 0.002841 | **0/44** | 1.14e-13 | +25.28 |
+| `called` (-1 dropped, renormalised) | 0.003654 | 0.003251 | **1/44** | 5.12e-12 | +14.98 |
+| `genotype_only` (missingness held fixed) | 0.002737 | 0.002763 | **31/44** | 0.00956 | -4.58 |
+
+So the verdict runs from "they win on all 44 at p = 1e-13" to "**we** win 31 of 44 at
+p = 0.01" with **nothing about either mechanism changing** — only the bookkeeping for
+cells neither tool is really disagreeing about. ⚠ Publish the SHIPPED figure, because it
+is what a reader of their paper reproduces, and publish that it is POLICY-DEPENDENT. The
+earlier flat claim that they distort allele frequencies less "at every capacity for every
+one of the 44" is TRUE OF THE SHIPPED METRIC ONLY and must never be quoted bare.
+
+⚠⚠ **`ld_loss` AND THE MIXED DENOMINATOR — THIS ONE MOVES A HEADLINE.** `p_A` and `p_Bs`
+are `nanmean`s over the NON-MISSING cells while `p_AB = nanmean((xs == 1) & (ys == 1))` is
+a nanmean over a BOOLEAN array, which holds no NaN because `np.nan == 1` is False, so it
+always divides by 88. D mixes the two. With `p_AB` taken over the cells non-missing in
+BOTH: ours 0.002146 against theirs 0.002800 — **our advantage is 1.30x, NOT the 7.53x the
+shipped code reports.** ⚠ And the shipped figure is not a mean over 7,462 pairs in any
+useful sense: its largest **6 pairs of ~7,500** carry **94%** of THEIR total and 60% of
+ours, against 16% and 10% under a consistent denominator. ✅ The smaller advantage is the
+MORE robust one — **44/44** at p = 1.14e-13, against 40/44 at p = 1.71e-08.
+
+⚠ The SHIPPED figures stay the ones to publish: they are what a reader of PanMixer's paper
+can reproduce, and the counterfactuals are ours, not theirs. But **7.53x must never be
+quoted without 1.30x beside it**, and the 5-position-unit window and the multi-allelic
+collapse to `allele == 1` still stand as stated.
+
+⚠⚠ **HOW THIS WAS CAUGHT, because the method matters more than the finding.** A five-lens
+adversarial audit of the staging (`verify-afld-staging`, 6 agents, 781,711 subagent
+tokens, 28:10), run after the fan-out and BEFORE its tables were believed. Four lenses
+returned no defect: build/axis consistency, CSV row order against the manifest across all
+660 rows, which pangenome row gets replaced, and output/log collisions. The fifth — "are
+ours and theirs actually comparable under these evaluators as shipped" — raised both
+findings above, and **both of its predictions reproduced on independent re-measurement,
+to every digit**: `ld_loss` 0.002146 / 0.002800 / 44/44 / 1.30x, and `af_loss`
+genotype-only 0.002737 / 0.002763 / 31/44 / p = 0.00956.
+⚠⚠ **AND I BRIEFLY DISMISSED THE SECOND ONE WRONGLY, which is worth recording.** I read
+the 4-subject x 3-variant demonstration in its evidence — which exists only to show that
+-1 scores identically to a real swap — as the SOURCE of its 31/44, and said so. It was
+not: that figure came from all 660 staged arrays. My own first counterfactual ("called")
+gave 1/44 and I treated the disagreement as its error rather than as two different
+questions. **The lesson is not "distrust the audit" but "when a verifier disagrees with
+you, find out which question each of you answered"** — here both answers are correct and
+the gap between them IS the finding.
 ⚠ `acc_ceiling` 0.50 is `eta` = 0 — NO protection — so its column is a floor, not a
 privacy level.
 ⚠⚠ CROSS-OPERATING-POINT REMAINS, and no build fix touches it: `capacity` is a utility-loss

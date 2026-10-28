@@ -1710,3 +1710,51 @@ runs**, so `${name}` on the same line is still unset at expansion time; the left
 assignment order people expect applies to the builtin's execution, not to the expansion.
 ⚠ This is the failure mode `set -u` exists for: loud and immediate instead of four jobs
 overwriting one path. Keep `set -u` in every fan-out harness.
+
+## ["Applied identically to both sides" is not "does not bias the comparison"] -> [Ask what property the identical rule keys on, and whether the two sides share it]
+
+**Symptom.** Both of PanMixer's in-graph utility evaluators were run unmodified on our
+releases and on theirs, against one build, with the same 44 people — and the resulting
+headline figures were recorded, and committed, as a settled split: `af_loss` "they are
+lower for 0 of 44, p = 1.14e-13" and `ld_loss` "we are lower for 40 of 44, ~7.5x". The
+entry asserting them also asserted that the evaluators' shipped quirks, "applied to both
+sides, so they do not bias the comparison". **That reasoning is wrong, and both headlines
+move when it is tested** (`scripts/arm1_afld_sensitivity.py`,
+`logs/B_arm1_afld_ourbuild/sensitivity.md`).
+
+An identical rule has an **asymmetric** effect whenever it keys on a property the two
+sides do not share. Both quirks do:
+
+**`af_loss`** treats an uncalled cell as an ordinary allele, so a cell whose
+called/uncalled status flips scores exactly like an allele swap. What that penalises is
+divergence from the row being replaced, and the two mechanisms differ there **by
+construction**: our release is a fixed-support path (uncalled 16,656..16,666, only 5
+distinct values over 308 releases, correlation with the master row's own uncalled count
+-0.32) while PanMixer edits a copy of the target's row (44 distinct values, +0.9991).
+Genuine allele swaps are within 1% (111,615 against 112,922). Across three defensible
+policies the verdict is 0/44, 1/44, then **31/44 the other way** (p = 0.00956) once the
+missingness skeleton is held fixed. Nothing about either mechanism changes between them.
+
+**`ld_loss`** computes `p_A` and `p_Bs` as `nanmean`s over the non-missing cells but
+`p_AB = nanmean((xs == 1) & (ys == 1))` over a BOOLEAN array, which holds no NaN because
+`np.nan == 1` is False — so it always divides by 88 and D mixes two denominators. Our
+advantage is **1.30x, not 7.53x**; and the shipped figure's largest **6 pairs of ~7,500
+carry 94%** of their total, so it is not a mean over 7,462 pairs in any useful sense.
+
+**Proven fix.** `scripts/arm1_afld_sensitivity.py` measures each evaluator under its
+shipped rule and under one counterfactual, paired over the same 44, and prints the
+support-divergence table that explains the `af_loss` result. The shipped figures stay the
+ones to publish — they are what a reader of PanMixer's paper reproduces — but every quote
+carries its policy dependence.
+
+⚠ **The test to apply, not the number to remember.** "Both sides get the same treatment"
+licenses nothing on its own. Name the property the rule keys on, then measure whether the
+two sides share it. Here they provably do not, and it was knowable before the fan-out ran.
+⚠ **How it was caught, and how it was nearly missed twice.** A five-lens adversarial audit
+of the staging. Four lenses found no defect; the fifth found both of these. It was then
+nearly discarded: its evidence included a 4-subject toy demonstrating that -1 scores like
+a swap, and that toy was mistaken for the source of its 31/44 figure, which actually came
+from all 660 staged arrays. Its `ld_loss` prediction reproduced to every digit. **When a
+verifier disagrees with your own counterfactual, first establish which question each of
+you answered** — here both answers were right, and the distance between them was the
+finding.

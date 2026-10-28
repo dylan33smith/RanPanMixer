@@ -24,9 +24,16 @@ The median SNP gap on chr21 is 83 bp, so it reaches 2.92% of SNP positions and ~
 pairs; a true 5 kb window would be 10,588,565 pairs, about 1,400x more. We run it AS
 SHIPPED, because that is the faithful comparison, and state the window every time.
 
-⚠ `af_loss.py:156` reads `row["capacity"]` and never uses it. Our staging writes the
-literal "n/a" into that column rather than a number a later reader could mistake for a
-real PanMixer setting.
+⚠ `af_loss.py:156` reads `row["capacity"]` and never uses it, so the CSV must carry that
+column or every row raises `KeyError`. Our staging writes the literal "n/a" there.
+⚠⚠ AND PANDAS DOES NOT KEEP IT (audit 2026-10-28): "n/a" is in `pd.read_csv`'s default
+`na_values`, so `load_data` returns `NaN`, not the string. The intent -- never put a
+number there that a later reader could mistake for a real PanMixer setting -- still
+holds, because `NaN` is not a number anyone will read as a capacity; but the comment
+used to claim the literal survives the read, and it does not. Harmless today:
+`af_loss.py` binds `capacity` and never uses it, and `ld_loss.py` reads neither column.
+It becomes a wrong number only if some later reader fills that `NaN` with 0.0 and reads
+it as `capacity` 0.
 
 ⚠⚠ TWO MIRROR SHAPES, AND THE MANIFEST DECIDES WHICH.
   LEGACY (`logs/B_eta_arm1`, 2026-10-14/25): exp_6 holds EIGHT rows -- HG00438 alone at
@@ -190,6 +197,14 @@ def main(argv=None) -> int:
     n = [len(af["all"][t]) for t in TAUS]
     if set(n) != {44}:
         raise SystemExit(f"incomplete: n per point = {n}, expected 44 everywhere")
+    # ⚠⚠ `ld_loss` USED TO HAVE NO GATE AT ALL (audit 2026-10-28). Only `af_loss` was
+    # counted, while `_collect` builds `ld[p]` by append-if-exists -- so a partial
+    # `ld_loss` fan-out printed a median over fewer than 44 targets under a hardcoded
+    # "n = 44" header, and fed the same short set to the paired sign test, whose n
+    # absorbed the missing people silently. Two metrics, one gate, is one gate short.
+    nld = [len(ld[t]) for t in TAUS]
+    if set(nld) != {44}:
+        raise SystemExit(f"ld_loss incomplete: n per point = {nld}, expected 44 everywhere")
 
     # THEIRS: 352 rows on the our-build mirror, 8 legacy rows otherwise.
     ourbuild = "theirs_rows" in man
@@ -198,6 +213,9 @@ def main(argv=None) -> int:
         tn = [len(taf["all"][p]) for p in tpts]
         if set(tn) != {44}:
             raise SystemExit(f"theirs incomplete: n per capacity = {tn}, expected 44")
+        tnld = [len(tld[p]) for p in tpts]
+        if set(tnld) != {44}:
+            raise SystemExit(f"theirs ld_loss incomplete: n per capacity = {tnld}")
         tcaps = tpts
     else:
         base = ROOT / "experiments/exp_6/data/chr21"

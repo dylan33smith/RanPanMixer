@@ -2576,10 +2576,38 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       ✅ REIMPLEMENTED from this definition with no PanMixer code
                       imported and matched EXACTLY: 0.003420953969 against
                       0.003420953969 (ours) and 8.674e-19 apart (theirs).
-                      ⚠ -1 is an ORDINARY ALLELE VALUE to `np.unique` here, so an
-                      uncalled cell is a category in both distributions and the
-                      per-site denominator is the size of the UNION of alleles seen.
-                      Provenance `logs/B_arm1_afld_ourbuild/af_ld.md`.
+                      ⚠⚠ -1 IS AN ORDINARY ALLELE VALUE to `np.unique` here, so a
+                      cell whose called/uncalled status FLIPS scores exactly like an
+                      allele swap — and that is NOT neutral between the two tools.
+                      Measured 2026-10-28: genuine allele swaps are within **1%**
+                      (111,615 ours against 112,922 theirs, median) while we flip
+                      the called/uncalled status of **10.9x** more cells, for
+                      **44/44** individuals, because our release supplies calls the
+                      source assembly left uncalled. Dropping -1 from both
+                      distributions and renormalising by each one's called count:
+                      ours **0.003654** against theirs **0.003251**, we are lower in
+                      **1 of 44** rather than 0 of 44 — 46% of the gap, same
+                      direction. ⚠⚠ BUT HOLDING THE MISSINGNESS SKELETON FIXED AT
+                      THE MASTER'S, so only jointly-called cells differ, REVERSES
+                      IT: ours **0.002737** against theirs **0.002763**, **WE are
+                      lower in 31 of 44** (p = 0.00956, z = -4.58).
+                      ⚠⚠ **SO THIS METRIC AS SHIPPED CANNOT SETTLE THE COMPARISON.**
+                      Across three defensible -1 policies the verdict runs from
+                      'they win on all 44 at p = 1e-13' to 'we win 31/44 at
+                      p = 0.01', with nothing about either mechanism changing. The
+                      cause is structural, not a quirk: our release is a
+                      FIXED-SUPPORT path (uncalled 16,656..16,666, 5 distinct values
+                      over 308 releases, correlation with the master row's own
+                      uncalled count -0.32) while PanMixer edits a COPY of the
+                      target's row (44 distinct values, correlation +0.9991).
+                      af_loss charges the side whose support diverges from the
+                      master, which is structurally us.
+                      ⚠ Publish the SHIPPED figure -- it is what a reader of their
+                      paper reproduces -- and publish that it is POLICY-DEPENDENT.
+                      Never quote 'they distort allele frequencies less for every
+                      one of the 44' without that.
+                      Provenance `logs/B_arm1_afld_ourbuild/af_ld.md` and
+                      `logs/B_arm1_afld_ourbuild/sensitivity.md`.
                       ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE.** This entry
                       used to say "we never modify the cohort, so the quantity is not
                       defined for our release object". That is true of ARM 2 only. In
@@ -2803,14 +2831,31 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       differs between the two tools on the SAME subject — 7,462 for
                       ours against 7,463 for theirs on HG00438. 'Per pair' is a ratio
                       of sums over a varying n; NEVER pool numerators across rows.
-                      ⚠⚠ TWO SHIPPED QUIRKS, applied to both sides, so they do not
-                      bias the comparison but DO bound what it means. (1) `p_AB` uses
-                      `(x == 1) & (y == 1)` on arrays where -1 became nan, and
-                      `nan == 1` is False, so a missing cell counts as a non-AB
-                      OBSERVATION while `p_A` and `p_Bs` exclude it via `nanmean`:
-                      the two terms of D use different denominators. (2) Only allele
-                      code 1 counts, so multi-allelic sites are COLLAPSED to
-                      'is allele 1'.
+                      ⚠⚠ **THE MIXED DENOMINATOR BIASES THIS COMPARISON IN OUR
+                      FAVOUR BY 5.8x, MEASURED 2026-10-28.** `p_A` and `p_Bs` are
+                      `nanmean`s over the NON-MISSING cells while
+                      `p_AB = nanmean((xs == 1) & (ys == 1))` is a nanmean over a
+                      BOOLEAN array, which holds no NaN because `np.nan == 1` is
+                      False — so it always divides by 88 and D mixes two
+                      denominators. This inflates r^2 deltas at pairs with missing
+                      cells, and the two tools' missingness differs by 10.9x.
+                      With `p_AB` over the cells non-missing in BOTH: ours
+                      **0.002146** against theirs **0.002800** — **our advantage is
+                      1.30x, not 7.53x**, though it is MORE robust at that size
+                      (**44/44**, p = 1.14e-13, against 40/44 at p = 1.71e-08).
+                      ⚠⚠ AND THE SHIPPED FIGURE IS NOT A MEAN OVER 7,462 PAIRS in
+                      any useful sense: its largest **6 pairs of ~7,500** carry
+                      **94%** of THEIR total and 60% of ours, against 16% and 10%
+                      under a consistent denominator.
+                      ⚠ Publish the SHIPPED figure — it is what a reader of their
+                      paper can reproduce — but **never quote 7.53x without 1.30x
+                      beside it**. An earlier version of this entry said the quirks
+                      'do not bias the comparison'; that was wrong, because an
+                      identical rule is asymmetric whenever it keys on a property
+                      the two tools do not share. Provenance
+                      `logs/B_arm1_afld_ourbuild/sensitivity.md`.
+                      ⚠ Only allele code 1 counts, so multi-allelic sites are
+                      COLLAPSED to 'is allele 1'. Measured not to bite on this build.
                       ✅ REIMPLEMENTED from this definition with no PanMixer code
                       imported, both quirks included, and matched EXACTLY on
                       numerator, denominator AND ratio: 37.482748988 / 7462 (ours)
