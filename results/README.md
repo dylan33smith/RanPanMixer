@@ -40,6 +40,9 @@ level is a floor, never a privacy result.
 | `arm1_exact_endpoint.json` | the exact `E[differ]` and `E_Q[u]` endpoint, zero Monte-Carlo error | same run, rides along |
 | `arm1_attack.md` + `.json` | **ARM 1: A1 and A3 at power on this grid** | `scripts/arm1_attack.py` |
 | `arm2_attack_a1.md` + `.json` | **ARM 2: A1 on this grid**, chr21 at share 1.0, K = 88, nothing held out | `scripts/arm2_attack.py` |
+| `arm2_attack_a34.md` + `.json` | **ARM 2: A3 and A4 on this grid**, with A3's power curve — read that, not its control | `scripts/arm2_attack_a3a4.py` |
+| `arm1_beagle.md` + `.json` | **PanMixer's BEAGLE reconstruction attack on all 308 Arm 1 releases**, their code called, our build | `scripts/arm1_attacks_results.py` |
+| `arm2_queue.log` | the run queue for the three passes above, with completeness counted FROM DISK | `scripts/beagle_attack_run.sh` and the queue driver |
 
 ## The headline numbers, each with the caveat that bounds it
 
@@ -89,6 +92,57 @@ level is a floor, never a privacy result.
   ⚠⚠ **A SCOPE SPLIT THAT MUST BE STAMPED, NEVER POOLED.** Arm 2's ATTACK evidence here is
   chr21 at share 1.0 -- the only scope its driver implements -- while Arm 2's UTILITY
   numbers are genome-wide. Two different released objects; they may not share a table.
+- **Beagle does not reconstruct our release, and it does worse than guessing.** PanMixer's
+  own reconstruction attack on all 308 cells (308/308, 0 failures, counted from disk):
+  the published statistic `beagle_accuracy` - `major_allele_accuracy` is **negative at
+  every point**, -0.046384 at `acc_ceiling` 0.50 to -0.044885 at 0.80, so the attack
+  recovers the truth ~4.5 points *less* often than a baseline that ignores our release
+  entirely. `reconstruction_accuracy` 0.2255-0.2325.
+  ✅ The in-panel / out-of-panel control separates nothing (0.2254-0.2366 against
+  0.2165-0.2345 on n = 5), so no part of that reconstruction is Beagle copying an
+  in-panel target's own row out of the reference.
+  ⚠⚠ **BUT WE SIT ~0.104 ABOVE THEIR DIGITIZED Fig S2 CURVE** at a matched
+  obfuscated-variant count (-0.0449 against an interpolated -0.1491 at our ~81,500
+  altered `snp_only` cells): Beagle recovers MORE from our release than their own figure
+  predicts at the same amount of obfuscation. That direction is against us and belongs in
+  the paper. ⚠ It compares OUR digitization of THEIR figure across different builds, and
+  is never a table-to-table comparison.
+- **⚠⚠ EVERY AGGREGATE STATISTIC ON THIS GRID IS FLAT, AND THAT IS THE GRID RATHER THAN
+  THE MECHANISM.** `af_loss`, `ld_loss`, the Beagle difference, the release's overall
+  agreement with the target and its agreement restricted to non-reference positions all
+  fail to move across `acc_ceiling` 0.50-0.80 (paired sign tests p = 0.17 to 0.45,
+  n = 44). Chased to cause rather than reported:
+  it is **not** a plateau bug — adjacent ceiling points differ in ~72,000 `snp_only`
+  cells per target, about as far apart as either is from the truth — and it is **not** the
+  donor panel, which under leave-one-out still carries the target's own allele at a median
+  **97.51%** of its non-reference cells while the release reaches 44%.
+  **The cause is that the per-position tilt is `eta_tau` x `beta_v`, not `eta_tau`:** at
+  `acc_ceiling` 0.80 that is 27,540 x 4.52e-08 ~ **0.00124**, a multiplicative preference
+  of 1.0012 for carrying the target's allele.
+  ✅ **It reconciles with A1 instead of contradicting it** — the likelihood ratio
+  aggregates that infinitesimal per-position signal over T = 332,521 positions and reaches
+  0.706818. An optimal aggregate test resolves this grid; nothing per-cell can.
+  ⚠⚠ **So every flat row above and below is a POWER statement and must never be written up
+  as a null.** The exact posterior on these same 308 releases moves `target_fidelity`
+  **44/44 targets in the faithful direction**, by **+0.0935 points** across the whole
+  range — far below what one draw per cell can resolve against a within-target spread of
+  2.71%. The mechanism moves fidelity monotonically; these sampled statistics are too
+  coarse to see it, and the exact calculation is the instrument that can.
+- **A3 and A4 add nothing significant, and A3's pre-registered control is worthless.**
+  Neither attack exceeds its bound (A3 peaks 0.5980, A4 0.5990, against Bonferroni z_crit
+  2.82 over 21 A3 cells and 4.51 over 15,603 A4 block-cells).
+  ⚠⚠ **A3's positive control CANNOT FAIL**: its score sums `-log P_HWE` only where
+  genotypes agree, mismatches contribute zero and the weights are non-negative, so
+  `score(p, q)` is a subset sum of `score(p, p)` and a positive log-ratio is algebraically
+  forced. Its 1.0000 (30/30) checks the site axis, genotype encoding and weights — the
+  plumbing — and nothing about power.
+  ✅ **The power curve is what to cite instead:** A3 reaches 0.9900 at a verbatim-leak
+  fraction f = 0.01 and is **blind at f = 0.001**. That is what its null rules out: a leak
+  of at least 1% of positions, and no subtler one.
+  ✅ A4's control IS non-vacuous and passed properly — a 4,096-position block copied
+  verbatim from the target was the argmax block in 30 of 30 pairs.
+  ⚠ A3's `D1_extremal` row is exactly 0.5000 at all seven labels, the same subset-sum
+  degeneracy that makes Arm 1's A3 `D1_extremal` row TPR 1.0000 / TNR 0.0000.
 - **Read mapping is flat**: worst degradation anywhere is -0.063 points, against
   PanMixer's own published -0.01. ⚠ n = 1 graph per column; absolute levels are not
   comparable to their published figures (vg 1.68 against 1.36), only deltas.
@@ -102,10 +156,7 @@ level is a floor, never a privacy result.
   haplotypes) and NOT the tilt. They are needed for the head-to-head parity claim --
   theirs is identified at rank 1 of 44 at `capacity` 0.01/0.05/0.1 where ours never is --
   but never as evidence that the tilt protects anyone.
-- **Arm 2's A3/A4, and Beagle's reconstruction attack** on this grid -- both RUNNING as
-  of this snapshot, not yet here. Arm 2's A3/A4 is on the same seven etas as its A1 above;
-  Beagle is 308 rows on OUR 340,849 build (PanMixer's own protocol pass).
-  ⚠⚠ **BEAGLE'S EXCLUDE-SELF PASS IS DROPPED BY DECISION (2026-10-28), and that costs a
+- **Beagle's `exclude-self` pass**, DROPPED by decision (2026-10-28), **and that costs a
   control.** PanMixer's published protocol passes no `excludesamples=`, and **39 of our 44
   targets ARE in Beagle's 1000G reference panel** -- so for those 39 the panel holds the
   target's own true row and Beagle can copy from it. The exclude-self pass is what
@@ -114,13 +165,17 @@ level is a floor, never a privacy result.
   disk, so it is a ~2.2 h addition whenever wanted. ⚠ The head-to-head against PanMixer is
   unaffected: their published figures use the same no-exclusion protocol, so the
   cross-tool comparison is like-for-like. It is our own column that loses a control.
+  ⚠ The **5 out-of-panel targets are a partial substitute and they point the same way**
+  (`reconstruction_accuracy` 0.2165-0.2345 against the 39 in-panel targets' 0.2254-0.2366,
+  so the panel is not visibly the source) — but n = 5 against n = 39 cannot resolve a
+  difference the size of this grid's effects, so it weakens the concern without settling
+  it. Do not quote it as the control the exclude-self pass would have been.
 - **Read mapping** on this grid. The existing numbers are on the old genome-wide `eta`
   grid and are deliberately NOT included here.
-- **PanMixer's privacy evaluators** (`gap_score`, `diploid_gap_score`, `MIA_privacy`) on
-  this grid. They ran on the earlier genome-wide `eta` grid, where they were defeated by
-  our `eta` = 0 release too — which makes them a statement about release FORM rather than
-  about the tilt.
-- **Arm 2**, which carries genome-wide alone and is not part of this comparison.
+- **Arm 2's genome-wide UTILITY sweep** at all 10 targets. Arm 2's ATTACK evidence is
+  here (A1, A3, A4) but at chr21 share 1.0, the only scope its driver implements; its
+  utility numbers are genome-wide and not yet re-run in this regime. ⚠⚠ The two are
+  different released objects and must never share a table.
 - **Anything at matched privacy between the two tools.** `capacity` is a utility-loss
   budget and bounds nothing about distinguishability; `acc_ceiling` does not transfer to
   their mechanism. Every cross-tool row here pairs the two at their OWN endpoints, and

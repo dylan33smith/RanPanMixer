@@ -1,0 +1,13 @@
+### 13:25:25 waiting for Arm 2 A1 to finish
+### 13:36:25 A1 done
+### 13:36:25 Arm 2 A3/A4, 7 etas, 10 targets x 25 draws, 30 workers
+### 14:20:36 A3/A4 exit 0
+### 14:20:36 Beagle protocol pass, 308 rows, NPAR=8 x 6 threads
+### 16:39:18 protocol exit 0
+### 16:39:18 COMPLETENESS, counted from disk
+    beagle protocol    308 / 308  ok
+    a1_acc.json  present
+    a34_acc.json  present
+    nonzero beagle sentinels: 0
+    ⚠ exclude-self pass NOT run by design; 39 of 44 targets are in the panel
+### 16:39:18 QUEUE DONE fail=0
