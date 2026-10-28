@@ -71,13 +71,21 @@ TAUS = ("0p00", "0p05", "0p10", "0p25", "0p50", "0p90", "0p99")
 def point_label(label: str) -> tuple:
     """A `--taus` entry -> (directory name, knob, numeric value).
 
-    ⚠ ACCEPTS THREE FORMS because the release tree now has two namespaces:
-      "0p99"      legacy bare suffix -> tau_0p99, knob "tau",  0.99
-      "tau_0p99"  explicit           -> tau_0p99, knob "tau",  0.99
-      "eta_250"   the eta namespace  -> eta_250,  knob "eta",  250.0
-    The old code hardcoded an "tau_" prefix, so an eta label became `tau_eta_0`
+    ⚠ ACCEPTS FOUR FORMS because the release tree now has three namespaces:
+      "0p99"      legacy bare suffix -> tau_0p99, knob "tau",         0.99
+      "tau_0p99"  explicit           -> tau_0p99, knob "tau",         0.99
+      "eta_250"   the eta namespace  -> eta_250,  knob "eta",         250.0
+      "acc_0p80"  the ceiling grid   -> acc_0p80, knob "acc_ceiling", 0.80
+    The old code hardcoded a "tau_" prefix, so an eta label became `tau_eta_0`
     and the stage aborted on a missing release -- measured 2026-10-25.
+    ⚠⚠ THE `acc_` BRANCH WAS ADDED 2026-10-28 AND ITS ABSENCE WAS NOT A MISSING
+    RELEASE BUT A CRASH: an `acc_0p50` label fell through to the tau branch and
+    raised `ValueError: could not convert string to float: 'acc_0.50'`, so staging
+    the reported grid was impossible. Same defect class as the eta branch above --
+    a namespace added to `src/releases.py` without its reader.
     """
+    if label.startswith("acc_"):
+        return label, "acc_ceiling", float(label[4:].replace("p", "."))
     if label.startswith("eta_"):
         return label, "eta", float(label[4:].replace("p", "."))
     name = label if label.startswith("tau_") else f"tau_{label}"
