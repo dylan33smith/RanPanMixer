@@ -17,6 +17,7 @@ scripts/    runnable experiments and scoring, one concern per file
 configs/    pinned run configurations
 tests/      the gates; see "Testing" below
 docs/       terms.md only -- the metric glossary the calibration gate parses
+results/    the emitted tables and figures this branch's numbers come from
 ```
 
 ## Stack
@@ -99,6 +100,20 @@ replace a parsing gate with a literal.
 
 A gate that cannot fail is decoration. When adding one, inject the error it exists
 to catch and confirm it fires.
+
+⚠ TWO GATES ARE DELIBERATELY ABSENT FROM THIS BRANCH, AND NEITHER IS AN OVERSIGHT.
+`tests/test_docs_contract.py` parses the five-file doc set, and this branch carries
+`docs/terms.md` alone, so it would fail on files that are not meant to be here. And
+`tests/test_attacks.py` omits the decision-K addendum gate, which asserts a file under
+`paper/` -- a directory this branch does not track. Both live on the working branch,
+where the files they check exist. Do NOT "fix" this branch by adding either one back:
+that trades a real gate on the working branch for a red suite here.
+⚠ AND ONE TEST SILENTLY SKIPS HERE: `tests/test_exact_utility.py` validates against
+`logs/B_exact_utility.json`, and `/logs/` is gitignored, so on a fresh clone it reports
+`skipped` rather than running. "405 passed" on this branch therefore does NOT mean every
+gate ran -- read the skip line.
+⚠ Consequence worth knowing: edits to `docs/terms.md` on this branch are NOT checked by
+the docs contract. Make them on the working branch, where they are.
 
 ## Long runs
 

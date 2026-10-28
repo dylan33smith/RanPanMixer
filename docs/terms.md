@@ -746,6 +746,46 @@ Aliases:              "the normalizer", "Z_p" (Z_p is the unlogged form)
 ```
 
 
+### d_logz  [implementation] [evaluation] [diagnostic]
+```
+Is:                   log Z_p - log Z_q for ONE pair of input paths under ONE
+                      mechanism: the normaliser difference that the Neyman-Pearson
+                      statistic needs. `Lambda(y) = eta_tau [u(p,y) - u(q,y)] -
+                      d_logz`, so it is the only term of the optimal attacker's
+                      statistic that does not depend on the released path y.
+Computed by:          scripts/exact_kl_stable.py:kl_stable, returned beside `kl`, as
+                      the summed per-position difference of the two tilted forward
+                      passes' log normalisers.
+                      ⚠⚠ THE BASELINE CANCELS EXACTLY AND THAT IS WHY THIS FORM IS
+                      PREFERRED. `baseline_log_norm` is the same constant inside both
+                      log Z values, so it never enters the difference. Computing
+                      log Z_p and log Z_q separately and subtracting re-introduces the
+                      chance of applying the baseline to one side only --
+                      `scripts/arm1_attack.py` therefore passes `log_z_p = 0.0` and
+                      `log_z_q = -d_logz` to `attacks.lrt_statistic` rather than
+                      assembling the two normalisers itself.
+CHANGES MEANING WITH: the PAIR, the arm, the panel and `eta_tau`. It is not a property
+                      of a release. ⚠ In ARM 1 it also changes with the leave-one-out
+                      panel, which is per target.
+                      ⚠⚠ ITS SIGN CARRIES THE PANEL ASYMMETRY, and that is not a
+                      defect. In arm 1 the target is HELD OUT while a D2/D3 decoy is a
+                      cohort member IN the panel, so the decoy is exactly reproducible
+                      by the mosaic and the target is not. Measured on HG00438 at the
+                      acc_0p80 label: +253.148 against the constructed D1_extremal
+                      decoy, +0.949 against D2_nearest. A negative value means the
+                      in-panel decoy carries the larger normaliser. The offset is a
+                      legitimate part of the statistic and sits inside the Theorem 1
+                      bounds, but it drives TPR and TNR apart, which is why those are
+                      reported as their own rows.
+Valid vs:             the same pair, arm, panel and knob value. Two `d_logz` from
+                      different pairs are different quantities wearing one name.
+Status:               DIAGNOSTIC, and an INPUT to A1. Not an endpoint. Reported beside
+                      an attack table to show which way the panel asymmetry points,
+                      never as a privacy figure.
+Aliases:              "the normaliser difference", "log Z_p - log Z_q"
+```
+
+
 ### baseline_log_norm  [implementation] [diagnostic]
 ```
 Is:                   The log conditioning constant of R_D: sum_t log c_t from an
@@ -2560,6 +2600,54 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       check.
                       ⚠ Reporting it as an ENDPOINT needs a NEW dated pre-registration,
                       not an addendum. Provenance `logs/B_arm1_af_ld.md`.
+                      ⚠⚠ **RE-MEASURED 2026-10-28 ON ONE BUILD — the cross-build
+                      confound above is GONE and the conclusion did not change.**
+                      Their evaluator unmodified against OUR 340,849-record
+                      `starting_data`, our 308 `acc_ceiling` cells and their 352 runs
+                      on the SAME 44 individuals. Ours **0.003577..0.003604** across
+                      `acc_ceiling` 0.50->0.80, a span of **0.77% of the floor**;
+                      theirs **0.000216..0.002841**. **PAIRED BY INDIVIDUAL AT OUR
+                      0.80 AGAINST THEIR SATURATION WE ARE LOWER IN 0 OF 44** —
+                      sign p = 1.14e-13, z = +25.28 — and their WORST column
+                      (0.002841) is below our BEST (0.003577). The decision-F
+                      requirement in CHANGES MEANING WITH is satisfied for chr21.
+                      ⚠ It still FAILS the direction check the pre-registered
+                      endpoints pass: **25/44 down, 19/44 up**, median -8.352e-06.
+                      ✅ REIMPLEMENTED from this definition with no PanMixer code
+                      imported and matched EXACTLY: 0.003420953969 against
+                      0.003420953969 (ours) and 8.674e-19 apart (theirs).
+                      ⚠⚠ -1 IS AN ORDINARY ALLELE VALUE to `np.unique` here, so a
+                      cell whose called/uncalled status FLIPS scores exactly like an
+                      allele swap — and that is NOT neutral between the two tools.
+                      Measured 2026-10-28: genuine allele swaps are within **1%**
+                      (111,615 ours against 112,922 theirs, median) while we flip
+                      the called/uncalled status of **10.9x** more cells, for
+                      **44/44** individuals, because our release supplies calls the
+                      source assembly left uncalled. Dropping -1 from both
+                      distributions and renormalising by each one's called count:
+                      ours **0.003654** against theirs **0.003251**, we are lower in
+                      **1 of 44** rather than 0 of 44 — 46% of the gap, same
+                      direction. ⚠⚠ BUT HOLDING THE MISSINGNESS SKELETON FIXED AT
+                      THE MASTER'S, so only jointly-called cells differ, REVERSES
+                      IT: ours **0.002737** against theirs **0.002763**, **WE are
+                      lower in 31 of 44** (p = 0.00956, z = -4.58).
+                      ⚠⚠ **SO THIS METRIC AS SHIPPED CANNOT SETTLE THE COMPARISON.**
+                      Across three defensible -1 policies the verdict runs from
+                      'they win on all 44 at p = 1e-13' to 'we win 31/44 at
+                      p = 0.01', with nothing about either mechanism changing. The
+                      cause is structural, not a quirk: our release is a
+                      FIXED-SUPPORT path (uncalled 16,656..16,666, 5 distinct values
+                      over 308 releases, correlation with the master row's own
+                      uncalled count -0.32) while PanMixer edits a COPY of the
+                      target's row (44 distinct values, correlation +0.9991).
+                      af_loss charges the side whose support diverges from the
+                      master, which is structurally us.
+                      ⚠ Publish the SHIPPED figure -- it is what a reader of their
+                      paper reproduces -- and publish that it is POLICY-DEPENDENT.
+                      Never quote 'they distort allele frequencies less for every
+                      one of the 44' without that.
+                      Provenance `logs/B_arm1_afld_ourbuild/af_ld.md` and
+                      `logs/B_arm1_afld_ourbuild/sensitivity.md`.
                       ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE.** This entry
                       used to say "we never modify the cohort, so the quantity is not
                       defined for our release object". That is true of ARM 2 only. In
@@ -2767,6 +2855,52 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       single-draw noise (one release per target per `tau`,
                       constraint 5), so the grid scatter is NOT a trend.
                       Provenance `logs/B_arm1_af_ld.md`.
+                      ⚠⚠ **RE-MEASURED 2026-10-28 ON ONE BUILD, and this is the half
+                      of the in-graph comparison we WIN.** Their evaluator unmodified
+                      against OUR `starting_data`, same 44 people both sides. Ours
+                      **0.005291..0.005571** per pair across `acc_ceiling` 0.50->0.80;
+                      theirs **0.000077** at `capacity` 0.01 then
+                      **0.037462..0.040671** from 0.05 up. **PAIRED AT OUR 0.80
+                      AGAINST THEIR SATURATION WE ARE LOWER IN 40 OF 44** — sign
+                      p = 1.71e-08, z = -19.65, ~7.5x lower — while at `capacity`
+                      0.01 they are ~70x lower, because that setting barely
+                      perturbs LD at all.
+                      ⚠⚠ **THE DENOMINATOR IS PER ROW AND MOVES WITH THE RELEASE.**
+                      `count` (`ld_loss.py:120`) is the number of pairs whose r^2 is
+                      non-nan in BOTH the original and the substituted cohort, so it
+                      differs between the two tools on the SAME subject — 7,462 for
+                      ours against 7,463 for theirs on HG00438. 'Per pair' is a ratio
+                      of sums over a varying n; NEVER pool numerators across rows.
+                      ⚠⚠ **THE MIXED DENOMINATOR BIASES THIS COMPARISON IN OUR
+                      FAVOUR BY 5.8x, MEASURED 2026-10-28.** `p_A` and `p_Bs` are
+                      `nanmean`s over the NON-MISSING cells while
+                      `p_AB = nanmean((xs == 1) & (ys == 1))` is a nanmean over a
+                      BOOLEAN array, which holds no NaN because `np.nan == 1` is
+                      False — so it always divides by 88 and D mixes two
+                      denominators. This inflates r^2 deltas at pairs with missing
+                      cells, and the two tools' missingness differs by 10.9x.
+                      With `p_AB` over the cells non-missing in BOTH: ours
+                      **0.002146** against theirs **0.002800** — **our advantage is
+                      1.30x, not 7.53x**, though it is MORE robust at that size
+                      (**44/44**, p = 1.14e-13, against 40/44 at p = 1.71e-08).
+                      ⚠⚠ AND THE SHIPPED FIGURE IS NOT A MEAN OVER 7,462 PAIRS in
+                      any useful sense: its largest **6 pairs of ~7,500** carry
+                      **94%** of THEIR total and 60% of ours, against 16% and 10%
+                      under a consistent denominator.
+                      ⚠ Publish the SHIPPED figure — it is what a reader of their
+                      paper can reproduce — but **never quote 7.53x without 1.30x
+                      beside it**. An earlier version of this entry said the quirks
+                      'do not bias the comparison'; that was wrong, because an
+                      identical rule is asymmetric whenever it keys on a property
+                      the two tools do not share. Provenance
+                      `logs/B_arm1_afld_ourbuild/sensitivity.md`.
+                      ⚠ Only allele code 1 counts, so multi-allelic sites are
+                      COLLAPSED to 'is allele 1'. Measured not to bite on this build.
+                      ✅ REIMPLEMENTED from this definition with no PanMixer code
+                      imported, both quirks included, and matched EXACTLY on
+                      numerator, denominator AND ratio: 37.482748988 / 7462 (ours)
+                      and 297.584444050 / 7463 (theirs), diff 0.000e+00 on all three.
+                      Provenance `logs/B_arm1_afld_ourbuild/af_ld.md`.
 ```
 
 ### capacity  [mechanism] [evaluation]
@@ -2989,6 +3123,53 @@ Aliases:              none. ⚠ **"retained" is FORBIDDEN for this quantity** �
                       DIFFER rate, and `utility_retained` is a different quantity in the
                       opposite direction. "fidelity loss" and "the differ rate" are the
                       safe informal names.
+```
+
+### target_fidelity_onesided  [utility] [evaluation]
+```
+Is:                   **The same DIFFER rate as `target_fidelity`, under PanMixer's
+                      OTHER mask: the original alone.** The denominator is every cell
+                      the TARGET calls; the numerator counts a cell as altered even
+                      where the release has no call at all. Carried as the SENSITIVITY
+                      beside `target_fidelity`, which is the HEADLINE by decision
+                      2026-10-27.
+                      ⚠ **IT IS >= `target_fidelity` BY CONSTRUCTION, ALWAYS.** A cell
+                      the target calls and the release does not leaves the two-sided
+                      ratio from BOTH sides and scores as ALTERED here, so the two
+                      conventions cannot cross. The SPREAD between them is what a
+                      reader needs; neither figure alone says how much of the gap is
+                      the mask rather than the mechanism.
+                      ⚠ Quoting whichever convention is kinder is denominator-shopping.
+                      Both appear in every head-to-head table, or neither does.
+Computed by:          `scripts/arm1_headtohead.py` `score()`, key `fidelity_onesided`,
+                      mirroring external/PanMixer/tools/panmixer/stacker.py:74,81-82
+                      (`mask = original_haplotypes != -1`), which PanMixer writes into
+                      `stacked.json` as `changed_alleles_percentage` (x100).
+                      ⚠ PanMixer's PRIMARY artifact and its own EVALUATORS both use the
+                      TWO-sided mask — obfuscate.py:474-476 into `stats.json`, and the
+                      both-sides-called evaluator masking already recorded in the
+                      `new_haplotypes` entry. The one-sided mask is the outlier INSIDE
+                      their own codebase, which is why it is the sensitivity and not a
+                      co-equal headline. ⚠ Not a defect in PanMixer: two scripts
+                      written for two purposes.
+                      ⚠ SAMPLED ONLY, 1 draw per point. The exact-expectation branch
+                      integrates obfuscate.py's two-sided mask and has no one-sided
+                      counterpart, so this row is `n/a` in EXACT columns — recorded
+                      with its reason, never an omitted row.
+CHANGES MEANING WITH: how COMPLETE the release is. Our path release is complete by
+                      construction, so our two masks nearly coincide; PanMixer leaves
+                      the original in place outside the blocks it swaps, so theirs can
+                      diverge. The two conventions therefore do NOT move the two tools
+                      by the same amount, and that asymmetry is exactly why the pair
+                      must travel together.
+Valid vs:             `target_fidelity_onesided` on the other tool at matched utility.
+                      ⚠ NEVER against `target_fidelity` — a one-sided number beside a
+                      two-sided one is two quantities wearing one name, the error
+                      standing constraint 7 exists to prevent.
+Status:               SENSITIVITY — never the headline (decision 2026-10-27).
+Aliases:              none. ⚠ PanMixer's own name for it is
+                      `changed_alleles_percentage`. "retained" is FORBIDDEN here for the
+                      same reason as `target_fidelity`: this is a DIFFER rate.
 ```
 
 ---

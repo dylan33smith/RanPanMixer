@@ -1,0 +1,383 @@
+<title>Arm 1 against PanMixer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+<style>
+/* Layout: single measured column, scroll story; data tables full-bleed inside their own scrollers. */
+:root{
+  --ink:#16191d; --ink-2:#4a5058; --ink-3:#767d87;
+  --paper:#fbfaf8; --card:#ffffff; --rule:#e2e0db;
+  --ours:#1f5f8b; --theirs:#9a5b2a; --warn:#8a6d12; --bad:#8f2f2f; --good:#2b6b45;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --disp:'Newsreader',Georgia,serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ink:#e8e6e1; --ink-2:#b0aca5; --ink-3:#85817a;
+  --paper:#15171a; --card:#1c1f23; --rule:#2e3237;
+  --ours:#6fb3dd; --theirs:#d99a5f; --warn:#d6b24a; --bad:#e08585; --good:#74c295;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ink:#e8e6e1; --ink-2:#b0aca5; --ink-3:#85817a;
+  --paper:#15171a; --card:#1c1f23; --rule:#2e3237;
+  --ours:#6fb3dd; --theirs:#d99a5f; --warn:#d6b24a; --bad:#e08585; --good:#74c295;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);margin:0;
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:960px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:40px 72px}
+h1{font-family:var(--disp);font-weight:500;font-size:clamp(28px,5vw,42px);line-height:1.1;
+  margin:0 0 10px;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--disp);font-weight:500;font-size:clamp(21px,3vw,27px);line-height:1.2;
+  margin:0 0 4px;text-wrap:balance}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
+  font-weight:600;margin:0 0 10px}
+p{margin:0 0 12px;max-width:68ch}
+section{margin-block:48px 0;border-top:1px solid var(--rule);padding-block:26px 0}
+section:first-of-type{border-top:0}
+.sub{color:var(--ink-2);font-size:14px;max-width:68ch}
+.stamp{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);line-height:1.5;
+  margin-top:8px}
+.big{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 6px}
+.tile{background:var(--card);border:1px solid var(--rule);border-radius:3px;
+  padding:14px 16px;min-width:0;flex:1 1 190px}
+.tile .v{font-family:var(--mono);font-size:26px;font-weight:500;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .k{font-size:12px;color:var(--ink-3);margin-top:5px;line-height:1.35}
+.tile.ours .v{color:var(--ours)} .tile.theirs .v{color:var(--theirs)}
+table{border-collapse:collapse;font-family:var(--mono);font-size:12.5px;
+  font-variant-numeric:tabular-nums;width:100%;min-width:560px}
+.scroll{overflow-x:auto;margin:14px 0 6px;border:1px solid var(--rule);border-radius:3px;
+  background:var(--card)}
+th,td{text-align:right;padding:7px 11px;border-bottom:1px solid var(--rule);white-space:nowrap}
+th{font-weight:500;color:var(--ink-3);font-size:11px;text-transform:uppercase;
+  letter-spacing:.05em;background:var(--card);position:sticky;top:0}
+th:first-child,td:first-child{text-align:left;font-family:var(--body);white-space:normal;
+  min-width:190px}
+tr:last-child td{border-bottom:0}
+td.hi{color:var(--ours);font-weight:500}
+td.hit{color:var(--theirs);font-weight:500}
+figure{margin:18px 0 6px}
+figcaption{font-size:12.5px;color:var(--ink-3);margin-top:9px;max-width:68ch}
+svg{display:block;max-width:100%;height:auto}
+.note{border-left:2px solid var(--warn);padding:2px 0 2px 14px;margin:16px 0;
+  font-size:14px;color:var(--ink-2);max-width:68ch}
+.note strong{color:var(--ink)}
+.note.bad{border-left-color:var(--bad)}
+.note.good{border-left-color:var(--good)}
+ul{margin:0 0 12px;padding-left:20px;max-width:68ch;font-size:14px;color:var(--ink-2)}
+li{margin-bottom:6px}
+li strong,p strong{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:.9em;background:var(--card);
+  border:1px solid var(--rule);border-radius:2px;padding:.5px 4px}
+.lede{font-size:17px;color:var(--ink-2);max-width:64ch;margin-bottom:0}
+.pend li{color:var(--ink-2)}
+</style>
+
+<div class="wrap">
+<h1>Arm 1 against PanMixer</h1>
+<p class="lede">Both mechanisms on one GRCh38 build, chr21, the same 44 HPRC individuals
+in the same order. Every figure below is measured, not derived.</p>
+<p class="stamp">Arm 1: 44 individuals &times; 7 <code>acc_ceiling</code> labels, K = 86 per-target leave-one-out, chr21, exact expectation. &nbsp;PanMixer: the same 44 &times; 8 capacities &times; 5 draws, its own unmodified mechanism on our build. &nbsp;Denominator: the two-sided mask on both sides.</p>
+
+<section>
+<h2>The headline</h2>
+<p>At our strongest privacy setting against PanMixer at its saturation, paired by
+individual, we alter fewer of the target's called cells.</p>
+<div class="big">
+  <div class="tile ours"><div class="v">33/44</div>
+    <div class="k">individuals where our release is more faithful</div></div>
+  <div class="tile"><div class="v">-0.0972</div>
+    <div class="k">median paired difference, percentage points</div></div>
+  <div class="tile"><div class="v">1.26e&minus;3</div>
+    <div class="k">exact two-sided sign test</div></div>
+  <div class="tile"><div class="v">-5.25</div>
+    <div class="k">paired z on the mean difference</div></div>
+</div>
+<div class="note good"><strong>The two tests agree only after the extra draws.</strong>
+On a single draw per cell they disagreed — sign test p = 0.174, paired z -3.26 — because
+PanMixer's draw noise was flipping marginal individuals' signs. Five draws per cell
+settled it. The median difference barely moved; the dispersion fell.</div>
+<div class="note"><strong>Our column is an exact expectation; theirs is a 5-draw mean.</strong>
+A paired test treats their value as fixed. Residual noise on their side is about 29% of
+the effect, down from 66% on one draw.</div>
+</section>
+
+<section>
+<h2>They offer a frontier. We offer a point.</h2>
+<p>PanMixer's capacity knob moves its alteration rate across more than fifteen
+percentage points. Our whole released privacy range moves ours by +0.0935 points.</p>
+<figure id="fig-frontier"></figure>
+<div class="note"><strong>Our level is reached at <code>acc_ceiling</code> 0.50, which is
+&eta;&nbsp;=&nbsp;0 — no protection applied, zero target information.</strong> So the
+comparison above is between two release <em>forms</em>, not between two privacy knobs.
+It is not ours to quote as a privacy result.</div>
+</section>
+
+<section>
+<h2>Every individual, paired</h2>
+<figure id="fig-paired"></figure>
+<div class="note bad"><strong>For 11 of 44, PanMixer is more faithful at every
+setting it offers.</strong> That is a quarter of the cohort, and no matched-fidelity point
+exists for them. The same 11 individuals are exactly those where the paired test
+says we lose — two independent routes to the same split.</div>
+</section>
+
+<section>
+<h2>Where a privacy comparison becomes legitimate</h2>
+<p>Privacy is comparable only at matched utility. For the 33 individuals whose
+frontier crosses ours, that happens at capacity 0.2524.</p>
+<div class="scroll"><table>
+<thead><tr><th>our <code>acc_ceiling</code></th><th>0.50</th><th>0.65</th><th>0.80</th></tr></thead>
+<tbody>
+<tr><td>individuals with a crossing</td><td>22 / 44</td><td>27 / 44</td><td>33 / 44</td></tr>
+<tr><td>matched capacity, median</td><td>0.2639</td><td>0.2608</td><td>0.2524</td></tr>
+<tr><td>range</td><td>0.1996&ndash;0.2990</td><td>0.1989&ndash;0.2982</td><td>0.1982&ndash;0.2966</td></tr>
+</tbody></table></div>
+<div class="note"><strong>A crossing is not a privacy result.</strong> It is the capacity
+at which one becomes legitimate. Nothing about which tool is more private follows from it;
+that needs the attack numbers, which have not been run.</div>
+</section>
+
+<section>
+<h2>Alteration rate, both tools</h2>
+<h3>Ours — exact expectation, median over 44</h3>
+<div class="scroll"><table>
+<thead><tr><th><code>acc_ceiling</code></th><th>0.50</th><th>0.55</th><th>0.60</th><th>0.65</th><th>0.70</th><th>0.75</th><th>0.80</th></tr></thead>
+<tbody><tr><td>median</td><td class="hi">0.176250</td><td class="hi">0.176095</td><td class="hi">0.175940</td><td class="hi">0.175785</td><td class="hi">0.175631</td><td class="hi">0.175476</td><td class="hi">0.175321</td></tr>
+<tr><td>min</td><td class="">0.158669</td><td class="">0.158496</td><td class="">0.158322</td><td class="">0.158149</td><td class="">0.157975</td><td class="">0.157802</td><td class="">0.157628</td></tr><tr><td>max</td><td class="">0.186487</td><td class="">0.186337</td><td class="">0.186187</td><td class="">0.186037</td><td class="">0.185887</td><td class="">0.185737</td><td class="">0.185586</td></tr></tbody></table></div>
+<h3 style="margin-top:26px">Theirs — mean of 5 draws, median over the same 44</h3>
+<div class="scroll"><table>
+<thead><tr><th><code>capacity</code></th><th>0.01</th><th>0.05</th><th>0.1</th><th>0.2</th><th>0.3</th><th>0.5</th><th>0.7</th><th>0.9</th></tr></thead>
+<tbody><tr><td>median</td><td class="hit">0.011633</td><td class="hit">0.050199</td><td class="hit">0.100321</td><td class="hit">0.173388</td><td class="hit">0.176251</td><td class="hit">0.176286</td><td class="hit">0.176286</td><td class="hit">0.176286</td></tr>
+<tr><td>min</td><td class="">0.010922</td><td class="">0.045555</td><td class="">0.085383</td><td class="">0.155661</td><td class="">0.156988</td><td class="">0.157018</td><td class="">0.157018</td><td class="">0.157018</td></tr><tr><td>max</td><td class="">0.012529</td><td class="">0.057640</td><td class="">0.111582</td><td class="">0.183673</td><td class="">0.188938</td><td class="">0.189028</td><td class="">0.189028</td><td class="">0.189028</td></tr>
+<tr><td>draw sd (within cell)</td><td class="">6.80e-06</td><td class="">5.25e-05</td><td class="">1.20e-04</td><td class="">7.96e-04</td><td class="">9.86e-04</td><td class="">9.89e-04</td><td class="">9.89e-04</td><td class="">9.89e-04</td></tr>
+<tr><td>between-individual sd</td><td class="">3.24e-04</td><td class="">2.95e-03</td><td class="">5.53e-03</td><td class="">8.88e-03</td><td class="">1.01e-02</td><td class="">1.01e-02</td><td class="">1.01e-02</td><td class="">1.01e-02</td></tr></tbody></table></div>
+<div class="note"><strong>Their saturation reproduces on our build, as a
+three-settings plateau.</strong> Capacities <strong>0.5, 0.7 and 0.9</strong> are
+byte-identical per individual at a fixed seed, for 43 of the 44; only HG03492 also
+matches at 0.3. <strong>Capacity 0.3 is distinct</strong> — a median 24 cells away, and
+its optimiser does about 17% less work. Corrected 2026-10-28: this page and two doc files
+said four settings. The percentage is printed to two decimals and all four rounded to the
+same value, which is how four different counts came to be written down as one. No figure
+on this page moves — every one of them reads capacity 0.9.</div>
+</section>
+
+<section>
+<h2>Our grid, and why &eta; is per individual</h2>
+<p>Each individual's leave-one-out chain and share differ, so the constant relating
+&eta; to privacy spans 35.73% across the cohort. One shared &eta; could not place
+every individual on the same ceiling. <code>acc_ceiling</code> can.</p>
+<div class="scroll"><table>
+<thead><tr><th><code>acc_ceiling</code></th><th>0.55</th><th>0.60</th><th>0.65</th><th>0.70</th><th>0.75</th><th>0.80</th></tr></thead>
+<tbody><tr><td>&eta; median</td><td class="hi">4,592</td><td class="hi">9,183</td><td class="hi">13,774</td><td class="hi">18,363</td><td class="hi">22,952</td><td class="hi">27,540</td></tr>
+<tr><td>&eta; min</td><td>4,123</td><td>8,247</td><td>12,370</td><td>16,494</td><td>20,619</td><td>24,743</td></tr><tr><td>&eta; max</td><td>4,805</td><td>9,610</td><td>14,414</td><td>19,218</td><td>24,022</td><td>28,825</td></tr></tbody></table></div>
+<div class="big">
+  <div class="tile"><div class="v">7.22e&minus;8</div>
+    <div class="k">worst |measured &minus; label| over 44 &times; 6 cells, after one refinement</div></div>
+  <div class="tile"><div class="v">+0.1973</div>
+    <div class="k">build effect in percentage points, the one like-for-like comparison</div></div>
+</div>
+<div class="note"><strong><code>acc_ceiling</code> is a Pinsker bound.</strong> The true
+ceiling is closer to 0.5 than every label here. And it is defined against the extremal
+decoy pair — a measured accuracy against any other decoy must be compared to that pair's
+own ceiling, which is roughly 0.12 lower.</div>
+</section>
+
+<section>
+<h2>In-graph utility: the half we lose</h2>
+<p>PanMixer's own <code>af_loss</code> and <code>ld_loss</code>, its evaluators run
+unmodified, both tools measured against <strong>one</strong> pangenome on <strong>the same
+44 people</strong>. These are <em>utility</em> metrics in its framing, not privacy.</p>
+<h3>Paired by individual, our 0.80 against their saturation</h3>
+<div class="scroll"><table>
+<thead><tr><th>metric, as their code ships</th><th>ours</th><th>theirs</th><th>we are lower in</th><th>sign&nbsp;p</th><th>paired&nbsp;z</th></tr></thead>
+<tbody>
+<tr><td><code>af_loss</code> [all]</td><td class="hi">0.003580</td><td class="hit">0.002841</td><td class="bad"><strong>0 of 44</strong></td><td>1.14e-13</td><td>+25.28</td></tr>
+<tr><td><code>ld_loss</code> per pair</td><td class="hi">0.005405</td><td class="hit">0.040671</td><td class="good"><strong>40 of 44</strong></td><td>1.71e-08</td><td>&minus;19.65</td></tr>
+</tbody></table></div>
+<div class="note bad"><strong>Neither of those two rows survives on its own, and an
+adversarial audit of the staging is what caught it.</strong> Both evaluators decide what
+to do with uncalled cells, and that rule keys on a property the two tools do not share.
+An identical rule is not a neutral rule.</div>
+<h3 style="margin-top:26px">What <code>af_loss</code> is actually measuring</h3>
+<p>Their code treats an uncalled cell as just another allele, so a cell whose
+called/uncalled status <em>flips</em> scores exactly like a real allele swap. What that
+penalises is divergence from the row being replaced &mdash; and the two mechanisms differ
+there by construction, not by accident.</p>
+<div class="scroll"><table>
+<thead><tr><th>uncalled cells in the released row</th><th>range</th><th>distinct values</th><th>correlation with the row it replaces</th></tr></thead>
+<tbody>
+<tr><td>ours</td><td class="hi">16,656&ndash;16,666</td><td class="hi"><strong>5</strong></td><td class="hi"><strong>&minus;0.32</strong></td></tr>
+<tr><td>theirs</td><td class="hit">7,113&ndash;54,955</td><td class="hit">44</td><td class="hit"><strong>+0.9991</strong></td></tr>
+<tr><td>the original row itself</td><td>7,561&ndash;55,191</td><td>44</td><td>&mdash;</td></tr>
+</tbody></table></div>
+<p>Our mechanism emits a <strong>fixed-support path</strong> &mdash; nearly the same
+uncalled set for every individual. PanMixer edits a <strong>copy of that individual's own
+row</strong>, so its uncalled set tracks the original almost perfectly. Genuine allele
+swaps, where both cells are called, are within <strong>1%</strong> of each other
+(111,615 against 112,922).</p>
+<div class="scroll"><table>
+<thead><tr><th>how uncalled cells are handled</th><th>ours</th><th>theirs</th><th>we are lower in</th><th>sign&nbsp;p</th></tr></thead>
+<tbody>
+<tr><td>as shipped &mdash; uncalled is an allele</td><td class="hi">0.003580</td><td class="hit">0.002841</td><td class="bad"><strong>0 of 44</strong></td><td>1.14e-13</td></tr>
+<tr><td>dropped, each side renormalised</td><td class="hi">0.003654</td><td class="hit">0.003251</td><td class="bad"><strong>1 of 44</strong></td><td>5.12e-12</td></tr>
+<tr><td>held fixed &mdash; genotype change only</td><td class="hi">0.002737</td><td class="hit">0.002763</td><td class="good"><strong>31 of 44</strong></td><td>0.0096</td></tr>
+</tbody></table></div>
+<div class="note bad"><strong>The verdict runs from &ldquo;they win on all 44 at
+p&nbsp;=&nbsp;1e&minus;13&rdquo; to &ldquo;we win 31 of 44&rdquo; &mdash; with nothing
+about either mechanism changing.</strong> Only the bookkeeping for cells the two tools
+are not really disagreeing about. So <code>af_loss</code> as shipped cannot settle this
+comparison. The shipped figure is still the one to publish, because it is what a reader
+of their paper reproduces &mdash; but it has to be published as policy-dependent, and
+&ldquo;they distort allele frequencies less for every one of the 44&rdquo; is a statement
+about the bookkeeping, not about the mechanisms.</div>
+<h3 style="margin-top:26px">And the LD advantage is 1.30&times;, not 7.5&times;</h3>
+<p>In their LD code, <code>p_A</code> and <code>p_Bs</code> are averaged over the cells
+that are present, while the joint term is averaged over all 88 &mdash; a missing cell
+silently counts as a non-observation rather than being excluded. The two halves of the
+same quantity use different denominators, which inflates the result wherever cells are
+missing.</p>
+<div class="scroll"><table>
+<thead><tr><th>joint-term denominator</th><th>ours</th><th>theirs</th><th>theirs/ours</th><th>we are lower in</th><th>sign&nbsp;p</th></tr></thead>
+<tbody>
+<tr><td>as shipped &mdash; always 88</td><td class="hi">0.005405</td><td class="hit">0.040671</td><td><strong>7.53&times;</strong></td><td class="good"><strong>40 of 44</strong></td><td>1.71e-08</td></tr>
+<tr><td>consistent &mdash; present in both</td><td class="hi">0.002146</td><td class="hit">0.002800</td><td><strong>1.30&times;</strong></td><td class="good"><strong>44 of 44</strong></td><td>1.14e-13</td></tr>
+</tbody></table></div>
+<div class="note"><strong>Under the shipped denominator, the largest 6 pairs out of about
+7,500 carry 94% of their total</strong> and 60% of ours &mdash; against 16% and 10% under
+a consistent one. So the 7.5&times; figure is set by a handful of pairs with missing
+cells; it is not a mean over 7,462 pairs in any useful sense. <strong>We do disturb local
+linkage less, on all 44 individuals, and the honest size of it is 1.30&times;.</strong>
+The smaller number is the more robust one.</div>
+<h3 style="margin-top:26px">Our side does not move</h3>
+<div class="scroll"><table>
+<thead><tr><th><code>acc_ceiling</code></th><th>0.50</th><th>0.55</th><th>0.60</th><th>0.65</th><th>0.70</th><th>0.75</th><th>0.80</th></tr></thead>
+<tbody>
+<tr><td><code>af_loss</code> [all]</td><td class="hi">0.003600</td><td class="hi">0.003604</td><td class="hi">0.003577</td><td class="hi">0.003592</td><td class="hi">0.003591</td><td class="hi">0.003596</td><td class="hi">0.003580</td></tr>
+<tr><td><code>ld_loss</code> per pair</td><td class="hi">0.005426</td><td class="hi">0.005571</td><td class="hi">0.005392</td><td class="hi">0.005310</td><td class="hi">0.005436</td><td class="hi">0.005291</td><td class="hi">0.005405</td></tr>
+</tbody></table></div>
+<div class="note"><code>af_loss</code> spans 0.003577&ndash;0.003604 across the whole
+ceiling range &mdash; <strong>0.77% of its own floor</strong> &mdash; with no systematic
+direction (25 of 44 down, 19 up). Every pre-registered utility endpoint moves 44/44
+together; this one does not, so its scatter is draw noise and no trend may be read from
+it. This reproduces what the earlier cross-build run found, now that the build confound
+is gone.</div>
+<div class="note"><strong>Both evaluators were reimplemented from their definitions and
+matched exactly.</strong> No PanMixer code imported: <code>af_loss</code> agreed to
+0.000e+00 on our cell and 8.674e-19 on theirs; <code>ld_loss</code> agreed to 0.000e+00
+on numerator, denominator <em>and</em> ratio. The pipeline is checked, not just its
+output.</div>
+<div class="note"><strong>What this still cannot say.</strong> <code>capacity</code> is a
+utility-loss budget and bounds nothing about distinguishability; <code>acc_ceiling</code>
+does not transfer to their mechanism. So every row above compares the two tools at each
+one's own endpoint, <em>not</em> at matched privacy. Putting both on one build removed the
+build confound and left that one untouched. Also: <code>ld_loss</code>'s window is 5
+position units despite being named for 5&nbsp;kb, and its denominator is counted per row,
+so it moves with the release.</div>
+</section>
+
+<section>
+<h2>What has not been run</h2>
+<ul class="pend">
+<li><strong>The attacks.</strong> A1 (the optimal distinguisher) and A3 are specified and
+the instrument verifies exactly on a real Arm 1 release, but no powered run exists. The
+driver is not written.</li>
+<li><strong>PanMixer's privacy evaluators</strong> — gap score, diploid gap score, MIA —
+on the new releases. Previously run on the old grid, where they were defeated by our
+&eta;&nbsp;=&nbsp;0 release too, which makes them a statement about release form rather
+than about the tilt.</li>
+<li><strong>Read mapping</strong> on the new grid. Done once on the old grid: no harm, at
+the same order as PanMixer's own degradation.</li>
+</ul>
+</section>
+</div>
+
+<script>
+const P = {"lab":["0.50","0.55","0.60","0.65","0.70","0.75","0.80"],"caps":[0.01,0.05,0.1,0.2,0.3,0.5,0.7,0.9],"oursMed":[0.17624980986347383,0.17609505498237704,0.1759402700841861,0.17578545607542928,0.17563061386232642,0.17547574435131527,0.1753208484483302],"oursMin":[0.15866914226988618,0.15849563636130948,0.1583221507136358,0.15814868675784466,0.15797524591223044,0.15780182958118427,0.1576284391558784],"oursMax":[0.18648740326003724,0.18633748691879695,0.1861874718105658,0.18603735938606525,0.18588715110105275,0.18573684841670862,0.18558645279848535],"theirsMed":[0.011632809524011587,0.050199484304119635,0.10032128965745063,0.17338770006601703,0.17625125557042037,0.17628625724778196,0.17628625724778196,0.17628625724778196],"theirsMin":[0.010922295277943814,0.045555136127416754,0.08538252639992978,0.1556605703499386,0.1569883698857111,0.1570178370915578,0.1570178370915578,0.1570178370915578],"theirsMax":[0.012528511253665163,0.05763991505633682,0.11158202232403111,0.18367309514184643,0.18893848579045466,0.18902825009720645,0.18902825009720645,0.18902825009720645],"drawSd":[6.795333787571932e-06,5.24659645116564e-05,0.0001199701597247138,0.0007956648911826593,0.0009855456895490053,0.0009887860795821345,0.0009887860795821345,0.0009887860795821345],"betweenSd":[0.00032443731217648736,0.0029541983993547176,0.00552512885646743,0.008880820679817826,0.010061111242698973,0.010069488097336713,0.010069488097336713,0.010069488097336713],"diffs":[[-0.0066151,"HG01106"],[-0.00476812,"HG00735"],[-0.00459776,"HG03098"],[-0.0045541,"HG01071"],[-0.00452798,"HG02886"],[-0.00374904,"HG02055"],[-0.00352156,"HG02145"],[-0.00349879,"HG02572"],[-0.00347204,"HG02630"],[-0.00333535,"HG02818"],[-0.00328684,"HG02717"],[-0.0032668,"NA18906"],[-0.00318017,"NA21309"],[-0.00268239,"HG02486"],[-0.00235395,"HG02109"],[-0.00229621,"HG02559"],[-0.00195539,"HG00741"],[-0.00179713,"HG03516"],[-0.00168219,"HG01123"],[-0.00108013,"HG01358"],[-0.00104157,"HG02723"],[-0.00102838,"HG02622"],[-0.00091533,"HG00438"],[-0.00084146,"HG02257"],[-0.00075116,"HG01243"],[-0.000704,"HG01891"],[-0.00063803,"HG01258"],[-0.00050694,"HG00733"],[-0.00034815,"HG01109"],[-0.00030778,"HG01952"],[-0.00028904,"HG03579"],[-0.0002498,"HG03453"],[-0.00011619,"HG01175"],[0.00029879,"HG01978"],[0.0003654,"NA20129"],[0.00041048,"HG00621"],[0.00042042,"HG03486"],[0.00045184,"HG03540"],[0.00051349,"HG00673"],[0.0006106,"HG02148"],[0.00061249,"HG02080"],[0.00065778,"HG01361"],[0.00082238,"HG01928"],[0.00158369,"HG03492"]],"eta":{"0.55":{"median":4592.1893801105525,"min":4123.259599354883,"max":4805.317557301719},"0.60":{"median":9183.4738032407,"min":8246.721279471301,"max":9610.120779036226},"0.65":{"median":13773.886437402769,"min":12370.427612519457,"max":14414.455298853922},"0.70":{"median":18363.460501813584,"min":16494.420949577838,"max":19218.36670088661},"0.75":{"median":22952.229266291346,"min":20618.743391795288,"max":24021.90053683614},"0.80":{"median":27540.226038098237,"min":24743.436783509464,"max":28825.102295983434}},"paired":{"one_draw":{"wins":27,"n":44,"median":-0.0010226773345401036,"mean":-0.0011972002104263272,"sd":0.0024365788088567754,"sign_p":0.17417114727072658,"z":-3.259212369807701},"five_draws":{"wins":33,"n":44,"median":-0.0009718533705701388,"mean":-0.0015275341885372662,"sd":0.0019285025125778921,"sign_p":0.0012600338162656044,"z":-5.254084684645688}},"knob":{"median":0.000934741197499353,"min":0.0008768028270018657,"max":0.0010537688779749255,"faithful_direction":44,"n":44},"crossing":{"0.50":{"n_cross":22,"n":44,"median":0.2639249780203454,"min":0.1996230155356245,"max":0.29904266702533755},"0.65":{"n_cross":27,"n":44,"median":0.2608435622997086,"min":0.19892450120206182,"max":0.29822925926693633},"0.80":{"n_cross":33,"n":44,"median":0.2524051980882793,"min":0.1982255452212733,"max":0.296613141462465}},"c":{"min":8.664432349150451e-10,"max":1.1760505587482347e-09,"spread_pct":35.73313419240287},"grid":{"worst_abs_error":7.224035014630203e-08,"n_targets":44,"k_states":86,"weights":"uniform"},"build":{"theirs_own_build":0.16409,"our_build":0.16606348872301122,"diff":0.001973488723011202,"hg00438_rank":16,"cohort_median_sat":0.17628625724778196},"noCross":["HG00621","HG00673","HG01361","HG01928","HG01978","HG02080","HG02148","HG03486","HG03492","HG03540","NA20129"],"nDraws":5};
+const NS = 'http://www.w3.org/2000/svg';
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function el(t, a, parent){const e=document.createElementNS(NS,t);
+  for(const k in a) e.setAttribute(k,a[k]); if(parent) parent.appendChild(e); return e;}
+function svg(parent, w, h){const s=el('svg',{viewBox:`0 0 ${w} ${h}`,width:'100%',
+  role:'img'},parent); return s;}
+
+function frontier(){
+  const host=document.getElementById('fig-frontier'); host.textContent='';
+  const W=900,H=330,L=116,R=26,T=24,B=58;
+  const s=svg(host,W,H);
+  const xs=i=>L+i*(W-L-R)/(P.caps.length-1);
+  const lo=0, hi=0.20;
+  const y=v=>T+(1-(v-lo)/(hi-lo))*(H-T-B);
+  for(let g=0;g<=4;g++){const v=lo+g*(hi-lo)/4;
+    el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--rule'),'stroke-width':1},s);
+    const t=el('text',{x:L-10,y:y(v)+4,'text-anchor':'end','font-size':11,
+      fill:css('--ink-3'),'font-family':css('--mono')},s);
+    t.textContent=(v*100).toFixed(0)+'%';}
+  // their band + median
+  let band='';
+  P.caps.forEach((c,i)=>band+=`${i?'L':'M'}${xs(i)},${y(P.theirsMin[i])}`);
+  for(let i=P.caps.length-1;i>=0;i--) band+=`L${xs(i)},${y(P.theirsMax[i])}`;
+  el('path',{d:band+'Z',fill:css('--theirs'),opacity:.14},s);
+  let line='';
+  P.caps.forEach((c,i)=>line+=`${i?'L':'M'}${xs(i)},${y(P.theirsMed[i])}`);
+  el('path',{d:line,fill:'none',stroke:css('--theirs'),'stroke-width':2.4},s);
+  P.caps.forEach((c,i)=>el('circle',{cx:xs(i),cy:y(P.theirsMed[i]),r:3.4,
+    fill:css('--theirs')},s));
+  // ours: a flat band across the whole width
+  const om=P.oursMed, oMin=Math.min(...P.oursMin), oMax=Math.max(...P.oursMax);
+  el('rect',{x:L,y:y(oMax),width:W-L-R,height:Math.max(1,y(oMin)-y(oMax)),
+    fill:css('--ours'),opacity:.13},s);
+  el('line',{x1:L,x2:W-R,y1:y(om[0]),y2:y(om[om.length-1]),stroke:css('--ours'),
+    'stroke-width':2.4},s);
+  // x labels
+  P.caps.forEach((c,i)=>{const t=el('text',{x:xs(i),y:H-B+20,'text-anchor':'middle',
+    'font-size':11,fill:css('--ink-3'),'font-family':css('--mono')},s);
+    t.textContent=c;});
+  let t=el('text',{x:(L+W-R)/2,y:H-10,'text-anchor':'middle','font-size':11.5,
+    fill:css('--ink-3')},s); t.textContent="PanMixer capacity";
+  t=el('text',{x:L+8,y:y(om[0])-9,'font-size':12,fill:css('--ours'),
+    'font-weight':600},s); t.textContent='ours — the whole 0.50 to 0.80 range';
+  t=el('text',{x:xs(1)+6,y:y(P.theirsMed[1])-10,'font-size':12,fill:css('--theirs'),
+    'font-weight':600},s); t.textContent='PanMixer';
+  t=el('text',{x:10,y:T-8,'font-size':11.5,fill:css('--ink-3')},s);
+  t.textContent="share of called cells altered";
+}
+
+function paired(){
+  const host=document.getElementById('fig-paired'); host.textContent='';
+  const W=900,H=300,L=58,R=26,T=22,B=52;
+  const s=svg(host,W,H);
+  const n=P.diffs.length;
+  const vals=P.diffs.map(d=>d[0]);
+  const lo=Math.min(...vals)*1.08, hi=Math.max(...vals)*1.25;
+  const y=v=>T+(1-(v-lo)/(hi-lo))*(H-T-B);
+  const x=i=>L+(i+.5)*(W-L-R)/n;
+  for(const v of [-0.006,-0.004,-0.002,0,0.002]){
+    if(v<lo||v>hi) continue;
+    el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--rule'),
+      'stroke-width':v===0?1.6:1,'stroke-dasharray':v===0?'':'3 4'},s);
+    const t=el('text',{x:L-9,y:y(v)+4,'text-anchor':'end','font-size':11,
+      fill:css('--ink-3'),'font-family':css('--mono')},s);
+    t.textContent=(v*100).toFixed(1);}
+  P.diffs.forEach((d,i)=>{
+    const col=d[0]<0?css('--ours'):css('--bad');
+    el('line',{x1:x(i),x2:x(i),y1:y(0),y2:y(d[0]),stroke:col,'stroke-width':2,
+      opacity:.5},s);
+    const c=el('circle',{cx:x(i),cy:y(d[0]),r:3.6,fill:col},s);
+    el('title',{},c).textContent=`${d[1]}: ${(d[0]*100).toFixed(4)} points`;});
+  let t=el('text',{x:L+6,y:y(0)-9,'font-size':12,fill:css('--ink-3')},s);
+  t.textContent='0 — the two tools alter the same share';
+  t=el('text',{x:(L+W-R)/2,y:H-12,'text-anchor':'middle','font-size':11.5,
+    fill:css('--ink-3')},s);
+  t.textContent=`44 individuals, sorted — below the line we are more faithful (${P.paired.five_draws.wins}), above it they are (${n-P.paired.five_draws.wins})`;
+  t=el('text',{x:10,y:T-6,'font-size':11.5,fill:css('--ink-3')},s);
+  t.textContent='percentage points (ours minus theirs)';
+}
+function draw(){frontier();paired();}
+draw();
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+</script>

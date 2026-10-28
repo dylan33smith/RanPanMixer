@@ -95,9 +95,17 @@ out += ["", f"**Provenance.** OURS: chr21/hprc-v1.0-pggb, 44 individuals / 88 ha
 if cross:
     out.append(f"- **Our model-C release sits at {share_c:.2f}%, which PanMixer reaches at "
                f"capacity ≈ {cross:.2f}.** That is the matched-fidelity operating point.")
+# ⚠⚠ THIS IS A TOLERANCE, NOT AN IDENTITY, AND THE WORDING USED TO CLAIM OTHERWISE.
+# `p >= sat - 0.01` admits every capacity within 0.01 PERCENTAGE POINTS of the maximum,
+# and the old text called that "four settings return the identical count" with the word
+# "four" hand-written. Measured 2026-10-28: only 0.5/0.7/0.9 are byte-identical, on
+# either build; 0.3 prints the same 2-dp percentage and is 15 alleles away on theirs,
+# a median 24 cells on ours. Say what the test actually tests.
+_plat = [c for c, _, _, p in pm if p >= sat - 0.01]
 out.append(f"- **PanMixer's knob SATURATES at {sat:.2f}%** from capacity "
-           f"{min(c for c,_,_,p in pm if p>=sat-0.01):g} upward — four settings return the "
-           f"identical count. Its reachable range is "
+           f"{min(_plat):g} upward — {len(_plat)} settings land within 0.01 points of the "
+           f"maximum (NOT necessarily byte-identical: that is a separate test, and on both "
+           f"builds only the top three are). Its reachable range is "
            f"{min(p for *_,p in pm):.2f}% to {sat:.2f}%.")
 out.append(f"- **Ours does not move with `tau` at all** on this axis: "
            f"{ours['C'][0.0]/known:.4%} at `tau`=0 to {ours['C'][0.99]/known:.4%} at "

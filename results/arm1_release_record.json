@@ -1,0 +1,3404 @@
+{
+ "targets": [
+  "HG00438",
+  "HG00621",
+  "HG00673",
+  "HG00733",
+  "HG00735",
+  "HG00741",
+  "HG01071",
+  "HG01106",
+  "HG01109",
+  "HG01123",
+  "HG01175",
+  "HG01243",
+  "HG01258",
+  "HG01358",
+  "HG01361",
+  "HG01891",
+  "HG01928",
+  "HG01952",
+  "HG01978",
+  "HG02055",
+  "HG02080",
+  "HG02109",
+  "HG02145",
+  "HG02148",
+  "HG02257",
+  "HG02486",
+  "HG02559",
+  "HG02572",
+  "HG02622",
+  "HG02630",
+  "HG02717",
+  "HG02723",
+  "HG02818",
+  "HG02886",
+  "HG03098",
+  "HG03453",
+  "HG03486",
+  "HG03492",
+  "HG03516",
+  "HG03540",
+  "HG03579",
+  "NA18906",
+  "NA20129",
+  "NA21309"
+ ],
+ "taus": [
+  "0.50",
+  "0.55",
+  "0.60",
+  "0.65",
+  "0.70",
+  "0.75",
+  "0.80"
+ ],
+ "results": [
+  {
+   "target": "HG00735",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p50/HG00735_tau0_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed2839074257_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p55/HG00735_tau1_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed181297384_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p60/HG00735_tau1_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed940306474_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p65/HG00735_tau1_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed4039208018_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p70/HG00735_tau1_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed54537888_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p75/HG00735_tau1_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed1064022553_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00735/acc_0p80/HG00735_tau1_indicator-wuniform-betachain-share0.0150225765-chromchr21_seed2779043788_chr21"
+   ],
+   "seconds": 362.7600667476654,
+   "k_states": 86,
+   "t_chr21": 332518,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 105595.46999744492,
+     "called_cells": 654075,
+     "target_fidelity": 0.1614424492564995,
+     "e_q_u": 0.01238966865022963,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.8385575507435005
+    },
+    "0.55": {
+     "e_differ": 105485.71854057162,
+     "called_cells": 654075,
+     "target_fidelity": 0.16127465281591807,
+     "e_q_u": 0.01239214783880488,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.838725347184082
+    },
+    "0.60": {
+     "e_differ": 105375.98218128926,
+     "called_cells": 654075,
+     "target_fidelity": 0.16110687945769103,
+     "e_q_u": 0.01239462668633887,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.838893120542309
+    },
+    "0.65": {
+     "e_differ": 105266.26207566482,
+     "called_cells": 654075,
+     "target_fidelity": 0.16093913094930218,
+     "e_q_u": 0.01239710516671707,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.8390608690506979
+    },
+    "0.70": {
+     "e_differ": 105156.55937089928,
+     "called_cells": 654075,
+     "target_fidelity": 0.16077140904468032,
+     "e_q_u": 0.01239958325402522,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.8392285909553198
+    },
+    "0.75": {
+     "e_differ": 105046.87520517391,
+     "called_cells": 654075,
+     "target_fidelity": 0.16060371548396424,
+     "e_q_u": 0.012402060922552808,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.8393962845160359
+    },
+    "0.80": {
+     "e_differ": 104937.21070742625,
+     "called_cells": 654075,
+     "target_fidelity": 0.1604360519931602,
+     "e_q_u": 0.012404538146798134,
+     "u_ceiling": 0.014774977148848553,
+     "e_q_u_over_ceiling": 0.8395639480068399
+    }
+   }
+  },
+  {
+   "target": "HG00741",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p50/HG00741_tau0_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed3338334935_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p55/HG00741_tau1_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed1978166434_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p60/HG00741_tau1_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed2265983953_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p65/HG00741_tau1_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed3436763229_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p70/HG00741_tau1_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed2215785032_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p75/HG00741_tau1_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed3572807386_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00741/acc_0p80/HG00741_tau1_indicator-wuniform-betachain-share0.0150226695-chromchr21_seed3753687378_chr21"
+   ],
+   "seconds": 367.58539271354675,
+   "k_states": 86,
+   "t_chr21": 332520,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 109277.34714391454,
+     "called_cells": 654689,
+     "target_fidelity": 0.16691489721671593,
+     "e_q_u": 0.012320370238779795,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.8330851027832845
+    },
+    "0.55": {
+     "e_differ": 109171.07130834612,
+     "called_cells": 654689,
+     "target_fidelity": 0.1667525669567476,
+     "e_q_u": 0.012322770916570192,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.8332474330432524
+    },
+    "0.60": {
+     "e_differ": 109064.78299819467,
+     "called_cells": 654689,
+     "target_fidelity": 0.16659021764256718,
+     "e_q_u": 0.012325171876150474,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.8334097823574331
+    },
+    "0.65": {
+     "e_differ": 108958.48304862255,
+     "called_cells": 654689,
+     "target_fidelity": 0.1664278505498375,
+     "e_q_u": 0.012327573098655044,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.8335721494501629
+    },
+    "0.70": {
+     "e_differ": 108852.17228885136,
+     "called_cells": 654689,
+     "target_fidelity": 0.16626546694514702,
+     "e_q_u": 0.012329974565352512,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.8337345330548531
+    },
+    "0.75": {
+     "e_differ": 108745.85154276656,
+     "called_cells": 654689,
+     "target_fidelity": 0.16610306808693373,
+     "e_q_u": 0.01233237625763204,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.8338969319130665
+    },
+    "0.80": {
+     "e_differ": 108639.52162871859,
+     "called_cells": 654689,
+     "target_fidelity": 0.1659406552251811,
+     "e_q_u": 0.0123347781570078,
+     "u_ceiling": 0.014788849539642731,
+     "e_q_u_over_ceiling": 0.834059344774819
+    }
+   }
+  },
+  {
+   "target": "HG02148",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p50/HG02148_tau0_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed2165240187_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p55/HG02148_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed873807054_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p60/HG02148_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed1726693965_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p65/HG02148_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed1006090374_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p70/HG02148_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed2794435477_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p75/HG02148_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed564768350_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02148/acc_0p80/HG02148_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed2163890913_chr21"
+   ],
+   "seconds": 368.36932277679443,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 101286.60563712411,
+     "called_cells": 638351,
+     "target_fidelity": 0.15866914226988618,
+     "e_q_u": 0.012131808067423169,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.841330857730114
+    },
+    "0.55": {
+     "e_differ": 101175.84796687827,
+     "called_cells": 638351,
+     "target_fidelity": 0.15849563636130948,
+     "e_q_u": 0.012134309984905545,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.8415043636386909
+    },
+    "0.60": {
+     "e_differ": 101065.10323020013,
+     "called_cells": 638351,
+     "target_fidelity": 0.1583221507136358,
+     "e_q_u": 0.012136811610230103,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.8416778492863645
+    },
+    "0.65": {
+     "e_differ": 100954.3723405569,
+     "called_cells": 638351,
+     "target_fidelity": 0.15814868675784466,
+     "e_q_u": 0.012139312922762427,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.8418513132421553
+    },
+    "0.70": {
+     "e_differ": 100843.65620331821,
+     "called_cells": 638351,
+     "target_fidelity": 0.15797524591223044,
+     "e_q_u": 0.012141813902051025,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.8420247540877694
+    },
+    "0.75": {
+     "e_differ": 100732.95571497855,
+     "called_cells": 638351,
+     "target_fidelity": 0.15780182958118427,
+     "e_q_u": 0.012144314527844886,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.8421981704188157
+    },
+    "0.80": {
+     "e_differ": 100622.27176359414,
+     "called_cells": 638351,
+     "target_fidelity": 0.1576284391558784,
+     "e_q_u": 0.012146814780083604,
+     "u_ceiling": 0.014419782605091214,
+     "e_q_u_over_ceiling": 0.8423715608441219
+    }
+   }
+  },
+  {
+   "target": "HG01258",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p50/HG01258_tau0_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed4006463030_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p55/HG01258_tau1_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed3043405621_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p60/HG01258_tau1_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed3727035687_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p65/HG01258_tau1_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed691571677_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p70/HG01258_tau1_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed2693367554_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p75/HG01258_tau1_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed863954692_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01258/acc_0p80/HG01258_tau1_indicator-wuniform-betachain-share0.0150226043-chromchr21_seed468919255_chr21"
+   ],
+   "seconds": 377.42037081718445,
+   "k_states": 86,
+   "t_chr21": 332518,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 107078.22466361398,
+     "called_cells": 645965,
+     "target_fidelity": 0.16576474679528144,
+     "e_q_u": 0.012172999334306185,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8342352532047181
+    },
+    "0.55": {
+     "e_differ": 106971.77834419867,
+     "called_cells": 645965,
+     "target_fidelity": 0.1655999602829854,
+     "e_q_u": 0.012175403867196372,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8344000397170143
+    },
+    "0.60": {
+     "e_differ": 106865.36386587271,
+     "called_cells": 645965,
+     "target_fidelity": 0.165435223062972,
+     "e_q_u": 0.012177807680823112,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8345647769370279
+    },
+    "0.65": {
+     "e_differ": 106758.9820512941,
+     "called_cells": 645965,
+     "target_fidelity": 0.16527053640877462,
+     "e_q_u": 0.01218021075660325,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8347294635912251
+    },
+    "0.70": {
+     "e_differ": 106652.63370601143,
+     "called_cells": 645965,
+     "target_fidelity": 0.16510590156744007,
+     "e_q_u": 0.012182613076340117,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8348940984325594
+    },
+    "0.75": {
+     "e_differ": 106546.31961863155,
+     "called_cells": 645965,
+     "target_fidelity": 0.16494131975978815,
+     "e_q_u": 0.012185014622219765,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8350586802402117
+    },
+    "0.80": {
+     "e_differ": 106440.04056093955,
+     "called_cells": 645965,
+     "target_fidelity": 0.16477679218059732,
+     "e_q_u": 0.012187415376808198,
+     "u_ceiling": 0.014591806432949888,
+     "e_q_u_over_ceiling": 0.8352232078194024
+    }
+   }
+  },
+  {
+   "target": "HG01928",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p50/HG01928_tau0_indicator-wuniform-betachain-share0.015022714-chromchr21_seed4136712383_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p55/HG01928_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed1606227943_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p60/HG01928_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2192261235_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p65/HG01928_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2564429039_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p70/HG01928_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2436964186_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p75/HG01928_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed1232624215_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01928/acc_0p80/HG01928_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2425190428_chr21"
+   ],
+   "seconds": 378.23233795166016,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 102602.14688691508,
+     "called_cells": 644319,
+     "target_fidelity": 0.15924122505609037,
+     "e_q_u": 0.012236907404643413,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8407587749439098
+    },
+    "0.55": {
+     "e_differ": 102492.04129851412,
+     "called_cells": 644319,
+     "target_fidelity": 0.1590703382928551,
+     "e_q_u": 0.012239394593074517,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8409296617071451
+    },
+    "0.60": {
+     "e_differ": 102381.9555911874,
+     "called_cells": 644319,
+     "target_fidelity": 0.15889948238556895,
+     "e_q_u": 0.012241881332409638,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8411005176144316
+    },
+    "0.65": {
+     "e_differ": 102271.89061176198,
+     "called_cells": 644319,
+     "target_fidelity": 0.15872865864852964,
+     "e_q_u": 0.012244367603519685,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8412713413514706
+    },
+    "0.70": {
+     "e_differ": 102161.84719413525,
+     "called_cells": 644319,
+     "target_fidelity": 0.1585578683759679,
+     "e_q_u": 0.012246853387567662,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8414421316240325
+    },
+    "0.75": {
+     "e_differ": 102051.82615940733,
+     "called_cells": 644319,
+     "target_fidelity": 0.15838711284225257,
+     "e_q_u": 0.012249338666005631,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8416128871577474
+    },
+    "0.80": {
+     "e_differ": 101941.82831591961,
+     "called_cells": 644319,
+     "target_fidelity": 0.15821639330195075,
+     "e_q_u": 0.012251823420573882,
+     "u_ceiling": 0.014554599689381515,
+     "e_q_u_over_ceiling": 0.8417836066980494
+    }
+   }
+  },
+  {
+   "target": "HG01358",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p50/HG01358_tau0_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed3559471815_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p55/HG01358_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed1169651115_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p60/HG01358_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed1404399312_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p65/HG01358_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed2607638381_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p70/HG01358_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed3791894852_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p75/HG01358_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed1123599063_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01358/acc_0p80/HG01358_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed3859995296_chr21"
+   ],
+   "seconds": 378.5736060142517,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 102892.93786296679,
+     "called_cells": 640603,
+     "target_fidelity": 0.16061888230771132,
+     "e_q_u": 0.012146399165743747,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.8393811176922887
+    },
+    "0.55": {
+     "e_differ": 102783.05498168967,
+     "called_cells": 640603,
+     "target_fidelity": 0.16044735191950346,
+     "e_q_u": 0.01214888132375316,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.8395526480804968
+    },
+    "0.60": {
+     "e_differ": 102673.16581771617,
+     "called_cells": 640603,
+     "target_fidelity": 0.160275811723823,
+     "e_q_u": 0.012151363623683173,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.839724188276177
+    },
+    "0.65": {
+     "e_differ": 102563.27136017327,
+     "called_cells": 640603,
+     "target_fidelity": 0.160104263264726,
+     "e_q_u": 0.012153846043190288,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.8398957367352742
+    },
+    "0.70": {
+     "e_differ": 102453.37259605588,
+     "called_cells": 640603,
+     "target_fidelity": 0.1599327080829404,
+     "e_q_u": 0.012156328559979139,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.8400672919170595
+    },
+    "0.75": {
+     "e_differ": 102343.47050959099,
+     "called_cells": 640603,
+     "target_fidelity": 0.15976114771487332,
+     "e_q_u": 0.012158811151816915,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.8402388522851267
+    },
+    "0.80": {
+     "e_differ": 102233.56608270238,
+     "called_cells": 640603,
+     "target_fidelity": 0.1595895836933364,
+     "e_q_u": 0.01216129379652281,
+     "u_ceiling": 0.014470660477969594,
+     "e_q_u_over_ceiling": 0.8404104163066636
+    }
+   }
+  },
+  {
+   "target": "HG02080",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p50/HG02080_tau0_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed826575932_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p55/HG02080_tau1_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed2359997454_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p60/HG02080_tau1_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed344419435_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p65/HG02080_tau1_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed1659585720_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p70/HG02080_tau1_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed2140424771_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p75/HG02080_tau1_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed1709112662_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02080/acc_0p80/HG02080_tau1_indicator-wuniform-betachain-share0.0150229231-chromchr21_seed4019286065_chr21"
+   ],
+   "seconds": 378.9859802722931,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 104873.02663282107,
+     "called_cells": 640239,
+     "target_fidelity": 0.16380293395563386,
+     "e_q_u": 0.012093614896647661,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.8361970660443659
+    },
+    "0.55": {
+     "e_differ": 104764.53437556274,
+     "called_cells": 640239,
+     "target_fidelity": 0.16363347808484446,
+     "e_q_u": 0.012096065675449123,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.8363665219151556
+    },
+    "0.60": {
+     "e_differ": 104656.01059117675,
+     "called_cells": 640239,
+     "target_fidelity": 0.1634639729713072,
+     "e_q_u": 0.012098517166430584,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.8365360270286928
+    },
+    "0.65": {
+     "e_differ": 104547.45650757084,
+     "called_cells": 640239,
+     "target_fidelity": 0.16329442053291168,
+     "e_q_u": 0.012100969341854305,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.8367055794670881
+    },
+    "0.70": {
+     "e_differ": 104438.87336309404,
+     "called_cells": 640239,
+     "target_fidelity": 0.16312482270385598,
+     "e_q_u": 0.012103422173746686,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.836875177296144
+    },
+    "0.75": {
+     "e_differ": 104330.26240588225,
+     "called_cells": 640239,
+     "target_fidelity": 0.1629551814336244,
+     "e_q_u": 0.012105875633913035,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.8370448185663756
+    },
+    "0.80": {
+     "e_differ": 104221.62489374143,
+     "called_cells": 640239,
+     "target_fidelity": 0.16278549868680514,
+     "e_q_u": 0.01210832969394023,
+     "u_ceiling": 0.01446263732287003,
+     "e_q_u_over_ceiling": 0.8372145013131947
+    }
+   }
+  },
+  {
+   "target": "HG00733",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p50/HG00733_tau0_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed1589644690_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p55/HG00733_tau1_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed2764453722_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p60/HG00733_tau1_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed1007959803_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p65/HG00733_tau1_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed4270654946_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p70/HG00733_tau1_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed1175115639_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p75/HG00733_tau1_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed3175862853_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00733/acc_0p80/HG00733_tau1_indicator-wuniform-betachain-share0.0150226648-chromchr21_seed3464148781_chr21"
+   ],
+   "seconds": 384.47954273223877,
+   "k_states": 86,
+   "t_chr21": 332520,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 103628.15082429629,
+     "called_cells": 642228,
+     "target_fidelity": 0.16135726069915401,
+     "e_q_u": 0.012166493728374113,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.8386427393008462
+    },
+    "0.55": {
+     "e_differ": 103519.54778843738,
+     "called_cells": 642228,
+     "target_fidelity": 0.16118815714736415,
+     "e_q_u": 0.012168946974799415,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.8388118428526359
+    },
+    "0.60": {
+     "e_differ": 103410.92674518295,
+     "called_cells": 642228,
+     "target_fidelity": 0.16101902555662934,
+     "e_q_u": 0.012171400627995842,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.8389809744433707
+    },
+    "0.65": {
+     "e_differ": 103302.28881124666,
+     "called_cells": 642228,
+     "target_fidelity": 0.16084986766576148,
+     "e_q_u": 0.012173854662737814,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.8391501323342384
+    },
+    "0.70": {
+     "e_differ": 103193.635110659,
+     "called_cells": 642228,
+     "target_fidelity": 0.1606806852249653,
+     "e_q_u": 0.012176309053634489,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.839319314775035
+    },
+    "0.75": {
+     "e_differ": 103084.96677464765,
+     "called_cells": 642228,
+     "target_fidelity": 0.16051147999565207,
+     "e_q_u": 0.012178763775132419,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.839488520004348
+    },
+    "0.80": {
+     "e_differ": 102976.28494100543,
+     "called_cells": 642228,
+     "target_fidelity": 0.1603422537494557,
+     "e_q_u": 0.012181218801529885,
+     "u_ceiling": 0.014507361905400851,
+     "e_q_u_over_ceiling": 0.8396577462505446
+    }
+   }
+  },
+  {
+   "target": "HG01109",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p50/HG01109_tau0_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed133744406_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p55/HG01109_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed443810211_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p60/HG01109_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed3283056108_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p65/HG01109_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed79382328_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p70/HG01109_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed4251583532_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p75/HG01109_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed3334027333_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01109/acc_0p80/HG01109_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed525411846_chr21"
+   ],
+   "seconds": 403.47253942489624,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 109811.9960148347,
+     "called_cells": 627935,
+     "target_fidelity": 0.1748779666921492,
+     "e_q_u": 0.011703952086838009,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.8251220333078508
+    },
+    "0.55": {
+     "e_differ": 109711.31884994151,
+     "called_cells": 627935,
+     "target_fidelity": 0.17471763614059022,
+     "e_q_u": 0.01170622629721872,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.8252823638594098
+    },
+    "0.60": {
+     "e_differ": 109610.58317901801,
+     "called_cells": 627935,
+     "target_fidelity": 0.17455721241691896,
+     "e_q_u": 0.011708501829200229,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.825442787583081
+    },
+    "0.65": {
+     "e_differ": 109509.7899993792,
+     "called_cells": 627935,
+     "target_fidelity": 0.17439669710938105,
+     "e_q_u": 0.011710778660254051,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.8256033028906189
+    },
+    "0.70": {
+     "e_differ": 109408.94031899457,
+     "called_cells": 627935,
+     "target_fidelity": 0.1742360918231896,
+     "e_q_u": 0.011713056767611023,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.8257639081768104
+    },
+    "0.75": {
+     "e_differ": 109308.03515608962,
+     "called_cells": 627935,
+     "target_fidelity": 0.17407539817989062,
+     "e_q_u": 0.011715336128270307,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.8259246018201094
+    },
+    "0.80": {
+     "e_differ": 109207.07553887999,
+     "called_cells": 627935,
+     "target_fidelity": 0.17391461781693962,
+     "e_q_u": 0.011717616719005399,
+     "u_ceiling": 0.014184510429224346,
+     "e_q_u_over_ceiling": 0.8260853821830603
+    }
+   }
+  },
+  {
+   "target": "HG01106",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p50/HG01106_tau0_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed2227611950_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p55/HG01106_tau1_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed3630263344_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p60/HG01106_tau1_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed1148513118_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p65/HG01106_tau1_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed1211797050_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p70/HG01106_tau1_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed2675665666_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p75/HG01106_tau1_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed3971285092_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01106/acc_0p80/HG01106_tau1_indicator-wuniform-betachain-share0.0150227127-chromchr21_seed2331988103_chr21"
+   ],
+   "seconds": 403.5758695602417,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 106688.60136743318,
+     "called_cells": 649745,
+     "target_fidelity": 0.16420072700433735,
+     "e_q_u": 0.01226716545170866,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8357992729956627
+    },
+    "0.55": {
+     "e_differ": 106581.05652686808,
+     "called_cells": 649745,
+     "target_fidelity": 0.16403520846927344,
+     "e_q_u": 0.012269594794878193,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8359647915307266
+    },
+    "0.60": {
+     "e_differ": 106473.48704867484,
+     "called_cells": 649745,
+     "target_fidelity": 0.16386965201529036,
+     "e_q_u": 0.012272024694590032,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8361303479847095
+    },
+    "0.65": {
+     "e_differ": 106365.89391086603,
+     "called_cells": 649745,
+     "target_fidelity": 0.16370405914761332,
+     "e_q_u": 0.012274455128751742,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8362959408523869
+    },
+    "0.70": {
+     "e_differ": 106258.27809811995,
+     "called_cells": 649745,
+     "target_fidelity": 0.1635384313817266,
+     "e_q_u": 0.012276886075120294,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8364615686182735
+    },
+    "0.75": {
+     "e_differ": 106150.64060132476,
+     "called_cells": 649745,
+     "target_fidelity": 0.16337277024267177,
+     "e_q_u": 0.012279317511312409,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8366272297573283
+    },
+    "0.80": {
+     "e_differ": 106042.98241717879,
+     "called_cells": 649745,
+     "target_fidelity": 0.16320707726443265,
+     "e_q_u": 0.012281749414813546,
+     "u_ceiling": 0.014677166932367407,
+     "e_q_u_over_ceiling": 0.8367929227355675
+    }
+   }
+  },
+  {
+   "target": "HG02055",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p50/HG02055_tau0_indicator-wuniform-betachain-share0.015022714-chromchr21_seed1305933804_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p55/HG02055_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2450774893_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p60/HG02055_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed202465524_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p65/HG02055_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed3961693487_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p70/HG02055_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed1741587393_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p75/HG02055_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed288416247_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02055/acc_0p80/HG02055_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed334256237_chr21"
+   ],
+   "seconds": 405.28917384147644,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 117675.9642089135,
+     "called_cells": 647826,
+     "target_fidelity": 0.18164748591275048,
+     "e_q_u": 0.011975623171519928,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.8183525140872496
+    },
+    "0.55": {
+     "e_differ": 117580.19869455977,
+     "called_cells": 647826,
+     "target_fidelity": 0.181499659931154,
+     "e_q_u": 0.011977786430286887,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.8185003400688463
+    },
+    "0.60": {
+     "e_differ": 117484.41500952099,
+     "called_cells": 647826,
+     "target_fidelity": 0.18135180590084526,
+     "e_q_u": 0.01197995009951364,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.818648194099155
+    },
+    "0.65": {
+     "e_differ": 117388.61371593969,
+     "called_cells": 647826,
+     "target_fidelity": 0.18120392468956123,
+     "e_q_u": 0.011982114166501887,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.818796075310439
+    },
+    "0.70": {
+     "e_differ": 117292.79537513145,
+     "called_cells": 647826,
+     "target_fidelity": 0.18105601716376227,
+     "e_q_u": 0.011984278618572007,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.8189439828362383
+    },
+    "0.75": {
+     "e_differ": 117196.96054747867,
+     "called_cells": 647826,
+     "target_fidelity": 0.1809080841884683,
+     "e_q_u": 0.01198644344306544,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.8190919158115318
+    },
+    "0.80": {
+     "e_differ": 117101.10979224613,
+     "called_cells": 647826,
+     "target_fidelity": 0.1807601266269741,
+     "e_q_u": 0.011988608627348902,
+     "u_ceiling": 0.014633819735834688,
+     "e_q_u_over_ceiling": 0.8192398733730262
+    }
+   }
+  },
+  {
+   "target": "HG00621",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p50/HG00621_tau0_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed4149025188_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p55/HG00621_tau1_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed1522251110_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p60/HG00621_tau1_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed4180250609_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p65/HG00621_tau1_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed2274067178_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p70/HG00621_tau1_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed3873326204_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p75/HG00621_tau1_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed3551863794_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00621/acc_0p80/HG00621_tau1_indicator-wuniform-betachain-share0.0150225792-chromchr21_seed2228932373_chr21"
+   ],
+   "seconds": 405.9176149368286,
+   "k_states": 86,
+   "t_chr21": 332518,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 105154.8190776163,
+     "called_cells": 640508,
+     "target_fidelity": 0.16417409162354926,
+     "e_q_u": 0.01209315819149286,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8358259083764512
+    },
+    "0.55": {
+     "e_differ": 105046.15710628469,
+     "called_cells": 640508,
+     "target_fidelity": 0.1640044419527698,
+     "e_q_u": 0.012095612769994563,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8359955580472305
+    },
+    "0.60": {
+     "e_differ": 104937.46508883183,
+     "called_cells": 640508,
+     "target_fidelity": 0.16383474537216058,
+     "e_q_u": 0.01209806802721176,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8361652546278396
+    },
+    "0.65": {
+     "e_differ": 104828.74406735816,
+     "called_cells": 640508,
+     "target_fidelity": 0.16366500350871208,
+     "e_q_u": 0.01210052393960432,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8363349964912883
+    },
+    "0.70": {
+     "e_differ": 104719.99509613271,
+     "called_cells": 640508,
+     "target_fidelity": 0.16349521800841318,
+     "e_q_u": 0.012102980483357223,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8365047819915873
+    },
+    "0.75": {
+     "e_differ": 104611.21924146624,
+     "called_cells": 640508,
+     "target_fidelity": 0.16332539053605302,
+     "e_q_u": 0.012105437634383445,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8366746094639472
+    },
+    "0.80": {
+     "e_differ": 104502.41758152601,
+     "called_cells": 640508,
+     "target_fidelity": 0.16315552277493178,
+     "e_q_u": 0.012107895368328144,
+     "u_ceiling": 0.014468513203883804,
+     "e_q_u_over_ceiling": 0.8368444772250686
+    }
+   }
+  },
+  {
+   "target": "HG01978",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p50/HG01978_tau0_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed2898328309_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p55/HG01978_tau1_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed275169696_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p60/HG01978_tau1_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed4142817011_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p65/HG01978_tau1_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed842663536_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p70/HG01978_tau1_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed1510290549_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p75/HG01978_tau1_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed79280025_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01978/acc_0p80/HG01978_tau1_indicator-wuniform-betachain-share0.0150226661-chromchr21_seed826670833_chr21"
+   ],
+   "seconds": 406.3737235069275,
+   "k_states": 86,
+   "t_chr21": 332520,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 101299.29965143205,
+     "called_cells": 637096,
+     "target_fidelity": 0.15900162558143835,
+     "e_q_u": 0.01210317417181562,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8409983744185617
+    },
+    "0.55": {
+     "e_differ": 101187.38044264761,
+     "called_cells": 637096,
+     "target_fidelity": 0.1588259547111387,
+     "e_q_u": 0.012105702327879683,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8411740452888615
+    },
+    "0.60": {
+     "e_differ": 101075.47067646615,
+     "called_cells": 637096,
+     "target_fidelity": 0.1586502986621579,
+     "e_q_u": 0.012108230270643682,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8413497013378423
+    },
+    "0.65": {
+     "e_differ": 100963.57144302054,
+     "called_cells": 637096,
+     "target_fidelity": 0.15847465914559272,
+     "e_q_u": 0.012110757975482483,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8415253408544073
+    },
+    "0.70": {
+     "e_differ": 100851.68382389614,
+     "called_cells": 637096,
+     "target_fidelity": 0.1582990378591235,
+     "e_q_u": 0.012113285417964026,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8417009621408765
+    },
+    "0.75": {
+     "e_differ": 100739.80889258289,
+     "called_cells": 637096,
+     "target_fidelity": 0.1581234364877238,
+     "e_q_u": 0.012115812573839126,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8418765635122762
+    },
+    "0.80": {
+     "e_differ": 100627.94771434974,
+     "called_cells": 637096,
+     "target_fidelity": 0.15794785670346342,
+     "e_q_u": 0.012118339419044293,
+     "u_ceiling": 0.01439143586952038,
+     "e_q_u_over_ceiling": 0.8420521432965367
+    }
+   }
+  },
+  {
+   "target": "HG00438",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p50/HG00438_tau0_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed257963669_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p55/HG00438_tau1_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed240701211_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p60/HG00438_tau1_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed2519737764_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p65/HG00438_tau1_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed3046065860_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p70/HG00438_tau1_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed2205394907_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p75/HG00438_tau1_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed463152601_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00438/acc_0p80/HG00438_tau1_indicator-wuniform-betachain-share0.0150248984-chromchr21_seed3264191283_chr21"
+   ],
+   "seconds": 407.44221544265747,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 107287.19295331379,
+     "called_cells": 645569,
+     "target_fidelity": 0.16619012522799853,
+     "e_q_u": 0.012161080755754958,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.8338098747720017
+    },
+    "0.55": {
+     "e_differ": 107178.83397457123,
+     "called_cells": 645569,
+     "target_fidelity": 0.16602227488397248,
+     "e_q_u": 0.012163528845721678,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.8339777251160277
+    },
+    "0.60": {
+     "e_differ": 107070.41135370947,
+     "called_cells": 645569,
+     "target_fidelity": 0.16585432595696117,
+     "e_q_u": 0.012165978373516954,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.8341456740430393
+    },
+    "0.65": {
+     "e_differ": 106961.926208867,
+     "called_cells": 645569,
+     "target_fidelity": 0.16568628017898474,
+     "e_q_u": 0.012168429313879337,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.8343137198210154
+    },
+    "0.70": {
+     "e_differ": 106853.3796744596,
+     "called_cells": 645569,
+     "target_fidelity": 0.16551813930727716,
+     "e_q_u": 0.012170881641179656,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.834481860692723
+    },
+    "0.75": {
+     "e_differ": 106744.77290148435,
+     "called_cells": 645569,
+     "target_fidelity": 0.16534990512475714,
+     "e_q_u": 0.012173335329414114,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.8346500948752429
+    },
+    "0.80": {
+     "e_differ": 106636.10705656785,
+     "called_cells": 645569,
+     "target_fidelity": 0.16518157943855397,
+     "e_q_u": 0.012175790352225815,
+     "u_ceiling": 0.014584956503519826,
+     "e_q_u_over_ceiling": 0.8348184205614463
+    }
+   }
+  },
+  {
+   "target": "HG01361",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p50/HG01361_tau0_indicator-wuniform-betachain-share0.015022712-chromchr21_seed4180272_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p55/HG01361_tau1_indicator-wuniform-betachain-share0.015022712-chromchr21_seed2720338921_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p60/HG01361_tau1_indicator-wuniform-betachain-share0.015022712-chromchr21_seed1338716070_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p65/HG01361_tau1_indicator-wuniform-betachain-share0.015022712-chromchr21_seed735672906_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p70/HG01361_tau1_indicator-wuniform-betachain-share0.015022712-chromchr21_seed2445304709_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p75/HG01361_tau1_indicator-wuniform-betachain-share0.015022712-chromchr21_seed3542481285_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01361/acc_0p80/HG01361_tau1_indicator-wuniform-betachain-share0.015022712-chromchr21_seed1403695659_chr21"
+   ],
+   "seconds": 407.6460518836975,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 105608.14034008281,
+     "called_cells": 644980,
+     "target_fidelity": 0.1637386280816193,
+     "e_q_u": 0.012183934413037074,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8362613719183805
+    },
+    "0.55": {
+     "e_differ": 105499.53167689119,
+     "called_cells": 644980,
+     "target_fidelity": 0.16357023733587273,
+     "e_q_u": 0.012186387786911362,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8364297626641273
+    },
+    "0.60": {
+     "e_differ": 105390.91871139705,
+     "called_cells": 644980,
+     "target_fidelity": 0.16340183991968288,
+     "e_q_u": 0.012188841257970867,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8365981600803173
+    },
+    "0.65": {
+     "e_differ": 105282.30215056152,
+     "called_cells": 644980,
+     "target_fidelity": 0.16323343692914744,
+     "e_q_u": 0.012191294810245957,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8367665630708525
+    },
+    "0.70": {
+     "e_differ": 105173.68269692271,
+     "called_cells": 644980,
+     "target_fidelity": 0.16306502945350665,
+     "e_q_u": 0.012193748427866923,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8369349705464932
+    },
+    "0.75": {
+     "e_differ": 105065.06104796588,
+     "called_cells": 644980,
+     "target_fidelity": 0.16289661857416646,
+     "e_q_u": 0.012196202095078186,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8371033814258334
+    },
+    "0.80": {
+     "e_differ": 104956.4378965621,
+     "called_cells": 644980,
+     "target_fidelity": 0.16272820536537894,
+     "e_q_u": 0.012198655796228405,
+     "u_ceiling": 0.014569529123516937,
+     "e_q_u_over_ceiling": 0.8372717946346212
+    }
+   }
+  },
+  {
+   "target": "HG00673",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p50/HG00673_tau0_indicator-wuniform-betachain-share0.015022731-chromchr21_seed1014797916_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p55/HG00673_tau1_indicator-wuniform-betachain-share0.015022731-chromchr21_seed4041091030_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p60/HG00673_tau1_indicator-wuniform-betachain-share0.015022731-chromchr21_seed1970998559_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p65/HG00673_tau1_indicator-wuniform-betachain-share0.015022731-chromchr21_seed1734023654_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p70/HG00673_tau1_indicator-wuniform-betachain-share0.015022731-chromchr21_seed3122743278_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p75/HG00673_tau1_indicator-wuniform-betachain-share0.015022731-chromchr21_seed3003941576_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG00673/acc_0p80/HG00673_tau1_indicator-wuniform-betachain-share0.015022731-chromchr21_seed3993075436_chr21"
+   ],
+   "seconds": 410.5220754146576,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 105222.75354956591,
+     "called_cells": 633781,
+     "target_fidelity": 0.16602383717651037,
+     "e_q_u": 0.011939679535246255,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8339761628234895
+    },
+    "0.55": {
+     "e_differ": 105115.85774988134,
+     "called_cells": 633781,
+     "target_fidelity": 0.16585517355345356,
+     "e_q_u": 0.011942094220099755,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8341448264465461
+    },
+    "0.60": {
+     "e_differ": 105008.90202825273,
+     "called_cells": 633781,
+     "target_fidelity": 0.16568641538363052,
+     "e_q_u": 0.011944510258538817,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8343135846163693
+    },
+    "0.65": {
+     "e_differ": 104901.8872109154,
+     "called_cells": 633781,
+     "target_fidelity": 0.1655175639707019,
+     "e_q_u": 0.011946927631899484,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8344824360292978
+    },
+    "0.70": {
+     "e_differ": 104794.81413062457,
+     "called_cells": 633781,
+     "target_fidelity": 0.16534862062861552,
+     "e_q_u": 0.011949346321370536,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8346513793713846
+    },
+    "0.75": {
+     "e_differ": 104687.68362597193,
+     "called_cells": 633781,
+     "target_fidelity": 0.16517958668052835,
+     "e_q_u": 0.011951766308008885,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8348204133194714
+    },
+    "0.80": {
+     "e_differ": 104580.49654145219,
+     "called_cells": 633781,
+     "target_fidelity": 0.16501046345891118,
+     "e_q_u": 0.011954187572738133,
+     "u_ceiling": 0.014316571704907686,
+     "e_q_u_over_ceiling": 0.8349895365410887
+    }
+   }
+  },
+  {
+   "target": "HG01952",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p50/HG01952_tau0_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed813882773_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p55/HG01952_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed2374417443_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p60/HG01952_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed3956210039_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p65/HG01952_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed3143080548_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p70/HG01952_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed1826129999_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p75/HG01952_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed1692612280_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01952/acc_0p80/HG01952_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed990705919_chr21"
+   ],
+   "seconds": 411.31807136535645,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 106193.73589249986,
+     "called_cells": 640480,
+     "target_fidelity": 0.1658033598121719,
+     "e_q_u": 0.012069054751354145,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8341966401878281
+    },
+    "0.55": {
+     "e_differ": 106086.02842367656,
+     "called_cells": 640480,
+     "target_fidelity": 0.1656351930172317,
+     "e_q_u": 0.012071487767932869,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8343648069827683
+    },
+    "0.60": {
+     "e_differ": 105978.32267541371,
+     "called_cells": 640480,
+     "target_fidelity": 0.16546702890865245,
+     "e_q_u": 0.01207392074564565,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8345329710913474
+    },
+    "0.65": {
+     "e_differ": 105870.61958465245,
+     "called_cells": 640480,
+     "target_fidelity": 0.16529886894930748,
+     "e_q_u": 0.012076353663327825,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8347011310506927
+    },
+    "0.70": {
+     "e_differ": 105762.9200747193,
+     "called_cells": 640480,
+     "target_fidelity": 0.1651307145808133,
+     "e_q_u": 0.01207878650012225,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8348692854191868
+    },
+    "0.75": {
+     "e_differ": 105655.22505553298,
+     "called_cells": 640480,
+     "target_fidelity": 0.16496256722385239,
+     "e_q_u": 0.012081219235474672,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8350374327761476
+    },
+    "0.80": {
+     "e_differ": 105547.53542369985,
+     "called_cells": 640480,
+     "target_fidelity": 0.16479442827832227,
+     "e_q_u": 0.01208365184913154,
+     "u_ceiling": 0.014467877440307924,
+     "e_q_u_over_ceiling": 0.8352055717216775
+    }
+   }
+  },
+  {
+   "target": "HG02145",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p50/HG02145_tau0_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed3171995902_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p55/HG02145_tau1_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed2402559450_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p60/HG02145_tau1_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed1623457200_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p65/HG02145_tau1_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed80980382_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p70/HG02145_tau1_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed22215385_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p75/HG02145_tau1_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed3805765201_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02145/acc_0p80/HG02145_tau1_indicator-wuniform-betachain-share0.0150226919-chromchr21_seed3007213009_chr21"
+   ],
+   "seconds": 411.6395320892334,
+   "k_states": 86,
+   "t_chr21": 332520,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 117677.43299761815,
+     "called_cells": 653453,
+     "target_fidelity": 0.18008553483971784,
+     "e_q_u": 0.012102717565810267,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8199144651602821
+    },
+    "0.55": {
+     "e_differ": 117579.62528909891,
+     "called_cells": 653453,
+     "target_fidelity": 0.17993585657897188,
+     "e_q_u": 0.012104926959341579,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8200641434210283
+    },
+    "0.60": {
+     "e_differ": 117481.77556578591,
+     "called_cells": 653453,
+     "target_fidelity": 0.17978611402164488,
+     "e_q_u": 0.01210713730195159,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8202138859783551
+    },
+    "0.65": {
+     "e_differ": 117383.88458862927,
+     "called_cells": 653453,
+     "target_fidelity": 0.17963630833224312,
+     "e_q_u": 0.012109348576451087,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8203636916677567
+    },
+    "0.70": {
+     "e_differ": 117285.95312089447,
+     "called_cells": 653453,
+     "target_fidelity": 0.17948644067881617,
+     "e_q_u": 0.012111560765598555,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8205135593211839
+    },
+    "0.75": {
+     "e_differ": 117187.98192864195,
+     "called_cells": 653453,
+     "target_fidelity": 0.1793365122336908,
+     "e_q_u": 0.012113773852089327,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8206634877663093
+    },
+    "0.80": {
+     "e_differ": 117089.97178024487,
+     "called_cells": 653453,
+     "target_fidelity": 0.17918652417273295,
+     "e_q_u": 0.012115987818566501,
+     "u_ceiling": 0.01476095139197764,
+     "e_q_u_over_ceiling": 0.8208134758272669
+    }
+   }
+  },
+  {
+   "target": "HG02109",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p50/HG02109_tau0_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed1217617373_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p55/HG02109_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed584915252_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p60/HG02109_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed1405531555_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p65/HG02109_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed4270358579_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p70/HG02109_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed1953658738_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p75/HG02109_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed2345773337_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02109/acc_0p80/HG02109_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed954092705_chr21"
+   ],
+   "seconds": 411.93692779541016,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 115294.12368279674,
+     "called_cells": 631092,
+     "target_fidelity": 0.18268988306427072,
+     "e_q_u": 0.01165141840264864,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8173101169357291
+    },
+    "0.55": {
+     "e_differ": 115199.22893366637,
+     "called_cells": 631092,
+     "target_fidelity": 0.1825395171126656,
+     "e_q_u": 0.01165356199120745,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8174604828873341
+    },
+    "0.60": {
+     "e_differ": 115104.31415785568,
+     "called_cells": 631092,
+     "target_fidelity": 0.18238911942768357,
+     "e_q_u": 0.011655706032151278,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8176108805723161
+    },
+    "0.65": {
+     "e_differ": 115009.38020201099,
+     "called_cells": 631092,
+     "target_fidelity": 0.18223869135088225,
+     "e_q_u": 0.011657850506355136,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8177613086491177
+    },
+    "0.70": {
+     "e_differ": 114914.42791235978,
+     "called_cells": 631092,
+     "target_fidelity": 0.1820882342231557,
+     "e_q_u": 0.011659995394703485,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8179117657768442
+    },
+    "0.75": {
+     "e_differ": 114819.4581336613,
+     "called_cells": 631092,
+     "target_fidelity": 0.18193774938307142,
+     "e_q_u": 0.011662140678113959,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8180622506169283
+    },
+    "0.80": {
+     "e_differ": 114724.47170908705,
+     "called_cells": 631092,
+     "target_fidelity": 0.18178723816668102,
+     "e_q_u": 0.011664286337540072,
+     "u_ceiling": 0.014255810813075833,
+     "e_q_u_over_ceiling": 0.8182127618333191
+    }
+   }
+  },
+  {
+   "target": "HG01123",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p50/HG01123_tau0_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed4089200697_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p55/HG01123_tau1_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed1684243092_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p60/HG01123_tau1_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed1291290526_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p65/HG01123_tau1_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed1399373363_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p70/HG01123_tau1_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed2660014030_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p75/HG01123_tau1_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed2909032112_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01123/acc_0p80/HG01123_tau1_indicator-wuniform-betachain-share0.0150227181-chromchr21_seed2149309049_chr21"
+   ],
+   "seconds": 412.10653376579285,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 101779.77319418371,
+     "called_cells": 638565,
+     "target_fidelity": 0.15938827401154732,
+     "e_q_u": 0.012125509589373867,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8406117259884527
+    },
+    "0.55": {
+     "e_differ": 101670.86547609305,
+     "called_cells": 638565,
+     "target_fidelity": 0.15921772329534667,
+     "e_q_u": 0.012127969719634757,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8407822767046531
+    },
+    "0.60": {
+     "e_differ": 101561.96166300419,
+     "called_cells": 638565,
+     "target_fidelity": 0.15904717869442295,
+     "e_q_u": 0.012130429761685067,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8409528213055767
+    },
+    "0.65": {
+     "e_differ": 101453.06261300255,
+     "called_cells": 638565,
+     "target_fidelity": 0.15887664155254758,
+     "e_q_u": 0.012132889696141399,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8411233584474522
+    },
+    "0.70": {
+     "e_differ": 101344.16918070121,
+     "called_cells": 638565,
+     "target_fidelity": 0.15870611320805433,
+     "e_q_u": 0.012135349503698784,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8412938867919455
+    },
+    "0.75": {
+     "e_differ": 101235.28221674063,
+     "called_cells": 638565,
+     "target_fidelity": 0.15853559499305572,
+     "e_q_u": 0.012137809165141997,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8414644050069439
+    },
+    "0.80": {
+     "e_differ": 101126.40256802333,
+     "called_cells": 638565,
+     "target_fidelity": 0.1583650882338107,
+     "e_q_u": 0.012140268661340258,
+     "u_ceiling": 0.01442462579868941,
+     "e_q_u_over_ceiling": 0.8416349117661892
+    }
+   }
+  },
+  {
+   "target": "HG01243",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p50/HG01243_tau0_indicator-wuniform-betachain-share0.01502271-chromchr21_seed24620245_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p55/HG01243_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed2668327123_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p60/HG01243_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed2512998558_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p65/HG01243_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed795189057_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p70/HG01243_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed2643024855_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p75/HG01243_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed2337215712_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01243/acc_0p80/HG01243_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed92688526_chr21"
+   ],
+   "seconds": 412.31011986732483,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 110853.59172184252,
+     "called_cells": 633745,
+     "target_fidelity": 0.17491829004069856,
+     "e_q_u": 0.011811653956407923,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8250817099593013
+    },
+    "0.55": {
+     "e_differ": 110752.5080194493,
+     "called_cells": 633745,
+     "target_fidelity": 0.1747587878712247,
+     "e_q_u": 0.011813937347747692,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8252412121287752
+    },
+    "0.60": {
+     "e_differ": 110651.36536905871,
+     "called_cells": 633745,
+     "target_fidelity": 0.17459919268642546,
+     "e_q_u": 0.01181622207067053,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8254008073135746
+    },
+    "0.65": {
+     "e_differ": 110550.16454992739,
+     "called_cells": 633745,
+     "target_fidelity": 0.17443950571590686,
+     "e_q_u": 0.011818508107573717,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8255604942840931
+    },
+    "0.70": {
+     "e_differ": 110448.90634589098,
+     "called_cells": 633745,
+     "target_fidelity": 0.17427972819650014,
+     "e_q_u": 0.011820795440751108,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8257202718035
+    },
+    "0.75": {
+     "e_differ": 110347.59154537713,
+     "called_cells": 633745,
+     "target_fidelity": 0.17411986137228244,
+     "e_q_u": 0.011823084052392806,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8258801386277174
+    },
+    "0.80": {
+     "e_differ": 110246.22094101382,
+     "called_cells": 633745,
+     "target_fidelity": 0.17395990649395865,
+     "e_q_u": 0.011825373924594065,
+     "u_ceiling": 0.014315738446063184,
+     "e_q_u_over_ceiling": 0.8260400935060414
+    }
+   }
+  },
+  {
+   "target": "HG01175",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p50/HG01175_tau0_indicator-wuniform-betachain-share0.01502271-chromchr21_seed385938231_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p55/HG01175_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed2059400500_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p60/HG01175_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed2636880819_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p65/HG01175_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed1028458593_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p70/HG01175_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed3829607281_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p75/HG01175_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed3137496336_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01175/acc_0p80/HG01175_tau1_indicator-wuniform-betachain-share0.01502271-chromchr21_seed1395166060_chr21"
+   ],
+   "seconds": 428.9216935634613,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 105722.24556956392,
+     "called_cells": 643957,
+     "target_fidelity": 0.1641759396505728,
+     "e_q_u": 0.012158246561325407,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.8358240603494271
+    },
+    "0.55": {
+     "e_differ": 105614.80497008975,
+     "called_cells": 643957,
+     "target_fidelity": 0.16400909528134605,
+     "e_q_u": 0.012160673549341977,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.8359909047186539
+    },
+    "0.60": {
+     "e_differ": 105507.38751311753,
+     "called_cells": 643957,
+     "target_fidelity": 0.16384228685008087,
+     "e_q_u": 0.012163100014589916,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.836157713149919
+    },
+    "0.65": {
+     "e_differ": 105399.9941808262,
+     "called_cells": 643957,
+     "target_fidelity": 0.16367551588200174,
+     "e_q_u": 0.012165525934882675,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.8363244841179982
+    },
+    "0.70": {
+     "e_differ": 105292.62594399808,
+     "called_cells": 643957,
+     "target_fidelity": 0.16350878388463527,
+     "e_q_u": 0.012167951288291134,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.8364912161153644
+    },
+    "0.75": {
+     "e_differ": 105185.2837620399,
+     "called_cells": 643957,
+     "target_fidelity": 0.16334209234784294,
+     "e_q_u": 0.012170376053143157,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.836657907652157
+    },
+    "0.80": {
+     "e_differ": 105077.96858292661,
+     "called_cells": 643957,
+     "target_fidelity": 0.16317544274373383,
+     "e_q_u": 0.012172800208024817,
+     "u_ceiling": 0.014546418484582144,
+     "e_q_u_over_ceiling": 0.836824557256266
+    }
+   }
+  },
+  {
+   "target": "HG01071",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p50/HG01071_tau0_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed3210169852_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p55/HG01071_tau1_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed151072439_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p60/HG01071_tau1_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed263772671_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p65/HG01071_tau1_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed932741588_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p70/HG01071_tau1_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed1396073689_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p75/HG01071_tau1_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed1456361062_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01071/acc_0p80/HG01071_tau1_indicator-wuniform-betachain-share0.0150261205-chromchr21_seed1183763567_chr21"
+   ],
+   "seconds": 428.96087193489075,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 107329.52499319708,
+     "called_cells": 653422,
+     "target_fidelity": 0.1642575930917494,
+     "e_q_u": 0.012338546058811708,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8357424069082506
+    },
+    "0.55": {
+     "e_differ": 107220.58977531726,
+     "called_cells": 653422,
+     "target_fidelity": 0.16409087813896267,
+     "e_q_u": 0.012341007367591361,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8359091218610374
+    },
+    "0.60": {
+     "e_differ": 107111.64313579223,
+     "called_cells": 653422,
+     "target_fidelity": 0.16392414570643815,
+     "e_q_u": 0.012343468934434443,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8360758542935619
+    },
+    "0.65": {
+     "e_differ": 107002.68587930032,
+     "called_cells": 653422,
+     "target_fidelity": 0.16375739702565925,
+     "e_q_u": 0.012345930741159854,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8362426029743409
+    },
+    "0.70": {
+     "e_differ": 106893.71880771611,
+     "called_cells": 653422,
+     "target_fidelity": 0.16359063332381846,
+     "e_q_u": 0.012348392769649838,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8364093666761814
+    },
+    "0.75": {
+     "e_differ": 106784.74271911685,
+     "called_cells": 653422,
+     "target_fidelity": 0.16342385582229685,
+     "e_q_u": 0.012350855001872458,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8365761441777031
+    },
+    "0.80": {
+     "e_differ": 106675.75840778276,
+     "called_cells": 653422,
+     "target_fidelity": 0.16325706573666446,
+     "e_q_u": 0.012353317419881544,
+     "u_ceiling": 0.014763575423265864,
+     "e_q_u_over_ceiling": 0.8367429342633355
+    }
+   }
+  },
+  {
+   "target": "HG01891",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p50/HG01891_tau0_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2397771449_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p55/HG01891_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed790766771_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p60/HG01891_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed2982659187_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p65/HG01891_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed731332192_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p70/HG01891_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed4011686849_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p75/HG01891_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed1762727087_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG01891/acc_0p80/HG01891_tau1_indicator-wuniform-betachain-share0.015022714-chromchr21_seed154893618_chr21"
+   ],
+   "seconds": 430.1240665912628,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 117297.54947722975,
+     "called_cells": 640960,
+     "target_fidelity": 0.18300291668314678,
+     "e_q_u": 0.011829074324549604,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.8169970833168533
+    },
+    "0.55": {
+     "e_differ": 117201.13872831226,
+     "called_cells": 640960,
+     "target_fidelity": 0.18285250051221957,
+     "e_q_u": 0.011831252158598031,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.8171474994877805
+    },
+    "0.60": {
+     "e_differ": 117104.65941625996,
+     "called_cells": 640960,
+     "target_fidelity": 0.18270197737184843,
+     "e_q_u": 0.011833431541427391,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.817298022628152
+    },
+    "0.65": {
+     "e_differ": 117008.1121519031,
+     "called_cells": 640960,
+     "target_fidelity": 0.18255134821502605,
+     "e_q_u": 0.011835612459239555,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.817448651784974
+    },
+    "0.70": {
+     "e_differ": 116911.49755258902,
+     "called_cells": 640960,
+     "target_fidelity": 0.18240061400491298,
+     "e_q_u": 0.011837794898089202,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.817599385995087
+    },
+    "0.75": {
+     "e_differ": 116814.81624234967,
+     "called_cells": 640960,
+     "target_fidelity": 0.1822497757150987,
+     "e_q_u": 0.01183997884388,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.8177502242849015
+    },
+    "0.80": {
+     "e_differ": 116718.06885177926,
+     "called_cells": 640960,
+     "target_fidelity": 0.18209883432941099,
+     "e_q_u": 0.011842164282367371,
+     "u_ceiling": 0.014478722832798625,
+     "e_q_u_over_ceiling": 0.8179011656705892
+    }
+   }
+  },
+  {
+   "target": "HG02257",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p50/HG02257_tau0_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed3030059150_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p55/HG02257_tau1_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed1800406155_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p60/HG02257_tau1_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed354889950_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p65/HG02257_tau1_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed3097548088_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p70/HG02257_tau1_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed760535355_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p75/HG02257_tau1_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed3929160167_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02257/acc_0p80/HG02257_tau1_indicator-wuniform-betachain-share0.0150227853-chromchr21_seed299246595_chr21"
+   ],
+   "seconds": 198.19988870620728,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 116085.2295609985,
+     "called_cells": 647291,
+     "target_fidelity": 0.17934009519829336,
+     "e_q_u": 0.011999528211302743,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.8206599048017067
+    },
+    "0.55": {
+     "e_differ": 115988.03844567045,
+     "called_cells": 647291,
+     "target_fidelity": 0.17918994462408785,
+     "e_q_u": 0.012001723683556937,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.8208100553759121
+    },
+    "0.60": {
+     "e_differ": 115890.82007685467,
+     "called_cells": 647291,
+     "target_fidelity": 0.1790397519459635,
+     "e_q_u": 0.012003919771446379,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.8209602480540366
+    },
+    "0.65": {
+     "e_differ": 115793.57515177337,
+     "called_cells": 647291,
+     "target_fidelity": 0.1788895182410591,
+     "e_q_u": 0.012006116459221353,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.821110481758941
+    },
+    "0.70": {
+     "e_differ": 115696.30435533196,
+     "called_cells": 647291,
+     "target_fidelity": 0.17873924456748505,
+     "e_q_u": 0.012008313731410376,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.821260755432515
+    },
+    "0.75": {
+     "e_differ": 115599.00836020861,
+     "called_cells": 647291,
+     "target_fidelity": 0.17858893196446204,
+     "e_q_u": 0.012010511572818168,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.8214110680355379
+    },
+    "0.80": {
+     "e_differ": 115501.68782699233,
+     "called_cells": 647291,
+     "target_fidelity": 0.17843858145253422,
+     "e_q_u": 0.012012709968522536,
+     "u_ceiling": 0.014621803917911829,
+     "e_q_u_over_ceiling": 0.8215614185474659
+    }
+   }
+  },
+  {
+   "target": "HG02486",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p50/HG02486_tau0_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed2847028792_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p55/HG02486_tau1_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed776909265_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p60/HG02486_tau1_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed2275081342_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p65/HG02486_tau1_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed2282185155_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p70/HG02486_tau1_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed2703207129_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p75/HG02486_tau1_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed4067436798_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02486/acc_0p80/HG02486_tau1_indicator-wuniform-betachain-share0.0150226189-chromchr21_seed2538977478_chr21"
+   ],
+   "seconds": 193.49093103408813,
+   "k_states": 86,
+   "t_chr21": 332519,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 119154.44688014103,
+     "called_cells": 657944,
+     "target_fidelity": 0.18110119840007816,
+     "e_q_u": 0.012170778422658646,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.8188988015999217
+    },
+    "0.55": {
+     "e_differ": 119057.08007214259,
+     "called_cells": 657944,
+     "target_fidelity": 0.18095321193314717,
+     "e_q_u": 0.012172977852545527,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.8190467880668527
+    },
+    "0.60": {
+     "e_differ": 118959.68556816445,
+     "called_cells": 657944,
+     "target_fidelity": 0.1808051833714791,
+     "e_q_u": 0.01217517790806004,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.8191948166285208
+    },
+    "0.65": {
+     "e_differ": 118862.26405570729,
+     "called_cells": 657944,
+     "target_fidelity": 0.18065711375999674,
+     "e_q_u": 0.01217737857367215,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.8193428862400031
+    },
+    "0.70": {
+     "e_differ": 118764.81621246951,
+     "called_cells": 657944,
+     "target_fidelity": 0.1805090041287245,
+     "e_q_u": 0.012179579834073254,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.819490995871275
+    },
+    "0.75": {
+     "e_differ": 118667.34270653797,
+     "called_cells": 657944,
+     "target_fidelity": 0.1803608554930784,
+     "e_q_u": 0.012181781674171867,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.8196391445069212
+    },
+    "0.80": {
+     "e_differ": 118569.84419645536,
+     "called_cells": 657944,
+     "target_fidelity": 0.18021266885396836,
+     "e_q_u": 0.012183984079092089,
+     "u_ceiling": 0.014862371759343176,
+     "e_q_u_over_ceiling": 0.8197873311460313
+    }
+   }
+  },
+  {
+   "target": "HG02630",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p50/HG02630_tau0_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed503856981_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p55/HG02630_tau1_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed3515654867_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p60/HG02630_tau1_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed2825345772_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p65/HG02630_tau1_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed4017651236_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p70/HG02630_tau1_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed726599681_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p75/HG02630_tau1_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed1659299877_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02630/acc_0p80/HG02630_tau1_indicator-wuniform-betachain-share0.0150213683-chromchr21_seed2418948639_chr21"
+   ],
+   "seconds": 182.70534086227417,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 119118.70324975396,
+     "called_cells": 644157,
+     "target_fidelity": 0.18492184863279287,
+     "e_q_u": 0.011859091043489693,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.815078151367207
+    },
+    "0.55": {
+     "e_differ": 119022.11190852597,
+     "called_cells": 644157,
+     "target_fidelity": 0.18477189863422422,
+     "e_q_u": 0.011861272761502884,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.8152281013657755
+    },
+    "0.60": {
+     "e_differ": 118925.45720346925,
+     "called_cells": 644157,
+     "target_fidelity": 0.18462185026859795,
+     "e_q_u": 0.011863455910721033,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.8153781497314018
+    },
+    "0.65": {
+     "e_differ": 118828.73978618193,
+     "called_cells": 644157,
+     "target_fidelity": 0.1844717045474658,
+     "e_q_u": 0.011865640476426435,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.815528295452534
+    },
+    "0.70": {
+     "e_differ": 118731.96030738781,
+     "called_cells": 644157,
+     "target_fidelity": 0.18432146248102219,
+     "e_q_u": 0.011867826443921117,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.8156785375189775
+    },
+    "0.75": {
+     "e_differ": 118635.11941714931,
+     "called_cells": 644157,
+     "target_fidelity": 0.18417112507843478,
+     "e_q_u": 0.011870013798522068,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.8158288749215651
+    },
+    "0.80": {
+     "e_differ": 118538.2177647056,
+     "called_cells": 644157,
+     "target_fidelity": 0.1840206933475932,
+     "e_q_u": 0.011872202525564852,
+     "u_ceiling": 0.014549636772372476,
+     "e_q_u_over_ceiling": 0.8159793066524066
+    }
+   }
+  },
+  {
+   "target": "HG02559",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p50/HG02559_tau0_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed3122976466_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p55/HG02559_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed60552217_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p60/HG02559_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed455675683_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p65/HG02559_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed2842950715_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p70/HG02559_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed3253416457_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p75/HG02559_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed503636785_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02559/acc_0p80/HG02559_tau1_indicator-wuniform-betachain-share0.0150227161-chromchr21_seed3631144577_chr21"
+   ],
+   "seconds": 193.01465773582458,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 113118.24283699597,
+     "called_cells": 641809,
+     "target_fidelity": 0.17624907540560505,
+     "e_q_u": 0.011942660969034647,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.8237509245943948
+    },
+    "0.55": {
+     "e_differ": 113018.00067364647,
+     "called_cells": 641809,
+     "target_fidelity": 0.1760928884974291,
+     "e_q_u": 0.011944925351673207,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.823907111502571
+    },
+    "0.60": {
+     "e_differ": 112917.74627127066,
+     "called_cells": 641809,
+     "target_fidelity": 0.1759366825196759,
+     "e_q_u": 0.011947190010780644,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.8240633174803241
+    },
+    "0.65": {
+     "e_differ": 112817.4802369195,
+     "called_cells": 641809,
+     "target_fidelity": 0.17578045841818904,
+     "e_q_u": 0.011949454932644214,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.824219541581811
+    },
+    "0.70": {
+     "e_differ": 112717.20317430209,
+     "called_cells": 641809,
+     "target_fidelity": 0.17562421713360532,
+     "e_q_u": 0.011951720103626657,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.8243757828663949
+    },
+    "0.75": {
+     "e_differ": 112616.91568372506,
+     "called_cells": 641809,
+     "target_fidelity": 0.17546795960125997,
+     "e_q_u": 0.011953985510167561,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.8245320403987397
+    },
+    "0.80": {
+     "e_differ": 112516.61836168272,
+     "called_cells": 641809,
+     "target_fidelity": 0.1753116867505484,
+     "e_q_u": 0.011956251138792666,
+     "u_ceiling": 0.014497902961280524,
+     "e_q_u_over_ceiling": 0.8246883132494517
+    }
+   }
+  },
+  {
+   "target": "HG02717",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p50/HG02717_tau0_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed2902122911_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p55/HG02717_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed2518598753_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p60/HG02717_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed2354660226_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p65/HG02717_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed235774583_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p70/HG02717_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed3551818613_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p75/HG02717_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed1951137799_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02717/acc_0p80/HG02717_tau1_indicator-wuniform-betachain-share0.0150227256-chromchr21_seed940049165_chr21"
+   ],
+   "seconds": 184.62502598762512,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 117911.56331329996,
+     "called_cells": 650827,
+     "target_fidelity": 0.1811718986970423,
+     "e_q_u": 0.012038100391883145,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8188281013029577
+    },
+    "0.55": {
+     "e_differ": 117813.51609881666,
+     "called_cells": 650827,
+     "target_fidelity": 0.18102124850200846,
+     "e_q_u": 0.012040315193950869,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8189787514979917
+    },
+    "0.60": {
+     "e_differ": 117715.40959101838,
+     "called_cells": 650827,
+     "target_fidelity": 0.18087050720240308,
+     "e_q_u": 0.012042531335403471,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8191294927975972
+    },
+    "0.65": {
+     "e_differ": 117617.24430048188,
+     "called_cells": 650827,
+     "target_fidelity": 0.1807196755827307,
+     "e_q_u": 0.012044748804707465,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8192803244172695
+    },
+    "0.70": {
+     "e_differ": 117519.02073917666,
+     "called_cells": 650827,
+     "target_fidelity": 0.18056875442963594,
+     "e_q_u": 0.012046967590297893,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8194312455703638
+    },
+    "0.75": {
+     "e_differ": 117420.73942109145,
+     "called_cells": 650827,
+     "target_fidelity": 0.1804177445328658,
+     "e_q_u": 0.012049187680564212,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8195822554671344
+    },
+    "0.80": {
+     "e_differ": 117322.40086205967,
+     "called_cells": 650827,
+     "target_fidelity": 0.1802666466850018,
+     "e_q_u": 0.012051409063854171,
+     "u_ceiling": 0.014701620978478333,
+     "e_q_u_over_ceiling": 0.8197333533149983
+    }
+   }
+  },
+  {
+   "target": "HG02572",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p50/HG02572_tau0_indicator-wuniform-betachain-share0.015022675-chromchr21_seed1957939408_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p55/HG02572_tau1_indicator-wuniform-betachain-share0.015022675-chromchr21_seed2471831218_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p60/HG02572_tau1_indicator-wuniform-betachain-share0.015022675-chromchr21_seed3417379825_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p65/HG02572_tau1_indicator-wuniform-betachain-share0.015022675-chromchr21_seed810712133_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p70/HG02572_tau1_indicator-wuniform-betachain-share0.015022675-chromchr21_seed421431609_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p75/HG02572_tau1_indicator-wuniform-betachain-share0.015022675-chromchr21_seed2360125012_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02572/acc_0p80/HG02572_tau1_indicator-wuniform-betachain-share0.015022675-chromchr21_seed1996146843_chr21"
+   ],
+   "seconds": 186.52310991287231,
+   "k_states": 86,
+   "t_chr21": 332520,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 116013.76117567538,
+     "called_cells": 638221,
+     "target_fidelity": 0.18177678449263715,
+     "e_q_u": 0.011796207168170755,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.818223215507363
+    },
+    "0.55": {
+     "e_differ": 115915.85414558301,
+     "called_cells": 638221,
+     "target_fidelity": 0.18162337833694442,
+     "e_q_u": 0.011798418802794567,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.8183766216630556
+    },
+    "0.60": {
+     "e_differ": 115817.88672771702,
+     "called_cells": 638221,
+     "target_fidelity": 0.18146987756234442,
+     "e_q_u": 0.011800631801525645,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.8185301224376557
+    },
+    "0.65": {
+     "e_differ": 115719.85949791847,
+     "called_cells": 638221,
+     "target_fidelity": 0.1813162830710968,
+     "e_q_u": 0.011802846151356242,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.8186837169289035
+    },
+    "0.70": {
+     "e_differ": 115621.77303683106,
+     "called_cells": 638221,
+     "target_fidelity": 0.18116259577298624,
+     "e_q_u": 0.011805061839170114,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.8188374042270139
+    },
+    "0.75": {
+     "e_differ": 115523.62792967868,
+     "called_cells": 638221,
+     "target_fidelity": 0.18100881658497397,
+     "e_q_u": 0.011807278851747566,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.818991183415026
+    },
+    "0.80": {
+     "e_differ": 115425.42476586695,
+     "called_cells": 638221,
+     "target_fidelity": 0.18085494643057334,
+     "e_q_u": 0.011809497175774447,
+     "u_ceiling": 0.014416857093031973,
+     "e_q_u_over_ceiling": 0.8191450535694269
+    }
+   }
+  },
+  {
+   "target": "HG02622",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p50/HG02622_tau0_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed2372348230_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p55/HG02622_tau1_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed2017920646_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p60/HG02622_tau1_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed3623040129_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p65/HG02622_tau1_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed4159378949_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p70/HG02622_tau1_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed1574990458_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p75/HG02622_tau1_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed351160053_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02622/acc_0p80/HG02622_tau1_indicator-wuniform-betachain-share0.0150226851-chromchr21_seed1639119552_chr21"
+   ],
+   "seconds": 185.99977254867554,
+   "k_states": 86,
+   "t_chr21": 332520,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 115403.35620046285,
+     "called_cells": 644373,
+     "target_fidelity": 0.1790940281490113,
+     "e_q_u": 0.011948972110301374,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.8209059718509885
+    },
+    "0.55": {
+     "e_differ": 115305.38411278144,
+     "called_cells": 644373,
+     "target_fidelity": 0.1789419856399654,
+     "e_q_u": 0.011951185216019289,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.8210580143600347
+    },
+    "0.60": {
+     "e_differ": 115207.37283408837,
+     "called_cells": 644373,
+     "target_fidelity": 0.1787898823105381,
+     "e_q_u": 0.011953399207028644,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.8212101176894614
+    },
+    "0.65": {
+     "e_differ": 115109.32299368875,
+     "called_cells": 644373,
+     "target_fidelity": 0.17863771913734552,
+     "e_q_u": 0.011955614069114003,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.8213622808626543
+    },
+    "0.70": {
+     "e_differ": 115011.23522426165,
+     "called_cells": 644373,
+     "target_fidelity": 0.17848549710223993,
+     "e_q_u": 0.011957829787983668,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.82151450289776
+    },
+    "0.75": {
+     "e_differ": 114913.1101605409,
+     "called_cells": 644373,
+     "target_fidelity": 0.17833321719026232,
+     "e_q_u": 0.011960046349299546,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.8216667828097375
+    },
+    "0.80": {
+     "e_differ": 114814.94843982656,
+     "called_cells": 644373,
+     "target_fidelity": 0.17818088039043622,
+     "e_q_u": 0.011962263738665577,
+     "u_ceiling": 0.014555835284470756,
+     "e_q_u_over_ceiling": 0.8218191196095636
+    }
+   }
+  },
+  {
+   "target": "HG02723",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p50/HG02723_tau0_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed958079125_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p55/HG02723_tau1_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed4258265682_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p60/HG02723_tau1_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed3236933372_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p65/HG02723_tau1_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed3059291182_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p70/HG02723_tau1_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed6796395_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p75/HG02723_tau1_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed4032708001_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02723/acc_0p80/HG02723_tau1_indicator-wuniform-betachain-share0.0150227079-chromchr21_seed4131304367_chr21"
+   ],
+   "seconds": 183.293781042099,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 119108.90984489422,
+     "called_cells": 658265,
+     "target_fidelity": 0.1809437078454638,
+     "e_q_u": 0.012179057068930535,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.8190562921545361
+    },
+    "0.55": {
+     "e_differ": 119012.3354999801,
+     "called_cells": 658265,
+     "target_fidelity": 0.1807969974098275,
+     "e_q_u": 0.012181238597581665,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.8192030025901725
+    },
+    "0.60": {
+     "e_differ": 118915.71272781778,
+     "called_cells": 658265,
+     "target_fidelity": 0.18065021340617804,
+     "e_q_u": 0.012183421220161304,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.819349786593822
+    },
+    "0.65": {
+     "e_differ": 118819.04189552699,
+     "called_cells": 658265,
+     "target_fidelity": 0.18050335639222348,
+     "e_q_u": 0.012185604928376548,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.8194966436077765
+    },
+    "0.70": {
+     "e_differ": 118722.32337212085,
+     "called_cells": 658265,
+     "target_fidelity": 0.1803564269285483,
+     "e_q_u": 0.012187789713891718,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.8196435730714517
+    },
+    "0.75": {
+     "e_differ": 118625.55752892166,
+     "called_cells": 658265,
+     "target_fidelity": 0.18020942557924494,
+     "e_q_u": 0.012189975568318972,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.8197905744207552
+    },
+    "0.80": {
+     "e_differ": 118528.7447393833,
+     "called_cells": 658265,
+     "target_fidelity": 0.18006235291164394,
+     "e_q_u": 0.012192162483222314,
+     "u_ceiling": 0.014869621521242939,
+     "e_q_u_over_ceiling": 0.8199376470883558
+    }
+   }
+  },
+  {
+   "target": "HG03453",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p50/HG03453_tau0_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed1018409869_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p55/HG03453_tau1_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed1498146211_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p60/HG03453_tau1_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed389458687_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p65/HG03453_tau1_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed1740092799_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p70/HG03453_tau1_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed609438809_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p75/HG03453_tau1_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed3510884667_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03453/acc_0p80/HG03453_tau1_indicator-wuniform-betachain-share0.0150227106-chromchr21_seed1329227638_chr21"
+   ],
+   "seconds": 165.60987257957458,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 119327.50823659677,
+     "called_cells": 639869,
+     "target_fidelity": 0.18648740326003724,
+     "e_q_u": 0.011758571954135676,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.8135125967399628
+    },
+    "0.55": {
+     "e_differ": 119231.5814172437,
+     "called_cells": 639869,
+     "target_fidelity": 0.18633748691879695,
+     "e_q_u": 0.01176073885615125,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.8136625130812027
+    },
+    "0.60": {
+     "e_differ": 119135.59139995492,
+     "called_cells": 639869,
+     "target_fidelity": 0.1861874718105658,
+     "e_q_u": 0.011762907185752312,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.8138125281894343
+    },
+    "0.65": {
+     "e_differ": 119039.53911300219,
+     "called_cells": 639869,
+     "target_fidelity": 0.18603735938606525,
+     "e_q_u": 0.011765076921970001,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.8139626406139343
+    },
+    "0.70": {
+     "e_differ": 118943.42548787952,
+     "called_cells": 639869,
+     "target_fidelity": 0.18588715110105275,
+     "e_q_u": 0.011767248043762717,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.8141128488989472
+    },
+    "0.75": {
+     "e_differ": 118847.25145955093,
+     "called_cells": 639869,
+     "target_fidelity": 0.18573684841670862,
+     "e_q_u": 0.011769420530010427,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.814263151583291
+    },
+    "0.80": {
+     "e_differ": 118751.01796571403,
+     "called_cells": 639869,
+     "target_fidelity": 0.18558645279848535,
+     "e_q_u": 0.011771594359531387,
+     "u_ceiling": 0.014454074837017272,
+     "e_q_u_over_ceiling": 0.8144135472015144
+    }
+   }
+  },
+  {
+   "target": "HG03516",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p50/HG03516_tau0_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed3199934633_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p55/HG03516_tau1_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed2923168718_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p60/HG03516_tau1_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed1114114043_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p65/HG03516_tau1_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed811901207_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p70/HG03516_tau1_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed2829593670_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p75/HG03516_tau1_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed3443086620_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03516/acc_0p80/HG03516_tau1_indicator-wuniform-betachain-share0.0150227493-chromchr21_seed1983746495_chr21"
+   ],
+   "seconds": 164.3186206817627,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 114669.41323907499,
+     "called_cells": 640908,
+     "target_fidelity": 0.1789171195227318,
+     "e_q_u": 0.011887294903537338,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.8210828804772682
+    },
+    "0.55": {
+     "e_differ": 114571.61728513251,
+     "called_cells": 640908,
+     "target_fidelity": 0.17876452983132135,
+     "e_q_u": 0.011889504033339174,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.8212354701686789
+    },
+    "0.60": {
+     "e_differ": 114473.79672001212,
+     "called_cells": 640908,
+     "target_fidelity": 0.17861190173942612,
+     "e_q_u": 0.011891713719087177,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.821388098260574
+    },
+    "0.65": {
+     "e_differ": 114375.9523374985,
+     "called_cells": 640908,
+     "target_fidelity": 0.1784592364855775,
+     "e_q_u": 0.01189392394285042,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.8215407635144226
+    },
+    "0.70": {
+     "e_differ": 114278.08492815375,
+     "called_cells": 640908,
+     "target_fidelity": 0.17830653530327872,
+     "e_q_u": 0.01189613468677075,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.8216934646967213
+    },
+    "0.75": {
+     "e_differ": 114180.19527871817,
+     "called_cells": 640908,
+     "target_fidelity": 0.1781537994200699,
+     "e_q_u": 0.01189834593307636,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.8218462005799301
+    },
+    "0.80": {
+     "e_differ": 114082.28417216864,
+     "called_cells": 640908,
+     "target_fidelity": 0.17800103005761925,
+     "e_q_u": 0.011900557664080446,
+     "u_ceiling": 0.014477582210248554,
+     "e_q_u_over_ceiling": 0.8219989699423806
+    }
+   }
+  },
+  {
+   "target": "HG03540",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p50/HG03540_tau0_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3308723419_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p55/HG03540_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3439515458_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p60/HG03540_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3841531296_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p65/HG03540_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed934854374_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p70/HG03540_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3712075003_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p75/HG03540_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed2124288695_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03540/acc_0p80/HG03540_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed347260968_chr21"
+   ],
+   "seconds": 161.7737159729004,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 113713.17854991036,
+     "called_cells": 626488,
+     "target_fidelity": 0.18150894917366392,
+     "e_q_u": 0.011583128170355741,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8184910508263361
+    },
+    "0.55": {
+     "e_differ": 113615.89609607527,
+     "called_cells": 626488,
+     "target_fidelity": 0.18135366694346144,
+     "e_q_u": 0.011585325694657563,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8186463330565387
+    },
+    "0.60": {
+     "e_differ": 113518.595744104,
+     "called_cells": 626488,
+     "target_fidelity": 0.18119835614425814,
+     "e_q_u": 0.011587523623262394,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8188016438557416
+    },
+    "0.65": {
+     "e_differ": 113421.27838276242,
+     "called_cells": 626488,
+     "target_fidelity": 0.18104301819470192,
+     "e_q_u": 0.011589721936093809,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8189569818052979
+    },
+    "0.70": {
+     "e_differ": 113323.94489262096,
+     "called_cells": 626488,
+     "target_fidelity": 0.18088765450035907,
+     "e_q_u": 0.011591920613260502,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8191123454996408
+    },
+    "0.75": {
+     "e_differ": 113226.59614610094,
+     "called_cells": 626488,
+     "target_fidelity": 0.18073226645378834,
+     "e_q_u": 0.011594119635055244,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8192677335462115
+    },
+    "0.80": {
+     "e_differ": 113129.23300696156,
+     "called_cells": 626488,
+     "target_fidelity": 0.18057685543372187,
+     "e_q_u": 0.011596318981966492,
+     "u_ceiling": 0.014151807962544723,
+     "e_q_u_over_ceiling": 0.8194231445662782
+    }
+   }
+  },
+  {
+   "target": "HG02818",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p50/HG02818_tau0_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed3390610099_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p55/HG02818_tau1_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed2266191026_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p60/HG02818_tau1_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed1461487354_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p65/HG02818_tau1_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed1807960494_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p70/HG02818_tau1_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed577975555_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p75/HG02818_tau1_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed2961978011_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02818/acc_0p80/HG02818_tau1_indicator-wuniform-betachain-share0.0150227358-chromchr21_seed1782796635_chr21"
+   ],
+   "seconds": 170.30258178710938,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 116191.16591850811,
+     "called_cells": 644999,
+     "target_fidelity": 0.180141621798651,
+     "e_q_u": 0.011945321284433083,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8198583782013488
+    },
+    "0.55": {
+     "e_differ": 116092.96375391012,
+     "called_cells": 644999,
+     "target_fidelity": 0.17998937014462058,
+     "e_q_u": 0.011947539588193633,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8200106298553794
+    },
+    "0.60": {
+     "e_differ": 115994.7055723134,
+     "called_cells": 644999,
+     "target_fidelity": 0.1798370316423954,
+     "e_q_u": 0.01194975915733076,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8201629683576047
+    },
+    "0.65": {
+     "e_differ": 115896.3919177753,
+     "called_cells": 644999,
+     "target_fidelity": 0.17968460713547665,
+     "e_q_u": 0.011951979979554665,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8203153928645233
+    },
+    "0.70": {
+     "e_differ": 115798.02334259293,
+     "called_cells": 644999,
+     "target_fidelity": 0.17953209748014018,
+     "e_q_u": 0.01195420204238943,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8204679025198598
+    },
+    "0.75": {
+     "e_differ": 115699.60040748399,
+     "called_cells": 644999,
+     "target_fidelity": 0.1793795035457171,
+     "e_q_u": 0.011956425333168916,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8206204964542828
+    },
+    "0.80": {
+     "e_differ": 115601.12368123453,
+     "called_cells": 644999,
+     "target_fidelity": 0.17922682621404767,
+     "e_q_u": 0.01195864983904473,
+     "u_ceiling": 0.014569981355364567,
+     "e_q_u_over_ceiling": 0.8207731737859525
+    }
+   }
+  },
+  {
+   "target": "HG02886",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p50/HG02886_tau0_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed4185958927_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p55/HG02886_tau1_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed3477954576_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p60/HG02886_tau1_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed2233133339_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p65/HG02886_tau1_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed767251655_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p70/HG02886_tau1_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed2458689134_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p75/HG02886_tau1_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed254455065_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG02886/acc_0p80/HG02886_tau1_indicator-wuniform-betachain-share0.0150227405-chromchr21_seed1161340252_chr21"
+   ],
+   "seconds": 172.42592859268188,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 118651.16257559397,
+     "called_cells": 654349,
+     "target_fidelity": 0.1813270327846363,
+     "e_q_u": 0.012100964453796497,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.8186729672153641
+    },
+    "0.55": {
+     "e_differ": 118553.05910299392,
+     "called_cells": 654349,
+     "target_fidelity": 0.18117710748086102,
+     "e_q_u": 0.012103180528889191,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.8188228925191392
+    },
+    "0.60": {
+     "e_differ": 118454.92982083221,
+     "called_cells": 654349,
+     "target_fidelity": 0.18102714273397258,
+     "e_q_u": 0.01210539718699822,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.8189728572660276
+    },
+    "0.65": {
+     "e_differ": 118356.775492204,
+     "called_cells": 654349,
+     "target_fidelity": 0.18087713971016078,
+     "e_q_u": 0.012107614410885897,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.8191228602898393
+    },
+    "0.70": {
+     "e_differ": 118258.59687029658,
+     "called_cells": 654349,
+     "target_fidelity": 0.18072709956047397,
+     "e_q_u": 0.012109832183538363,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.819272900439526
+    },
+    "0.75": {
+     "e_differ": 118160.39469894498,
+     "called_cells": 654349,
+     "target_fidelity": 0.1805770234216679,
+     "e_q_u": 0.012112050488153005,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.8194229765783323
+    },
+    "0.80": {
+     "e_differ": 118062.16971213908,
+     "called_cells": 654349,
+     "target_fidelity": 0.18042691241545272,
+     "e_q_u": 0.012114269308149605,
+     "u_ceiling": 0.014781194614201985,
+     "e_q_u_over_ceiling": 0.8195730875845475
+    }
+   }
+  },
+  {
+   "target": "HG03098",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p50/HG03098_tau0_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed2675678750_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p55/HG03098_tau1_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed2313401016_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p60/HG03098_tau1_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed1874146188_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p65/HG03098_tau1_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed509029348_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p70/HG03098_tau1_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed3156927159_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p75/HG03098_tau1_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed3175716249_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03098/acc_0p80/HG03098_tau1_indicator-wuniform-betachain-share0.0150226216-chromchr21_seed932884353_chr21"
+   ],
+   "seconds": 171.26554608345032,
+   "k_states": 86,
+   "t_chr21": 332519,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 121157.2476347961,
+     "called_cells": 653783,
+     "target_fidelity": 0.18531721937523016,
+     "e_q_u": 0.012031545801451143,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.8146827806247698
+    },
+    "0.55": {
+     "e_differ": 121060.68598257603,
+     "called_cells": 653783,
+     "target_fidelity": 0.18516952258253278,
+     "e_q_u": 0.012033727043976858,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.8148304774174673
+    },
+    "0.60": {
+     "e_differ": 120964.09926158006,
+     "called_cells": 653783,
+     "target_fidelity": 0.18502178744565104,
+     "e_q_u": 0.0120359088527841,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.814978212554349
+    },
+    "0.65": {
+     "e_differ": 120867.48829350763,
+     "called_cells": 653783,
+     "target_fidelity": 0.18487401522142305,
+     "e_q_u": 0.012038091209311406,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.8151259847785769
+    },
+    "0.70": {
+     "e_differ": 120770.85389633296,
+     "called_cells": 653783,
+     "target_fidelity": 0.18472620716098914,
+     "e_q_u": 0.01204027409508146,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.8152737928390108
+    },
+    "0.75": {
+     "e_differ": 120674.19688371483,
+     "called_cells": 653783,
+     "target_fidelity": 0.1845783645088888,
+     "e_q_u": 0.012042457491714429,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.8154216354911111
+    },
+    "0.80": {
+     "e_differ": 120577.51806475595,
+     "called_cells": 653783,
+     "target_fidelity": 0.1844304885026927,
+     "e_q_u": 0.012044641380933394,
+     "u_ceiling": 0.014768381126484965,
+     "e_q_u_over_ceiling": 0.8155695114973072
+    }
+   }
+  },
+  {
+   "target": "NA20129",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p50/NA20129_tau0_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed1133124202_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p55/NA20129_tau1_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed3263992928_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p60/NA20129_tau1_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed2652775491_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p65/NA20129_tau1_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed1852876661_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p70/NA20129_tau1_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed439648542_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p75/NA20129_tau1_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed3690014203_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA20129/acc_0p80/NA20129_tau1_indicator-wuniform-betachain-share0.0150227717-chromchr21_seed934447386_chr21"
+   ],
+   "seconds": 164.64927744865417,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 112872.61108883104,
+     "called_cells": 640410,
+     "target_fidelity": 0.17625054432134263,
+     "e_q_u": 0.011916651537420761,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.8237494556786573
+    },
+    "0.55": {
+     "e_differ": 112774.42159988961,
+     "called_cells": 640410,
+     "target_fidelity": 0.176097221467325,
+     "e_q_u": 0.011918869560159905,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.8239027785326751
+    },
+    "0.60": {
+     "e_differ": 112676.2058768016,
+     "called_cells": 640410,
+     "target_fidelity": 0.1759438576486963,
+     "e_q_u": 0.011921088175507626,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.8240561423513038
+    },
+    "0.65": {
+     "e_differ": 112577.96447493887,
+     "called_cells": 640410,
+     "target_fidelity": 0.1757904537326695,
+     "e_q_u": 0.01192330737091852,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.8242095462673307
+    },
+    "0.70": {
+     "e_differ": 112479.69795261277,
+     "called_cells": 640410,
+     "target_fidelity": 0.17563701059104755,
+     "e_q_u": 0.01192552713378077,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.8243629894089525
+    },
+    "0.75": {
+     "e_differ": 112381.40687180874,
+     "called_cells": 640410,
+     "target_fidelity": 0.17548352910137058,
+     "e_q_u": 0.011927747451399578,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.8245164708986297
+    },
+    "0.80": {
+     "e_differ": 112283.0917976716,
+     "called_cells": 640410,
+     "target_fidelity": 0.17533001014611202,
+     "e_q_u": 0.01192996831100876,
+     "u_ceiling": 0.014466354369367156,
+     "e_q_u_over_ceiling": 0.824669989853888
+    }
+   }
+  },
+  {
+   "target": "HG03492",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p50/HG03492_tau0_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed2463561713_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p55/HG03492_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed3058948794_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p60/HG03492_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed3913195343_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p65/HG03492_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed609941123_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p70/HG03492_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed4134157816_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p75/HG03492_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed1818651309_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03492/acc_0p80/HG03492_tau1_indicator-wuniform-betachain-share0.0150227113-chromchr21_seed320330153_chr21"
+   ],
+   "seconds": 170.28687453269958,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 105239.2764571928,
+     "called_cells": 626499,
+     "target_fidelity": 0.1679799591973695,
+     "e_q_u": 0.011774796706823201,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8320200408026303
+    },
+    "0.55": {
+     "e_differ": 105132.10544841818,
+     "called_cells": 626499,
+     "target_fidelity": 0.16780889586163455,
+     "e_q_u": 0.0117772176052433,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8321911041383652
+    },
+    "0.60": {
+     "e_differ": 105024.91518281738,
+     "called_cells": 626499,
+     "target_fidelity": 0.1676378017886978,
+     "e_q_u": 0.011779638938658098,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8323621982113023
+    },
+    "0.65": {
+     "e_differ": 104917.70680875925,
+     "called_cells": 626499,
+     "target_fidelity": 0.16746667881155317,
+     "e_q_u": 0.011782060681126943,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8325333211884468
+    },
+    "0.70": {
+     "e_differ": 104810.48147162644,
+     "called_cells": 626499,
+     "target_fidelity": 0.1672955287584281,
+     "e_q_u": 0.011784482806776662,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8327044712415717
+    },
+    "0.75": {
+     "e_differ": 104703.24031392165,
+     "called_cells": 626499,
+     "target_fidelity": 0.16712435345295307,
+     "e_q_u": 0.01178690528979913,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8328756465470467
+    },
+    "0.80": {
+     "e_differ": 104595.98447511313,
+     "called_cells": 626499,
+     "target_fidelity": 0.16695315471391517,
+     "e_q_u": 0.011789328104454763,
+     "u_ceiling": 0.014152059000242747,
+     "e_q_u_over_ceiling": 0.8330468452860847
+    }
+   }
+  },
+  {
+   "target": "HG03579",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p50/HG03579_tau0_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed1178719739_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p55/HG03579_tau1_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed2653895181_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p60/HG03579_tau1_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed576798154_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p65/HG03579_tau1_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed1651857547_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p70/HG03579_tau1_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed3801566584_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p75/HG03579_tau1_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed3891371314_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03579/acc_0p80/HG03579_tau1_indicator-wuniform-betachain-share0.0150227093-chromchr21_seed3888979013_chr21"
+   ],
+   "seconds": 166.64777064323425,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 115954.17348942836,
+     "called_cells": 636483,
+     "target_fidelity": 0.18217952952306402,
+     "e_q_u": 0.011758284794837804,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.817820470476936
+    },
+    "0.55": {
+     "e_differ": 115858.11942195994,
+     "called_cells": 636483,
+     "target_fidelity": 0.18202861572415907,
+     "e_q_u": 0.011760454571079718,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.8179713842758407
+    },
+    "0.60": {
+     "e_differ": 115762.02852805576,
+     "called_cells": 636483,
+     "target_fidelity": 0.18187764406599352,
+     "e_q_u": 0.011762625179198178,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.8181223559340062
+    },
+    "0.65": {
+     "e_differ": 115665.90138044953,
+     "called_cells": 636483,
+     "target_fidelity": 0.18172661544840873,
+     "e_q_u": 0.011764796606255632,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.818273384551591
+    },
+    "0.70": {
+     "e_differ": 115569.73855369072,
+     "called_cells": 636483,
+     "target_fidelity": 0.1815755307740988,
+     "e_q_u": 0.011766968839273514,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.818424469225901
+    },
+    "0.75": {
+     "e_differ": 115473.54062502946,
+     "called_cells": 636483,
+     "target_fidelity": 0.18142439095000096,
+     "e_q_u": 0.011769141865212263,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.8185756090499989
+    },
+    "0.80": {
+     "e_differ": 115377.30817355585,
+     "called_cells": 636483,
+     "target_fidelity": 0.18127319688594332,
+     "e_q_u": 0.011771315670990738,
+     "u_ceiling": 0.014377586792344065,
+     "e_q_u_over_ceiling": 0.8187268031140564
+    }
+   }
+  },
+  {
+   "target": "NA21309",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p50/NA21309_tau0_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed3195099764_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p55/NA21309_tau1_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed1463354942_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p60/NA21309_tau1_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed953398326_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p65/NA21309_tau1_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed1751430217_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p70/NA21309_tau1_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed862132104_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p75/NA21309_tau1_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed4194895230_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA21309/acc_0p80/NA21309_tau1_indicator-wuniform-betachain-share0.0150227154-chromchr21_seed1554622453_chr21"
+   ],
+   "seconds": 165.93698906898499,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 118390.66733114808,
+     "called_cells": 653499,
+     "target_fidelity": 0.18116426701670252,
+     "e_q_u": 0.012087627830577513,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8188357329832977
+    },
+    "0.55": {
+     "e_differ": 118292.11780399906,
+     "called_cells": 653499,
+     "target_fidelity": 0.18101346414301944,
+     "e_q_u": 0.012089853977946804,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8189865358569808
+    },
+    "0.60": {
+     "e_differ": 118193.50574487803,
+     "called_cells": 653499,
+     "target_fidelity": 0.18086256558139802,
+     "e_q_u": 0.012092081537858488,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8191374344186021
+    },
+    "0.65": {
+     "e_differ": 118094.83192336347,
+     "called_cells": 653499,
+     "target_fidelity": 0.18071157250946593,
+     "e_q_u": 0.012094310492928466,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8192884274905342
+    },
+    "0.70": {
+     "e_differ": 117996.09711438199,
+     "called_cells": 653499,
+     "target_fidelity": 0.1805604861130346,
+     "e_q_u": 0.012096540825651817,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8194395138869653
+    },
+    "0.75": {
+     "e_differ": 117897.30209735135,
+     "called_cells": 653499,
+     "target_fidelity": 0.18040930758478796,
+     "e_q_u": 0.012098772518422191,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8195906924152122
+    },
+    "0.80": {
+     "e_differ": 117798.44765620449,
+     "called_cells": 653499,
+     "target_fidelity": 0.18025803812431923,
+     "e_q_u": 0.012101005553531219,
+     "u_ceiling": 0.014761969151661426,
+     "e_q_u_over_ceiling": 0.8197419618756809
+    }
+   }
+  },
+  {
+   "target": "NA18906",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p50/NA18906_tau0_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed2035294715_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p55/NA18906_tau1_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed2290347295_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p60/NA18906_tau1_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed2429921396_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p65/NA18906_tau1_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed2040921711_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p70/NA18906_tau1_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed83100858_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p75/NA18906_tau1_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed4194843188_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/NA18906/acc_0p80/NA18906_tau1_indicator-wuniform-betachain-share0.0150224976-chromchr21_seed420514553_chr21"
+   ],
+   "seconds": 166.52612972259521,
+   "k_states": 86,
+   "t_chr21": 332516,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 119216.79117960457,
+     "called_cells": 657917,
+     "target_fidelity": 0.18120339067025865,
+     "e_q_u": 0.012168771759162676,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8187966093297415
+    },
+    "0.55": {
+     "e_differ": 119119.24149563792,
+     "called_cells": 657917,
+     "target_fidelity": 0.18105512016810316,
+     "e_q_u": 0.012170975322146189,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8189448798318969
+    },
+    "0.60": {
+     "e_differ": 119021.66051191403,
+     "called_cells": 657917,
+     "target_fidelity": 0.18090680209192653,
+     "e_q_u": 0.012173179592164143,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8190931979080732
+    },
+    "0.65": {
+     "e_differ": 118924.04910582448,
+     "called_cells": 657917,
+     "target_fidelity": 0.1807584377753189,
+     "e_q_u": 0.012175384549397029,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8192415622246809
+    },
+    "0.70": {
+     "e_differ": 118826.40815053441,
+     "called_cells": 657917,
+     "target_fidelity": 0.18061002854544633,
+     "e_q_u": 0.012177590174120794,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8193899714545536
+    },
+    "0.75": {
+     "e_differ": 118728.73851502893,
+     "called_cells": 657917,
+     "target_fidelity": 0.18046157572312152,
+     "e_q_u": 0.012179796446705816,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8195384242768783
+    },
+    "0.80": {
+     "e_differ": 118631.04106424272,
+     "called_cells": 657917,
+     "target_fidelity": 0.18031308062300064,
+     "e_q_u": 0.012182003347613967,
+     "u_ceiling": 0.014861775953278443,
+     "e_q_u_over_ceiling": 0.8196869193769989
+    }
+   }
+  },
+  {
+   "target": "HG03486",
+   "skipped": false,
+   "cells": 7,
+   "written": [
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p50/HG03486_tau0_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3201767951_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p55/HG03486_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed2531823740_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p60/HG03486_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed4177078373_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p65/HG03486_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed130771209_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p70/HG03486_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3013223578_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p75/HG03486_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed3595722506_chr21",
+    "/home/ds85/projects/Pangenome/RanPanMixer/data/releases/arm1/HG03486/acc_0p80/HG03486_tau1_indicator-wuniform-betachain-share0.0150227086-chromchr21_seed459110735_chr21"
+   ],
+   "seconds": 172.1054184436798,
+   "k_states": 86,
+   "t_chr21": 332521,
+   "scope": "chr21",
+   "exact": {
+    "0.50": {
+     "e_differ": 121050.72526289751,
+     "called_cells": 654100,
+     "target_fidelity": 0.18506455475141034,
+     "e_q_u": 0.01204111007817104,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8149354452485901
+    },
+    "0.55": {
+     "e_differ": 120955.25884820923,
+     "called_cells": 654100,
+     "target_fidelity": 0.18491860395690143,
+     "e_q_u": 0.01204326657976012,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8150813960430988
+    },
+    "0.60": {
+     "e_differ": 120859.74368469932,
+     "called_cells": 654100,
+     "target_fidelity": 0.18477257863430566,
+     "e_q_u": 0.012045424182541821,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8152274213656945
+    },
+    "0.65": {
+     "e_differ": 120764.18041644112,
+     "called_cells": 654100,
+     "target_fidelity": 0.18462647976829402,
+     "e_q_u": 0.0120475828719671,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8153735202317062
+    },
+    "0.70": {
+     "e_differ": 120668.56969489291,
+     "called_cells": 654100,
+     "target_fidelity": 0.18448030835482787,
+     "e_q_u": 0.01204974263332009,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8155196916451725
+    },
+    "0.75": {
+     "e_differ": 120572.91217867928,
+     "called_cells": 654100,
+     "target_fidelity": 0.18433406540082448,
+     "e_q_u": 0.01205190345172304,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8156659345991757
+    },
+    "0.80": {
+     "e_differ": 120477.20853375559,
+     "called_cells": 654100,
+     "target_fidelity": 0.18418775192440848,
+     "e_q_u": 0.012054065312132621,
+     "u_ceiling": 0.014775538539126849,
+     "e_q_u_over_ceiling": 0.8158122480755918
+    }
+   }
+  }
+ ],
+ "missing": []
+}
