@@ -1758,3 +1758,37 @@ from all 660 staged arrays. Its `ld_loss` prediction reproduced to every digit. 
 verifier disagrees with your own counterfactual, first establish which question each of
 you answered** — here both answers were right, and the distance between them was the
 finding.
+
+## [A gate that clears its own precondition can never fire, so it is decoration] -> [Key the shared state instead of clearing it, and make the test try to poison it]
+
+**Symptom.** `arm2_attack_a3a4._A3` caches the bi-allelic site axis in an UNKEYED module
+global. Arm 1's axis is per target and measured `t_chain` spans only 332,516..332,521, so
+many targets share a T -- and where they do, a stale cache is served silently and every
+A3 number for that target is computed on another target's site axis. `arm1_attack._a3_for`
+was written to close that: clear `_A3`, call `a3_sites`, then assert the returned mask
+length against this target's chain.
+
+**The assertion could not fail.** Nothing can be stale if the cache is always empty, so
+the length check only ever compared `a3_sites`'s output against the panel it had just
+been derived from. `CLAUDE.md`'s rule names this exactly: a gate that cannot fail is
+decoration. It was caught by writing the test FIRST as an injection -- poison `_A3` from
+another panel, call `_a3_for`, expect a raise -- and watching it report DID NOT RAISE.
+
+**Proven fix.** Key the cache rather than clearing it, on a sha256 of the panel bytes:
+  * same key  -> serve it, which is the point of a cache (tested: the same panel twice
+                 returns the identical object, so no target recomputes);
+  * other key -> clear and recompute, the stale-serve path, caught BY KEY and not by
+                 length (tested with two DIFFERENT panels of the SAME length, which is
+                 the case a length check passes on);
+  * no key    -> RAISE. A non-empty cache this driver did not stamp was populated by some
+                 other caller, so whose chain it holds is unknowable (tested).
+
+⚠ **The general test, which is the reusable part.** For any gate, ask what state would
+have to be wrong for it to fire, then ask whether the code immediately before it makes
+that state impossible. If it does, the gate is asserting its own setup. Write the
+injection test before trusting the assertion; "the gate is there" and "the gate can fire"
+are different claims and only the second one is worth anything.
+⚠ A related trap in the same function: `_a3_for` returns the LIVE module global, not a
+copy, so a caller holding it across a `clear()` finds an empty dict. That cost one failing
+test too. The driver is safe (one target at a time, nothing clears mid-target) but the
+aliasing is now stated at the call site.

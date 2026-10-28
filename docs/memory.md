@@ -7683,3 +7683,111 @@ the preview. The verification passes — `diff` reports only additions and no ch
 so every figure they share is byte-identical — but the PREVIEW is the superset: it carries
 the `wd_af` family and the published-scale table that `af_ld.md` lacks. `af_ld.md` is the
 stale subset. The preview is kept and the row corrected.
+
+## 2026-10-28 — B-ATK-arm1-driver: the A1/A3 driver EXISTS, its gates are shown to fire, and the pre-run prediction HELD
+
+**Status: DRIVER WRITTEN AND VERIFIED; THE POWERED RUN IS IN FLIGHT.** This entry covers
+the instrument, not the result. `scripts/arm1_attack.py` (444 lines) implements the
+2026-10-27 spec entry above in full; `tests/test_arm1_attack.py` carries 15 gates, each
+injected with the error it exists to catch. The powered run (44 targets x 7
+`acc_ceiling` labels x 10 draws per hypothesis per condition, 22 workers) was launched
+after the checks below and its table is NOT in this entry.
+
+✅ **THE PREDICTION WRITTEN DOWN BEFORE THE RUN HELD, EXACTLY.** The 2026-10-27 entry
+predicted A3's `D1_extremal` row would come back DEGENERATE in Arm 1 -- TPR -> 1.0000,
+TNR -> 0.0000 -- at every label. Measured on the smoke run: **TPR 1.0000 / TNR 0.0000 at
+both 0.50 and 0.80**, balanced accuracy exactly 0.500000, flagged DEGENERATE by the
+driver's own rule. Three further A3 rows are degenerate, and A3's `D2_nearest` at 0.80
+scores balanced **0.000000** (TPR 0 / TNR 0) -- ANTI-correlated, worse than chance, the
+same constant-answer artefact wearing a third face. ✅ And A1 is NOT degenerate, also as
+predicted: TPR and TNR both sit away from 0 and 1 in every cell measured.
+
+✅ **THE INSTRUMENT AGREES WITH THE SPEC'S INDEPENDENT MEASUREMENT ON FOUR QUANTITIES.**
+HG00438 at the acc_0p80 label, computed by a different route three weeks apart:
+
+| condition | ceiling, spec | ceiling, driver | `d_logz`, spec | `d_logz`, driver |
+|---|---|---|---|---|
+| D1_extremal | 0.800000 | **0.800000** | +253.148 | **+253.148** |
+| D2_nearest | 0.678293 | **0.678293** | +0.949 | **+0.949** |
+
+⚠ D3_random differs (0.692453 against the spec's 0.696243) and that is EXPECTED, not a
+failure: D3 is a uniform draw from the other 43 members and this driver's `DECOY_SEED` is
+20261028 against the instrument check's, so a different member was drawn. D2 is
+deterministic (highest concordance), which is why its agreement is the meaningful one.
+✅ `kl` at 0.80 is exactly 0.720000, the fit's own target, and `eta` is 25492.110 -- the
+value whose `tanh` saturates, which is why `p_succ_bound` cannot be used here.
+
+**THREE DEFECTS IN MY OWN WORK, CAUGHT BEFORE THE RUN.**
+
+⚠⚠ **1. A GATE THAT CLEARED ITS OWN PRECONDITION AND SO COULD NEVER FIRE.** `_a3_for`
+closed the unkeyed-`_A3` hazard by clearing the cache unconditionally and then asserting
+the returned mask length against this target's chain. That assertion is UNFALSIFIABLE:
+nothing can be stale if the cache is always empty, so the gate was decoration under
+`CLAUDE.md`'s own rule. The test is what found it -- it poisoned the cache and the gate
+did not raise. Fixed by KEYING the cache on a sha256 of the panel: same key serves, other
+key clears and recomputes, and a non-empty cache with NO key RAISES, because Arm 1
+targets share a `t_chain` so whose axis an unstamped entry holds is unknowable. All three
+branches are now tested, including the same-length-different-target case a length check
+cannot catch. See `docs/bugs.md`.
+
+⚠⚠ **2. THE WRONG CEILING FOR A POOLED TEST.** The report compared the pooled accuracy to
+the MAX per-pair ceiling in the pool. With equal draws per target the pooled balanced
+accuracy IS the average of the per-target accuracies, so its bound is the MEAN of those
+ceilings. Testing against the max is a LOOSER test that could hide a real excess, which
+inverts the purpose of a violation check. Now tested against the mean, with the max
+printed beside it as the conservative reading.
+
+⚠ **3. A COST BLUNDER THAT WOULD HAVE MADE THE RUN INFEASIBLE.** The first version drew a
+separate release under p for each of the three conditions. A draw from `Q_p` does not
+depend on `q`, so one release serves all three -- a third of the dominant cost, since a
+release over 332,521 positions at K = 86 runs ~8 s and the grid needs thousands. ⚠ It
+makes the three conditions CORRELATED through the shared draw, so they are reported
+separately and never pooled across conditions; stated at the call site.
+
+⚠ **AND I OVER-ESTIMATED THE NEEDED SAMPLE SIZE BY 20x.** I first sized the run at 100
+draws per cell from the spec's SE of 0.1095 -- but that SE was for ONE target. The report
+pools across 44, which standing constraint 5 permits for attack OUTCOMES (never for
+utilities), so 10 draws gives n = 440 per arm and SE ~ 0.017. That resolves the spec's
+flagged +0.1217 excess at ~7 SE. The 100-draw run would have been ~123,000 releases.
+
+**WHAT THE DRIVER REFUSES TO DO, each from a numbered spec hazard.**
+1. `_a3_for` keys the `_A3` cache (hazard 1), and nothing calls `arm2_attack.load_state()`
+   -- gated structurally by an AST walk, because the defect would be an ADDED CALL.
+2. FIXED-MECHANISM posing only (hazard 2): both `ffbs.release` calls pass p's own
+   `st["model"]` and `st["panel"]`, asserted by AST so a second mechanism cannot be
+   introduced silently. The PROCEDURE posing is not implemented.
+3. `calibration.p_succ_bound` is never called (hazard 3) -- it raises on every cell here,
+   and `arm2_attack_a3a4._report`'s `if tau >= 1.0: continue` would have skipped all of
+   them and printed a clean null having checked nothing.
+4. The missing '0.50' fit key is `eta` = 0 by construction, not a gap to fill (hazard 4).
+   At `eta` = 0 `Q_p = Q_q = R_D`, so EVERY statistic scores exactly 0.5 balanced -- and
+   the smoke run returns exactly 0.500000 with TPR = TNR = 0.5000. It is a harness check.
+5. `extremal` is IMPORTED from `exact_kl_stable` rather than reimplemented, so the decoy
+   the ceiling was fitted against cannot drift from the decoy the attack scores. Gated.
+
+⚠ ONE SUBTLETY FOUND BY A FAILING TEST AND WORTH KEEPING: at `eta` = 0 every `Lambda` is
+exactly 0, so the accuracy is DETERMINISTICALLY 0.5 and its true variance is zero -- but
+the binomial SE is computed at TPR = TNR = 0.5, where it is at its MAXIMUM (0.05 at
+n = 50). The 0.50 column's SE is an over-estimate, not sampling noise. It changes no
+verdict, since the excess there is exactly 0.
+
+**`scripts/pm_attack.py` — THE SAME QUESTION ON PANMIXER'S OWN RELEASES.** Written, not
+yet run (it reads this run's JSON for the decoy identities, so both tools are scored on
+IDENTICAL (target, decoy) pairs rather than two independently chosen pairings).
+⚠⚠ **A1 IS `n/a` THERE, WITH A REASON.** A1 is the Neyman-Pearson optimum for OUR release
+distribution and needs `eta`, `u` and `log Z`; PanMixer's release is a constrained
+optimiser's output followed by resampling, with no tractable likelihood, so no such
+statistic exists for it. A heuristic called A1 would pit the OPTIMAL attacker on one tool
+against an ARBITRARY one on the other, and the null on their side would then be a
+statement about our choice of heuristic.
+⚠⚠ **`acc_ceiling` IS `n/a` THERE TOO, AND IT CUTS BOTH WAYS.** Theorem 1 gives our
+releases a per-pair bound a measured accuracy can be tested against; their privacy notion
+bounds nothing of this form. So a low accuracy on their side is NOT evidence of a
+guarantee, and our having a bound is NOT evidence that our measured accuracy is lower.
+⚠ D1_extremal is `n/a` there as well: it is a constructed path, not a cohort member, so
+PanMixer never obfuscated it and the second hypothesis has no draws.
+⚠ CORRECTED ASSUMPTION: `new_haplotypes.npy` SURVIVES in `obf_draws` -- 1,408 of them,
+only the VCFs were deleted -- so their side has **5 draws** per cell, not 1, giving
+n = 220 per arm. Their A3 axis is their own (310,028 bi-allelic of 340,849, 88
+haplotypes, NOBODY held out), so the raw SCORES are not comparable across the two tables;
+only the accuracies are.

@@ -746,6 +746,46 @@ Aliases:              "the normalizer", "Z_p" (Z_p is the unlogged form)
 ```
 
 
+### d_logz  [implementation] [evaluation] [diagnostic]
+```
+Is:                   log Z_p - log Z_q for ONE pair of input paths under ONE
+                      mechanism: the normaliser difference that the Neyman-Pearson
+                      statistic needs. `Lambda(y) = eta_tau [u(p,y) - u(q,y)] -
+                      d_logz`, so it is the only term of the optimal attacker's
+                      statistic that does not depend on the released path y.
+Computed by:          scripts/exact_kl_stable.py:kl_stable, returned beside `kl`, as
+                      the summed per-position difference of the two tilted forward
+                      passes' log normalisers.
+                      ⚠⚠ THE BASELINE CANCELS EXACTLY AND THAT IS WHY THIS FORM IS
+                      PREFERRED. `baseline_log_norm` is the same constant inside both
+                      log Z values, so it never enters the difference. Computing
+                      log Z_p and log Z_q separately and subtracting re-introduces the
+                      chance of applying the baseline to one side only --
+                      `scripts/arm1_attack.py` therefore passes `log_z_p = 0.0` and
+                      `log_z_q = -d_logz` to `attacks.lrt_statistic` rather than
+                      assembling the two normalisers itself.
+CHANGES MEANING WITH: the PAIR, the arm, the panel and `eta_tau`. It is not a property
+                      of a release. ⚠ In ARM 1 it also changes with the leave-one-out
+                      panel, which is per target.
+                      ⚠⚠ ITS SIGN CARRIES THE PANEL ASYMMETRY, and that is not a
+                      defect. In arm 1 the target is HELD OUT while a D2/D3 decoy is a
+                      cohort member IN the panel, so the decoy is exactly reproducible
+                      by the mosaic and the target is not. Measured on HG00438 at the
+                      acc_0p80 label: +253.148 against the constructed D1_extremal
+                      decoy, +0.949 against D2_nearest. A negative value means the
+                      in-panel decoy carries the larger normaliser. The offset is a
+                      legitimate part of the statistic and sits inside the Theorem 1
+                      bounds, but it drives TPR and TNR apart, which is why those are
+                      reported as their own rows.
+Valid vs:             the same pair, arm, panel and knob value. Two `d_logz` from
+                      different pairs are different quantities wearing one name.
+Status:               DIAGNOSTIC, and an INPUT to A1. Not an endpoint. Reported beside
+                      an attack table to show which way the panel asymmetry points,
+                      never as a privacy figure.
+Aliases:              "the normaliser difference", "log Z_p - log Z_q"
+```
+
+
 ### baseline_log_norm  [implementation] [diagnostic]
 ```
 Is:                   The log conditioning constant of R_D: sum_t log c_t from an
