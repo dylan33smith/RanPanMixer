@@ -17,8 +17,10 @@ no numbers**; those live in `docs/`.
   is true of the target. **Never state a property of the target without naming its
   arm** — that confusion is what the 2026-09-28 scope correction was about.
   - **Arm 1 — the head-to-head.** The target is one of the 44 cohort members. We
-    release the obfuscated paths of all of them, diploid, over the 22 autosomes,
-    and run PanMixer's own evaluations so the comparison is direct. Requires
+    release the obfuscated paths of all of them, diploid, **on chr21 ONLY** (Dylan
+    2026-10-27; **arm 2 carries genome-wide alone**), on the SAME 44 individuals in
+    the same order as PanMixer, and run its own evaluations so the comparison is
+    direct. Requires
     **per-target leave-one-out**: BOTH of the target's haplotypes leave the donor
     panel. Every leave-one-out, reduced-`K` and cohort-distortion quantity belongs
     to this arm alone.

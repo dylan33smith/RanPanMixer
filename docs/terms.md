@@ -2991,6 +2991,53 @@ Aliases:              none. ⚠ **"retained" is FORBIDDEN for this quantity** �
                       safe informal names.
 ```
 
+### target_fidelity_onesided  [utility] [evaluation]
+```
+Is:                   **The same DIFFER rate as `target_fidelity`, under PanMixer's
+                      OTHER mask: the original alone.** The denominator is every cell
+                      the TARGET calls; the numerator counts a cell as altered even
+                      where the release has no call at all. Carried as the SENSITIVITY
+                      beside `target_fidelity`, which is the HEADLINE by decision
+                      2026-10-27.
+                      ⚠ **IT IS >= `target_fidelity` BY CONSTRUCTION, ALWAYS.** A cell
+                      the target calls and the release does not leaves the two-sided
+                      ratio from BOTH sides and scores as ALTERED here, so the two
+                      conventions cannot cross. The SPREAD between them is what a
+                      reader needs; neither figure alone says how much of the gap is
+                      the mask rather than the mechanism.
+                      ⚠ Quoting whichever convention is kinder is denominator-shopping.
+                      Both appear in every head-to-head table, or neither does.
+Computed by:          `scripts/arm1_headtohead.py` `score()`, key `fidelity_onesided`,
+                      mirroring external/PanMixer/tools/panmixer/stacker.py:74,81-82
+                      (`mask = original_haplotypes != -1`), which PanMixer writes into
+                      `stacked.json` as `changed_alleles_percentage` (x100).
+                      ⚠ PanMixer's PRIMARY artifact and its own EVALUATORS both use the
+                      TWO-sided mask — obfuscate.py:474-476 into `stats.json`, and the
+                      both-sides-called evaluator masking already recorded in the
+                      `new_haplotypes` entry. The one-sided mask is the outlier INSIDE
+                      their own codebase, which is why it is the sensitivity and not a
+                      co-equal headline. ⚠ Not a defect in PanMixer: two scripts
+                      written for two purposes.
+                      ⚠ SAMPLED ONLY, 1 draw per point. The exact-expectation branch
+                      integrates obfuscate.py's two-sided mask and has no one-sided
+                      counterpart, so this row is `n/a` in EXACT columns — recorded
+                      with its reason, never an omitted row.
+CHANGES MEANING WITH: how COMPLETE the release is. Our path release is complete by
+                      construction, so our two masks nearly coincide; PanMixer leaves
+                      the original in place outside the blocks it swaps, so theirs can
+                      diverge. The two conventions therefore do NOT move the two tools
+                      by the same amount, and that asymmetry is exactly why the pair
+                      must travel together.
+Valid vs:             `target_fidelity_onesided` on the other tool at matched utility.
+                      ⚠ NEVER against `target_fidelity` — a one-sided number beside a
+                      two-sided one is two quantities wearing one name, the error
+                      standing constraint 7 exists to prevent.
+Status:               SENSITIVITY — never the headline (decision 2026-10-27).
+Aliases:              none. ⚠ PanMixer's own name for it is
+                      `changed_alleles_percentage`. "retained" is FORBIDDEN here for the
+                      same reason as `target_fidelity`: this is a DIFFER rate.
+```
+
 ---
 
 ## Measured quantities

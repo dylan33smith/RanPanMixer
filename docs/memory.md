@@ -104,6 +104,302 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-27 (later still, 2) — B-EVL-arm1-chr21-grid: ARM 1 IS chr21 ONLY, and its grid is solved PER TARGET and verified by measurement
+
+**Scope change (Dylan, 2026-10-27).** Arm 1 exists to be directly comparable to
+PanMixer, whose pipeline is per-chromosome, so a genome-wide Arm 1 buys nothing the
+comparison can use. **Arm 1 is chr21 ONLY; ARM 2 CARRIES GENOME-WIDE ALONE.** The
+genome-wide Arm 1 KL fit was killed at 2 h 32 m with 0 of 22 chromosomes closed and no
+checkpoint — its workers held chr1..chr10, so chr21 sat in the LAST wave of three.
+⚠ `CLAUDE.md`'s Arm 1 bullet is updated; it had said "over the 22 autosomes".
+
+**A claim of mine, WITHDRAWN.** I argued that a chr21 release at `beta_share` ~0.0150
+has no `acc_ceiling` of its own and that only a `beta_share` = 1 release would do.
+**That was wrong.** Chromosomes are independent given the shares, so the chr21 term IS
+a KL in its own right. Worse, the two parameterisations are the SAME FAMILY of
+releases: genome-normalised `beta_v` on chr21 is the chr21-normalised weights scaled by
+0.0150248984, so `exp(eta * u_genome) = exp(eta * 0.015 * u_chr21)` and the only
+difference is `eta` relabelled by ~66.6x. On an `acc_ceiling` axis that relabelling is
+INVISIBLE. My "67x more tilt budget, genuinely different objects" statement was wrong in
+both halves, and it would have thrown away a working `tau`-regime approach.
+
+**Method.** New `scripts/arm1_chr21_kl.py` — a DRIVER over `exact_kl_stable.one_chrom`,
+which already does one chromosome at a given share for ARM 1 (K = 86, chain rebuilt per
+target). No new arithmetic: `kl` from `kl_stable`, `acc_ceiling` the same
+`0.5 * (1 + min(1, sqrt(kl/2)))`. Fans out over TARGETS, not chromosomes, because one
+chromosome would otherwise pin the run to a single core. Each target uses ITS OWN chr21
+`beta_share` from `loo.loo_shares` over the measured leave-one-out chains.
+
+**Result — the fit, 44 targets, 59.27 s on 22 workers, 1.8 GB per worker:**
+`c` = kl/eta^2 spans **8.664432e-10 to 1.176051e-09, a 35.7331% spread across targets**.
+So a single shared `eta` could NOT have placed every target on one ceiling, and the
+per-target grid is required rather than preferred. ⚠ This is why `acc_ceiling` is the
+reporting axis (Dylan, 2026-10-27): matching on it is standing constraint 7, and it
+makes the per-target `eta` spread a reportable fact instead of a confound.
+
+**Result — the grid, VERIFIED BY MEASUREMENT (n = 44 x 6 points):**
+
+| metric | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|
+| `eta_tau` median | 4,627.9 | 9,254.2 | 13,879.1 | 18,502.5 | 23,124.5 | 27,745.1 |
+| `eta_tau` min | 4,123.3 | 8,246.7 | 12,370.4 | 16,494.4 | 20,618.7 | 24,743.4 |
+| `eta_tau` max | 4,805.3 | 9,610.1 | 14,414.5 | 19,218.4 | 24,021.9 | 28,825.1 |
+| worst \|error\| FROM THE FIT | 3.42e-05 | 4.99e-05 | 4.93e-05 | 3.62e-05 | 1.20e-05 | 6.79e-05 |
+
+**Worst \|`acc_ceiling` - target\| after ONE multiplicative refinement: 7.224e-08** over
+all 264 cells (5:49.55 wall, 2597% CPU). `acc_ceiling` 0.50 is the seventh point, exact
+at `eta` = 0 by construction.
+
+⚠⚠ **`kl = c * eta^2` IS THE LEADING TERM, NOT AN IDENTITY, and a gate of mine asserted
+otherwise.** I printed "❌ NOT quadratic" at a 1.139e-03 spread against a threshold I had
+picked arbitrarily. The genome grid's own `c` drifts 0.0068% monotonically across its
+range, so a departure was expected; the message was wrong. But the underlying fact
+matters: the FIT pins `eta` to only ~0.05%, giving the 3-7e-05 errors in the table above,
+where both arm 2 grids were held to 6e-06 (genome) and 1.2e-05 (chr21) BY MEASUREMENT.
+Refining and re-measuring is now how this grid is established, and the gate reports
+conditioning rather than passing judgement.
+
+**Independent confirmation that ARM 1 RUNS HOTTER.** HG00438's measured `c` is
+1.107721e-09 against **7.876e-10 predicted** by scaling arm 2's chr21 share-1 constant
+(3.4887e-06) by 0.0150248984^2 — a factor **1.406**, so Arm 1 reaches the same ceiling
+at **1.186x less `eta`**. That reproduces the genome-scope finding (median 0.791469 vs
+0.755795 at `eta_tau` = 2821 on 10 targets) at chr21 scope on all 44, by a different
+route.
+
+**Two of my own defects, both caught by gates rather than by luck.** (1) I read the
+survey's chain-length field off the `__arm2__` pseudo-row (`t`) when real targets carry
+`t_chain` — the same sampling error as the 20,000-record chr21 slice, and the repo's own
+earlier note had the spelling RIGHT while my "correction" had it wrong. Now an assert.
+(2) I indexed `one_chrom`'s result as `out[target]` when the per-target map sits under
+`out["kl"]`, which `exact_kl_stable.py:395` shows plainly. The fan-out completeness
+assertion refused to write a partial grid both times, which is the only reason neither
+became a silently short result.
+
+---
+
+## 2026-10-27 (latest) — B-DAT-pm-ourbuild COMPLETE: the AF layer is IDENTICAL on both builds, not merely comparable
+
+**Goal.** Finish the decision-F rebuild and find out how much our GRCh38 deconstruction
+actually moves PanMixer's allele-frequency table.
+
+**Method.** PanMixer's own `get_af.py`, `get_mappings.py`, `get_possible_alleles.py`,
+`build_biallelic_snp_mask.py` and `VCFtoNP.py`, UNMODIFIED, run against our `cohort44` chr21
+in the mirror root. 45:33 wall, 13.7 GB peak RSS, exit 0. The 12.84 GB panel conversion was
+29 min of that; `get_mappings` 85 s; `get_af` 13.5 min. PLINK, block segmentation,
+`apply_mask.py` and `get_support_and_pmi.py` were SKIPPED after reading `get_af.py` in full
+and confirming it reads no blocks file and no mask — which is what made this a 45-minute job
+rather than a multi-day one.
+
+**Result — the strict mapping is the SAME SET, and the AF values are byte-identical.**
+
+| | ours | theirs |
+|---|---|---|
+| pangenome records | 340,849 | 340,824 |
+| `allele_frequencies.npy` | (340,849, 89) | (340,824, 90) |
+| `Max allele` | 88 | 89 |
+| strict (pos,ref,alt) mapping | 258,610 | 258,610 |
+| relaxed (pos,ref) mapping | 268,851 | 268,851 |
+
+⚠⚠ **258,610 and 268,851 are PanMixer's own published figures, reproduced to the digit on a
+DIFFERENT BUILD, and that looked too good to report without checking.** It is real. Verified
+three ways: (1) the mapped key SETS are equal — zero keys in either direction, not merely
+equal counts; (2) an independent `(POS,REF,ALT)` intersection against the panel reproduces
+258,610 for both builds, so the script and the measurement cross-validate; (3) **none of our
+18,071 build-unique keys match the panel at all**, and 17,047 of them (94.3%) are
+multiallelic. The cause is mechanical: `get_mappings.py:20` joins on the ALT column VERBATIM
+and the panel is split-biallelic, so a comma-joined multiallelic ALT can never match in
+EITHER build. **The entire 5.3% axis disagreement lives in sites that map in neither build.**
+
+✅ **And the frequencies themselves agree exactly**: over all 258,610 strictly-mapped sites,
+matched by key rather than by row index, **max absolute difference 0.000e+00** — every row
+identical — and their unused 90th column is all-zero on those rows, so the column truncation
+hides no mass. Where the mapping exists the two tables are the SAME OBJECT, and the
+comparison no longer rests on two builds.
+
+**What this does NOT establish.** Only the AF layer. Nothing of PanMixer's MECHANISM has run
+on our build yet: the PLINK `--blocks` pass, obfuscation at 8 capacities and the scoring are
+all still to do, and `get_support_and_pmi.py` (their own budget: up to 24 h per subject x 44)
+gates the optimiser path. The 89-vs-90 column count and the 25 extra rows are real
+differences, confined to unmapped and novel sites — which is exactly where two
+deconstructions SHOULD differ.
+
+⚠ A reproducibility trap for whoever verifies this: **5,773 of our 340,849 rows sum to
+1.0 +/- 3.331e-16**, not exactly 1.0 (theirs has 5,760 such rows). A check written as
+`rowsum == 1.0` raises thousands of false failures on a faithful rebuild.
+
+⚠ An instrument failure worth keeping, the second of the day: a python script run from the
+scratchpad ROOT died with "partially initialized module numpy has no attribute load" because
+a subagent had left an `inspect.py` there and `sys.path[0]` is the script's own directory, so
+numpy's `import inspect` picked it up. Nothing numeric depended on it. Checks now live in a
+clean subdirectory. The first failure was a `/tmp/d.txt` write refused by the sandbox, after
+which `cat` read ANOTHER user's file at that path and returned a page of protein annotations
+as if it were a git diff.
+
+---
+
+## 2026-10-27 (later still) — B-FIX-denominator: PanMixer reports the changed-allele rate FOUR ways, and the headline is now fixed
+
+**Goal.** Settle which denominator the paper quotes against PanMixer. The PI asked whether
+our figure is lower than theirs, and the answer had been moving with the convention.
+
+**Method.** Five readers over PanMixer's starting-data pipeline, then one adversarial pass
+that re-opened every file to check each claimed flag and to give its own verdict on the
+denominator. Default-to-contradiction when a claim was unconfirmed.
+
+**Result — there are FOUR, not two, in their own tree:**
+
+| where | mask | written to |
+|---|---|---|
+| `obfuscate.py:474-476` | `(original != -1) & (final != -1)` — two-sided | `stats.json` `total_alleles` |
+| `stacker.py:74,81-82` | `original != -1` — one-sided | `stacked.json` `changed_alleles_percentage` |
+| `stacker.py:73` | none | `mean_difference` |
+| `stacker.py:86` | none, divides by every slot | `alleles_touched_percentage` |
+
+The unit counted is a (position, haplotype-slot) pair, not a position: `original` is
+`pangenome[subject_id]` of shape (n_variants, 2), so their chr21 ceiling is 340,824 x 2 =
+681,648 slots per subject. One-sided is **>= two-sided by construction** — a slot the target
+calls and the release does not leaves the two-sided ratio from both sides and scores as
+ALTERED in the one-sided one. On their chr21, 4.90% of genotype cells are half-missing and
+95.74% of allele slots are called, which bounds how far the conventions can separate.
+
+**DECISION (Dylan, 2026-10-27): the two-sided mask of `obfuscate.py` is the HEADLINE; the
+one-sided `stacker.py` figure is reported beside it as a SENSITIVITY.** The reasons are that
+the two-sided convention is what their PRIMARY artifact records, what their own EVALUATORS
+use (the both-sides-called masking already recorded in `new_haplotypes`'s terms entry), and
+the one our scoring already reproduces exactly against their reported `changed_alleles` and
+`total_alleles`. Inside their own codebase the one-sided mask is the OUTLIER. ⚠ This is not
+a defect in PanMixer — two scripts written for two purposes.
+
+**Implemented.** `scripts/arm1_headtohead.py` `score()` gained `fidelity_onesided`,
+`changed_onesided` and `called_orig_cells`; both report blocks gained a SENSITIVITY row and
+its denominator; the synthesis gained a bullet that prints both conventions and names the
+spread as the quantity a reader needs. New term `target_fidelity_onesided` in `docs/terms.md`,
+adjacent to `target_fidelity` so the pair cannot be read apart.
+
+**Gate.** The discriminating case was injected rather than assumed: a cell called in the
+original and -1 after resampling must move ONLY the one-sided figure. On a 5-site fixture the
+two-sided reads 1/6 = 0.166667 and the one-sided 3/8 = 0.375000, the denominators differ by
+exactly the dropped cells, and miswiring the one-sided mask to two-sided collapses 0.375000
+to 0.166667 — so the check can fail. `tests/test_docs_contract.py` 23 passed.
+
+**What this does NOT establish.** No new head-to-head NUMBER. The τ-regime releases on disk
+are being discarded, so the matched figures arrive with the η rerun. The exact-expectation
+branch integrates the two-sided mask only, so the sensitivity rows are SAMPLED (1 draw) and
+carry `n/a` in EXACT columns — recorded with the reason, not omitted.
+
+**Three BLOCKING errors the verification pass caught**, each of which would have run:
+(1) every reader's plan drove the pipeline with `sbatch`, and there is no SLURM on this box;
+(2) one reader put OUR cohort44 VCF in the 1000G panel slot, which collapses
+`NOVEL_DENOMINATOR` from 2x(3202+44) = 6,492 to 2x(44+44) = 176 and draws every mapped
+site's AF from 44 samples instead of 3,202 — a complete, plausible, WRONG table;
+(3) the path tools/obfuscate.py does not exist (a stale docstring; the real path is
+`external/PanMixer/tools/panmixer/obfuscate.py`, README.md:128).
+
+---
+
+## 2026-10-27 (later) — B-DAT-pm-ourbuild: PanMixer's starting data rebuilt on OUR build, and our chr21 axis measured against theirs
+
+**Goal.** Decision F: both arms on ONE consistent build, so our numbers and PanMixer's are
+directly comparable rather than resting on two different deconstructions.
+
+**PG verified, not assumed.** The public PanGenie callset was downloaded independently from
+Zenodo record 7669083 (asset `grch38_all-samples_bi_all.vcf.gz`) to
+`/home/ds85/pg_staging/PG_all.vcf.gz`: 5,056,330,314 B, `bgzip -t` clean on every block and
+CRC, 368 samples, contigs chr1-chr22 + chrX. md5 `e97bddcbe84b30a6d9c69d15c16ccc8a` is
+IDENTICAL to PanMixer's own copy, so we are demonstrably running their object without having
+consumed their artifact. The chr21 slice holds **384,720 records, the same as theirs**.
+⚠ The download waiter reported "4.71 GB of 5.06" and looked truncated; it was comparing GiB
+against GB. The file was complete. The instrument was wrong, not the download.
+
+**OUR chr21 axis against THEIRS — the Decision F number.** `data/temp/chr21/cohort44.vcf.gz`
+is a drop-in for their `external/PanMixer/starting_data/chr21/pangenome.vcf.gz`: same PanSN contig `grch38#chr21`, 44
+samples, chm13 already dropped, multiallelics comma-joined exactly as theirs are — which
+matters because `get_mappings.py:20` joins on the ALT column VERBATIM, so a pre-split build
+would have shifted the match rate and broken comparability under identical code.
+
+| | ours | theirs |
+|---|---|---|
+| records | 340,849 | 340,824 |
+| unique (POS,REF,ALT) | 340,849 | 340,824 |
+| POS max | 46,699,788 | 46,699,788 |
+| bi-allelic SNPs | 274,476 | 274,458 |
+
+Shared (POS,REF,ALT) keys **322,778**: 94.698% of ours, 94.705% of theirs, Jaccard 89.937%.
+By POS alone, 339,744 shared against 1,105 ours-only and 1,080 theirs-only — so **94% of the
+key disagreement is the same variant written differently**, the vg 1.68 vs 1.36 multiallelic
+difference, not a different variant set. Milder than the 92.7% the chrY survey predicted.
+⚠ The 339,744 figure independently reproduces the shared-axis count already quoted in
+`scripts/arm1_symmetric_compare.py` ("339,744 of chr21, 99.68% of each").
+
+**Mirror root** at `/home/ds85/pm_ourbuild/`, built by symlink so nothing is copied and
+PanMixer's tree is untouched: `/home/ds85/pm_ourbuild/starting_data/chr21/pangenome.vcf.gz`,
+`/home/ds85/pm_ourbuild/starting_data/chr21/PG.vcf.gz` and
+`/home/ds85/pm_ourbuild/starting_data/chr21/1000g_phased.vcf.gz` ->
+our cohort44, our PG slice, and `data/raw/1000g_30x_phased.vcf.gz` (sha256 `a925c112...`
+re-verified against the pin in `configs/inputs.chr21.yaml`, 3,202 samples, 1,002,753
+records). `paths.py` resolves BASE_PATH to the mirror root, so their scripts run unmodified.
+
+**The AF table skips their most expensive stages entirely.** `get_af.py` reads no blocks
+file, no mask and no `num_alleles` beyond one assert, so PLINK `--make-bed`/`--blocks`, the
+block segmentation, `apply_mask.py` and `get_support_and_pmi.py` — which their own job
+scripts budget at up to 24 h PER SUBJECT, times 44 — are all off the critical path. The
+remaining chain is `get_possible_alleles` -> three `VCFtoNP` conversions ->
+`build_biallelic_snp_mask` (tripwire) -> `get_mappings` -> `get_af`, peaking near 15 GB.
+
+**Axis tripwire PASSED**: `build_biallelic_snp_mask.py` raises if the VCF and
+`pangenome_positions.npy` disagree on record count or on any POS. 274,476 bi-allelic SNPs of
+340,849 records. This is the only hard-failing proof that the VCF and the arrays agree.
+
+**STILL RUNNING, not complete:** the three conversions, `get_mappings` and `get_af`
+(`/home/ds85/pm_ourbuild/logs/af_chain.log`, with a status sentinel beside it). No AF table exists yet and no
+`docs/data.md` row has been written for one — the row goes in when the artifact exists, not
+when it is expected.
+
+---
+
+## 2026-10-27 — B-EVL-etagrid-v2: the eta regime verified DIRECTLY at both scopes, 0.50-0.80
+
+**Goal.** Dylan's requirement: restrict the released grid to `acc_ceiling` 0.50-0.80, because
+1.0 is essentially a guaranteed attack — and compute chr21 DIRECTLY rather than deriving it
+from the genome number.
+
+**Method.** `scripts/eta_sweep.py --with-kl`, exact via state marginals, HG00096, Arm 2,
+`weights uniform`. Seven evenly spaced ceilings. chr21 at chromosome scope (`beta_sum` = 1,
+K = 88, T = 332,521); genome-wide over 22 autosomes (T = 22,134,562, decision-J shares
+summing to 1.000000), 11 workers.
+
+**Result — genome-wide** (`logs/B_eta_grid_v2/genome_uniform.json`):
+
+| `eta_tau` | target | measured `acc_ceiling` | error | `kl_exact` |
+|---|---|---|---|---|
+| 0 | 0.50 | 0.500000 | +0.000000 | 0 |
+| 551.4 | 0.55 | 0.550000 | -0.000000 | 1.999977e-02 |
+| 1102.8 | 0.60 | 0.599999 | -0.000001 | 7.999799e-02 |
+| 1654.3 | 0.65 | 0.650006 | +0.000006 | 1.800148e-01 |
+| 2205.7 | 0.70 | 0.700004 | +0.000004 | 3.200123e-01 |
+| 2757.1 | 0.75 | 0.750001 | +0.000001 | 5.000033e-01 |
+| 3308.5 | 0.80 | 0.799997 | -0.000003 | 7.199861e-01 |
+
+Worst error across seven points is **six parts in a million**. Fitted
+`c = kl_exact / eta^2` = 6.577740e-08 (spread 0.0068% across the grid, a precision artifact
+of the exact KL, not a departure from quadraticity), so
+**`acc_ceiling` = 0.5 + 9.067621e-05 * `eta_tau`** genome-wide. This reproduces the recorded
+genome constant 6.57786e-08 to four significant figures.
+
+**Result — chr21, measured not scaled** (`logs/B_eta_grid_v2/chr21_uniform.json`): all seven
+land within 1.2e-05 of target, slope 6.60510e-04 per `eta_tau`. The earlier chr21 grid had
+been SELECTED by scaling and then verified point-by-point; this one is solved directly at
+chromosome scope, which is what Dylan asked for.
+
+**What this does NOT establish.** Arm 2 only. **Arm 1 runs HOTTER at the same `eta`** —
+median 0.791469 against 0.755795 at `eta_tau` = 2821 on the 10 targets measured — so pinning
+Arm 2's grid on Arm 1 would land near 0.84 and BREACH the 0.80 cap. Arm 1 needs its own grid
+from its own KL across all 44 targets; that fit is RUNNING and
+has not written its JSON yet, and the 308 Arm 1 releases are blocked on it.
+⚠ Pinsker is an inequality: the TRUE ceiling is closer to 0.5 than every figure above.
+
+---
+
 ## 2026-10-26 (later) — B-EVL-wdaf: our AF column put on PanMixer's published scale, and on the rare-variant panel we WIN
 
 **Goal.** Close the last named item on the biological-utility docket: emit `wd_af`, the
