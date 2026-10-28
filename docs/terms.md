@@ -2560,6 +2560,26 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       check.
                       ⚠ Reporting it as an ENDPOINT needs a NEW dated pre-registration,
                       not an addendum. Provenance `logs/B_arm1_af_ld.md`.
+                      ⚠⚠ **RE-MEASURED 2026-10-28 ON ONE BUILD — the cross-build
+                      confound above is GONE and the conclusion did not change.**
+                      Their evaluator unmodified against OUR 340,849-record
+                      `starting_data`, our 308 `acc_ceiling` cells and their 352 runs
+                      on the SAME 44 individuals. Ours **0.003577..0.003604** across
+                      `acc_ceiling` 0.50->0.80, a span of **0.77% of the floor**;
+                      theirs **0.000216..0.002841**. **PAIRED BY INDIVIDUAL AT OUR
+                      0.80 AGAINST THEIR SATURATION WE ARE LOWER IN 0 OF 44** —
+                      sign p = 1.14e-13, z = +25.28 — and their WORST column
+                      (0.002841) is below our BEST (0.003577). The decision-F
+                      requirement in CHANGES MEANING WITH is satisfied for chr21.
+                      ⚠ It still FAILS the direction check the pre-registered
+                      endpoints pass: **25/44 down, 19/44 up**, median -8.352e-06.
+                      ✅ REIMPLEMENTED from this definition with no PanMixer code
+                      imported and matched EXACTLY: 0.003420953969 against
+                      0.003420953969 (ours) and 8.674e-19 apart (theirs).
+                      ⚠ -1 is an ORDINARY ALLELE VALUE to `np.unique` here, so an
+                      uncalled cell is a category in both distributions and the
+                      per-site denominator is the size of the UNION of alleles seen.
+                      Provenance `logs/B_arm1_afld_ourbuild/af_ld.md`.
                       ⚠ **THE OLD REASON WAS WRONG AND IS CORRECTED HERE.** This entry
                       used to say "we never modify the cohort, so the quantity is not
                       defined for our release object". That is true of ARM 2 only. In
@@ -2767,6 +2787,35 @@ Status:               PANMIXER-ONLY — **NOT ADOPTED as an endpoint (decision H
                       single-draw noise (one release per target per `tau`,
                       constraint 5), so the grid scatter is NOT a trend.
                       Provenance `logs/B_arm1_af_ld.md`.
+                      ⚠⚠ **RE-MEASURED 2026-10-28 ON ONE BUILD, and this is the half
+                      of the in-graph comparison we WIN.** Their evaluator unmodified
+                      against OUR `starting_data`, same 44 people both sides. Ours
+                      **0.005291..0.005571** per pair across `acc_ceiling` 0.50->0.80;
+                      theirs **0.000077** at `capacity` 0.01 then
+                      **0.037462..0.040671** from 0.05 up. **PAIRED AT OUR 0.80
+                      AGAINST THEIR SATURATION WE ARE LOWER IN 40 OF 44** — sign
+                      p = 1.71e-08, z = -19.65, ~7.5x lower — while at `capacity`
+                      0.01 they are ~70x lower, because that setting barely
+                      perturbs LD at all.
+                      ⚠⚠ **THE DENOMINATOR IS PER ROW AND MOVES WITH THE RELEASE.**
+                      `count` (`ld_loss.py:120`) is the number of pairs whose r^2 is
+                      non-nan in BOTH the original and the substituted cohort, so it
+                      differs between the two tools on the SAME subject — 7,462 for
+                      ours against 7,463 for theirs on HG00438. 'Per pair' is a ratio
+                      of sums over a varying n; NEVER pool numerators across rows.
+                      ⚠⚠ TWO SHIPPED QUIRKS, applied to both sides, so they do not
+                      bias the comparison but DO bound what it means. (1) `p_AB` uses
+                      `(x == 1) & (y == 1)` on arrays where -1 became nan, and
+                      `nan == 1` is False, so a missing cell counts as a non-AB
+                      OBSERVATION while `p_A` and `p_Bs` exclude it via `nanmean`:
+                      the two terms of D use different denominators. (2) Only allele
+                      code 1 counts, so multi-allelic sites are COLLAPSED to
+                      'is allele 1'.
+                      ✅ REIMPLEMENTED from this definition with no PanMixer code
+                      imported, both quirks included, and matched EXACTLY on
+                      numerator, denominator AND ratio: 37.482748988 / 7462 (ours)
+                      and 297.584444050 / 7463 (theirs), diff 0.000e+00 on all three.
+                      Provenance `logs/B_arm1_afld_ourbuild/af_ld.md`.
 ```
 
 ### capacity  [mechanism] [evaluation]

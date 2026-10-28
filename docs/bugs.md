@@ -1662,3 +1662,51 @@ and returns `(nan, nan)` without the guard — measured, so the gate is known to
 ⚠ When a new gate passes on the existing fixture, ask which real-data property the
 fixture lacks before trusting it; "the toy has feature A and feature B" is not "the toy
 has A and B together".
+
+## [A rounded display made four different numbers look identical, and the claim was written down as an identity] -> [State what the test tests; compare the objects, not their formatted form]
+
+**Symptom.** `docs/data.md` and `docs/memory.md` both asserted that PanMixer's capacity
+plateau is FOUR byte-identical settings (0.3/0.5/0.7/0.9). It is THREE. Measured 2026-10-28
+by md5 over all 44 subjects' `new_haplotypes.npy`: 0.5/0.7/0.9 are byte-identical for 43 of
+44 and 0.3 is DISTINCT (median 24 cells away); only HG03492 includes 0.3. The same holds on
+PanMixer's OWN build, where the phase-A arrays survive: `cap0p3` hashes `fa2f721c377d`
+against `5f3321ed2227` shared by the three above it.
+
+**Why it survived.** `logs/pmsweep.log` printed
+`changed=106534/649242 alleles (16.41%)` at capacity 0.3 and
+`changed=106549/649242 alleles (16.41%)` at 0.5/0.7/0.9. Four lines, one percentage, two
+different counts — **the percentage is rounded to two decimals and the counts are fifteen
+alleles apart.** Reading the formatted column instead of the counts gave "four settings
+identical". `scripts/fidelity_frontier.py:99` then made it durable: it computes the
+plateau's start as every capacity within **0.01 PERCENTAGE POINTS** of the maximum and
+printed "four settings return the identical count" — a TOLERANCE reported as an identity,
+with the word "four" hand-written in the prose rather than computed. It never compared
+bytes or counts. The claim was then copied forward into two doc files and a published page.
+
+**Proven fix.** `scripts/fidelity_frontier.py` now computes `_plat` and prints how many
+settings land within 0.01 points, says explicitly that this is NOT byte-identity and that
+byte-identity is a separate test, and names its outcome. The corrections are in place in
+`docs/memory.md` (2026-10-27 entry), `docs/data.md` (two rows) and `docs/plan.md`.
+
+⚠ **The contradiction was in the same document.** The median table printed directly above
+the false sentence in `docs/memory.md` reads 0.176759 at capacity 0.3 against 0.176790 at
+0.5/0.7/0.9. The prose contradicted its own table, one line away. When writing a ✅ beside a
+reproduction claim, re-read the table above it as the first check.
+⚠ No reported figure moved: `arm1_headtohead.py` selects their column with `max(tf)` and
+`pm_draw_noise.py` reads `draws[(s, 0.9)]`, both inside the real plateau. A documentation
+defect, not a measurement defect — but it was quoted as a validation against their paper.
+
+## [`local a=$1 b="${a}"` aborts under `set -u` with "a: unbound variable"] -> [One `local` per variable when a later one reads an earlier one]
+
+**Symptom.** A four-job timing harness died immediately with
+`line 8: name: unbound variable` four times, from
+`local name=$1 exp=$2 row=$3 cwd="$SCR/timing_${name}_exp${exp}_row${row}"`.
+Nothing ran, and with `set -u` absent it would instead have built paths from EMPTY strings
+and silently written every job's output to the same file.
+
+**Proven fix.** Split the declaration — `local name=$1` then `local exp=$2` and so on, with
+the composed value last. Bash word-expands **every argument to `local` before the builtin
+runs**, so `${name}` on the same line is still unset at expansion time; the left-to-right
+assignment order people expect applies to the builtin's execution, not to the expansion.
+⚠ This is the failure mode `set -u` exists for: loud and immediate instead of four jobs
+overwriting one path. Keep `set -u` in every fan-out harness.

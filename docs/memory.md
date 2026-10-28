@@ -328,8 +328,29 @@ obfuscations on our mirror (44 subjects x 8 capacities, seed 123, exit 0, 16:13.
 |---|---|---|---|---|---|---|---|---|
 | median | 0.011632 | 0.050219 | 0.100303 | 0.173454 | 0.176759 | 0.176790 | 0.176790 | 0.176790 |
 
-✅ **THEIR SATURATION REPRODUCES ON OUR BUILD**: capacities 0.3, 0.5, 0.7 and 0.9 are
-BYTE-IDENTICAL per subject, the same four-settings plateau their own sweep showed.
+[INCORRECT] - ✅ **THEIR SATURATION REPRODUCES ON OUR BUILD**: capacities 0.3, 0.5, 0.7 and 0.9 are
+[INCORRECT] - BYTE-IDENTICAL per subject, the same four-settings plateau their own sweep showed.
+[CORRECTION - 2026-10-28]: **THE PLATEAU IS THREE SETTINGS, NOT FOUR, ON EITHER BUILD.**
+md5 over all 44 subjects' `new_haplotypes.npy` on OUR build: capacities 0.5/0.7/0.9 are
+byte-identical for **43 of 44** subjects and 0.3 is DISTINCT; only HG03492 has all four
+identical. 0.3 vs 0.5 differ by a median of **24 cells** (range 0..103) while `moves`
+differs by ~17% (HG00438 154,040 -> 180,842), so the optimiser is still working at 0.5
+and lands on nearly the same solution. On **THEIR** build the phase-A arrays survive at
+`/data/ds85/RanPanMixer/runs/capacity_sweep/` and say the same thing: `cap0p3` hashes
+`fa2f721c377d` against `5f3321ed2227` shared by 0p5/0p7/0p9.
+⚠⚠ **TWO PRIMARY SOURCES CONTRADICTED THIS CLAIM AT THE TIME IT WAS WRITTEN.** The median
+table directly above these lines reads 0.176759 at 0.3 against 0.176790 at 0.5/0.7/0.9 --
+the prose contradicted its own table. And `logs/pmsweep.log` (2026-10-07) records
+`changed=106534` at capacity 0.3 against `changed=106549` at 0.5/0.7/0.9, fifteen alleles
+apart, with all four lines printing "(16.41%)" because the percentage is rounded to two
+decimals. FOUR NUMBERS LOOKED IDENTICAL BECAUSE THE DISPLAY WAS TOO COARSE, and the word
+"four" was hand-written prose: `scripts/fidelity_frontier.py:99` computes the plateau's
+start as every capacity within 0.01 PERCENTAGE POINTS of the maximum -- a TOLERANCE -- and
+then prints "four settings return the identical count". It never compared bytes or counts.
+✅ **NO REPORTED FIGURE CHANGES.** `arm1_headtohead.py` selects their column with
+`max(tf)` and `pm_draw_noise.py` reads `draws[(s, 0.9)]`, both inside the real plateau, so
+the 33/44 paired result, the matched-fidelity capacities and every `at saturation` figure
+stand exactly as published. This was a documentation defect, not a measurement defect.
 
 **THE PAIRED RESULT, which is the only one that uses the matched design.** Our
 `acc_ceiling` 0.80 against their saturation, same subject, same build, n = 44: we are
@@ -7503,3 +7524,97 @@ weight the attack cannot see, which flatters us. Neither A3 nor A4 has run on an
 release or on PanMixer's output, though the pre-registration admits both attacks in both
 arms. Nine of the ten above-bound point estimates sit at `tau` = 0.05 and 0.10, which the
 experiment does not resolve below the bound at `delta` = 0.0556; the proof carries them.
+
+## 2026-10-28 — B-EVL-afld-ourbuild: `af_loss` and `ld_loss`, BOTH TOOLS ON ONE BUILD
+
+**Hypothesis.** The 2026-10-14/25 `af_loss`/`ld_loss` comparison was CROSS-BUILD: our
+releases were measured against PanMixer's vg-1.36 `starting_data` while their column was
+their own published figures. If both halves are measured against OUR rebuilt 340,849-record
+GRCh38 tree, with their evaluators unmodified and the SAME 44 individuals on both sides,
+the comparison becomes a difference between two mechanisms and nothing else.
+
+**Method.** New mirror root `/home/ds85/pm_eval_ourbuild` (`scripts/arm1_afld_ourbuild.py`):
+a COPY of their `constants.py` (their `BASE_PATH` is `dirname(abspath(__file__))` with no
+env override, so copying that one file redirects `STARTING_DATA_PATH` and `EXPERIMENT_PATH`),
+`tools` symlinked to their unmodified tree, `starting_data` symlinked to OURS. `exp_5` =
+our 308 cells (44 targets x 7 `acc_ceiling` 0.50..0.80); `exp_6` = their 352 runs (the same
+44 subjects x 8 `capacity`). Arrays SYMLINKED, not copied. 1,320 jobs via
+`scripts/arm1_af_ld_run.sh` at 32 workers: 308+352 af_loss, 308+352 ld_loss, exit 0 on all
+1,320, 6:14 total wall, 372 MB peak per af_loss job. Completeness counted FROM DISK
+(308/308, 308/308, 352/352, 352/352), zero `ld_loss` with a zero denominator, zero nonzero
+sentinels. Tabled by `scripts/arm1_af_ld_results.py --root /home/ds85/pm_eval_ourbuild`.
+
+**OURS — median over 44 targets, columns `acc_ceiling`:**
+
+| variable | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|---|
+| `af_loss` [all] | 0.003600 | 0.003604 | 0.003577 | 0.003592 | 0.003591 | 0.003596 | 0.003580 |
+| `ld_loss` per pair | 0.005426 | 0.005571 | 0.005392 | 0.005310 | 0.005436 | 0.005291 | 0.005405 |
+
+**THEIRS — median over the same 44 subjects, columns `capacity`:**
+
+| variable | 0.01 | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 | 0.7 | 0.9 |
+|---|---|---|---|---|---|---|---|---|
+| `af_loss` [all] | 0.000216 | 0.000898 | 0.001730 | 0.002779 | 0.002840 | 0.002841 | 0.002841 | 0.002841 |
+| `ld_loss` per pair | 0.000077 | 0.037462 | 0.039025 | 0.040408 | 0.040671 | 0.040671 | 0.040671 | 0.040671 |
+
+⚠⚠ **THE RESULT IS A SPLIT, AND ONE HALF GOES AGAINST US.** Paired by individual, our
+`acc_ceiling` 0.80 against their saturation (`capacity` 0.9), n = 44:
+  `af_loss` [all]     we are lower in **0 of 44**, sign p = 1.14e-13, paired z = +25.28
+  `ld_loss` per pair  we are lower in **40 of 44**, sign p = 1.71e-08, paired z = -19.65
+**THEIR `af_loss` IS LOWER THAN OURS AT EVERY CAPACITY FOR EVERY ONE OF THE 44** — their
+worst (0.002841) is below our best (0.003577). ⚠ And `af_loss` is very close to their
+optimiser's OWN objective (`utility_loss_panmixer` is the induced L1 AF change, their
+Supplementary Remark 1), so this table scores them on what they minimise and us on what we
+do not optimise. State that beside the number; it is not an excuse, it is the denominator
+of the claim. On `ld_loss` we are ~7.5x lower from `capacity` 0.05 up and they are ~70x
+lower at `capacity` 0.01 — their lowest setting barely perturbs LD at all.
+
+✅ **BOTH CONCLUSIONS FROM THE CROSS-BUILD RUN SURVIVE THE BUILD FIX.** Our `af_loss` is
+FLAT across the live knob: 0.003577..0.003604, span 2.76e-05 = **0.77% of the floor** while
+`acc_ceiling` runs 0.50 -> 0.80 (the cross-build eta-grid figure was 0.54%). And it still
+FAILS the direction check the pre-registered endpoints pass: **25/44 down, 19/44 up**,
+median -8.352e-06, against 44/44 for `target_fidelity` and `e_q_u`. Its movement is noise.
+
+✅ **BOTH EVALUATORS REIMPLEMENTED FROM THEIR DEFINITIONS AND MATCHED EXACTLY**, without
+importing any PanMixer code, for one cell per side — the instrument, not just the result.
+`af_loss` [all]: ours 0.003420953969 against 0.003420953969 (diff 0.000e+00), theirs
+0.002740736487 (diff 8.674e-19). `ld_loss`: ours num 37.482748988 / count 7462 and theirs
+num 297.584444050 / count 7463, both diff 0.000e+00 on numerator, denominator and ratio.
+
+⚠ `ld_loss`'s DENOMINATOR IS PER ROW, not a constant: `count` is the number of pairs where
+r^2 is non-nan in BOTH the original and the substituted cohort, so it moves with the
+release (7,462 for ours against 7,463 for theirs on HG00438). "Per pair" is a ratio of sums
+over a varying n; never pool the numerators across rows.
+⚠ TWO SHIPPED QUIRKS, applied to both sides, so they do not bias the comparison but do
+bound what it means: the LD window is 5 POSITION UNITS and not 5 kb (`ld_loss.py:107`), and
+`p_AB` uses `(x == 1) & (y == 1)` on arrays where -1 became nan — `nan == 1` is False — so a
+missing cell counts as a non-AB observation while `p_A` and `p_Bs` exclude it via `nanmean`.
+The two terms of D use different denominators. Only allele code 1 counts, so multi-allelic
+sites are collapsed.
+⚠ `acc_ceiling` 0.50 is `eta` = 0 — NO protection — so its column is a floor, not a
+privacy level.
+⚠⚠ CROSS-OPERATING-POINT REMAINS, and no build fix touches it: `capacity` is a utility-loss
+budget that bounds nothing about distinguishability, `acc_ceiling` does not transfer to their
+mechanism, so the paired row compares the two tools at THEIR OWN endpoints, not at matched
+privacy (standing constraint 5). Decision F is now satisfied; constraint 5 is not, and
+cannot be by this measurement.
+⚠ EXPLORATORY under decision H. `af_loss`/`ld_loss` are UTILITY metrics in PanMixer's own
+framing, NOT privacy metrics — their privacy suite is `gap_score`, `diploid_gap_score`,
+`MIA_privacy` and the Beagle reconstruction, none of which has run on this grid.
+Provenance `logs/B_arm1_afld_ourbuild/af_ld.md`.
+
+**A DOCUMENTATION DEFECT FOUND WHILE CROSS-CHECKING, corrected in place above
+(2026-10-28).** The claimed four-settings byte-identical plateau is THREE settings. See the
+`[CORRECTION - 2026-10-28]` block in the 2026-10-27 entry: two primary sources contradicted
+it when it was written, a 2-dp percentage made four numbers look equal, and
+`scripts/fidelity_frontier.py:99` tested a 0.01-point TOLERANCE while printing "identical".
+No reported figure moves. The lesson is the same one `docs/bugs.md` already carries about
+broken one-liners: a display that rounds is an instrument, and it was not verified.
+
+**AND THE PREVIEW-FILE INSTRUCTION IN `docs/data.md` WAS BACKWARDS.** That row said to
+verify `logs/B_eta_arm1/af_ld_ETA_PREVIEW.md` against the chain's `af_ld.md` and then DROP
+the preview. The verification passes — `diff` reports only additions and no changed line,
+so every figure they share is byte-identical — but the PREVIEW is the superset: it carries
+the `wd_af` family and the published-scale table that `af_ld.md` lacks. `af_ld.md` is the
+stale subset. The preview is kept and the row corrected.
