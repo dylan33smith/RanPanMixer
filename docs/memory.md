@@ -7791,3 +7791,74 @@ only the VCFs were deleted -- so their side has **5 draws** per cell, not 1, giv
 n = 220 per arm. Their A3 axis is their own (310,028 bi-allelic of 340,849, 88
 haplotypes, NOBODY held out), so the raw SCORES are not comparable across the two tables;
 only the accuracies are.
+
+## 2026-10-28 — B-ATK-arm1-powered: A1 NEVER BEATS ITS OWN PAIR CEILING, and the flagged cell was noise
+
+**The powered run.** `scripts/arm1_attack.py --draws 10 --workers 22`, 44 targets x 7
+`acc_ceiling` labels x 3 conditions x 10 draws per hypothesis, chr21, K = 86 per-target
+leave-one-out, weights `uniform`. exit 0, **1:38:01 wall**, 1.88 GB peak per worker.
+Completeness asserted from the result set: 44/44 targets, 308 cells, 924 condition-cells,
+9,240 draws per arm. Provenance `logs/B_arm1_attack/attack.md` + `.json`.
+**This is the FIRST attack evidence anywhere on the reported 0.50-0.80 grid.** Every other
+attack number in the repo sits on the dead `tau` grid, the old genome-wide `eta` grid, or
+Arm 2's own attack grid whose top point is vacuous.
+
+✅✅ **NOT ONE OF THE 21 POOLED ROWS EXCEEDS ITS OWN PAIR `acc_ceiling`.** A1 is the
+Neyman-Pearson OPTIMUM for its pair, so this is the strongest null available -- no attack
+in any literature can beat it for a given pair. n = 440 per arm per row, SE ~0.0165.
+
+| A1 `D1_extremal` | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|---|
+| balanced accuracy | 0.500000 | 0.534091 | 0.584091 | 0.613636 | 0.670455 | 0.689773 | 0.706818 |
+| pair ceiling (mean) | 0.500000 | 0.550000 | 0.600000 | 0.650000 | 0.700000 | 0.750000 | 0.800000 |
+| z | +0.00 | -0.95 | -0.96 | -2.22 | -1.86 | -3.86 | **-6.07** |
+
+⚠⚠ **THE MARGIN WIDENS WITH THE CEILING, which is the shape worth reading.** At 0.55 the
+optimal attacker is 0.95 SE below its bound; at 0.80 it is **6.07 SE below**, reaching
+0.707 where the bound permits 0.800. Pinsker runs CONSERVATIVE, so the TRUE ceiling is
+lower still and the real margin is smaller than this -- but the DIRECTION is that the
+attainable accuracy falls further behind the bound as the tilt grows. D2_nearest and
+D3_random are within at every point too (worst z -3.31 and -3.36).
+
+✅ **THE CELL THE 2026-10-27 SPEC TOLD US TO WATCH IS RESOLVED, AND IT WAS NOISE.** D2_nearest
+at the 0.80 label showed balanced **0.80 against a pair ceiling of 0.678293, +0.1217 at
+1.11 SE on n = 5**, with the note "at the powered n an excess that size would be
+significant -- this is the cell to watch". Measured at power: pooled balanced **0.636364**
+against a mean pair ceiling of 0.689971, excess **-0.053607, z = -3.31**. HG00438's own
+cell is TPR 0.8000 / TNR 0.5000 = 0.6500 against its 0.678293. The apparent excess does
+not survive power. ✅ Its pair ceiling reproduces to all six decimals (0.678293), as does
+D1's `d_logz` (+253.148 for HG00438) -- the instrument agreed with the spec's independent
+measurement three weeks apart on four quantities before the run and still does.
+
+✅ **A3'S PREDICTION HELD AT FULL POWER.** Written down before any run: A3's `D1_extremal`
+row would be DEGENERATE at every label, TPR -> 1.0000, TNR -> 0.0000. Measured: exactly
+that, at **all seven labels**, balanced 0.500000 with SE 0.000000. Seven DEGENERATE rows,
+all of them A3/D1, all auto-flagged. ⚠ And on D2/D3 A3 sits FAR below the bound (z -4.99
+to -8.07), so A3 is a weak attacker and its null proves little -- which is exactly why A1
+exists and why only A1's null is evidence.
+
+✅ **THE `eta` = 0 HARNESS COLUMN IS EXACT, AND IT IS MEASURED RATHER THAN ASSUMED.** All
+**2,640 of 2,640** Lambda values at the 0.50 label are identically 0.0, because
+`Q_p = Q_q = R_D` there. Ties split gives TPR = TNR = 0.5000 and balanced exactly
+0.500000. A 0.50 column away from 0.5 would have been a harness bug.
+
+⚠⚠ **A FALSE FINDING I ALMOST REPORTED, caught by checking the instrument.** A throwaway
+per-cell scan said **134 of 924 A1 cells were DEGENERATE**. 132 of those sat at the 0.50
+label, all in one direction. The cause was MY scratch script scoring `(v > 0)` only and
+counting every exact tie as a miss -- at `eta` = 0 every value is a tie, so it manufactured
+132 constant-answer cells out of the one column that is provably exactly 0.5. The driver's
+`_acc` splits ties and was right. With the driver's convention only **2 of 924** cells trip
+the flag, at 0.60 and 0.65, one each, consistent with n = 10 sampling.
+⚠ The lesson is the standing one and this is its fourth occurrence: a scratch
+re-implementation of a convention that already exists in the code is a second instrument,
+and the disagreement was in the CHECK, not the result. Reuse `_acc`, do not retype it.
+
+⚠ POOLING. The test runs against the MEAN of the per-pair ceilings, because with equal
+draws per target the pooled accuracy IS the average of the per-target accuracies. The max
+is printed beside it; testing against the max would be looser and could hide an excess.
+⚠ The three conditions share each p-side draw, so they are correlated and are never pooled
+across conditions.
+⚠ Standing constraint 4 still binds: an attacker that fails is not evidence the bound
+holds. A1's null is the strongest available because A1 is provably optimal FOR ITS PAIR --
+it says nothing about a pair we did not test, and D2's decoy pool is the other 43 cohort
+members rather than a wider panel, which flatters us.
