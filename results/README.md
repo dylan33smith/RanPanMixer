@@ -38,6 +38,7 @@ level is a floor, never a privacy result.
 | `kl_fit_verified.json` | the per-target fitted `eta` at each ceiling label, and its measured error | `scripts/arm1_chr21_kl.py --verify` |
 | `arm1_release_record.json` | the release record for all 308 cells (44 targets x 7 ceilings) | `scripts/arm1_release.py --ceilings` |
 | `arm1_exact_endpoint.json` | the exact `E[differ]` and `E_Q[u]` endpoint, zero Monte-Carlo error | same run, rides along |
+| `arm1_attack.md` + `.json` | **A1 and A3 at power on this grid** -- the only attack evidence in the reported regime | `scripts/arm1_attack.py` |
 
 ## The headline numbers, each with the caveat that bounds it
 
@@ -61,16 +62,34 @@ level is a floor, never a privacy result.
   theirs edits a copy of the target's own row.
 - **`ld_loss`: we distort linkage less**, and the honest size is **1.30x, not the 7.53x**
   the shipped code reports — whose largest 6 pairs of ~7,500 carry 94% of their total.
+- **The optimal attacker never beats its own pair ceiling.** A1 is the Neyman-Pearson
+  optimum for its pair, so no attack in any literature can beat it there. Over 44 targets
+  x 7 labels x 3 conditions x 10 draws (n = 440 per arm per row), **0 of 21 pooled rows
+  exceed**, and the margin WIDENS: 0.95 SE below the bound at 0.55, **6.07 SE below at
+  0.80**, where it reaches 0.707 against a permitted 0.800. ⚠ Pinsker is conservative so
+  the true margin is smaller than it looks; the readable thing is the direction.
+  ⚠ `acc_ceiling` is PER PAIR here and printed as a row -- the 0.80 label is D1's ceiling
+  alone, and D2's at that label is 0.689971 (mean over targets).
+  ⚠ A3's `D1_extremal` row is DEGENERATE at all 7 labels (TPR 1.0000 / TNR 0.0000),
+  exactly as predicted in writing before the run, and A3 sits z -4.99..-8.07 below the
+  bound on D2/D3. A3 is a weak attacker; only A1's null is evidence.
 - **Read mapping is flat**: worst degradation anywhere is -0.063 points, against
   PanMixer's own published -0.01. ⚠ n = 1 graph per column; absolute levels are not
   comparable to their published figures (vg 1.68 against 1.36), only deltas.
 
 ## What is NOT here
 
-- **The A1/A3 attack results.** `scripts/arm1_attack.py` and `scripts/pm_attack.py` are
-  both in this branch and gated (`tests/test_arm1_attack.py`, 15 gates), and the powered
-  run was in flight when this snapshot was taken. Nothing in this directory reports an
-  attack outcome.
+- **PanMixer's own privacy evaluators** (`gap_score`, `diploid_gap_score`,
+  `MIA_privacy`) on this grid -- DEFERRED by decision, 2026-10-28. ⚠ And an audit
+  established what a fresh run could conclude: all three are defeated by our `eta` = 0
+  release too, so they measure the release FORM (a complete mosaic of other people's
+  haplotypes) and NOT the tilt. They are needed for the head-to-head parity claim --
+  theirs is identified at rank 1 of 44 at `capacity` 0.01/0.05/0.1 where ours never is --
+  but never as evidence that the tilt protects anyone.
+- **Beagle reconstruction, Arm 2's attacks, and read mapping** on this grid. The existing
+  numbers for all three are on superseded grids (the inert `tau` grid, the old
+  genome-wide `eta` grid, and Arm 2's own grid whose top point is vacuous) and are
+  deliberately NOT included here.
 - **PanMixer's privacy evaluators** (`gap_score`, `diploid_gap_score`, `MIA_privacy`) on
   this grid. They ran on the earlier genome-wide `eta` grid, where they were defeated by
   our `eta` = 0 release too — which makes them a statement about release FORM rather than
