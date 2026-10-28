@@ -92,7 +92,32 @@ SEED_GRID = TAUS + EXPLORATORY_TAUS
 # `eta_tau` -- one `eta` is two different privacy levels at two different scopes.
 # ⚠ The attack release is CHROMOSOME-scope on chr21; the metric table is a genome-wide
 # release. Same privacy level per release, DIFFERENT released objects. Never pool them.
-ETA_GRID = (0.0, 34.33, 68.66, 173.3, 387.39, 774.78)
+# ⚠⚠ APPENDED 2026-10-28 AND DELIBERATELY NOT SORTED. The seed index of a cell is
+# `ETA_SEED_OFFSET + ETA_GRID.index(eta)` (and in a3a4, `* 1_000 + k`), so the index is
+# the value's POSITION in this tuple. Sorting it, or inserting in the middle, would
+# RENUMBER every recorded cell and silently redraw it under another cell's seed -- which
+# is occurrence FIVE of this project's common-random-numbers defect, the one `SEED_GRID`
+# and `genome_seed` already exist to prevent. Append only. The first six keep indices
+# 0..5 and every 2026-10-25 cell therefore keeps its seed and stays reproducible.
+#
+# THE SECOND BLOCK is the grid the paper reports: the chr21 `eta` that realise
+# `acc_ceiling` 0.50/0.55/0.60/0.65/0.70/0.75/0.80, MEASURED in
+# logs/B_eta_grid_v2/chr21_uniform.json at `beta_sum` 1.0 -- the same chr21 share-1
+# scope `load_state` below actually builds, so these are this driver's own etas and not
+# a genome-wide grid borrowed into it. Worst |acc_ceiling - label| is 6.8e-06.
+# ⚠ The FIRST block's top point is `acc_ceiling` 1.000000 -- VACUOUS, it bounds nothing --
+# and only its `eta` = 0 point is shared with the reported grid.
+# ⚠ `eta` = 0.0 appears ONCE and keeps index 0, so both grids' untilted column shares a
+# seed. That is correct and is a free reproducibility gate rather than CRN: at `eta` = 0
+# `Q_p = Q_q = R_D` at the same panel, chain, scope and weighting, so the two grids' first
+# column IS the same cell and a bit-identical release there is the right answer.
+ETA_GRID = (
+    # 2026-10-25, matched on acc_ceiling to the OLD genome release grid
+    # (0, 250, 500, 1262, 2821, 5642). SUPERSEDED as a reporting grid.
+    0.0, 34.33, 68.66, 173.3, 387.39, 774.78,
+    # 2026-10-28, the REPORTED acc_ceiling 0.50..0.80 grid (0.50 is the eta = 0 above).
+    75.7, 151.4, 227.1, 302.8, 378.5, 454.19,
+)
 ETA_SEED_OFFSET = 1000
 CHROM = "chr21"
 DECOY_SEED = 20261010

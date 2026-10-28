@@ -38,7 +38,8 @@ level is a floor, never a privacy result.
 | `kl_fit_verified.json` | the per-target fitted `eta` at each ceiling label, and its measured error | `scripts/arm1_chr21_kl.py --verify` |
 | `arm1_release_record.json` | the release record for all 308 cells (44 targets x 7 ceilings) | `scripts/arm1_release.py --ceilings` |
 | `arm1_exact_endpoint.json` | the exact `E[differ]` and `E_Q[u]` endpoint, zero Monte-Carlo error | same run, rides along |
-| `arm1_attack.md` + `.json` | **A1 and A3 at power on this grid** -- the only attack evidence in the reported regime | `scripts/arm1_attack.py` |
+| `arm1_attack.md` + `.json` | **ARM 1: A1 and A3 at power on this grid** | `scripts/arm1_attack.py` |
+| `arm2_attack_a1.md` + `.json` | **ARM 2: A1 on this grid**, chr21 at share 1.0, K = 88, nothing held out | `scripts/arm2_attack.py` |
 
 ## The headline numbers, each with the caveat that bounds it
 
@@ -73,6 +74,21 @@ level is a floor, never a privacy result.
   ⚠ A3's `D1_extremal` row is DEGENERATE at all 7 labels (TPR 1.0000 / TNR 0.0000),
   exactly as predicted in writing before the run, and A3 sits z -4.99..-8.07 below the
   bound on D2/D3. A3 is a weak attacker; only A1's null is evidence.
+- **ARM 2's optimal attacker lands where ARM 1's did, and no condition significantly
+  exceeds its ceiling in either arm.** At the 0.80 label A1 reaches **0.7080** in Arm 2
+  against **0.706818** in Arm 1 -- within 0.0012, against the same 0.800 bound.
+  ⚠⚠ THIS IS NOT A REPRODUCTION. The arms release DIFFERENT objects: Arm 1 is chr21
+  carrying the genome-normalised `beta_share` 0.0150249 under K = 86 leave-one-out; Arm 2
+  is chr21 at share **1.0** under the full K = 88 with nothing held out. What agrees is
+  where the Neyman-Pearson optimum lands against a bound the two were matched on by
+  `acc_ceiling`, which is what matching on `acc_ceiling` rather than `eta_tau` buys.
+  ⚠ Arm 2 is n = 250 per cell per arm against Arm 1's 440, and its `delta` is 0.0556 --
+  a cell resolves only where the ceiling exceeds 0.5556, so the 0.55 and 0.60 columns add
+  nothing over the ceiling itself. One point-estimate exceedance (D3_random at 0.55,
+  0.5580 vs 0.5500, z = +0.36) sits inside exactly that band.
+  ⚠⚠ **A SCOPE SPLIT THAT MUST BE STAMPED, NEVER POOLED.** Arm 2's ATTACK evidence here is
+  chr21 at share 1.0 -- the only scope its driver implements -- while Arm 2's UTILITY
+  numbers are genome-wide. Two different released objects; they may not share a table.
 - **Read mapping is flat**: worst degradation anywhere is -0.063 points, against
   PanMixer's own published -0.01. ⚠ n = 1 graph per column; absolute levels are not
   comparable to their published figures (vg 1.68 against 1.36), only deltas.
@@ -86,10 +102,20 @@ level is a floor, never a privacy result.
   haplotypes) and NOT the tilt. They are needed for the head-to-head parity claim --
   theirs is identified at rank 1 of 44 at `capacity` 0.01/0.05/0.1 where ours never is --
   but never as evidence that the tilt protects anyone.
-- **Beagle reconstruction, Arm 2's attacks, and read mapping** on this grid. The existing
-  numbers for all three are on superseded grids (the inert `tau` grid, the old
-  genome-wide `eta` grid, and Arm 2's own grid whose top point is vacuous) and are
-  deliberately NOT included here.
+- **Arm 2's A3/A4, and Beagle's reconstruction attack** on this grid -- both RUNNING as
+  of this snapshot, not yet here. Arm 2's A3/A4 is on the same seven etas as its A1 above;
+  Beagle is 308 rows on OUR 340,849 build (PanMixer's own protocol pass).
+  ⚠⚠ **BEAGLE'S EXCLUDE-SELF PASS IS DROPPED BY DECISION (2026-10-28), and that costs a
+  control.** PanMixer's published protocol passes no `excludesamples=`, and **39 of our 44
+  targets ARE in Beagle's 1000G reference panel** -- so for those 39 the panel holds the
+  target's own true row and Beagle can copy from it. The exclude-self pass is what
+  separates what the RELEASE leaks from what the PANEL leaks; without it a reconstruction
+  figure cannot be attributed to the release alone. The 44 per-target panels exist on
+  disk, so it is a ~2.2 h addition whenever wanted. ⚠ The head-to-head against PanMixer is
+  unaffected: their published figures use the same no-exclusion protocol, so the
+  cross-tool comparison is like-for-like. It is our own column that loses a control.
+- **Read mapping** on this grid. The existing numbers are on the old genome-wide `eta`
+  grid and are deliberately NOT included here.
 - **PanMixer's privacy evaluators** (`gap_score`, `diploid_gap_score`, `MIA_privacy`) on
   this grid. They ran on the earlier genome-wide `eta` grid, where they were defeated by
   our `eta` = 0 release too — which makes them a statement about release FORM rather than
