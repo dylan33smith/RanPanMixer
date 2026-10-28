@@ -72,6 +72,7 @@ def score(orig: np.ndarray, final: np.ndarray, ul: np.ndarray) -> dict:
         raise AssertionError(f"original {orig.shape} vs final {final.shape}")
     alt = final != orig                       # obfuscate.py:290 -- RAW, no masking
     valid = (orig != -1) & (final != -1)      # obfuscate.py:474-481 -- fidelity mask
+    called_orig = orig != -1                  # stacker.py:74 -- ONE-SIDED, original only
     w = ul[:, None]
     cost_raw = float((alt * w).sum())
     cost_masked = float(((alt & valid) * w).sum())
@@ -83,6 +84,21 @@ def score(orig: np.ndarray, final: np.ndarray, ul: np.ndarray) -> dict:
         "cost_total": total,
         "changed_masked": changed, "valid_cells": int(valid.sum()),
         "fidelity": changed / int(valid.sum()) if valid.any() else float("nan"),
+        # ⚠ PanMixer records this quantity under TWO live conventions and they do not
+        # agree. `fidelity` above is obfuscate.py:474-481's TWO-SIDED mask -- the one
+        # `stats.json` carries, the one this script reproduces EXACTLY against their own
+        # `changed_alleles`/`total_alleles`, and the HEADLINE by decision 2026-10-27.
+        # `fidelity_onesided` is stacker.py:74,81-82's ONE-SIDED mask, which
+        # `stacked.json` carries as `changed_alleles_percentage`. A cell called in the
+        # original but -1 after resampling is dropped from BOTH sides of the two-sided
+        # ratio and counted as CHANGED by the one-sided one, so one-sided >= two-sided on
+        # identical data, ALWAYS. Reported as a SENSITIVITY, never as an alternative
+        # headline -- quoting whichever is kinder is the failure this pair exists to
+        # make visible. ⚠ Not a defect in PanMixer: two scripts, two purposes.
+        "changed_onesided": int((alt & called_orig).sum()),
+        "called_orig_cells": int(called_orig.sum()),
+        "fidelity_onesided": (int((alt & called_orig).sum()) / int(called_orig.sum())
+                              if called_orig.any() else float("nan")),
         "altered_raw": int(alt.sum()), "all_cells": int(alt.size),
         "uncalled_cost_frac": (cost_raw - cost_masked) / cost_raw if cost_raw else 0.0,
     }
@@ -274,6 +290,10 @@ def _report(ours, theirs, target) -> None:
                       ("`target_fidelity` * [masked, 1 draw]", "fidelity", ".6f"),
                       ("  cells changed [masked]", "changed_masked", ",.0f"),
                       ("  denominator: cells valid both sides", "valid_cells", ",.0f"),
+                      ("`target_fidelity` [SENSITIVITY: one-sided, stacker.py:74]",
+                       "fidelity_onesided", ".6f"),
+                      ("  denominator: cells called in the original",
+                       "called_orig_cells", ",.0f"),
                       ("  -1 share OF THE RAW COST", "uncalled_cost_frac", ".4%")):
         print(f"| {lab} | " + " | ".join(f"{r[k]:{f}}" for r in ours) + " |")
     if "exact_raw" in ours[0]:
@@ -298,6 +318,10 @@ def _report(ours, theirs, target) -> None:
                       ("`target_fidelity` * [masked]", "fidelity", ".6f"),
                       ("  cells changed [masked]", "changed_masked", ",.0f"),
                       ("  denominator: cells valid both sides", "valid_cells", ",.0f"),
+                      ("`target_fidelity` [SENSITIVITY: one-sided, stacker.py:74]",
+                       "fidelity_onesided", ".6f"),
+                      ("  denominator: cells called in the original",
+                       "called_orig_cells", ",.0f"),
                       ("  -1 share OF THE RAW COST", "uncalled_cost_frac", ".4%"),
                       ("  their OWN reported cost [optimiser objective]",
                        "their_reported_cost", ",.4f")):
@@ -319,6 +343,20 @@ def _report(ours, theirs, target) -> None:
           f"of ours, because a path release is COMPLETE by construction while theirs "
           f"preserves the original outside the blocks it swaps. **Not a defect in "
           f"PanMixer** -- a difference in what the two mechanisms emit.")
+    o1 = [r["fidelity_onesided"] for r in ours]
+    t1 = [r["fidelity_onesided"] for r in theirs]
+    print(f"- ⚠ **THE HEADLINE DENOMINATOR IS obfuscate.py's TWO-SIDED MASK** "
+          f"(`stats.json`), fixed by decision 2026-10-27 because it is the convention "
+          f"this script reproduces EXACTLY against PanMixer's own reported numbers. The "
+          f"one-sided mask of stacker.py:74 (`stacked.json`) is carried beside it as a "
+          f"SENSITIVITY: ours {np.median(o1):.6f} median against theirs "
+          f"{min(t1):.6f}-{max(t1):.6f}, versus the two-sided {np.median(of):.6f} and "
+          f"{min(tf):.6f}-{max(tf):.6f}. One-sided is >= two-sided by construction on "
+          f"both sides, so the SPREAD between the two conventions -- not either figure "
+          f"alone -- is what a reader needs to judge the comparison. Reporting only the "
+          f"kinder one would be denominator-shopping; both are printed for that reason. "
+          f"⚠ No EXACT expectation exists for the one-sided convention: the exact branch "
+          f"integrates obfuscate.py's mask only, so these two rows are SAMPLED (1 draw).")
     print(f"- ✅ **THE ALIGNMENT AXIS IS UNAFFECTED**: both sides mask -1 for "
           f"`target_fidelity`, and our scoring reproduces their reported `changed_alleles` "
           f"and `total_alleles` exactly. Ours spans {min(of):.6f}-{max(of):.6f} across the "

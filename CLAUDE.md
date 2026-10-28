@@ -32,7 +32,17 @@ without naming its arm.**
 - **Arm 1** — the target is one of the cohort members, released under **per-target
   leave-one-out**: both of the target's haplotypes leave the donor panel. Every
   leave-one-out, reduced-`K` and cohort-distortion quantity belongs to this arm.
-  Used for head-to-head comparison against existing tools.
+  Used for head-to-head comparison against existing tools, and therefore **chr21
+  ONLY** — the tool it is compared against is per-chromosome, so a genome-wide
+  Arm 1 buys the comparison nothing. **Arm 2 carries genome-wide alone.**
+- **The reporting axis is `acc_ceiling`, not `eta_tau`.** Arm 1's `eta_tau` is fitted
+  PER TARGET (its leave-one-out chain and `beta_share` differ, so one `eta` sits at
+  different ceilings for different targets); `acc_ceiling` is what the two arms, and
+  any two tools, can be matched on. ⚠ `acc_ceiling` is a PINSKER bound — the true
+  ceiling is closer to 0.5 than the figure. The released grid runs 0.50 to 0.80;
+  1.0 is a guaranteed attack and is not an operating point. `acc_ceiling` 0.50 is
+  `eta_tau` = 0, the UNTILTED control: any level reached there carries zero target
+  information and is not a privacy result.
 - **Arm 2** — the target is outside `G`, `D`, every panel and the attack database,
   so the full cohort is the donor panel and nothing is held out. Nothing in the
   mechanism is a function of the target but the tilt. This is the general case the
