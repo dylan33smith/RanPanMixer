@@ -1792,3 +1792,32 @@ are different claims and only the second one is worth anything.
 copy, so a caller holding it across a `clear()` finds an empty dict. That cost one failing
 test too. The driver is safe (one target at a time, nothing clears mid-target) but the
 aliasing is now stated at the call site.
+
+## [`pytest ... | tail` returns tail's exit code, so `&&` proceeds and a failing gate is pushed] -> [Redirect to a file, echo `$?`, and never put a gate inside a pipeline]
+
+**Symptom.** A commit went out, and was PUSHED, with `tests/test_docs_contract.py`
+failing. The command was
+`python -m pytest tests/test_docs_contract.py -q 2>&1 | tail -2 && git add ... && git commit ... && git push`.
+A shell pipeline's exit status is the status of the LAST command, so `tail` returning 0
+satisfied the `&&` and the whole chain ran on a red gate. The failure text was printed
+right above the commit hash and the chain continued anyway.
+
+**Why it kept happening.** This was the THIRD occurrence in one session. Earlier the same
+pattern reported `PYTEST EXIT=0` for a run that had actually died on an unrecognised
+`--timeout` argument, and again when a results script raised `SystemExit` with a message
+that `| tail` swallowed into a 0. Each time the output LOOKED like evidence the step had
+passed, because the error text and the success exit sat side by side.
+
+**Proven fix.** Never put a gate inside a pipeline. Redirect and check explicitly:
+```
+python -m pytest tests/ -q > /tmp/out 2>&1; echo "EXIT=$?"; tail -3 /tmp/out
+```
+`set -o pipefail` also works inside a script, but the redirect form is what survives being
+pasted into a one-off command, which is where this bug lives.
+
+⚠ **The general shape.** A verification step whose exit code can be lost is not a
+verification step. If a gate's result reaches you through a pipe, a `grep`, a `tail` or a
+`|| true`, you are reading its OUTPUT and not its VERDICT -- and this repository's standing
+lesson is that output which looks plausible is exactly what gets believed. The fix for the
+plateau claim, for the broken one-liners and for this are all the same instruction: check
+the instrument that reports the check.
