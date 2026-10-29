@@ -17,6 +17,55 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
 
 ## Tooling / reading source documents
 
+### `find` over a symlinked tree reports a file ABSENT that is plainly there
+- **[2026-10-28] `find external/PanMixer -name apply_mask.sbatch` -> nothing; `grep -rl` finds it**
+  **[Symptom]** A survey concludes a producer script, or an evaluator, does not exist
+  in PanMixer's tree, and plans to write a replacement. No error is printed —
+  `find` exits 0 with empty output, which reads exactly like a verified absence.
+  **[Cause]** `external/PanMixer` is a SYMLINK to `/data/ds85/RanPanMixer/external/PanMixer`,
+  and `find` does not follow symlinks given on the command line unless asked.
+  `grep -r` does follow them, which is why the two disagreed and the disagreement
+  is what exposed it.
+  **[Proven fix]** Use `find -L` over that tree, or operate on the resolved path
+  directly. Never conclude "absent" from a bare `find` under `external/`; cross-check
+  with `grep -rl` or `ls` on the resolved path. ⚠ This cost one false conclusion that
+  `apply_mask` had no producer and that the three privacy evaluators were missing;
+  both were present and the whole job was already runnable.
+  **[Severity]** HIGH — it is SILENT, and it argues for building something that exists.
+
+### A mask of INDICES into the wrong axis has the right length and indexes LEGALLY
+- **[2026-10-28] PanMixer's `pangenome_mask.npy` against our 340,849-site arrays**
+  **[Symptom]** An evaluator runs to completion on our releases and emits plausible
+  privacy numbers that are wrong, with no shape error anywhere.
+  **[Cause]** `pangenome_mask.npy` is an int64 INDEX array, not a boolean mask.
+  Ours is shape (258610,) with max 340843; PanMixer's is ALSO (258610,) with max
+  340818, and every one of the 258,610 values differs. Because 340818 < 340849,
+  theirs fancy-indexes our arrays legally and returns an array of the SAME length —
+  so neither a shape check nor a range check can see it. Same for
+  `pangenome_mask_posref.npy` ((268851,), max 340843 vs 340818).
+  **[Proven fix]** The mirror root's `starting_data` symlink is the ONLY thing that
+  decides which build an evaluator reads, so assert the axis by NAME before running:
+  `pangenome.npy` must be (44, 340849, 2) and the mirror's `manifest.json` must
+  record `n_sites` 340849. `/home/ds85/beagle_acc_ourbuild/root` satisfies both;
+  `/data/ds85/RanPanMixer/runs/beagle_attack/root` points at PanMixer's tree and
+  does not. ⚠ A shape check comparing a RELEASE to a COHORT ROW catches a cross-axis
+  mix but NOT the error that actually happens: a run entirely on the stale tree,
+  which is internally consistent.
+  **[Severity]** HIGHEST — silent, and it produces publishable-looking numbers.
+
+### An unguarded `rm -f $DIR/$VAR*` in a run script is one empty variable from `rm -f /*`
+- **[2026-10-28] `rm -f $OUT/$G.final.vcf.gz*` in the scratchpad readmap driver**
+  **[Symptom]** Nothing, until the day a variable is unset or a refactor renames it;
+  then the cleanup line deletes from the filesystem root.
+  **[Cause]** `set -u` does NOT protect a glob: `$OUT` and `$G` were interpolated
+  unquoted into a cleanup line, and with either empty the expression becomes a
+  top-level path. The eta-grid driver shipped this on four lines.
+  **[Proven fix]** `"${OUT:?}/${G:?}.final.vcf.gz"` — `:?` makes the shell abort with
+  a named error instead of expanding to `/`. Applied to every `rm` in
+  `scripts/readmap_acc_run.sh`. ⚠ Also split the two-pattern form into separate
+  explicit paths so no glob straddles a variable boundary.
+  **[Severity]** HIGH — latent and destructive, and it survived a run unnoticed.
+
 ### A PanMixer evaluator dies on a missing `xsol.npy`, and the fix is a comparability decision
 
 **[Symptom]** `scripts/beagle_attack_one.py --experiment 6` raises

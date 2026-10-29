@@ -104,6 +104,79 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-28 (latest, 4) — B-LCK-grid-0p50-0p80 + B-EVL-arm2-chr21-kl: THE GRID IS FROZEN AT 0.50-0.80 BY DECISION, AND ARM 2's COLUMN LABELS WERE ONE TARGET'S FIT
+
+**Decision (Dylan, 2026-10-28).** Asked whether to extend the `acc_ceiling` grid past
+0.80 to find where `target_fidelity` measurably moves, Dylan chose **"Keep 0.50-0.80"**.
+The grid is CLOSED at seven points for both arms. Consistent with the standing
+paper-branch instruction ("everything ... in one place for the .5-.8 regime for both arm
+1 and arm 2 ... nothing from the old regime"), and it settles the question the same day's
+flatness finding raised.
+
+⚠ WHAT THE DECISION MEANS FOR THE WRITEUP. Extending the grid was the only route to a
+per-cell statistic that MOVES, because the per-position tilt is `eta_tau` x `beta_v` and
+at 0.80 that is 27,540 x 4.52e-08 ~ 0.00124. Keeping it means the paper reports the
+trade-off AS MEASURED: an optimal aggregate test resolves this regime (A1 reaches
+0.706818 against a permitted 0.800) while no per-cell statistic does, and every flat row
+is a POWER statement about this grid, never a null about the mechanism. Nothing above
+0.80 is claimed, and the absence of a measurement there is not evidence either way.
+
+**Hypothesis (mine, and it was WRONG).** Arm 2's A1/A3/A4 tables ran on 10 targets at a
+FIXED shared `eta` list, with the column labels 0.50-0.80 taken from
+`logs/B_eta_grid_v2/chr21_uniform.json`, whose `target` field is **HG00096 alone**. Arm 1
+fits `eta` PER TARGET because its `c` = kl/eta^2 spans 35.7331% across 44 targets. I
+predicted Arm 2's spread would be MUCH SMALLER, because Arm 1's compounds leave-one-out
+(K = 86, chain rebuilt per target, each target's own `beta_share`) while Arm 2 holds
+nothing out: K = 88 and share 1 for every target, leaving only which positions the target
+agrees with.
+
+**Method.** New `scripts/arm2_chr21_kl.py`, a driver over `exact_kl_stable.one_chrom` at
+`arm="arm2"` and share=None (which is how `one_chrom` spells `beta_share` = 1). The
+ceiling arithmetic is IMPORTED from `arm1_chr21_kl` rather than copied -- one definition
+of `acc_ceiling`, not three -- and `tests/test_arm2_chr21_kl.py` (7 tests) asserts the
+sharing by function identity. ⚠ That gate was MUTATION-TESTED: shadowing the import with
+a local copy makes it fail, and it passes on the real file. ⚠ Its first run FAILED on a
+defect in the TEST, not the source: loading both modules with
+`importlib.util.spec_from_file_location` creates a fresh module object each time, so
+`is` compared two copies of one source. Fixed to a normal import.
+
+**Result — THE SPREAD IS 30.93%, NOT SMALL, AND MY PREDICTION WAS REFUTED.**
+`c` = kl/eta^2 across the 10 Arm 2 targets spans **2.690912e-06 (NA20294) to
+3.523140e-06 (HG01323), a 30.9274% spread**, against Arm 1's 35.7331%. Holding nothing
+out removes almost none of the variation. Within-target fit conditioning across the two
+`eta` was 4.935e-04 (0.0493%), so the fit itself is well conditioned and the spread is
+real rather than noise.
+
+⚠⚠ **SIX OF TEN TARGETS SIT BELOW HG00096's `c` (3.489996e-06)** -- HG00097, HG01468,
+HG02389, HG03757, NA19350, NA20294. Those are the ones whose printed ceiling was too
+GENEROUS: a smaller `c` means a LOWER true ceiling at the shared `eta`, so their bound is
+TIGHTER than the label, which is the direction that could hide an exceedance.
+
+**Result — the grid, VERIFIED BY MEASUREMENT (n = 10 x 6 points):** worst
+|`acc_ceiling` - target| after one refinement **3.031e-08** (Arm 1's was 7.224e-08).
+`eta_tau` median at 0.80 is 458.36 against the shared 454.19, min 452.06, max 517.17.
+
+| metric | 0.55 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 |
+|---|---|---|---|---|---|---|
+| worst \|`acc_ceiling` - label\| AT THE SHARED `eta` | 6.11e-03 | 1.22e-02 | 1.83e-02 | 2.44e-02 | 3.05e-02 | **3.65e-02** |
+
+✅✅ **AND THE ARM 2 NULL SURVIVES THE CORRECTION.** At the 0.80 column the worst target's
+true ceiling is 0.0365 from the label, so the corrected worst-case bound is 0.7635, while
+the measured D1_extremal accuracy there is 0.7080 -- a margin of 0.0555 instead of 0.092.
+The conclusion "no condition exceeded the exact `acc_ceiling` at any eta" is therefore
+UNCHANGED, but it is now VERIFIED at its stated labels rather than assumed from one
+target's fit. ⚠ A per-TARGET bound check is a different and underpowered question: 25
+draws per target gives a per-target accuracy SE of ~0.1, so only the pooled check
+resolves anything at this n.
+
+**What this does NOT establish.** Nothing about the mechanism, and nothing about Arm 2's
+GENOME-WIDE labels -- `logs/B_eta_grid_v2/genome_uniform.json` is HG00096-only too, and
+at a 30.93% chr21 spread its labels cannot be assumed either. The genome-wide per-target
+fit is running -- progress in `logs/B_acc_arm2/arm2_genome_kl.log`, which writes its JSON
+only on success -- and Arm 2's pending genome-wide utility sweep must use that output,
+never the shared grid.
+
+
 ## 2026-10-28 (latest, 3) — B-EVL-beagle-acc + B-ATK-arm2-a34: PanMixer's Beagle attack on the 0.50-0.80 grid, and WHY EVERY AGGREGATE STATISTIC ON THAT GRID IS FLAT
 
 **Goal.** Close the 0.50-0.80 re-run queue: Arm 2's A3/A4 at chr21 share 1.0, and

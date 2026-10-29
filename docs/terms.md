@@ -3419,6 +3419,36 @@ Aliases:              "the Pinsker ceiling" is acceptable in prose. ⚠ NEVER "t
                       and means close to the opposite thing.
 ```
 
+### c_quadratic  [theory] [privacy] [evaluation]
+```
+Is:                   The per-target coefficient in kl_exact = c * eta_tau^2, i.e.
+                      c = kl_exact / eta_tau^2. It is what converts a requested
+                      acc_ceiling into the eta_tau that realises it on ONE target:
+                      eta = sqrt(2 * tv^2 / c) with tv = 2*acc - 1.
+Computed by:          scripts/arm1_chr21_kl.py (arm 1, chr21, per-target leave-one-out
+                      share) and scripts/arm2_chr21_kl.py (arm 2, chr21, beta_share = 1),
+                      both as kl/eta^2 averaged over two non-zero eta, with the spread
+                      between those two points reported as the fit's conditioning.
+CHANGES MEANING WITH: the TARGET, the ARM and the SCOPE -- all three. It is target
+                      -dependent because the tilt is a function of which positions the
+                      target agrees with, and it is scope-dependent because beta is
+                      normalised over the scope. ⚠⚠ MEASURED SPREADS ACROSS TARGETS:
+                      arm 1 chr21 35.7331% (44 targets, K = 86, leave-one-out),
+                      arm 2 chr21 30.9274% (10 targets, K = 88, nothing held out).
+                      So holding nothing out does NOT make it uniform, which is the
+                      prediction that was refuted on 2026-10-28. A single shared eta
+                      therefore places different targets on DIFFERENT ceilings, and a
+                      column labelled from one target's c mislabels the others.
+Valid vs:             the measured acc_ceiling at the solved eta. kl = c * eta^2 is the
+                      LEADING term, not an identity, so a grid solved from c is a
+                      STARTING POINT and is quotable only after acc_ceiling is
+                      re-measured AT that eta and refined once (--verify).
+Status:               PRIMARY for grid construction; DIAGNOSTIC as a number in itself.
+Aliases:              "the quadratic coefficient". Do not write "c" bare in a table --
+                      it collides with capacity, which is PanMixer's knob.
+```
+
+
 ### attacker_accuracy  [attack] [evaluation] [gate]
 ```
 Is:                   The empirical success rate of an IMPLEMENTED binary attacker

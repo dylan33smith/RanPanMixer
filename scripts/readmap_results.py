@@ -44,12 +44,41 @@ import statistics as st
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-D = REPO / "logs" / "B_readmap_eta"
 DONORS = ("HG00138", "HG00635", "HG01112", "HG02698", "NA18853")
-# "base" is the unobfuscated graph; the rest are HG00438's release at each eta.
-GRAPHS = ("base", "eta_0", "eta_250", "eta_500", "eta_1262", "eta_2821", "eta_5642")
-LBL = {"base": "baseline (unobfuscated)", "eta_0": "0", "eta_250": "250",
-       "eta_500": "500", "eta_1262": "1262", "eta_2821": "2821", "eta_5642": "5642"}
+# ⚠⚠ TWO GRIDS, AND THEY ARE NOT POOLABLE. `eta` is the 2026-10-26 run, which was
+#    CROSS-BUILD on PanMixer's stale 340,824 tree; `acc` is the reported 0.50-0.80
+#    ceiling grid, run one-build on our 340,849 axis by
+#    `scripts/readmap_acc_run.sh`. Selected by --grid; `eta` stays the default so the
+#    registered 2026-10-26 table re-emits byte-identically.
+GRIDS = {
+    "eta": {
+        "dir": REPO / "logs" / "B_readmap_eta",
+        "knob": "eta_tau",
+        # "base" is the unobfuscated graph; the rest are HG00438's release at each eta.
+        "graphs": ("base", "eta_0", "eta_250", "eta_500", "eta_1262", "eta_2821",
+                   "eta_5642"),
+        "lbl": {"base": "baseline (unobfuscated)", "eta_0": "0", "eta_250": "250",
+                "eta_500": "500", "eta_1262": "1262", "eta_2821": "2821",
+                "eta_5642": "5642"},
+        "build": "CROSS-BUILD (PanMixer's 340,824-site tree, marked STALE)",
+    },
+    "acc": {
+        "dir": REPO / "logs" / "B_readmap_acc",
+        "knob": "acc_ceiling",
+        "graphs": ("base", "acc_0p50", "acc_0p55", "acc_0p60", "acc_0p65", "acc_0p70",
+                   "acc_0p75", "acc_0p80"),
+        # ⚠ 0.50 is `eta` = 0 -- a SECOND control, not a privacy point.
+        "lbl": {"base": "baseline (unobfuscated)", "acc_0p50": "0.50 [eta = 0]",
+                "acc_0p55": "0.55", "acc_0p60": "0.60", "acc_0p65": "0.65",
+                "acc_0p70": "0.70", "acc_0p75": "0.75", "acc_0p80": "0.80"},
+        "build": "ONE BUILD (our 340,849-site axis)",
+    },
+}
+D = GRIDS["eta"]["dir"]
+GRAPHS = GRIDS["eta"]["graphs"]
+LBL = GRIDS["eta"]["lbl"]
+KNOB = GRIDS["eta"]["knob"]
+BUILD = GRIDS["eta"]["build"]
 # PanMixer's published pair, for the DELTA comparison only.
 THEIR_BASE = (77.83, 95.62, 77.01)
 THEIR_OBF = (77.82, 95.61, 77.01)
@@ -88,7 +117,17 @@ def parse(f: Path) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--grid", choices=tuple(GRIDS), default="eta",
+                    help="which run to table. `eta` is the 2026-10-26 CROSS-BUILD run "
+                         "and stays the default so its registered table re-emits "
+                         "unchanged; `acc` is the one-build 0.50-0.80 ceiling grid. "
+                         "⚠ The two are NOT poolable and must not share a table.")
     a = ap.parse_args(argv)
+
+    global D, GRAPHS, LBL, KNOB, BUILD
+    g_ = GRIDS[a.grid]
+    D, GRAPHS, LBL = g_["dir"], g_["graphs"], g_["lbl"]
+    KNOB, BUILD = g_["knob"], g_["build"]
 
     per: dict = {}
     for g in GRAPHS:
@@ -107,8 +146,9 @@ def main(argv=None) -> int:
                for k in ("perfect", "gapless", "mapq60")} for g in GRAPHS}
 
     print("READ MAPPING ON THE RELEASED GRAPH. ARM 1, chr21, target HG00438, "
-          f"5 external donors, median over donors. Metrics are ROWS, the knob is the "
+          f"5 external donors, median over donors. Metrics are ROWS, `{KNOB}` is the "
           f"COLUMN. vg 1.68.0, single-end, `vg autoindex --workflow giraffe`.")
+    print(f"⚠ {BUILD}.")
     print("⚠ Each metric is a percentage of ALIGNED reads, per "
           "`external/PanMixer/plot_util/plot_helpers.py:15-19` — not of reads "
           "submitted. ⚠ UTILITY, not privacy. ⚠ Levels are NOT comparable to their "
