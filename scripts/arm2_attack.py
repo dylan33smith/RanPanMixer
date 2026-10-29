@@ -119,6 +119,18 @@ ETA_GRID = (
     75.7, 151.4, 227.1, 302.8, 378.5, 454.19,
 )
 ETA_SEED_OFFSET = 1000
+# ⚠⚠ A THIRD SEED NAMESPACE, FOR PER-TARGET ETA. `--ceiling-grid` gives every target its
+# OWN `eta` at a SHARED `acc_ceiling` column, because `c` = kl/eta^2 spreads 30.9274%
+# across these ten targets (measured 2026-10-28; arm 1's is 35.7331%) and a shared `eta`
+# therefore puts them on DIFFERENT ceilings -- constraint 7 requires matching on
+# `acc_ceiling`, never on `eta_tau`. The seed index can no longer be the eta's position,
+# since there are now 10 x 7 distinct etas; it is the CEILING's position instead, which
+# is shared across targets and so keeps every (target, ceiling, draw) stream disjoint.
+# ⚠ A SEPARATE OFFSET so no `tau` cell (0..) and no `eta` cell (1000..) is renumbered.
+# Appending to ETA_GRID would have been occurrence SIX of the common-random-numbers
+# defect; this adds a namespace instead of disturbing one.
+CEIL_SEED_OFFSET = 2000
+REPORTED_CEILINGS = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80)
 CHROM = "chr21"
 DECOY_SEED = 20261010
 # the release-stream base; the per-cell seed is a SeedSequence over
@@ -126,6 +138,23 @@ DECOY_SEED = 20261010
 SEED_BASE = 50_000
 
 _STATE: dict = {}
+
+
+def _cell_seed(ti: int, taui: int, i: int) -> int:
+    """The per-cell release stream, keyed on the WHOLE cell.
+
+    ⚠⚠ A SeedSequence over the full key, NEVER arithmetic on the indices. The previous
+    form derived the seed from the draw index alone, so all 10 targets and all 7 `tau`
+    reused seeds 50000..50024 and the released path was BIT-IDENTICAL across `tau` at a
+    fixed seed -- the seven columns were one experiment reported seven times. ⚠ And an
+    arithmetic form is not safe merely by being wider: `scripts/arm2_attack_a3a4.py`
+    used `i * 10_000 + index * 1_000 + k`, which ALIASED once ETA_GRID grew to 12 entries
+    (occurrence SIX, 2026-10-28, 25.71% of cells sharing a stream). A SeedSequence cannot
+    alias whatever the index ranges become, which is why it is the form here.
+    ⚠ Hoisted to module level so `tests/test_arm2_ceiling_mode.py` gates the REAL
+    function instead of a copy of it that could silently disagree.
+    """
+    return int(np.random.SeedSequence([SEED_BASE, ti, taui, i]).generate_state(1)[0])
 
 # ⚠⚠ THE RELEASED TOOL'S `beta_v` WEIGHTING. Set from `--weights` BEFORE the first
 # `load_state()`; A3/A4 imports this module and sets it the same way.
@@ -224,6 +253,44 @@ def pick_decoys(target_id: str, st: dict, rng: np.random.Generator) -> dict:
         "D3_random": {"path": st["paths"][random_id], "id": random_id,
                       "concordance": conc[random_id]},
     }
+
+
+def ceiling_grid(path: Path, tids: list) -> dict:
+    """target -> {ceiling label: that target's own VERIFIED eta}.
+
+    Reads the `_verified.json` written by `scripts/arm2_chr21_kl.py --verify`, i.e. the
+    grid whose `acc_ceiling` was MEASURED at the solved `eta` and refined once. ⚠ A fit
+    JSON is NOT accepted: a grid quoted from a fit is a derived number wearing a measured
+    number's clothes, and this is the file the bound check reads its bound from.
+    """
+    d = json.loads(Path(path).read_text())
+    if "per_target" not in d or not all("refined" in v for v in d["per_target"].values()):
+        raise SystemExit(
+            f"{path} has no per-target `refined` block, so it is a FIT and not a "
+            f"VERIFIED grid. Run `scripts/arm2_chr21_kl.py --verify <fit>` first; the "
+            f"bound check below reads its bound from these labels.")
+    if d.get("arm") != "arm2" or d.get("scope") != CHROM:
+        raise SystemExit(f"{path} is {d.get('arm')}/{d.get('scope')}, not arm2/{CHROM}")
+    missing = sorted(set(tids) - set(d["per_target"]))
+    if missing:
+        raise SystemExit(
+            f"{missing} are being attacked but have no verified ceiling in {path}, so "
+            f"their columns could not be labelled. Fit them or drop them -- do not run "
+            f"them under another target's eta.")
+    out = {}
+    for t in tids:
+        # ⚠ 0.50 is `eta` = 0 EXACTLY, by construction and not by solving: at eta = 0
+        #   Q_p = Q_q = R_D and the column is the untilted control. `--verify` only
+        #   records labels above 0.5, so it is supplied here.
+        g = {f"{REPORTED_CEILINGS[0]:.2f}": 0.0}
+        for lab, rec in d["per_target"][t]["refined"].items():
+            g[f"{float(lab):.2f}"] = float(rec["eta"])
+        want = [f"{c:.2f}" for c in REPORTED_CEILINGS]
+        if sorted(g, key=float) != want:
+            raise SystemExit(f"{t}'s verified grid is {sorted(g, key=float)}, "
+                             f"not the reported axis {want}")
+        out[t] = g
+    return out
 
 
 def _tau_label(eta: float) -> str:
@@ -361,8 +428,12 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
     survived its first run.
     """
     table: dict = {}
-    print("Accuracy of the optimal distinguisher. Metrics are rows; `tau` is the "
-          "column.\n")
+    # ⚠ The knob is NAMED, per CLAUDE.md's reporting contract: a column stamped `tau`
+    #   while it holds an `acc_ceiling` makes the figure uninterpretable, not imprecise.
+    _knob = ("acc_ceiling" if getattr(a, "ceiling_etas", None)
+             else ("eta_tau" if getattr(a, "etas", None) else "tau"))
+    print(f"Accuracy of the optimal distinguisher. Metrics are rows; `{_knob}` is the "
+          f"column.\n")
     hdr = "| metric | " + " | ".join(str(t) for t in a.taus) + " |"
     print(hdr); print("|" + "---|" * (len(a.taus) + 1))
     for cond in ("D1_extremal", "D2_nearest", "D3_random"):
@@ -404,7 +475,31 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         for cond in ("D1_extremal", "D2_nearest", "D3_random"):
             print(f"| {cond} one-sided P_p(L>0) [diagnostic, NOT bounded] | " +
                   " | ".join(f"{table[cond][t]['tpr']:.4f}" for t in a.taus) + " |")
-    if getattr(a, "etas", None):
+    if getattr(a, "ceiling_etas", None):
+        cg = a.ceiling_etas
+        tord = sorted(cg)
+        # ⚠ `eta_tau` is now a RANGE, not a number: that is the point of this mode, and
+        #   collapsing it to one figure would hide the 30.9274% spread it exists for.
+        def _etas_at(col) -> list:
+            return [cg[t][f"{float(col):.2f}"] for t in tord]
+
+        def _median(v: list) -> float:
+            v = sorted(v)
+            return v[len(v) // 2]
+
+        for lab, fn in (("`eta_tau` median [per target]", _median),
+                        ("`eta_tau` min [per target]", min),
+                        ("`eta_tau` max [per target]", max)):
+            cells = [f"{fn(_etas_at(c)):,.2f}" for c in a.taus]
+            print(f"| {lab} | " + " | ".join(cells) + " |")
+        print("| `epsilon_tau` median [per target] | " + " | ".join(
+            f"{2 * _median(_etas_at(c)):,.2f}" for c in a.taus) + " |")
+        print("| equivalent `tau` | " + " | ".join(
+            "0" if float(c) <= 0.5 else "1 - 1e-65 or smaller" for c in a.taus) + " |")
+        print("| `p_succ_bound` * | " + " | ".join("~1.0" for _ in a.taus) + " |")
+        print("| `acc_ceiling` [THE BOUND, measured per target] * | " + " | ".join(
+            f"{float(c):.2f}" for c in a.taus) + " |")
+    elif getattr(a, "etas", None):
         # ⚠⚠ p_succ_bound = (1 + tanh(eta))/2 is 1.0 to float64 at every one of
         # these points, so the bound comparison is UNFALSIFIABLE here and is not
         # printed as if it were a test. The meaningful comparison is against the
@@ -454,7 +549,12 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         for spec in (getattr(a, "acc_ceiling", None) or []):
             k, _, val = spec.partition("=")
             ceilings[float(k)] = float(val)
-        if getattr(a, "etas", None):
+        if getattr(a, "ceiling_etas", None):
+            print(f"\n⚠ Bound check is against the COLUMN LABEL, which in this mode IS "
+                  f"the exact `acc_ceiling`: each target ran at its own `eta_tau`, "
+                  f"solved from its own `c` and verified by re-measurement. No "
+                  f"--acc-ceiling is involved and none is accepted.")
+        elif getattr(a, "etas", None):
             if ceilings:
                 print(f"\n⚠ Bound check is against the EXACT `acc_ceiling` supplied "
                       f"for {sorted(ceilings)}, NOT `p_succ_bound` (which is 1.0 to "
@@ -475,7 +575,10 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         # eta_sweep run at THIS beta scope. Without it, no bound check is attempted
         # and the accuracies stand as measurements, which is said out loud.
         for c, t, v in cells:
-            if getattr(a, "etas", None):
+            if getattr(a, "ceiling_etas", None):
+                # the column label IS the measured ceiling for every target in it
+                bound = float(t)
+            elif getattr(a, "etas", None):
                 bound = (ceilings or {}).get(float(t))
                 if bound is None:
                     continue
@@ -488,24 +591,30 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
             z = (bal - bound) / se if se > 0 else float("inf")
             (violations if z > z_crit else notes).append((c, t, bal, bound, z))
         if notes:
-            print(f"\n⚠ {len(notes)} cell(s) exceed `p_succ_bound` by POINT ESTIMATE "
+            _bname = ("their own measured `acc_ceiling`"
+                      if getattr(a, "ceiling_etas", None) else "`p_succ_bound`")
+            print(f"\n⚠ {len(notes)} cell(s) exceed {_bname} by POINT ESTIMATE "
                   f"but NOT significantly (one-sided 5%, Bonferroni over "
                   f"{len(cells)} cells, z_crit = {z_crit:.2f}). Reported, not claimed:")
             for c, t, bal, bound, z in notes:
-                print(f"    {c} at tau={t}: {bal:.4f} vs bound {bound:.4f} "
+                print(f"    {c} at {_knob}={t}: {bal:.4f} vs bound {bound:.4f} "
                       f"(+{bal - bound:.4f}, z = +{z:.2f})")
         violations = [(c, t, bal) for c, t, bal, _, _ in violations]
     print()
     if violations:
-        print("⚠⚠ MEASURED ACCURACY ABOVE p_succ_bound — this falsifies the "
-              "IMPLEMENTATION, not the theorem:")
+        print(f"⚠⚠ MEASURED ACCURACY ABOVE "
+              f"{'its own measured acc_ceiling' if getattr(a, 'ceiling_etas', None) else 'p_succ_bound'}"
+              f" — this falsifies the IMPLEMENTATION, not the theorem:")
         for c, t, v in violations:
             print(f"    {c} at point={t:g}: {v:.4f} > bound")
     else:
-        print(f"no condition exceeded "
-              f"{'the exact acc_ceiling' if ceilings else 'p_succ_bound'} at any "
-              f"{'eta' if getattr(a, 'etas', None) else 'tau'}")
-    if not getattr(a, "etas", None):
+        if getattr(a, "ceiling_etas", None):
+            print("no condition exceeded its own measured acc_ceiling at any ceiling")
+        else:
+            print(f"no condition exceeded "
+                  f"{'the exact acc_ceiling' if ceilings else 'p_succ_bound'} at any "
+                  f"{'eta' if getattr(a, 'etas', None) else 'tau'}")
+    if not getattr(a, "etas", None) and not getattr(a, "ceiling_etas", None):
         print(f"\n⚠ tau = 0.05 and 0.10 do NOT resolve below the bound at delta = "
               f"{delta:.4f}; those rows are reported, not claimed. The PROOF carries "
               f"them.")
@@ -520,6 +629,11 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
     if a.json:
         a.json.write_text(json.dumps(
             {"methodology": prereg, "git_rev": rev, "draws": a.draws,
+             "knob": ("acc_ceiling" if getattr(a, "ceiling_etas", None)
+                      else ("eta_tau" if getattr(a, "etas", None) else "tau")),
+             "ceiling_etas": getattr(a, "ceiling_etas", None),
+             "etas": (list(a.etas) if getattr(a, "etas", None) else None),
+             "ceiling_grid_source": (str(a.ceiling_grid) if a.ceiling_grid else None),
              "targets": tids, "taus": a.taus, "trials_per_cell": n_per,
              "delta": delta, "accuracy": {c: {str(k): v for k, v in r.items()}
                                           for c, r in table.items()},
@@ -547,6 +661,12 @@ def main(argv=None) -> int:
                          "run at the SAME beta scope, e.g. 200=0.616930. In eta "
                          "mode this is the only meaningful bound; p_succ_bound "
                          "is 1.0 everywhere there.")
+    ap.add_argument("--ceiling-grid", type=Path, default=None,
+                    help="a `_verified.json` from scripts/arm2_chr21_kl.py --verify. "
+                         "Runs each target at ITS OWN `eta_tau` with `acc_ceiling` as "
+                         "the shared column, which is what constraint 7 requires. The "
+                         "bound check then uses the COLUMN LABEL as the bound, so "
+                         "--acc-ceiling is neither needed nor accepted.")
     ap.add_argument("--etas", type=float, nargs="+", default=None,
                     help="drive the tilt by `eta` DIRECTLY instead of by `tau`, for "
                          "the window where tau is not representable (tanh(eta) = 1.0 "
@@ -581,6 +701,15 @@ def main(argv=None) -> int:
     if a.from_json:
         saved = json.loads(a.from_json.read_text())
         res = saved["trials"]
+        # ⚠ Restore the MODE too. Without this a ceiling-mode run re-reports as a tau
+        #   run and `C.p_succ_bound(0.8)` would be printed as its bound -- a different
+        #   number wearing the right name.
+        if saved.get("ceiling_etas"):
+            a.ceiling_etas = saved["ceiling_etas"]
+        elif saved.get("knob") == "eta_tau" and not a.etas:
+            # ⚠ Without this an ETA-mode run re-reports with its column stamped `tau`,
+            #   and `p_succ_bound` would be printed for it as though it were one.
+            a.etas = [float(x) for x in saved["taus"]]
         a.taus = sorted({r["tau"] for r in res})
         tids = sorted({r["target"] for r in res})
         n_per = len(res) // max(1, len(a.taus))
@@ -609,9 +738,6 @@ def main(argv=None) -> int:
     # chromosomes of one release. Read those before touching this line.
     # The fix: a SeedSequence over the full key, so every (target, tau, draw) cell
     # draws from a provably disjoint stream while staying reproducible from the key.
-    def _cell_seed(ti: int, taui: int, i: int) -> int:
-        return int(np.random.SeedSequence([SEED_BASE, ti, taui, i]).generate_state(1)[0])
-
     # the `tau` index is its place in SEED_GRID, NOT in `--taus`, so a subset run
     # draws the same streams as the full grid; the pinned points keep their indices
     off = [t for t in a.taus if t not in SEED_GRID]
@@ -622,7 +748,40 @@ def main(argv=None) -> int:
         print(f"⚠⚠ EXPLORATORY `tau` {[t for t in a.taus if t in EXPLORATORY_TAUS]}: "
               f"NOT in the signed grid {list(TAUS)}. Report apart from the "
               f"pre-registered result.\n")
-    if a.etas:
+    if a.ceiling_grid:
+        # ⚠⚠ PER-TARGET ETA AT A SHARED CEILING. This is the mode the reported Arm 2
+        #    table needs: `c` = kl/eta^2 spreads 30.9274% across these ten targets, so a
+        #    shared `eta` places them on different ceilings and nine of ten columns carry
+        #    a label that is not theirs. Here the COLUMN is the ceiling and the ETA
+        #    varies, which is what constraint 7 requires.
+        if a.etas:
+            raise SystemExit("--ceiling-grid and --etas are two different knobs. Pass "
+                             "one: --etas puts every target on the SAME eta (and so on "
+                             "different ceilings), --ceiling-grid on the same CEILING.")
+        if getattr(a, "acc_ceiling", None):
+            raise SystemExit("--acc-ceiling is not accepted with --ceiling-grid: in this "
+                             "mode the column LABEL is the exact, measured bound, and a "
+                             "second source for it could silently disagree with it.")
+        cg = ceiling_grid(a.ceiling_grid, tids)
+        a.ceiling_etas = cg
+        a.taus = [round(c, 2) for c in REPORTED_CEILINGS]
+        es = {lab: [cg[t][lab] for t in tids] for lab in (f"{c:.2f}" for c in REPORTED_CEILINGS)}
+        print(f"⚠⚠ CEILING MODE: each of the {len(tids)} targets runs at ITS OWN "
+              f"`eta_tau`, from {a.ceiling_grid}. The column is `acc_ceiling` and IS "
+              f"the bound -- measured at the solved eta and refined once, not fitted.")
+        for lab in sorted(es, key=float):
+            v = es[lab]
+            print(f"      {lab}: eta {min(v):,.2f} .. {max(v):,.2f} "
+                  f"(median {sorted(v)[len(v)//2]:,.2f})")
+        print(f"⚠ `p_succ_bound` is 1.0 to float64 at every one of these eta, so it is "
+              f"NOT the bound here and is printed as vacuous.\n")
+        jobs = [(t, round(acc, 2), cg[t][f"{acc:.2f}"],
+                 _cell_seed(ti, CEIL_SEED_OFFSET + REPORTED_CEILINGS.index(acc), i),
+                 a.one_sided)
+                for acc in REPORTED_CEILINGS
+                for ti, t in enumerate(tids)
+                for i in range(a.draws)]
+    elif a.etas:
         off = [e for e in a.etas if e not in ETA_GRID]
         if off:
             raise SystemExit(f"eta {off} is not in ETA_GRID {ETA_GRID}, so it has "

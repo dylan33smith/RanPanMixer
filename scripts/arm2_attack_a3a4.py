@@ -78,7 +78,8 @@ from mechanism import ffbs, utility  # noqa: E402
 # and the seeding discipline; a second copy would drift and then the two attacks
 # would no longer be running on the same experiment.
 import arm2_attack as A1  # noqa: E402  -- for the WEIGHTS global, which must be SET
-from arm2_attack import (CHROM, DECOY_SEED, ETA_GRID, ETA_SEED_OFFSET,  # noqa: E402
+from arm2_attack import (CEIL_SEED_OFFSET, CHROM, DECOY_SEED, ETA_GRID,  # noqa: E402
+                         ETA_SEED_OFFSET, REPORTED_CEILINGS, ceiling_grid,
                          EXPLORATORY_TAUS, SEED_GRID, TAUS, load_state,
                          pick_decoys)
 
@@ -116,6 +117,18 @@ _A3: dict = {}
 # ---------------------------------------------------------------------------
 # A3 — PanMixer's rarity-weighted genotype linkage, re-posed as 1-of-2
 # ---------------------------------------------------------------------------
+
+def _cell_seed(ti: int, pointi: int, k: int) -> int:
+    """This driver's per-cell release stream, keyed on the WHOLE cell.
+
+    ⚠ The `34` tag keeps these streams disjoint from `arm2_attack.py`'s, which uses the
+    same SEED_BASE and the same (target, point, draw) key; without it the two attacks
+    would silently score the SAME releases.
+    ⚠ Hoisted to module level so the seed-uniqueness gate tests the REAL function.
+    """
+    return int(np.random.SeedSequence(
+        [SEED_BASE, 34, ti, pointi, k]).generate_state(1)[0])
+
 
 def a3_sites(st: dict) -> dict:
     """The bi-allelic site axis, the cohort `alt_af`, and the HWE rarity weights.
@@ -667,6 +680,11 @@ def main(argv=None) -> int:
     # the `tau` index in the seed is its place in SEED_GRID, NOT in `--taus`, so a
     # subset run draws the same streams as the full grid (see arm2_attack.SEED_GRID)
     ap.add_argument("--taus", type=float, nargs="+", default=list(TAUS))
+    ap.add_argument("--ceiling-grid", type=Path, default=None,
+                    help="a `_verified.json` from scripts/arm2_chr21_kl.py --verify. "
+                         "Each target runs at ITS OWN `eta_tau` with `acc_ceiling` as "
+                         "the shared column -- constraint 7 matches on the ceiling, "
+                         "never on eta.")
     ap.add_argument("--etas", type=float, nargs="+", default=None,
                     help="drive the tilt by `eta_tau` directly (the knob since "
                          "2026-10-24). ⚠ p_succ_bound is vacuous at these points; "
@@ -727,7 +745,45 @@ def main(argv=None) -> int:
             print(f"JSON -> {a.json}")
         return 0
 
-    if a.etas:
+    # ⚠⚠⚠ OCCURRENCE SIX OF THE COMMON-RANDOM-NUMBERS DEFECT, FOUND 2026-10-28 AND
+    #     FIXED HERE. The seed was ARITHMETIC:
+    #         SEED_BASE + i * 10_000 + (ETA_SEED_OFFSET + ETA_GRID.index(eta)) * 1_000 + k
+    #     with `i` the TARGET index and `k` the draw. Appending the reported grid to
+    #     ETA_GRID on 2026-10-28 pushed `index(eta)` to 10 and 11, and at that point
+    #     `i * 10_000` and `index * 1_000` ALIAS: (target i, eta 378.5, draw k) lands on
+    #     exactly the seed of (target i+1, eta 0.0, draw k). MEASURED on the shipped
+    #     configuration: 225 colliding seeds, 450 of 1,750 cells = 25.71% sharing a
+    #     release stream with another cell.
+    #     ⚠ The append-only discipline on ETA_GRID protected the INDICES; it could not
+    #       protect the ARITHMETIC that consumes them. That is the lesson.
+    #     ⚠ `arm2_attack.py` was already immune: it was converted to a SeedSequence over
+    #       the whole key in 2026-10-25. This driver was not, and inherited the gap.
+    #     The fix is the same one: a SeedSequence over the full cell key, which cannot
+    #     alias whatever the index ranges become.
+    #     ⚠ The `34` tag keeps this driver's streams disjoint from `arm2_attack.py`'s,
+    #       which uses the same SEED_BASE and the same (target, point, draw) key. Without
+    #       it the two attacks would silently score the SAME releases.
+    if a.ceiling_grid:
+        if a.etas:
+            raise SystemExit("--ceiling-grid and --etas are two different knobs. Pass "
+                             "one: --etas puts every target on the SAME eta (and so on "
+                             "different ceilings), --ceiling-grid on the same CEILING.")
+        cg = ceiling_grid(a.ceiling_grid, tids)
+        a.ceiling_etas = cg
+        a.taus = [round(c, 2) for c in REPORTED_CEILINGS]
+        print(f"⚠⚠ CEILING MODE: each of the {len(tids)} targets at ITS OWN `eta_tau`, "
+              f"from {a.ceiling_grid}. The column is `acc_ceiling` and IS the bound.")
+        for c in REPORTED_CEILINGS:
+            v = sorted(cg[t][f"{c:.2f}"] for t in tids)
+            print(f"      {c:.2f}: eta {v[0]:,.2f} .. {v[-1]:,.2f} "
+                  f"(median {v[len(v)//2]:,.2f})")
+        print()
+        jobs = [(t, round(acc, 2), cg[t][f"{acc:.2f}"],
+                 _cell_seed(i, CEIL_SEED_OFFSET + REPORTED_CEILINGS.index(acc), k))
+                for i, t in enumerate(tids)
+                for acc in REPORTED_CEILINGS
+                for k in range(a.draws)]
+    elif a.etas:
         off = [e for e in a.etas if e not in ETA_GRID]
         if off:
             raise SystemExit(f"eta {off} is not in arm2_attack.ETA_GRID "
@@ -736,14 +792,14 @@ def main(argv=None) -> int:
               f"every one of these, so no bound comparison is printed; compare "
               f"against the exact acc_ceiling in logs/B_eta_sweep/.\n")
         a.taus = list(a.etas)
-        jobs = [(t, eta, eta, SEED_BASE + i * 10_000
-                 + (ETA_SEED_OFFSET + ETA_GRID.index(eta)) * 1_000 + k)
+        jobs = [(t, eta, eta,
+                 _cell_seed(i, ETA_SEED_OFFSET + ETA_GRID.index(eta), k))
                 for i, t in enumerate(tids)
                 for eta in a.etas
                 for k in range(a.draws)]
     else:
         jobs = [(t, tau, C.eta_tau(tau),
-                 SEED_BASE + i * 10_000 + SEED_GRID.index(tau) * 1_000 + k)
+                 _cell_seed(i, SEED_GRID.index(tau), k))
                 for i, t in enumerate(tids)
                 for tau in a.taus
                 for k in range(a.draws)]
