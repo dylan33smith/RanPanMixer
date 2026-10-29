@@ -17,6 +17,23 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
 
 ## Tooling / reading source documents
 
+### A test suite failure that is really a missing PATH entry, and it names a data file
+- **[2026-10-28] `tests/test_verify_panel.py` fails with FileNotFoundError on a 1000G VCF**
+  **[Symptom]** `pytest tests/` under the `ranpanmixer` env fails
+  `test_control_real_panel_chromosome_passes` with a `FileNotFoundError` whose `args` line
+  names `['bcftools', 'index', '-s', '/data/.../1000g_30x_chr22.vcf.gz']`. It reads as a
+  missing or corrupt DATA file, which is what sends you looking in the wrong place.
+  **[Cause]** The missing file is `bcftools` itself, not the VCF. `bcftools` lives in the
+  **panmixer** env (`/home/ds85/miniconda3/envs/panmixer/bin`); the `ranpanmixer` env does
+  not provide it, and `subprocess.run` reports the executable as the missing path.
+  **[Proven fix]** Run the suite with that bin on PATH:
+  `PATH=/home/ds85/miniconda3/envs/panmixer/bin:$PATH python -m pytest tests/`.
+  MEASURED 2026-10-28: 1 failed / 387 passed without it, **405 passed, 1 skipped, 0
+  failed** with it, on the same commit. ⚠ So a bare run UNDERSTATES the suite by 18 tests
+  as well as failing one — it stops early under `-x` and never reaches the rest.
+  **[Severity]** MEDIUM — it wastes a debug cycle and can be mistaken for a real defect
+  in a result file.
+
 ### An ARITHMETIC seed aliases the moment an index range grows, and append-only does not save it
 - **[2026-10-28] OCCURRENCE SIX. `arm2_attack_a3a4.py`: 450 of 1,750 cells shared a release stream**
   **[Symptom]** Nothing visible. Every cell runs, every number looks plausible, and the
