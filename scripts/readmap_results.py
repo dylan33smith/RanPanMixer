@@ -183,21 +183,55 @@ def main(argv=None) -> int:
           f"largest movement in either direction: **{max(allds, key=abs):+.3f}**.")
     print("⚠ A positive delta is the obfuscated graph aligning BETTER than the "
           "baseline, which at this magnitude is not a gain.")
-    print("⚠ THE ONE MOVEMENT ABOVE NOISE IS GRAPH-LEVEL, NOT DONOR-LEVEL, and the "
-          "distinction matters. At `eta_tau` = 500 ALL FIVE donors drop together "
-          "(-0.038 to -0.063 pts each), so that graph really does align slightly "
-          "worse for everyone — it is not one noisy donor. But it is NOT monotone in "
-          "the knob (1262, 2821 and 5642 return to -0.001/-0.002), so it is "
-          "draw-to-draw variation in WHICH variants the released row happens to "
-          "carry, not an effect of `eta_tau`. One release per point is the limit "
-          "here: with n = 1 graph per column this spread cannot be separated from "
-          "sampling, and quoting -0.063 as the knob's cost would overstate it.")
+    # ⚠⚠ DERIVED, NEVER HARDCODED. This paragraph used to carry the eta grid's own
+    #    numbers as prose (`eta_tau` = 500, -0.063, "1262, 2821 and 5642"), which are
+    #    WRONG for any other grid and would have been emitted beside the acc grid's
+    #    table as if they described it. Whatever moves, the sentence now names it.
+    dips = []
+    for g in GRAPHS[1:]:
+        for k in ("perfect", "gapless", "mapq60"):
+            dd = [per[g][s][k] - per["base"][s][k] for s in DONORS]
+            if all(x < -0.01 for x in dd):
+                dips.append((g, k, min(dd), max(dd)))
+    if not dips:
+        print("⚠ NOTHING MOVES ABOVE NOISE on this grid: no metric drops across all "
+              f"{len(DONORS)} donors at any point. With n = 1 graph per column that is "
+              "the strongest statement available here.")
+    else:
+        where = ", ".join(f"`{LBL[g]}` ({k} {lo:+.3f} to {hi:+.3f} pts)"
+                          for g, k, lo, hi in dips)
+        recov = [LBL[g] for g in GRAPHS[1:]
+                 if g not in {d[0] for d in dips}
+                 and float(str(LBL[g]).split()[0] or 0) >
+                     max(float(str(LBL[d[0]]).split()[0] or 0) for d in dips)]
+        print(f"⚠ THE MOVEMENT ABOVE NOISE IS GRAPH-LEVEL, NOT DONOR-LEVEL, and the "
+              f"distinction matters. At {where}, ALL {len(DONORS)} donors drop "
+              f"together, so that graph really does align slightly worse for everyone "
+              f"— it is not one noisy donor."
+              + (f" But it is NOT monotone in the knob ({', '.join(recov)} recover), "
+                 f"so it is draw-to-draw variation in WHICH variants the released row "
+                 f"happens to carry, not an effect of the knob." if recov else "")
+              + f" One release per point is the limit here: with n = 1 graph per column "
+                f"this spread cannot be separated from sampling, and quoting "
+                f"{min(d[2] for d in dips):+.3f} as the knob's cost would overstate it.")
     print("⚠ One target (HG00438) substituted into a 44-member graph, so the released "
           "row is 1 of 44: this measures the cost of obfuscating ONE member, exactly "
           "as their Fig 5A does, and must not be read as the cost of obfuscating all.")
-    print("⚠ `e_differ`-scale context: the substituted row differs from the original "
-          "in ~137,000-139,000 of 681,648 cells at every eta, so the graph really is "
-          "being perturbed; a flat result is NOT a null edit.")
+    # ⚠ Also derived: the cell counts are read from the run log of THIS grid, since
+    #   the two grids sit on different axes (681,648 vs 681,698 cells).
+    rl = D / "run.log"
+    cells = re.findall(r"; ([\d,]+) of ([\d,]+) cells differ", rl.read_text()) \
+        if rl.exists() else []
+    if cells:
+        n = sorted(int(a.replace(",", "")) for a, _ in cells)
+        tot = int(cells[0][1].replace(",", ""))
+        print(f"⚠ `e_differ`-scale context: the substituted row differs from the "
+              f"original in {n[0]:,}-{n[-1]:,} of {tot:,} cells at every point, so the "
+              f"graph really is being perturbed; a flat result is NOT a null edit.")
+    else:
+        print("⚠ `e_differ`-scale context: n/a — no substitution counts found in "
+              f"{rl}, so whether the graph was genuinely perturbed is UNMEASURED here. "
+              "A flat result cannot be read as 'alignment does not care' without it.")
 
     if a.json:
         a.json.write_text(json.dumps(
