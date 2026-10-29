@@ -1,3 +1,18 @@
+⚠⚠ **[CORRECTION - 2026-10-28] THE COLUMN LABELS HERE ARE ONE TARGET'S FIT.**
+All ten targets ran at the shared `eta_tau` list [0.0, 75.7, 151.4, 227.1, 302.8, 378.5,
+454.19], whose mapping to `acc_ceiling` 0.50-0.80 was fitted on **HG00096 alone**
+(`logs/B_eta_grid_v2/chr21_uniform.json`). `c_quadratic` spreads **30.9274%** across the
+ten (2.690912e-06 NA20294 to 3.523140e-06 HG01323), so nine of ten targets sat at a
+ceiling that is not the label -- by up to **0.0365 at the 0.80 column** -- and six of ten
+sat BELOW it, meaning their true bound was TIGHTER than printed.
+✅ **THE NULL SURVIVES THE CORRECTION**: the corrected worst-case bound at 0.80 is 0.7635
+against a measured 0.7080, a margin of 0.0555 rather than 0.092.
+✅ This table's SEEDS are sound -- `scripts/arm2_attack.py` already used a `SeedSequence`
+over the whole cell key, so the defect that voided the A3/A4 table did NOT touch this one.
+✅ REPLACED BY a re-run at per-target `eta_tau` (`logs/B_acc_arm2/a1_ceil.md`), in which
+each column IS the measured bound. This file is kept only until that lands.
+⚠ The text below is preserved VERBATIM as the record of what was run.
+
 methodology: docs/plan.md direction block, 2026-10-24 (git_rev 6979b5a4a1f096ff39a413271e4cd11c2e8bba16-dirty+844e5210ca16)
 
 ⚠⚠ ETA MODE: driving the tilt by eta [0.0, 75.7, 151.4, 227.1, 302.8, 378.5, 454.19] directly. The equivalent tau is 1.0 to float64 at every point, so p_succ_bound carries NO information here -- compare against the exact acc_ceiling in logs/B_eta_sweep/ instead.

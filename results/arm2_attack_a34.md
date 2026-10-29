@@ -1,3 +1,18 @@
+⚠⚠⚠ **[CORRECTION - 2026-10-28] THIS TABLE IS SUPERSEDED AND MUST NOT BE QUOTED.**
+Its releases were drawn under an ARITHMETIC seed in `scripts/arm2_attack_a3a4.py`:
+`SEED_BASE + i*10_000 + (ETA_SEED_OFFSET + ETA_GRID.index(eta))*1_000 + k`. Appending the
+reported grid to `ETA_GRID` the same day pushed `index(eta)` to 10 and 11, where the two
+terms ALIAS. **MEASURED on exactly this configuration: 225 colliding seeds, 450 of 1,750
+cells = 25.71%, each `(target i, eta 378.5, draw k)` landing on the seed of
+`(target i+1, eta 0.0, draw k)`.** The cells are therefore NOT independent and the
+standard errors below are too narrow. See `docs/bugs.md`, occurrence SIX.
+⚠⚠ **AND ITS COLUMNS ARE MISLABELLED INDEPENDENTLY OF THAT.** All ten targets ran at one
+shared `eta_tau` list taken from HG00096's fit alone, while `c_quadratic` spreads 30.9274%
+across them -- so nine of ten targets sat at a ceiling that is not the column's label.
+✅ REPLACED BY a re-run at per-target `eta_tau` (`logs/B_acc_arm2/a34_ceil.md`), in which
+the column IS the measured bound. This file is kept only until that lands.
+⚠ The text below is preserved VERBATIM as the record of what was run.
+
 methodology: docs/plan.md direction block, 2026-10-24 (git_rev 6979b5a4a1f096ff39a413271e4cd11c2e8bba16-dirty+ba903de77179)
 A3 scores on 302,547 bi-allelic cohort sites of 332,521 chain positions.
 computing the positive controls first -- a failed control voids the nulls...

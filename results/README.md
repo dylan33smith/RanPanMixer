@@ -77,6 +77,11 @@ level is a floor, never a privacy result.
   ⚠ A3's `D1_extremal` row is DEGENERATE at all 7 labels (TPR 1.0000 / TNR 0.0000),
   exactly as predicted in writing before the run, and A3 sits z -4.99..-8.07 below the
   bound on D2/D3. A3 is a weak attacker; only A1's null is evidence.
+- ⚠⚠ **[CORRECTION - 2026-10-28] ARM 2's COLUMN LABELS BELOW CAME FROM HG00096's FIT
+  ALONE.** `c_quadratic` spreads 30.9274% across the ten targets, so nine of ten sat at
+  a ceiling that is not the label, by up to 0.0365 at the 0.80 column, and six of ten
+  sat BELOW it. ✅ The null SURVIVES: corrected worst-case bound 0.7635 against the
+  measured 0.7080. A re-run at per-target `eta_tau` is in flight.
 - **ARM 2's optimal attacker lands where ARM 1's did, and no condition significantly
   exceeds its ceiling in either arm.** At the 0.80 label A1 reaches **0.7080** in Arm 2
   against **0.706818** in Arm 1 -- within 0.0012, against the same 0.800 bound.
@@ -128,6 +133,12 @@ level is a floor, never a privacy result.
   range — far below what one draw per cell can resolve against a within-target spread of
   2.71%. The mechanism moves fidelity monotonically; these sampled statistics are too
   coarse to see it, and the exact calculation is the instrument that can.
+- ⚠⚠⚠ **[CORRECTION - 2026-10-28] THE A3/A4 NUMBERS IN THIS BULLET ARE SUPERSEDED.**
+  They were drawn under an arithmetic seed that made **450 of 1,750 cells (25.71%)**
+  share a release stream with another cell, so they are not independent draws and
+  their standard errors are too narrow (`docs/bugs.md`, occurrence SIX). A re-run at
+  per-target `eta_tau` is in flight. The bullet is preserved verbatim below as the
+  record of what was reported; do not quote its figures until it is replaced.
 - **A3 and A4 add nothing significant, and A3's pre-registered control is worthless.**
   Neither attack exceeds its bound (A3 peaks 0.5980, A4 0.5990, against Bonferroni z_crit
   2.82 over 21 A3 cells and 4.51 over 15,603 A4 block-cells).
