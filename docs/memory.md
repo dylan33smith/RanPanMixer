@@ -104,6 +104,70 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-28 (latest, 5) — B-ATK-arm2-ceiling: PER-TARGET `eta_tau` AT A SHARED CEILING, AND OCCURRENCE SIX OF THE COMMON-RANDOM-NUMBERS DEFECT
+
+**Why.** Dylan, told that Arm 2's published columns were labelled from HG00096's fit
+alone and that the correction could either be re-run or stated in prose, chose the
+re-run: "Yes, re-run it". So the attack needed a mode in which every target sits at the
+SAME `acc_ceiling` on its OWN `eta_tau` -- which is what standing constraint 7 requires
+and what a shared `eta` cannot give once `c_quadratic` spreads 30.9274%.
+
+**Method.** `--ceiling-grid` on both `scripts/arm2_attack.py` and
+`scripts/arm2_attack_a3a4.py`, reading the `_verified.json` from
+`scripts/arm2_chr21_kl.py --verify`. The column is the ceiling; the eta varies by
+target; and the column LABEL IS THE BOUND, because it was measured at the solved eta and
+refined once (worst error 3.031e-08). `--acc-ceiling` is refused in this mode: a second
+source for a bound that is already exact could only disagree with it. ⚠ A FIT json is
+refused too -- a grid quoted from a fit is a derived number wearing a measured number's
+clothes, and here it would be the bound itself.
+
+**⚠⚠⚠ AND WIRING IT TURNED UP OCCURRENCE SIX, IN A RUN THAT HAD ALREADY SHIPPED.**
+`arm2_attack_a3a4.py` seeded each cell ARITHMETICALLY:
+`SEED_BASE + i * 10_000 + (ETA_SEED_OFFSET + ETA_GRID.index(eta)) * 1_000 + k`, with `i`
+the TARGET index and `k` the draw. Appending the reported grid to `ETA_GRID` earlier the
+same day took it to 12 entries, so `index(eta)` reached 10 and 11 -- and there
+`i * 10_000` and `index * 1_000` ALIAS.
+
+**MEASURED on the configuration that shipped** (not derived from the algebra and then
+asserted): **225 colliding seeds, 450 of 1,750 cells = 25.71%**, every one of the form
+`(target i, eta 378.5, draw k)` landing on `(target i+1, eta 0.0, draw k)`. The 2026-10-28
+A3/A4 numbers were drawn under that and are SUPERSEDED, not merely re-labelled.
+
+⚠⚠ **THE LESSON IS NARROWER AND WORSE THAN "SEEDS ARE HARD".** The append-only rule on
+`ETA_GRID` worked exactly as written -- no recorded cell was renumbered, and the comment
+block defending it is still correct. What it could not do is protect the ARITHMETIC that
+consumes the index. A rule about the table is not a rule about the formula reading it.
+⚠ `arm2_attack.py` was immune only because the 2026-10-25 fix had already converted it to
+a `SeedSequence` over the whole key. The same fix never reached `a3a4`, so the defect sat
+one file away from its own cure for three days.
+
+**The fix.** `np.random.SeedSequence([SEED_BASE, 34, ti, pointi, k])` in `a3a4` and the
+existing `SeedSequence` in `arm2_attack`, both HOISTED to module level so the gate tests
+the real function and not a copy of it. The `34` tag keeps the two drivers' streams
+disjoint: they share `SEED_BASE` and the same (target, point, draw) key, so without it
+the two attacks would have silently scored the SAME releases while reporting as
+independent evidence.
+
+**The gates** (`tests/test_arm2_ceiling_mode.py`, 14 tests): the three seed namespaces
+(tau 0.., eta 1000.., ceiling 2000..) cannot overlap; the pre-existing eta indices did
+not move; NO TWO CELLS share a stream in any of the three modes for EITHER driver; the
+two drivers do not share streams; and -- so the uniqueness gate is known to catch
+something that actually happened rather than a hypothetical -- a gate asserting the old
+arithmetic really did produce the recorded 225 collisions. ✅ MUTATION-TESTED three ways:
+colliding the ceiling offset onto the eta namespace, sorting `ETA_GRID`, and restoring
+the arithmetic seed, which makes the uniqueness gate report the exact 450-cell count.
+
+**Reporting.** The table's knob is now NAMED rather than always called `tau` -- a column
+stamped `tau` while holding an `acc_ceiling` is uninterpretable, not imprecise -- and the
+mode is recorded in the JSON so `--from-json` cannot re-report an eta run as a tau run.
+✅ The bound check was shown to FIRE in ceiling mode by injecting a 0.96 accuracy at the
+0.80 column: it flagged all three conditions and exited 1.
+
+**What this does NOT establish.** Nothing yet about the re-run's outcome -- it is running.
+And nothing about Arm 1, whose A1/A3 driver is separate and whose grid was already fitted
+per target.
+
+
 ## 2026-10-28 (latest, 4) — B-LCK-grid-0p50-0p80 + B-EVL-arm2-chr21-kl: THE GRID IS FROZEN AT 0.50-0.80 BY DECISION, AND ARM 2's COLUMN LABELS WERE ONE TARGET'S FIT
 
 **Decision (Dylan, 2026-10-28).** Asked whether to extend the `acc_ceiling` grid past

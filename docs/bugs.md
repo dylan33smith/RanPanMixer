@@ -17,6 +17,38 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
 
 ## Tooling / reading source documents
 
+### An ARITHMETIC seed aliases the moment an index range grows, and append-only does not save it
+- **[2026-10-28] OCCURRENCE SIX. `arm2_attack_a3a4.py`: 450 of 1,750 cells shared a release stream**
+  **[Symptom]** Nothing visible. Every cell runs, every number looks plausible, and the
+  table reports as though the cells were independent. The tell is arithmetic, not a
+  failure: two cells that should be independent produce correlated outcomes, and the
+  naive standard error is too narrow.
+  **[Cause]** The seed was
+  `SEED_BASE + i * 10_000 + (ETA_SEED_OFFSET + ETA_GRID.index(eta)) * 1_000 + k`
+  with `i` the TARGET index and `k` the draw. Appending the reported grid to `ETA_GRID`
+  on 2026-10-28 took the tuple to 12 entries, so `index(eta)` reached 10 and 11 — and at
+  that point `i * 10_000` and `index * 1_000` ALIAS. MEASURED on the configuration that
+  shipped: `(target i, eta 378.5, draw k)` lands on exactly the seed of
+  `(target i+1, eta 0.0, draw k)`, giving **225 colliding seeds and 450 of 1,750 cells,
+  25.71%**, sharing a release stream.
+  ⚠⚠ **THE APPEND-ONLY RULE ON `ETA_GRID` DID ITS JOB AND IT WAS NOT ENOUGH.** It
+  protects the INDICES, so no recorded cell was renumbered. It cannot protect the
+  ARITHMETIC that consumes them, and that is where this broke. A rule about the table is
+  not a rule about the formula reading it.
+  ⚠ `arm2_attack.py` was immune because it had already been converted to a
+  `SeedSequence` over the whole key on 2026-10-25. `arm2_attack_a3a4.py` never was, and
+  inherited the gap from the version the fix did not reach.
+  **[Proven fix]** `np.random.SeedSequence([SEED_BASE, <driver tag>, ti, pointi, k])`,
+  which cannot alias whatever the index ranges become. The driver tag keeps the two
+  attacks' streams disjoint — they share `SEED_BASE` and the same (target, point, draw)
+  key, so without it they would silently score the SAME releases. Both `_cell_seed`
+  functions are hoisted to module level so `tests/test_arm2_ceiling_mode.py` gates the
+  REAL function instead of a copy, and the gate is mutation-tested: restoring the
+  arithmetic form makes it report the exact 450-cell count.
+  ⚠ The 2026-10-28 A3/A4 numbers were drawn under this and are SUPERSEDED by the
+  per-target-eta re-run, not merely re-labelled.
+  **[Severity]** HIGHEST — silent, it produces a full table, and this is the sixth time.
+
 ### `find` over a symlinked tree reports a file ABSENT that is plainly there
 - **[2026-10-28] `find external/PanMixer -name apply_mask.sbatch` -> nothing; `grep -rl` finds it**
   **[Symptom]** A survey concludes a producer script, or an evaluator, does not exist
