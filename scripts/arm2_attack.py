@@ -245,7 +245,24 @@ def pick_decoys(target_id: str, st: dict, rng: np.random.Generator) -> dict:
 
     conc = {k: concordance(p, st["paths"][k]) for k in others}
     nearest = max(conc, key=conc.get)
+    # ⚠⚠ D3 MUST NOT BE D2. A uniform draw over `others` lands on `nearest` with
+    # probability 1/len(others) -- 1/9 here -- and it DID: HG01323's draw was index
+    # 5, which was HG04211, its own nearest. For that target the HARDEST decoy and
+    # the EASY baseline were ONE GENOME, so the two conditions were not two
+    # conditions and the D2/D3 contrast carried 1/10 of its trials twice. Arm 1
+    # collided the same way on HG00741 and HG01123 (2 of 44).
+    # ⚠ REJECTION, not a narrowed pool: each target has its OWN rng
+    # (`default_rng([DECOY_SEED, sha256(target)])`), so rejecting moves ONLY the
+    # targets that actually collided and leaves every other D3 identity unchanged.
+    # Narrowing the pool would shift every index and re-pick all ten.
+    if len(others) < 2:
+        raise ValueError(
+            f"{target_id}: the decoy pool is {len(others)} target(s), so D3_random "
+            f"cannot differ from D2_nearest ({nearest}). Prepare more targets -- "
+            f"silently letting them coincide would report one condition as two.")
     random_id = others[int(rng.integers(len(others)))]
+    while random_id == nearest:
+        random_id = others[int(rng.integers(len(others)))]
     return {
         "D1_extremal": {"path": extremal, "id": "constructed", "concordance": None},
         "D2_nearest": {"path": st["paths"][nearest], "id": nearest,
@@ -398,6 +415,81 @@ def _one_trial(job: tuple) -> dict:
     return out
 
 
+Z95 = 1.959963984540054
+"""Two-sided 95%. `Z95` * SE is the ERROR BAR a measured accuracy carries wherever it
+is shown against the acc line (Dylan, 2026-10-29): where a point sits above the line,
+the bar must be shown reaching BELOW it, or the excess is not inside sampling noise.
+
+⚠ Defined HERE, in the module both attack drivers import, so the two cannot drift. A
+second copy in `arm2_attack_a3a4.py` is how the ceiling branch ended up in one driver
+and not the other."""
+
+
+def _interval(bal: float, se: float, z: float = Z95) -> tuple:
+    """`bal` +- `z` * `se`, clipped to [0, 1] because an accuracy cannot leave it.
+
+    ⚠⚠ THE FLOOR IS 0.0, NOT 0.5, and that is load-bearing. Clipping at 0.5 is
+    tempting -- an attacker "cannot do worse than chance" -- but it would make "the
+    bar reaches below 0.50" impossible to show at the one column where the line IS
+    0.50, which is where most measured excesses sit.
+    """
+    return max(0.0, bal - z * se), min(1.0, bal + z * se)
+
+
+def _fmt(bal: float, se: float, z: float = Z95) -> str:
+    """One table cell: the estimate and its error bar, or a DEGENERACY notice.
+
+    ⚠⚠ A ZERO SE IS NOT PRECISION. It arises exactly when TPR or TNR is 0 or 1 -- a
+    CONSTANT ANSWER, which A3's `D1_extremal` gives at every label. Printing
+    `[0.5000, 0.5000]` would claim an infinitely tight bar for the one cell carrying
+    no information at all.
+    """
+    if not se > 0:
+        # ⚠ se = 0 has TWO meanings and they are opposites. At 0.5 it is a CONSTANT
+        # ANSWER carrying no information; at 0 or 1 it is EXACT SEPARATION carrying
+        # all of it. Neither gets a bar, but they must not share a label.
+        # ⚠ SHORT markers: these go in table CELLS, and the full reading is given
+        #   once in each table's preamble. `DEGENERATE` = a constant answer, no
+        #   information. `EXACT` = perfect separation, all of it. Both have se = 0
+        #   and neither gets a bar, which is the only thing they have in common.
+        return f"{bal:.4f} {'DEGENERATE' if abs(bal - 0.5) < 1e-12 else 'EXACT'}"
+    lo, hi = _interval(bal, se, z)
+    return f"{bal:.4f} [{lo:.4f}, {hi:.4f}]"
+
+
+def classify_excess(bal: float, se: float, bound: float, z_crit: float) -> tuple:
+    """How one measured cell stands against the acc line. -> (verdict, z, lo, hi).
+
+      'within'     -- at or below the line.
+      'degenerate' -- above it with se = 0, a CONSTANT ANSWER. `z` would be infinite,
+                      which would rank the least informative cell as the most damning.
+      'viol'       -- above it by more than `z_crit` SE. THE CLAIMABLE verdict.
+      'bar_clears' -- above it, not corrected-significant, but the 95% ERROR BAR does
+                      not reach below the line. Not claimable alone -- with many cells
+                      some are expected above by chance -- but it must be SHOWN rather
+                      than absorbed by the corrected threshold.
+      'reported'   -- above it with a bar that reaches below. Noise.
+    """
+    if bal <= bound:
+        return "within", 0.0, bal, bal
+    if not se > 0:
+        # ⚠⚠ se = 0 ABOVE THE LINE IS A PERFECT ATTACKER, NOT A DEGENERATE ONE, and
+        # getting this backwards inverts the most important verdict in the suite.
+        # se = 0 requires tpr and tnr BOTH in {0, 1}. The constant-answer case
+        # (tpr = 1, tnr = 0, which is what A3's D1_extremal does) scores exactly
+        # 0.5, and every line here is >= 0.5, so a constant answer can NEVER reach
+        # this branch. The only way to be above the line with se = 0 is
+        # tpr = tnr = 1: perfect separation, z = infinity, the strongest violation
+        # the experiment can produce. Filing it as "no evidence either way" would
+        # exit 0 on a total break.
+        return "viol", float("inf"), bal, bal
+    z = (bal - bound) / se
+    lo, hi = _interval(bal, se)
+    if z > z_crit:
+        return "viol", z, lo, hi
+    return ("bar_clears" if lo > bound else "reported"), z, lo, hi
+
+
 def _z_for_one_sided(alpha: float) -> float:
     """`z` with `P(Z > z) = alpha`, for a standard normal. No scipy dependency.
 
@@ -468,7 +560,10 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
             table.setdefault(cond, {})[tau] = {"tpr": tpr, "tnr": tnr, "balanced": bal,
                                                "se_balanced": se_bal,
                                                "n_per_arm": len(lp)}
-            cells.append(f"{bal:.4f}")
+            # ⚠ the cell carries `acc_ci95`, not a bare point estimate: a bound
+            # comparison shown without its uncertainty is unreadable, and where a cell
+            # sits above the line the bar is the whole claim.
+            cells.append(_fmt(bal, se_bal))
         label = "one-sided P_p(L>0)" if a.one_sided else "balanced accuracy"
         print(f"| {cond} {label} * | " + " | ".join(cells) + " |")
     if not a.one_sided:
@@ -498,7 +593,7 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
             "0" if float(c) <= 0.5 else "1 - 1e-65 or smaller" for c in a.taus) + " |")
         print("| `p_succ_bound` * | " + " | ".join("~1.0" for _ in a.taus) + " |")
         print("| `acc_ceiling` [THE BOUND, measured per target] * | " + " | ".join(
-            f"{float(c):.2f}" for c in a.taus) + " |")
+            f"{float(c):.4f}" for c in a.taus) + " |")
     elif getattr(a, "etas", None):
         # ⚠⚠ p_succ_bound = (1 + tanh(eta))/2 is 1.0 to float64 at every one of
         # these points, so the bound comparison is UNFALSIFIABLE here and is not
@@ -566,7 +661,13 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
                       f"--acc-ceiling eta=value from an eta_sweep run at this beta "
                       f"scope to make the comparison.")
         z_crit = _z_for_one_sided(0.05 / max(1, len(cells)))
-        violations, notes = [], []
+        # ⚠⚠ FOUR OUTCOMES, not two (Dylan, 2026-10-29). `bar_clears` is a cell above
+        # the line whose 95% ERROR BAR does not reach below it: not claimable on its
+        # own, since with many cells a few are expected above by chance, but it must
+        # be SHOWN rather than absorbed by the corrected threshold. `degen` is a cell
+        # with se = 0 -- a constant answer -- whose z would be infinite, which would
+        # rank the least informative cell in the suite as the most damning.
+        violations, notes, bar_clears, degen = [], [], [], []
         # ⚠⚠ IN ETA MODE THE BOUND IS NOT `p_succ_bound`. It would be
         # (1 + tanh(eta))/2, which is 1.0 to float64 at every eta we run here -- so
         # `C.p_succ_bound(t)` RAISES (t is an eta, not a tau) and, if it did not, the
@@ -588,18 +689,41 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
             if bal <= bound + 1e-9:
                 continue
             se = v.get("se_balanced") or 0.0
-            z = (bal - bound) / se if se > 0 else float("inf")
-            (violations if z > z_crit else notes).append((c, t, bal, bound, z))
+            verdict, z, lo, hi = classify_excess(bal, se, bound, z_crit)
+            rec = (c, t, bal, bound, z, lo, hi)
+            {"viol": violations, "reported": notes, "bar_clears": bar_clears,
+             "degenerate": degen, "within": []}[verdict].append(rec)
+        _bname = ("their own measured `acc_ceiling`"
+                  if getattr(a, "ceiling_etas", None) else "`p_succ_bound`")
         if notes:
-            _bname = ("their own measured `acc_ceiling`"
-                      if getattr(a, "ceiling_etas", None) else "`p_succ_bound`")
             print(f"\n⚠ {len(notes)} cell(s) exceed {_bname} by POINT ESTIMATE "
                   f"but NOT significantly (one-sided 5%, Bonferroni over "
-                  f"{len(cells)} cells, z_crit = {z_crit:.2f}). Reported, not claimed:")
-            for c, t, bal, bound, z in notes:
-                print(f"    {c} at {_knob}={t}: {bal:.4f} vs bound {bound:.4f} "
-                      f"(+{bal - bound:.4f}, z = +{z:.2f})")
-        violations = [(c, t, bal) for c, t, bal, _, _ in violations]
+                  f"{len(cells)} cells, z_crit = {z_crit:.2f}), each with a 95% bar "
+                  f"REACHING BELOW the line. Reported, not claimed:")
+            for c, t, bal, bound, z, lo, hi in notes:
+                print(f"    {c} at {_knob}={t}: {bal:.4f} [{lo:.4f}, {hi:.4f}] vs "
+                      f"bound {bound:.4f} (+{bal - bound:.4f}, z = +{z:.2f})")
+        if bar_clears:
+            print(f"\n⚠⚠ {len(bar_clears)} cell(s) exceed {_bname} and their 95% bar "
+                  f"does NOT reach below the line. Not significant after correction, "
+                  f"so not claimable -- stated here rather than absorbed, because "
+                  f"this is the case an uncorrected reader would call a violation:")
+            for c, t, bal, bound, z, lo, hi in bar_clears:
+                print(f"    {c} at {_knob}={t}: {bal:.4f} [{lo:.4f}, {hi:.4f}] vs "
+                      f"bound {bound:.4f} (+{bal - bound:.4f}, z = +{z:.2f})")
+        if degen:
+            print(f"\n⚠⚠ {len(degen)} cell(s) sit above {_bname} with se = 0 -- a "
+                  f"CONSTANT ANSWER, which is neither a violation nor a null:")
+            for c, t, bal, bound, _z, _lo, _hi in degen:
+                print(f"    {c} at {_knob}={t}: {bal:.4f} vs bound {bound:.4f}, "
+                      f"se = 0 -- DEGENERATE, no evidence either way")
+        if cells:
+            print(f"\n⚠ MULTIPLICITY. {len(cells):,} cells were examined, so at a "
+                  f"one-sided 5% level about {0.05 * len(cells):,.1f} of them are "
+                  f"expected above the line BY CHANCE even if the mechanism is exact. "
+                  f"A bare count of 95% exceedances is not evidence; the "
+                  f"Bonferroni-corrected z is.")
+        violations = [(c, t, bal) for c, t, bal, _, _, _, _ in violations]
     print()
     if violations:
         print(f"⚠⚠ MEASURED ACCURACY ABOVE "
