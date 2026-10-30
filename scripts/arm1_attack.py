@@ -81,6 +81,9 @@ from cohort import loo                                         # noqa: E402
 from mechanism import ffbs, hmm, utility                       # noqa: E402
 
 import arm2_attack_a3a4 as A3M                                 # noqa: E402
+# ⚠ the acc-line arithmetic has ONE home, scripts/arm2_attack.py; a second copy
+# is how the ceiling branch reached one driver and not the other.
+from arm2_attack import _interval                              # noqa: E402
 from exact_kl_stable import extremal, kl_stable                # noqa: E402
 
 CHROM = "chr21"
@@ -185,7 +188,19 @@ def pick_decoys(st: dict, rng: np.random.Generator) -> dict:
     conc = {s: _concordance(p, q) for s, q in st["others"].items()}
     nearest = max(conc, key=conc.get)
     keys = sorted(st["others"])
+    # ⚠⚠ D3 MUST NOT BE D2 -- the same defect and the same fix as
+    # `arm2_attack.pick_decoys`, measured HERE as 2 of 44 targets: HG00741 and
+    # HG01123 both drew their own nearest donor (HG01928, HG01978), so the pooled
+    # D3 row shared 2/44 of its trials IDENTICALLY with D2 while being reported as
+    # an independent condition. Rejection keeps every non-colliding target's D3
+    # unchanged, because the rng is per target (`default_rng([DECOY_SEED, _h(t)])`).
+    if len(keys) < 2:
+        raise ValueError(
+            f"the decoy pool is {len(keys)} donor(s), so D3_random cannot differ "
+            f"from D2_nearest ({nearest}).")
     rand = keys[int(rng.integers(len(keys)))]
+    while rand == nearest:
+        rand = keys[int(rng.integers(len(keys)))]
     return {
         "D1_extremal": {"path": extremal(p), "id": "constructed", "concordance": None},
         "D2_nearest": {"path": st["others"][nearest], "id": nearest,
@@ -374,7 +389,7 @@ def _report(res: list, labels: tuple, draws: int, rev: str) -> None:
     print("⚠ The 0.50 column is `eta` = 0, where `Q_p = Q_q = R_D` identically: the "
           "true accuracy is EXACTLY 0.5 for every attacker. It is a HARNESS CHECK.\n")
 
-    viol, degen = [], []
+    viol, degen, near = [], [], []
     for atk in ("A1", "A3"):
         name = ("A1 — `lrt_pair`, the Neyman-Pearson OPTIMAL distinguisher"
                 if atk == "A1" else
@@ -385,7 +400,7 @@ def _report(res: list, labels: tuple, draws: int, rev: str) -> None:
             print("| metric | " + " | ".join(labels) + " |")
             print("|---|" + "---|" * len(labels))
             rows: dict = {k: [] for k in
-                          ("balanced_accuracy", "se", "tpr", "tnr",
+                          ("balanced_accuracy", "se", "ci95", "tpr", "tnr",
                            "ceil_mean", "ceil_max", "excess", "z", "verdict")}
             for lab in labels:
                 cells = [r["cells"][lab]["conditions"][cond] for r in res]
@@ -404,10 +419,21 @@ def _report(res: list, labels: tuple, draws: int, rev: str) -> None:
                 cm = stats.fmean([c["acc_ceiling"] for c in cells])
                 cx = max(c["acc_ceiling"] for c in cells)
                 ex = bal - cm
-                z = ex / se if se > 0 else 0.0
+                # ⚠⚠ se = 0 with a POSITIVE excess is perfect separation, not a
+                # tie: forcing z to 0.0 there files a total break as "within".
+                # A constant answer (tpr 1 / tnr 0) scores 0.5 and is caught by
+                # DEGENERATE_FLOOR below, so it never reaches this.
+                z = ex / se if se > 0 else (float("inf") if ex > 0 else 0.0)
                 bad = min(tpr, tnr) < DEGENERATE_FLOOR
                 rows["balanced_accuracy"].append(f"{bal:.6f}")
                 rows["se"].append(f"{se:.6f}")
+                # ⚠ `acc_ci95`, the ERROR BAR. The SE row alone leaves the reader to
+                # do the arithmetic that decides whether an excess is inside noise;
+                # where a cell sits above its pair ceiling, the claim being made is
+                # that this interval reaches BELOW that ceiling.
+                _lo, _hi = _interval(bal, se)
+                rows["ci95"].append(
+                    f"[{_lo:.6f}, {_hi:.6f}]" if se > 0 else "DEGENERATE (se = 0)")
                 rows["tpr"].append(f"{tpr:.4f}")
                 rows["tnr"].append(f"{tnr:.4f}")
                 rows["ceil_mean"].append(f"{cm:.6f}")
@@ -420,7 +446,15 @@ def _report(res: list, labels: tuple, draws: int, rev: str) -> None:
                     degen.append((atk, cond, lab, tpr, tnr))
                 elif z > 1.96:
                     viol.append((atk, cond, lab, bal, cm, z))
+                elif ex > 0:
+                    # ⚠⚠ ABOVE THE CEILING BUT NOT SIGNIFICANT. These reached the
+                    # table's `excess` and `z` rows and stopped there: the SYNTHESIS
+                    # listed only z > 1.96, so a reader skimming the summary saw "0
+                    # cells exceed" while two did by point estimate. Shown now, with
+                    # the interval that qualifies them, rather than absorbed.
+                    near.append((atk, cond, lab, bal, cm, z, _lo))
             lbl = {"balanced_accuracy": "balanced accuracy*", "se": "SE",
+                   "ci95": "`acc_ci95` [THE ERROR BAR]",
                    "tpr": "TPR (P_p[Lambda>0])", "tnr": "TNR (P_q[Lambda<0])",
                    "ceil_mean": "`acc_ceiling` THIS pair, mean — THE BOUND*",
                    "ceil_max": "`acc_ceiling` THIS pair, max (conservative)",
@@ -439,6 +473,13 @@ def _report(res: list, labels: tuple, draws: int, rev: str) -> None:
     print(f"- **{len(viol)} cell(s) exceed their own pair `acc_ceiling` at z > 1.96** "
           f"and **{len(degen)} are DEGENERATE** (min(TPR, TNR) < "
           f"{DEGENERATE_FLOOR:g}).")
+    print(f"- **{len(near)} cell(s) exceed their pair `acc_ceiling` by POINT ESTIMATE "
+          f"without reaching z > 1.96.** Reported, not claimed:")
+    for atk, cond, lab, bal, ceil, z, lo in near:
+        reaches = "reaches below" if lo <= ceil else "⚠⚠ does NOT reach below"
+        print(f"  - {atk} {cond} @ {lab}: {bal:.6f} against a pair ceiling of "
+              f"{ceil:.6f} (+{bal - ceil:.6f}, z = {z:+.2f}); its 95% lower limit "
+              f"{lo:.6f} {reaches} the ceiling.")
     for atk, cond, lab, tpr, tnr in degen:
         print(f"  - DEGENERATE {atk} {cond} @ {lab}: TPR {tpr:.4f} / TNR {tnr:.4f} — a "
               f"CONSTANT ANSWER, not a null. It must not be read as the mechanism "

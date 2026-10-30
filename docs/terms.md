@@ -3387,6 +3387,73 @@ Aliases:              none. ⚠ NOT "the TV" and NOT "A2" — see `acc_ceiling` 
                       licenses, and A2 for what it is not.
 ```
 
+### acc_ci95  [attack] [evaluation] [gate]
+```
+Is:                   The two-sided 95% interval on a MEASURED `attacker_accuracy`:
+                      balanced accuracy +- 1.959963984540054 * SE, clipped to [0, 1].
+                      It is the ERROR BAR that every measured accuracy carries wherever
+                      it is shown against the acc line, and the thing that makes an
+                      excess over that line checkable instead of asserted: where a point
+                      sits ABOVE the line, the claim being made is that its interval
+                      REACHES BELOW it.
+                      ⚠⚠ THE FLOOR IS 0.0, NOT 0.5, and that is load-bearing. Clipping
+                      at chance is tempting -- an attacker "cannot do worse than
+                      chance" -- but it would make "the bar reaches below 0.50"
+                      unprovable at the one column where the line IS 0.50, which is
+                      where most measured excesses sit.
+                      ⚠⚠ A ZERO SE IS NOT A TIGHT INTERVAL, AND IT HAS TWO OPPOSITE
+                      MEANINGS. SE is 0 exactly when TPR and TNR are BOTH in {0, 1} --
+                      a conjunction, not a disjunction, since the SE is a sum of two
+                      non-negative terms and needs both to vanish. That is four cases:
+                        TPR 1 / TNR 0 -> 0.5  a CONSTANT ANSWER, no information
+                        TPR 0 / TNR 1 -> 0.5  likewise
+                        TPR 1 / TNR 1 -> 1.0  PERFECT separation, all the information
+                        TPR 0 / TNR 0 -> 0.0  perfect, labels swapped
+                      Neither kind gets a bar, and they must NOT share a label: a
+                      perfect attacker printed as "a constant answer" is the single most
+                      misleading cell this suite could emit. ⚠⚠ Every line in this
+                      project is >= 0.5, so a CONSTANT ANSWER can never sit above one --
+                      which means a zero-SE cell ABOVE the line is always perfect
+                      separation and is classed a VIOLATION at z = infinity, never a
+                      shrug. Reading the condition as a disjunction is what produced
+                      the 2026-10-29 defect in which a perfect attacker exited 0.
+Computed by:          _interval() in scripts/arm2_attack.py, imported by
+                      scripts/arm2_attack_a3a4.py and scripts/arm1_attack.py.
+                      ⚠ scripts/arm2_figures.py imports Z95 and classify_excess from
+                      the same module but NOT _interval -- it multiplies Z95 by the SE
+                      itself to build matplotlib's yerr. The
+                      verdict it feeds -- within / reported / bar_clears / viol /
+                      degenerate -- is classify_excess() in the same module, and is
+                      stored per run under the JSON's bound_check key.
+CHANGES MEANING WITH: n per arm, and WHICH STATISTIC it is placed on. ⚠⚠ ON A MAXIMUM
+                      IT IS ANTI-CONSERVATIVE: A4 reports a max over B blocks, and the
+                      SE stored is the argmax block's alone, unadjusted for the
+                      selection. The honest interval there is the SIMULTANEOUS one at
+                      the Bonferroni z over every block-cell examined (z = 4.51 over
+                      15,603), and both are printed side by side so the size of the
+                      selection penalty is visible rather than hidden.
+Valid vs:             the same cell's own bound. ⚠ NOT a substitute for `delta`, which
+                      is a property of the EXPERIMENT's size and is fixed by the design;
+                      this is a per-cell estimate and varies with the measured TPR/TNR.
+                      ⚠ A COUNT of cells whose interval clears the line is NOT evidence:
+                      at a one-sided 5% level about 5% of cells are expected above the
+                      line by chance, 4.2 of the 84 A3/A4 cells, which is why the
+                      claimable test stays the Bonferroni-corrected z.
+Status:               PRIMARY, and a GATE in two places: scripts/arm2_figures.py refuses
+                      to draw a point above the line whose interval does not reach below
+                      it, and both attack drivers report any such cell as bar_clears
+                      rather than filing it with the cells whose bars do reach below.
+                      MEASURED 2026-10-29 over the ceiling-mode runs: 8 cells above
+                      their line across both drivers, all 8 with intervals reaching
+                      below, largest A3 D3_random at the 0.50 column, 0.5300
+                      [0.4863, 0.5737].
+Aliases:              "the error bar" is acceptable in prose FOR THIS QUANTITY, because
+                      it is an estimate. ⚠ Never for `var_q_differ` or `sd_q_differ`,
+                      which are EXACT and whose entries forbid the phrase for that
+                      reason. ⚠ NEVER "the confidence interval on the ceiling": the
+                      ceiling is analytic and has none.
+```
+
 ### acc_ceiling  [privacy] [theory] [evaluation] [gate]
 ```
 Is:                   The largest accuracy ANY equal-prior binary attacker can achieve
@@ -3418,6 +3485,36 @@ Aliases:              "the Pinsker ceiling" is acceptable in prose. ⚠ NEVER "t
                       attacker accuracy" — that name belongs to a measured quantity
                       and means close to the opposite thing.
 ```
+
+### c_quadratic  [theory] [privacy] [evaluation]
+```
+Is:                   The per-target coefficient in kl_exact = c * eta_tau^2, i.e.
+                      c = kl_exact / eta_tau^2. It is what converts a requested
+                      acc_ceiling into the eta_tau that realises it on ONE target:
+                      eta = sqrt(2 * tv^2 / c) with tv = 2*acc - 1.
+Computed by:          scripts/arm1_chr21_kl.py (arm 1, chr21, per-target leave-one-out
+                      share) and scripts/arm2_chr21_kl.py (arm 2, chr21, beta_share = 1),
+                      both as kl/eta^2 averaged over two non-zero eta, with the spread
+                      between those two points reported as the fit's conditioning.
+CHANGES MEANING WITH: the TARGET, the ARM and the SCOPE -- all three. It is target
+                      -dependent because the tilt is a function of which positions the
+                      target agrees with, and it is scope-dependent because beta is
+                      normalised over the scope. ⚠⚠ MEASURED SPREADS ACROSS TARGETS:
+                      arm 1 chr21 35.7331% (44 targets, K = 86, leave-one-out),
+                      arm 2 chr21 30.9274% (10 targets, K = 88, nothing held out).
+                      So holding nothing out does NOT make it uniform, which is the
+                      prediction that was refuted on 2026-10-28. A single shared eta
+                      therefore places different targets on DIFFERENT ceilings, and a
+                      column labelled from one target's c mislabels the others.
+Valid vs:             the measured acc_ceiling at the solved eta. kl = c * eta^2 is the
+                      LEADING term, not an identity, so a grid solved from c is a
+                      STARTING POINT and is quotable only after acc_ceiling is
+                      re-measured AT that eta and refined once (--verify).
+Status:               PRIMARY for grid construction; DIAGNOSTIC as a number in itself.
+Aliases:              "the quadratic coefficient". Do not write "c" bare in a table --
+                      it collides with capacity, which is PanMixer's knob.
+```
+
 
 ### attacker_accuracy  [attack] [evaluation] [gate]
 ```

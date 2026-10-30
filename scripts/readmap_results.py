@@ -44,12 +44,41 @@ import statistics as st
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-D = REPO / "logs" / "B_readmap_eta"
 DONORS = ("HG00138", "HG00635", "HG01112", "HG02698", "NA18853")
-# "base" is the unobfuscated graph; the rest are HG00438's release at each eta.
-GRAPHS = ("base", "eta_0", "eta_250", "eta_500", "eta_1262", "eta_2821", "eta_5642")
-LBL = {"base": "baseline (unobfuscated)", "eta_0": "0", "eta_250": "250",
-       "eta_500": "500", "eta_1262": "1262", "eta_2821": "2821", "eta_5642": "5642"}
+# ⚠⚠ TWO GRIDS, AND THEY ARE NOT POOLABLE. `eta` is the 2026-10-26 run, which was
+#    CROSS-BUILD on PanMixer's stale 340,824 tree; `acc` is the reported 0.50-0.80
+#    ceiling grid, run one-build on our 340,849 axis by
+#    `scripts/readmap_acc_run.sh`. Selected by --grid; `eta` stays the default so the
+#    registered 2026-10-26 table re-emits byte-identically.
+GRIDS = {
+    "eta": {
+        "dir": REPO / "logs" / "B_readmap_eta",
+        "knob": "eta_tau",
+        # "base" is the unobfuscated graph; the rest are HG00438's release at each eta.
+        "graphs": ("base", "eta_0", "eta_250", "eta_500", "eta_1262", "eta_2821",
+                   "eta_5642"),
+        "lbl": {"base": "baseline (unobfuscated)", "eta_0": "0", "eta_250": "250",
+                "eta_500": "500", "eta_1262": "1262", "eta_2821": "2821",
+                "eta_5642": "5642"},
+        "build": "CROSS-BUILD (PanMixer's 340,824-site tree, marked STALE)",
+    },
+    "acc": {
+        "dir": REPO / "logs" / "B_readmap_acc",
+        "knob": "acc_ceiling",
+        "graphs": ("base", "acc_0p50", "acc_0p55", "acc_0p60", "acc_0p65", "acc_0p70",
+                   "acc_0p75", "acc_0p80"),
+        # ⚠ 0.50 is `eta` = 0 -- a SECOND control, not a privacy point.
+        "lbl": {"base": "baseline (unobfuscated)", "acc_0p50": "0.50 [eta = 0]",
+                "acc_0p55": "0.55", "acc_0p60": "0.60", "acc_0p65": "0.65",
+                "acc_0p70": "0.70", "acc_0p75": "0.75", "acc_0p80": "0.80"},
+        "build": "ONE BUILD (our 340,849-site axis)",
+    },
+}
+D = GRIDS["eta"]["dir"]
+GRAPHS = GRIDS["eta"]["graphs"]
+LBL = GRIDS["eta"]["lbl"]
+KNOB = GRIDS["eta"]["knob"]
+BUILD = GRIDS["eta"]["build"]
 # PanMixer's published pair, for the DELTA comparison only.
 THEIR_BASE = (77.83, 95.62, 77.01)
 THEIR_OBF = (77.82, 95.61, 77.01)
@@ -88,7 +117,17 @@ def parse(f: Path) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--grid", choices=tuple(GRIDS), default="eta",
+                    help="which run to table. `eta` is the 2026-10-26 CROSS-BUILD run "
+                         "and stays the default so its registered table re-emits "
+                         "unchanged; `acc` is the one-build 0.50-0.80 ceiling grid. "
+                         "⚠ The two are NOT poolable and must not share a table.")
     a = ap.parse_args(argv)
+
+    global D, GRAPHS, LBL, KNOB, BUILD
+    g_ = GRIDS[a.grid]
+    D, GRAPHS, LBL = g_["dir"], g_["graphs"], g_["lbl"]
+    KNOB, BUILD = g_["knob"], g_["build"]
 
     per: dict = {}
     for g in GRAPHS:
@@ -107,8 +146,9 @@ def main(argv=None) -> int:
                for k in ("perfect", "gapless", "mapq60")} for g in GRAPHS}
 
     print("READ MAPPING ON THE RELEASED GRAPH. ARM 1, chr21, target HG00438, "
-          f"5 external donors, median over donors. Metrics are ROWS, the knob is the "
+          f"5 external donors, median over donors. Metrics are ROWS, `{KNOB}` is the "
           f"COLUMN. vg 1.68.0, single-end, `vg autoindex --workflow giraffe`.")
+    print(f"⚠ {BUILD}.")
     print("⚠ Each metric is a percentage of ALIGNED reads, per "
           "`external/PanMixer/plot_util/plot_helpers.py:15-19` — not of reads "
           "submitted. ⚠ UTILITY, not privacy. ⚠ Levels are NOT comparable to their "
@@ -143,21 +183,55 @@ def main(argv=None) -> int:
           f"largest movement in either direction: **{max(allds, key=abs):+.3f}**.")
     print("⚠ A positive delta is the obfuscated graph aligning BETTER than the "
           "baseline, which at this magnitude is not a gain.")
-    print("⚠ THE ONE MOVEMENT ABOVE NOISE IS GRAPH-LEVEL, NOT DONOR-LEVEL, and the "
-          "distinction matters. At `eta_tau` = 500 ALL FIVE donors drop together "
-          "(-0.038 to -0.063 pts each), so that graph really does align slightly "
-          "worse for everyone — it is not one noisy donor. But it is NOT monotone in "
-          "the knob (1262, 2821 and 5642 return to -0.001/-0.002), so it is "
-          "draw-to-draw variation in WHICH variants the released row happens to "
-          "carry, not an effect of `eta_tau`. One release per point is the limit "
-          "here: with n = 1 graph per column this spread cannot be separated from "
-          "sampling, and quoting -0.063 as the knob's cost would overstate it.")
+    # ⚠⚠ DERIVED, NEVER HARDCODED. This paragraph used to carry the eta grid's own
+    #    numbers as prose (`eta_tau` = 500, -0.063, "1262, 2821 and 5642"), which are
+    #    WRONG for any other grid and would have been emitted beside the acc grid's
+    #    table as if they described it. Whatever moves, the sentence now names it.
+    dips = []
+    for g in GRAPHS[1:]:
+        for k in ("perfect", "gapless", "mapq60"):
+            dd = [per[g][s][k] - per["base"][s][k] for s in DONORS]
+            if all(x < -0.01 for x in dd):
+                dips.append((g, k, min(dd), max(dd)))
+    if not dips:
+        print("⚠ NOTHING MOVES ABOVE NOISE on this grid: no metric drops across all "
+              f"{len(DONORS)} donors at any point. With n = 1 graph per column that is "
+              "the strongest statement available here.")
+    else:
+        where = ", ".join(f"`{LBL[g]}` ({k} {lo:+.3f} to {hi:+.3f} pts)"
+                          for g, k, lo, hi in dips)
+        recov = [LBL[g] for g in GRAPHS[1:]
+                 if g not in {d[0] for d in dips}
+                 and float(str(LBL[g]).split()[0] or 0) >
+                     max(float(str(LBL[d[0]]).split()[0] or 0) for d in dips)]
+        print(f"⚠ THE MOVEMENT ABOVE NOISE IS GRAPH-LEVEL, NOT DONOR-LEVEL, and the "
+              f"distinction matters. At {where}, ALL {len(DONORS)} donors drop "
+              f"together, so that graph really does align slightly worse for everyone "
+              f"— it is not one noisy donor."
+              + (f" But it is NOT monotone in the knob ({', '.join(recov)} recover), "
+                 f"so it is draw-to-draw variation in WHICH variants the released row "
+                 f"happens to carry, not an effect of the knob." if recov else "")
+              + f" One release per point is the limit here: with n = 1 graph per column "
+                f"this spread cannot be separated from sampling, and quoting "
+                f"{min(d[2] for d in dips):+.3f} as the knob's cost would overstate it.")
     print("⚠ One target (HG00438) substituted into a 44-member graph, so the released "
           "row is 1 of 44: this measures the cost of obfuscating ONE member, exactly "
           "as their Fig 5A does, and must not be read as the cost of obfuscating all.")
-    print("⚠ `e_differ`-scale context: the substituted row differs from the original "
-          "in ~137,000-139,000 of 681,648 cells at every eta, so the graph really is "
-          "being perturbed; a flat result is NOT a null edit.")
+    # ⚠ Also derived: the cell counts are read from the run log of THIS grid, since
+    #   the two grids sit on different axes (681,648 vs 681,698 cells).
+    rl = D / "run.log"
+    cells = re.findall(r"; ([\d,]+) of ([\d,]+) cells differ", rl.read_text()) \
+        if rl.exists() else []
+    if cells:
+        n = sorted(int(a.replace(",", "")) for a, _ in cells)
+        tot = int(cells[0][1].replace(",", ""))
+        print(f"⚠ `e_differ`-scale context: the substituted row differs from the "
+              f"original in {n[0]:,}-{n[-1]:,} of {tot:,} cells at every point, so the "
+              f"graph really is being perturbed; a flat result is NOT a null edit.")
+    else:
+        print("⚠ `e_differ`-scale context: n/a — no substitution counts found in "
+              f"{rl}, so whether the graph was genuinely perturbed is UNMEASURED here. "
+              "A flat result cannot be read as 'alignment does not care' without it.")
 
     if a.json:
         a.json.write_text(json.dumps(

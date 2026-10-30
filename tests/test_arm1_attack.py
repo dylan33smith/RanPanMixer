@@ -267,3 +267,151 @@ def test_extremal_decoy_is_the_shared_one_not_a_copy():
     called = p >= 0
     assert (e[called] != p[called]).all(), "every called allele must differ"
     assert (e[~called] == p[~called]).all(), "uncalled cells must stay uncalled"
+
+
+# -------------------------------------------- 5. D3_random must never BE D2_nearest
+# ⚠ WHY THIS GATE EXISTS. `pick_decoys` drew D3 uniformly from the SAME pool it took
+# D2 from, so a draw could land on the nearest donor and did: Arm 2's HG01323 and Arm
+# 1's HG00741 and HG01123 each had D3_random == D2_nearest in the shipped runs. Those
+# targets contributed one genome to two conditions reported as independent -- 1/10 of
+# Arm 2's D3 row and 2/44 of Arm 1's. Nothing raised, because a collision is a legal
+# uniform draw. Both arms now REJECT the nearest, and these gates fire on a revert.
+class _ScriptedRNG:
+    """An rng whose draws are pinned, so a collision is forced rather than hoped for."""
+
+    def __init__(self, seq):
+        self.seq = list(seq)
+        self.calls = 0
+
+    def integers(self, n):
+        self.calls += 1
+        assert self.seq, "pick_decoys drew more times than the script allows"
+        return self.seq.pop(0)
+
+
+def _diploid(val: int, t: int = 6) -> np.ndarray:
+    return np.full((t, 2), val, dtype=np.int16)
+
+
+def _arm2_state():
+    """Target plus three donors; the FIRST listed donor is the concordance maximum."""
+    return {"paths": {"T0": _diploid(0), "NEAR": _diploid(0),
+                      "FAR1": _diploid(1), "FAR2": _diploid(1)}}
+
+
+def test_arm2_d3_rejects_the_nearest_when_the_draw_lands_on_it():
+    import arm2_attack as A2
+    st = _arm2_state()
+    # others == [NEAR, FAR1, FAR2]; index 0 IS the nearest, so draw 0 then 1.
+    rng = _ScriptedRNG([0, 1])
+    d = A2.pick_decoys("T0", st, rng)
+    assert d["D2_nearest"]["id"] == "NEAR"
+    assert d["D3_random"]["id"] != d["D2_nearest"]["id"], (
+        "D3_random came back AS D2_nearest -- one genome in two conditions")
+    assert d["D3_random"]["id"] == "FAR1"
+
+
+def test_arm2_d3_is_untouched_when_the_draw_does_not_collide():
+    """The fix must be REJECTION, not a narrowed pool: a clean draw is left alone."""
+    import arm2_attack as A2
+    rng = _ScriptedRNG([2])
+    d = A2.pick_decoys("T0", _arm2_state(), rng)
+    assert d["D3_random"]["id"] == "FAR2"
+    assert rng.calls == 1, (
+        f"a non-colliding draw consumed {rng.calls} draws, so the pool was re-indexed "
+        f"and every other target's D3 identity would move too")
+
+
+def test_arm2_d3_raises_when_the_pool_cannot_satisfy_the_invariant():
+    import arm2_attack as A2
+    st = {"paths": {"T0": _diploid(0), "ONLY": _diploid(0)}}
+    with pytest.raises(ValueError, match="cannot differ from D2_nearest"):
+        A2.pick_decoys("T0", st, _ScriptedRNG([0]))
+
+
+def test_arm1_d3_rejects_the_nearest_when_the_draw_lands_on_it():
+    # sorted(others) == [A_NEAR, B_FAR, C_FAR]; index 0 IS the nearest.
+    st = {"path": _diploid(0),
+          "others": {"A_NEAR": _diploid(0), "B_FAR": _diploid(1), "C_FAR": _diploid(1)}}
+    rng = _ScriptedRNG([0, 2])
+    d = AA.pick_decoys(st, rng)
+    assert d["D2_nearest"]["id"] == "A_NEAR"
+    assert d["D3_random"]["id"] != d["D2_nearest"]["id"]
+    assert d["D3_random"]["id"] == "C_FAR"
+
+
+def test_arm1_d3_raises_when_the_pool_cannot_satisfy_the_invariant():
+    st = {"path": _diploid(0), "others": {"ONLY": _diploid(0)}}
+    with pytest.raises(ValueError, match="cannot differ"):
+        AA.pick_decoys(st, _ScriptedRNG([0]))
+
+
+def test_the_recorded_arm2_collision_is_the_one_this_gate_reproduces():
+    """HG01323's REAL seed drew index 5 of 9, which was its own nearest donor.
+
+    Not a synthetic case: the seed and the index are the shipped run's.
+    """
+    import hashlib
+    import arm2_attack as A2
+    stable = int.from_bytes(hashlib.sha256(b"HG01323").digest()[:4], "big")
+    rng = np.random.default_rng([A2.DECOY_SEED, stable])
+    assert int(rng.integers(9)) == 5, "the historical draw is not reproducing"
+    # Rebuild a 9-donor pool whose index 5 is the concordance maximum, as it was.
+    names = [f"D{i}" for i in range(9)]
+    names[5] = "HG04211"
+    paths = {"HG01323": _diploid(0)}
+    for n in names:
+        paths[n] = _diploid(0) if n == "HG04211" else _diploid(1)
+    d = A2.pick_decoys("HG01323", {"paths": paths},
+                       np.random.default_rng([A2.DECOY_SEED, stable]))
+    assert d["D2_nearest"]["id"] == "HG04211"
+    assert d["D3_random"]["id"] != "HG04211", (
+        "the exact collision the shipped run had is still reachable")
+
+
+# ------------------------- 6. the decoy is never the TARGET, in either arm
+# ⚠ Verified empirically first (0 cells in either shipped run), then gated, because
+# "it held last time" is not an invariant. Both arms exclude the target with an
+# explicit guard in a comprehension -- `arm2_attack.py` inside `pick_decoys` itself,
+# `arm1_attack.py` up in `load_state` -- and a dropped guard would make the target its
+# OWN nearest decoy, since concordance(p, p) = 1.0 is the maximum possible. The
+# measured accuracy would then collapse to chance and read as a flawless null.
+def test_arm2_rejects_the_target_as_its_own_decoy():
+    import arm2_attack as A2
+    st = _arm2_state()
+    d = A2.pick_decoys("T0", st, _ScriptedRNG([1, 2]))
+    assert d["D2_nearest"]["id"] != "T0"
+    assert d["D3_random"]["id"] != "T0"
+
+
+def test_arm2_would_pick_the_target_without_its_guard():
+    """The mutation this gate exists for, shown rather than asserted in a comment.
+
+    With the target left in the pool, concordance(p, p) = 1.0 beats every real donor,
+    so D2_nearest becomes the target itself.
+    """
+    import arm2_attack as A2
+    st = _arm2_state()
+    p = st["paths"]["T0"]
+    pool_with_target = list(st["paths"])                      # the guard removed
+    conc = {k: A2.concordance(p, st["paths"][k]) for k in pool_with_target}
+    assert max(conc, key=conc.get) == "T0", (
+        "if this is not the target then concordance is not maximal at identity and "
+        "the guard this gate protects is not the thing that keeps the target out")
+
+
+def test_both_arms_carry_the_target_exclusion_guard_in_source():
+    """⚠ STRUCTURAL, and deliberately so. Arm 1's guard is in `load_state`, which needs
+    the cohort arrays, so a behavioural gate on it would be skipif'd on a gitignored
+    artifact -- the silent-coverage-hole defect `docs/bugs.md` 2026-10-29 records. The
+    guard is one clause; assert the clause is there.
+    """
+    a2 = (REPO / "scripts" / "arm2_attack.py").read_text(encoding="utf-8")
+    a1 = (REPO / "scripts" / "arm1_attack.py").read_text(encoding="utf-8")
+    assert 'others = [k for k in st["paths"] if k != target_id]' in a2, (
+        "arm2_attack.pick_decoys no longer excludes the target from the decoy pool")
+    assert "for s, r in index.items() if s != target" in a1, (
+        "arm1_attack.load_state no longer excludes the target from the decoy pool")
+    # And the pool feeds BOTH conditions, so one guard covers D2 and D3 in each arm.
+    assert "conc = {k: concordance(p, st[\"paths\"][k]) for k in others}" in a2
+    assert 'conc = {s: _concordance(p, q) for s, q in st["others"].items()}' in a1
