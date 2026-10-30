@@ -104,6 +104,123 @@ It is a defect in the document, found by reading it, before any code was written
 
 <!-- APPEND NEW ENTRIES BELOW THIS LINE -->
 
+## 2026-10-29 — B-FIX-acc-line: THE A3/A4 BOUND LINE WAS THE WRONG ONE, AND EVERY MEASURED ACCURACY NOW CARRIES ITS ERROR BAR
+
+**Why.** Dylan: "can you fix the A3/A4 table. Also if we have any points that exceed the
+acc ceiling, we're going to have to add error bars that show the variance of that
+measure reaches below the acc line. That goes for any of our figures where we're
+comparing against the acc line."
+
+**The defect.** In `--ceiling-grid` mode `scripts/arm2_attack_a3a4.py` stored the
+`acc_ceiling` column labels in its taus slot and then handed them to
+`C.p_succ_bound`, which returns (1 + label)/2. So the line it printed and tested against
+ran **0.7500 at the 0.50 column to 0.9000 at 0.80**, between 0.10 and 0.25 ABOVE the
+real one, for every A3 and A4 cell in `logs/B_acc_arm2/a34_ceil.md`.
+⚠⚠ An `acc_ceiling` of 0.50-0.80 is a perfectly legal `tau`, so nothing raised.
+`scripts/arm2_attack.py` was never affected: the ceiling branch reached it and not this
+file -- the same one-file-short pattern as the `SeedSequence` fix (occurrence six) and
+the knob rename, now three times in one driver pair.
+⚠ In ETA mode the same code printed `~1.0 (vacuous)` and was honest. Ceiling mode made
+it worse by printing a plausible finite number.
+
+**What the correct line gives.** Recomputed from the stored per-cell data, no re-run:
+**six cells exceed, none significantly**, and every one has a 95% bar reaching below the
+line -- largest `A3 D3_random` at the 0.50 column, 0.5300 [0.4863, 0.5737], z = +1.34
+against a corrected z_crit of 2.82. All six sit at the 0.50 and 0.55 columns, which are
+exactly the two the 0.0556 `delta` cannot resolve. ✅ **THE NULL SURVIVES**, and the
+abstract's "do not significantly exceed it" is true against the right line; what was
+missing was evidence for it, not the conclusion.
+
+**Two further defects found while fixing it, both load-bearing.**
+⚠⚠ `arm2_attack_a3a4.py` **could not fail**: it returned 0 unconditionally, where
+`arm2_attack.py` has always returned `1 if violations else 0`. A falsifying cell would
+have exited clean and every queue reading `$?` would have logged `fail=0`.
+⚠⚠ `--from-json` **raised `KeyError: a4_under_p`**: the persisted trials have every
+`a4_*` key stripped (~8M numbers), so the A4 half of a table could never be re-emitted
+without redrawing 7,000 releases, despite a code comment claiming it could.
+
+**What was built.** The bound is now `bound_at(t)`, one function that BOTH the printed
+row and the check read, so the displayed line and the tested line cannot drift apart.
+Z95, _interval(), _fmt() and classify_excess() live in `arm2_attack.py` and are
+IMPORTED by the A3/A4 driver -- one definition, one mutation point, one set of gates.
+Every measured cell in both drivers now prints `balanced accuracy [95% interval]`, and
+the check reports four verdicts instead of two: the new bar_clears is a cell above the
+line whose bar does NOT reach below it, which is not claimable alone (with 84 cells
+~4.2 are expected above by chance) but must be SHOWN rather than absorbed by a corrected
+threshold. A zero SE is named DEGENERATE rather than drawn as a zero-width bar -- A3's
+`D1_extremal` is a constant answer at every label, and `[0.5000, 0.5000]` would claim
+infinite precision for the one cell carrying no information.
+`scripts/arm2_figures.py` is new: measured accuracy against the acc line on the current
+grid, which **did not exist** -- the paper's only such figure, `fig3_attacks_vs_bound`,
+is on the dead `tau` grid against a `p_succ_bound` that is 1.0 to float64 at these
+`eta_tau`, so it could not be relabelled. ⚠ The bound there is the DIAGONAL, not a
+horizontal, because the column label IS each target's measured ceiling.
+
+**Gates, mutation-tested.** `tests/test_acc_line_interval.py`, 21 tests. Five mutations
+were injected and each was caught: reverting bound_at() to `p_succ_bound` (caught by
+TWO gates, the display and the check), clipping the interval floor at 0.5, collapsing
+bar_clears into `reported`, giving degenerate cells a bar, and removing the non-zero
+exit. ⚠ The floor-at-0.0 gate is the load-bearing one: clipping at 0.5 is tempting and
+would make "the bar reaches below 0.50" unprovable at the one column where the line IS
+0.50, which is where most excesses sit.
+
+**WHAT AN ADVERSARIAL REVIEW OF THE FIX THEN FOUND — three defects IN THE FIX, two of
+them mine and one serious.** Six reviewers over the diff, each finding verified against
+the source before it was accepted.
+⚠⚠⚠ **A PERFECT ATTACKER WAS FILED AS "NO EVIDENCE EITHER WAY" AND EXITED 0.** The new
+`degenerate` verdict fired on any cell above the line with SE = 0, on the reasoning that
+SE = 0 means a CONSTANT ANSWER. That reasoning is half right and the wrong half inverts
+the suite's most important verdict. SE = 0 requires TPR and TNR BOTH in {0, 1} -- a
+conjunction -- which is four cases, not one: TPR 1 / TNR 0 and TPR 0 / TNR 1 give 0.5,
+the constant answer; **TPR 1 / TNR 1 gives 1.0, PERFECT SEPARATION**. Every line here is
+>= 0.5, so a constant answer can never BE above one, and the only way to reach that
+branch was a perfect attacker -- a total break of the mechanism, reported as a shrug.
+⚠ Before the change the same cell was a violation (`z = inf > z_crit`), so this was a
+REGRESSION I introduced. Fixed: SE = 0 above the line returns `viol` at z = infinity,
+and the display names the two cases differently (DEGENERATE at 0.5, EXACT at 0 or 1).
+The test that was supposed to cover it **asserted the bug**, and now asserts the
+enumeration instead.
+⚠⚠ **`--controls-only` crashed with UnboundLocalError.** A blanket string replace meant
+to add the violation count to `return table` also hit the early return 130 lines above
+the variable it names. Found by five reviewers independently, each with a reproduction.
+⚠⚠ **EVERY GATE THAT COULD TELL THE TWO LINES APART SKIPPED ON A GITIGNORED ARTIFACT.**
+The discriminating tests were `skipif`'d on files under `logs/`, which `.gitignore`
+excludes, so on a fresh clone or in CI they all skip, the suite goes green, and reverting
+the bound line is invisible. Replaced with dataset-free gates that drive the reporter
+directly with synthetic cells and a stubbed state; mutating the bound line now fails two
+of them with no `logs/` present at all.
+⚠ Also corrected: the figure read its corrected thresholds from a key the driver writes
+one level deeper and silently fell back to literals; the figure's own synthesis asserted
+"every exceedance sits at 0.50/0.55", which is true of A3/A4 and FALSE of the combined
+list it was printed under (an A1 cell sits at 0.60); the multiplicity note applied a 5%
+per-cell rate to 63 cells that are MAXIMA over 743 blocks each; `p_succ_bound` printed
+"~1.0 (vacuous)" at the 0.50 column where eta is 0 by construction and it is exactly
+0.5000, the tightest real bound in the table; the power curve's cells carried no bars at
+all (n = 50, SE ~0.048) and its f = 0 bullet hand-rolled an interval, printing
+"[0.5000, 0.5000] ... whose 95% bar reaches below it" for a zero-SE cell -- the exact
+false-precision claim the formatter exists to stop. ⚠ And the seed whitelist I widened
+admitted the CONTAINER name `REPORTED_CEILINGS`, which would let a CONSTANT index
+(`REPORTED_CEILINGS.index(0.50)`) satisfy the only gate watching those call sites --
+the common-random-numbers defect itself. Narrowed to `acc`, and mutation-tested.
+
+**A STANDING SE DEFECT, PRE-EXISTING, NOT FIXED AND DELIBERATELY SO.** With ties split
+each trial contributes X in {0, 0.5, 1}, whose variance is p(1-p) - t/4 for tie fraction
+t; all three drivers use the no-ties Wald form, which OVERSTATES the SE by t/4 per arm.
+At the eta = 0 control column every Lambda is identically 0, so t = 1 and the true SE is
+0 -- yet the table prints the widest bars in the grid there. ⚠ The direction is
+CONSERVATIVE (bars too wide), so it threatens no claim and makes every "the bar reaches
+below the line" statement weaker than it needs to be; correcting it would move published
+SEs and z values in three drivers, which is a decision for Dylan, not a silent fix.
+
+**What this does NOT establish.** Nothing about Arm 1, whose `acc_ceiling` is PER PAIR
+so its reference is a band and not this diagonal -- its figure is still unbuilt. Nothing
+genome-wide: every attack log is chr21 and the genome-wide ceiling has no measured
+accuracy beside it. And `src/attacks.py:empirical_accuracy` still returns a bare float,
+so each of the four drivers re-derives its own SE -- returning `(bal, se)` from the one
+primitive is what would make this rule enforceable rather than remembered.
+
+---
+
 ## 2026-10-28 (latest, 5) — B-ATK-arm2-ceiling: PER-TARGET `eta_tau` AT A SHARED CEILING, AND OCCURRENCE SIX OF THE COMMON-RANDOM-NUMBERS DEFECT
 
 **Why.** Dylan, told that Arm 2's published columns were labelled from HG00096's fit
@@ -160,8 +277,16 @@ the arithmetic seed, which makes the uniqueness gate report the exact 450-cell c
 **Reporting.** The table's knob is now NAMED rather than always called `tau` -- a column
 stamped `tau` while holding an `acc_ceiling` is uninterpretable, not imprecise -- and the
 mode is recorded in the JSON so `--from-json` cannot re-report an eta run as a tau run.
-✅ The bound check was shown to FIRE in ceiling mode by injecting a 0.96 accuracy at the
+[INCORRECT] - ✅ The bound check was shown to FIRE in ceiling mode by injecting a 0.96 accuracy at the
 0.80 column: it flagged all three conditions and exited 1.
+[CORRECTION - 2026-10-29]: The injection fired, but it COULD NOT HAVE ESTABLISHED WHAT
+THIS CLAIMS. 0.96 exceeds the correct line (the `acc_ceiling` label, 0.80) and the wrong
+one (`p_succ_bound(0.80)` = 0.90) alike, so it flags identically whichever line the code
+uses and distinguishes nothing. "All three conditions" is `arm2_attack.py`'s shape, so
+it was never run on `arm2_attack_a3a4.py` either -- which was at that moment testing
+every A3 and A4 cell against `p_succ_bound(acc_ceiling)`, a line 0.10 to 0.25 too high.
+A discriminating injection sits BETWEEN the two lines; `tests/test_acc_line_interval.py`
+uses 0.85 at the 0.80 column, which fires against 0.80 and is silent against 0.90.
 
 **What this does NOT establish.** Nothing yet about the re-run's outcome -- it is running.
 And nothing about Arm 1, whose A1/A3 driver is separate and whose grid was already fitted
@@ -2400,7 +2525,7 @@ Dylan asked how `tau` and `kl_exact` relate. The briefing's metric table read "`
 privacy dial. Attacker ADVANTAGE over a coin flip" — **wrong**. `tau` is a CEILING ON TOTAL
 VARIATION (`docs/terms.md`); the accuracy bound is `(1+tau)/2` and the ADVANTAGE bound is
 half of `tau`. The same message had given an example implying half of `tau`, so the text contradicted
-itself. Corrected in the briefing. ⚠ `paper/figures/fig1_permitted_vs_achieved.png` was already correct — it plots
+itself. Corrected in the briefing. ⚠ paper/figures/fig1_permitted_vs_achieved.png (REMOVED 2026-10-29 — see docs/data.md) was already correct — it plots
 half of `tau`.
 
 ### 5. `donor_coherence`: the two tools are NOT the same kind of object at saturation
@@ -8182,3 +8307,82 @@ chromosome axis in the driver, which does not exist.
 ⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample panel, so it is a
 LOWER BOUND on decoy difficulty and flatters us. The three conditions share each release
 and must not be pooled.
+
+## 2026-10-30 — [B-FIX-decoy-distinct] THE SHARED CEILING LABEL WAS SOUND ALL ALONG, AND D3 COULD BE D2
+
+**Hypothesis under test.** Dylan supplied a written brief arguing (a) that calibrating
+`eta` on the D1_extremal pair makes the shared column label a VALID bound for D2_nearest
+and D3_random rather than the wrong bound for them, and (b) that the decoy-pool caveat in
+`scripts/arm2_attack.py` states its direction backwards. Both were checked against source
+rather than accepted.
+
+**Method and provenance.** Every citation in the brief re-read at the line cited;
+`extremal()` at `scripts/exact_kl_stable.py:120`, the per-cell assert at
+`scripts/arm1_attack.py:336`, the pool line at `scripts/arm2_attack.py:237`, the harness
+check at `:52-54` and `:378`. The max-TV property measured directly from
+`logs/B_arm1_attack/attack.json` over all 44 targets x 6 tilted labels.
+
+**Result — the brief holds.** D1 is the maximum-TV decoy in **264 of 264** tilted Arm 1
+cells, never a tie, minimum relative margin **43.6%**, median 54.7%. Since `acc_ceiling`
+is monotone in `kl` and D1 has the largest `kl` at any `eta`, solving the label against D1
+puts D2's and D3's own ceilings BELOW it. The label is an ENVELOPE; the fault is tightness.
+
+- ⚠⚠ **[INCORRECT] - The 2026-10-29 plan.md reading called it "a PRESENTATION defect that
+  reads as a broken guarantee: `scripts/arm2_figures.py` plots D2_nearest and D3_random
+  against D1_extremal's `acc_ceiling`, which is NOT their bound".**
+  **[CORRECTION - 2026-10-30]** It IS their bound, and an enveloping one. `arm1_attack.py`
+  had it right the whole time ("~0.12 too loose" — tightness, not validity), as did
+  `docs/data.md`. The error was confined to that one plan.md sentence and to the assistant's
+  statements in chat, where it was twice called a defect. ⚠ A consequence worth keeping:
+  a point above the label is ABOVE ITS OWN PER-PAIR CEILING TOO, so the exceedance finding
+  is strengthened by this correction, not weakened.
+- ⚠⚠ **[INCORRECT] - Also claimed in chat 2026-10-29: that deciding the label IS the bound
+  "closes that gap at zero cost — no run needed".**
+  **[CORRECTION - 2026-10-30]** It closes nothing. Arm 1 MEASURES the property per cell;
+  Arm 2 has never computed a D2/D3 ceiling at any scope — `a1_ceil.json` contains the
+  string `acc_ceiling` exactly once and `arm2_chr21_kl_verified.json` carries no condition
+  field. The envelope is assumed in Arm 2 at both scopes. Closed by new
+  `scripts/arm2_genome_ceiling.py` at genome scope, and Dylan's call is that Arm 2 also
+  gets Arm 1's per-cell chr21 assert once the attacks finish.
+- ⚠ **[INCORRECT] - Claimed in chat 2026-10-30 that the "two per super-population" target
+  rationale is recorded only in `configs/README.md` and is missing from `docs/`.**
+  **[CORRECTION - 2026-10-30]** It is in `docs/data.md:220`. The claim was made after
+  checking `configs/` alone and reported as "confirmed"; `grep` over `docs/` settles it in
+  one command. The brief made the same claim and it is false in both.
+
+**The real defect, and it is separate.** `pick_decoys` drew D3_random uniformly from the
+same pool `nearest` was taken from, so a draw could land on the nearest — and did, in both
+arms, in shipped runs: Arm 2's HG01323 -> HG04211 (1 of 10) and Arm 1's HG00741 -> HG01928
+and HG01123 -> HG01978 (2 of 44). Fix, fingerprint and gates in `docs/bugs.md` 2026-10-30.
+⚠ Direction of the harm: those targets' trials appear in two conditions reported as
+independent. D1 is untouched, so the headline A1/D1 result does not move.
+
+**Measured while picking this apart — the nine-target pool is nearly equiconcordant.**
+Nearest-concordance across the ten Arm 2 targets runs **0.741712 to 0.817642**, and
+NA19056 is the nearest for FOUR of the ten (HG01468, HG02389, HG03757, NA19350). The one
+pair known to share a population, HG00096 and HG00097, sits at 0.800590 and is BEATEN by
+three cross-pairings, HG02389 <-> NA19056 at 0.817642 highest. So `concordance` over this
+pool does not order by ancestry, and "nearest of nine" is only weakly separated from
+"random" — of which the HG01323 collision is the concrete face. ⚠ Recorded here as a
+measurement; Dylan's call 2026-10-30 was that `docs/data.md` carries the selection
+rationale alone and not this reading.
+
+**The decoy-pool caveat is backwards and is deferred, not accepted.**
+`scripts/arm2_attack.py:233-234` reads "Widening the pool strengthens the attacker, so
+this limitation flatters us." For A1's 1-of-2 discrimination both halves are wrong:
+widening gives a CLOSER decoy, so `Q_p` approaches `Q_q`, so `Lambda` approaches 0 and
+measured accuracy FALLS. The narrow pool therefore produces a stronger-looking attacker
+and stresses the bound HARDER — conservative, not flattering. ⚠ The linkage reading does
+not rescue it either: more candidates also make a linkage attacker's job harder, so there
+is no attack in the suite where widening strengthens the attacker. Dylan's call is to
+state the corrected direction AND what the narrow pool actually costs, which is the claim
+"even the hardest realistic decoy cannot be distinguished". Deferred only because the
+driver is executing. ⚠ 13 occurrences of "flatters us" across five files, counted not
+read; each needs reading before it is touched.
+
+**Also corrected.** The brief quotes D3's ceiling for HG00438 at the 0.80 label as
+0.696243. The recorded run gives **0.692453** (decoy NA21309); 0.696243 is the
+pre-powered spec figure, still quoted at `scripts/arm1_attack.py:11`, and the difference
+was already explained in this file on 2026-10-28 — D3 is a uniform draw under a different
+`DECOY_SEED`, while D2 is deterministic, which is why D2's exact agreement is the
+meaningful one.

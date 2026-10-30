@@ -1965,3 +1965,158 @@ verification step. If a gate's result reaches you through a pipe, a `grep`, a `t
 lesson is that output which looks plausible is exactly what gets believed. The fix for the
 plateau claim, for the broken one-liners and for this are all the same instruction: check
 the instrument that reports the check.
+
+---
+
+## [A column label that is legal in TWO modes silently selects the wrong bound line] -> [One function feeds both the printed row and the check, and the mode travels inside the JSON]
+
+- **[2026-10-29] `arm2_attack_a3a4.py` tested every A3 and A4 cell against `p_succ_bound(acc_ceiling)`**
+  **[Symptom]** A ceiling-mode table whose bound row reads `0.7500 | 0.7750 | 0.8000 |
+  0.8250 | 0.8500 | 0.8750 | 0.9000` under columns labelled 0.50 to 0.80, closing with
+  "no condition exceeded `p_succ_bound` significantly". Both the row and the sentence are
+  **true and vacuous**: the line sits 0.10 to 0.25 above the real one.
+  ⚠ SILENT DEGRADATION. Nothing raises, because an `acc_ceiling` of 0.50-0.80 is a
+  perfectly legal `tau`. Under this line a cell can exceed the true ceiling by 0.2 and
+  print as comfortably within.
+  **[Cause]** `--ceiling-grid` stored the ceiling labels in the taus slot
+  (`a.taus = [round(c, 2) for c in REPORTED_CEILINGS]`) and every downstream consumer
+  kept treating that slot as a `tau`. ⚠ The sibling driver `arm2_attack.py` was never
+  affected -- it had a ceiling branch and this file did not. **Third occurrence of the
+  same one-file-short pattern in this driver pair**, after the `SeedSequence` seed fix
+  and the knob rename.
+  **[Proven fix]** A single `bound_at(t)` that returns the label itself in ceiling mode,
+  read by BOTH the printed bound row and the check -- if the row re-derives the line
+  itself, the displayed bound and the tested bound can drift apart, which is worse than
+  either error alone. And persist `knob` / `ceiling_etas` in the JSON: a re-table that
+  cannot recover the mode must REFUSE rather than guess, because the labels alone cannot
+  tell the two modes apart. `tests/test_acc_line_interval.py`.
+
+## [An injection that clears BOTH the right and the wrong threshold proves the gate fires and nothing more] -> [Inject strictly BETWEEN the two, so the outcome names which one is in force]
+
+- **[2026-10-29] "the bound check was shown to FIRE by injecting 0.96 at the 0.80 column"**
+  **[Symptom]** A gate recorded in `docs/memory.md` and `docs/plan.md` as mutation-tested
+  and demonstrated. It did fire. It still could not have detected the defect it was cited
+  for, and the wrong bound shipped anyway.
+  **[Cause]** 0.96 exceeds the correct line (0.80) and the wrong line (0.90) alike, so it
+  fires identically whichever the code uses. The injection tested that the check *can*
+  flag something, which was never in doubt — not that it flags against the right number.
+  ⚠ A mutation test must distinguish the correct implementation from the incorrect one.
+  An injection far outside both is a smoke test wearing a gate's clothes.
+  **[Proven fix]** Inject **between** the candidate thresholds: 0.85 at the 0.80 column is
+  above the correct line and below the wrong one, so "fires" and "silent" are different
+  outcomes that name the line in force. Assert BOTH directions in the same test.
+
+## [A driver returns 0 whatever it finds, so a falsifying run is recorded as a success] -> [Propagate the violation count into the exit code, and pin the propagation in a test]
+
+- **[2026-10-29] `arm2_attack_a3a4.py` exited 0 on any outcome**
+  **[Symptom]** A queue log reading `QUEUE DONE fail=0` and a `.status` sentinel of `0`
+  for a run that could have contained a significant bound violation. The sentinel is the
+  thing this project polls to decide a run succeeded, so the failure mode is a clean bill
+  of health.
+  **[Cause]** `main()` ended in a bare `return 0`. The sibling `arm2_attack.py` has
+  returned `1 if violations else 0` since it was written; the behaviour was never shared.
+  **[Proven fix]** `_report` returns `(table, n_viol)` and both the run path and the
+  `--from-json` path return `1 if n_viol else 0`. Gate it by asserting the source contains
+  the propagation at BOTH exits -- a test that only runs the happy path cannot see this,
+  because the happy path is exactly where the two behaviours agree.
+
+## [`--from-json` raises KeyError because the writer strips the very keys the reader recomputes from] -> [Read the stored per-cell summary, and say so where the keys are dropped]
+
+- **[2026-10-29] `KeyError: 'a4_under_p'` re-tabling a persisted A3/A4 run**
+  **[Symptom]** A re-table that cannot run at all, despite a code comment promising "the
+  table can be rebuilt with `--from-json` without redrawing a release".
+  **[Cause]** The JSON writer strips every `a4_*` key from the persisted trials (~8M
+  numbers) while the reporter recomputes the A4 table from those same raw keys. The
+  comment described the INTENT; no test exercised the path.
+  **[Proven fix]** Detect the absence (`"a4_under_p" in next(iter(res[0]["conditions"].values()))`)
+  and read the stored `table["a4"]` summary instead, which retains `max_balanced`,
+  `se_at_max`, `n_blocks` and every per-block accuracy. ⚠ A comment claiming a capability
+  is not the capability; run the path once before writing the comment.
+
+## [SE = 0 was read as "a constant answer", so a PERFECT attacker was filed as no evidence and the run exited 0] -> [Enumerate the four TPR/TNR corners; above the line, SE = 0 can only be perfect separation]
+
+- **[2026-10-29] `classify_excess` returned `degenerate` for a cell at accuracy 1.0000**
+  **[Symptom]** A bound check that reports "N cell(s) sit above the line with se = 0 — a
+  CONSTANT ANSWER, which is neither a violation nor a null", and exits 0, for an attacker
+  that separated the two hypotheses **perfectly**.
+  ⚠ SILENT DEGRADATION of the worst kind: the louder the break, the quieter the report.
+  **[Cause]** The SE is `0.5*sqrt(tpr(1-tpr)/n + tnr(1-tnr)/n)`, a sum of two non-negative
+  terms, so it vanishes only when TPR **and** TNR are both in {0,1} — a conjunction read
+  as a disjunction. That is four corners, not one: `1/0` and `0/1` give balanced 0.5 (the
+  constant answer, no information); `1/1` and `0/0` give 1.0 and 0.0 (perfect separation,
+  all of it). Since every bound in this project is >= 0.5, a constant answer can never be
+  above one — so the branch was reachable *only* by a perfect attacker.
+  **[Proven fix]** Above the line with SE = 0, return the violation at z = infinity, which
+  is what the code did before the `degenerate` branch was added. Give the two cases
+  different labels in the table — a perfect attacker printed as "a constant answer" is the
+  most misleading cell the suite can emit.
+  ⚠ **[CORRECTION - 2026-10-30]** This line used to prescribe the labels as
+  `DEGENERATE (a constant answer)` vs `EXACT (perfect separation)`, i.e. the reading
+  inside every cell. That is NOT what shipped and not what should: the cell carries the
+  SHORT marker and the reading is given once in the table's preamble, because spelling it
+  out inline would widen an already nine-column table. Every emitted table that uses a
+  marker does define it — `logs/B_acc_arm2/a34_ceil.md` in its preamble,
+  `logs/B_arm1_attack/attack.md` inline on each line that uses one, and
+  `logs/B_acc_arm2/a1_ceil.md` uses neither marker so needs no definition. ⚠ The test
+  written from this line asserted the long form and was RED for that reason, not because
+  the code was wrong; it now asserts the two invariants that matter — the markers are
+  distinguishable, and the emitted table resolves them. ⚠ The test written alongside the branch asserted the bug; it
+  now asserts the four-corner enumeration instead.
+
+## [Every gate that can detect the defect is skipif'd on a gitignored artifact, so a fresh clone is green] -> [Drive the reporter directly with synthetic cells and a stubbed dataset]
+
+- **[2026-10-29] six of the acc-line gates skipped wherever `logs/` was absent**
+  **[Symptom]** `pytest` reports "14 passed, 7 skipped" and a green suite on a machine
+  without the run artifacts — while the defect the suite exists to catch is present.
+  **[Cause]** The only gates that exercise the reporter's *choice* of bound line ran it as
+  a subprocess over a real run JSON under `logs/`, and `.gitignore` excludes `/logs/`. The
+  pure gates that remain pass the bound in explicitly, so none of them can see the choice.
+  **[Proven fix]** Call `_report` directly with hand-built cells, monkeypatching the two
+  dataset accessors (`load_state`, `a3_sites`) it needs for its caveat lines. Verified by
+  mutation with the artifacts present *and* by reasoning about a clone: reverting the bound
+  line fails two dataset-free gates. ⚠ A `skipif` on data is a silent coverage hole; count
+  the skips, and ask what each one was the only cover for.
+
+## [D3_random is drawn from the same pool D2_nearest came from, so one genome is reported as two conditions] -> [Reject the nearest; per-target rng makes the rejection surgical]
+
+- **[2026-10-30] 1 of 10 Arm 2 targets and 2 of 44 Arm 1 targets had D3_random == D2_nearest**
+  **[Symptom]** None. Every table printed three decoy conditions, every cell was populated,
+  every gate passed, and the exit code was 0. The defect is invisible in output because a
+  collision is a *legal* uniform draw — the only way to see it is to compare the two
+  conditions' recorded decoy ids, which no gate did.
+  **[Cause]** `pick_decoys` picked `nearest` as the concordance maximum over `others` and
+  then drew D3 uniformly over the *same* `others`, so P(collision) = 1/len(others) per
+  target — 1/9 in Arm 2 and 1/43 in Arm 1. Expected count across both arms was ~2.1 and
+  the observed was 3: Arm 2's HG01323 drew HG04211 (its own nearest, at draw index 5 of 9)
+  and Arm 1's HG00741 and HG01123 drew HG01928 and HG01978. For those targets the
+  "hardest real decoy" and the "easy baseline" were one genome, so the D2/D3 contrast
+  carried that target's trials twice while reporting them as independent.
+  **[Proven fix]** Reject: draw, and redraw while the draw equals `nearest`. ⚠ REJECTION
+  AND NOT A NARROWED POOL, and the reason is not style — each target's decoy rng is
+  `default_rng([DECOY_SEED, sha256(target)])`, independent of every other target, so
+  rejecting moves ONLY the targets that actually collided. Narrowing `others` would shift
+  every index and silently re-pick all ten. Both drivers also now RAISE when the pool
+  cannot satisfy the invariant (a single candidate that *is* the nearest), because
+  silently letting them coincide is what produced this. Gated by 6 tests in
+  `tests/test_arm1_attack.py` — including one that reproduces HG01323's real seed and
+  draw index rather than a synthetic case, and one asserting a non-colliding draw consumes
+  exactly one rng call, which is what distinguishes rejection from re-indexing.
+  Mutation-tested: removing the loop fails 2 gates in Arm 2 and 1 in Arm 1.
+  ⚠ The lesson generalises past decoys: two quantities drawn from one pool need an
+  explicit disjointness invariant, because the collision case is always a legal draw.
+
+## [`pgrep -f <pattern>` matches the shell running it, so `kill` on the result kills your own session] -> [Bracket the pattern, or address the job by its tmux session]
+
+- **[2026-10-30] stopping a run killed the shell that was stopping it**
+  **[Symptom]** The command exits 144 with no useful output, part-way through a multi-step
+  stop sequence, leaving it ambiguous whether the target was killed.
+  **[Cause]** `CLAUDE.md` warns against `pkill -f <pattern>` matching your own command
+  line. The same hazard applies to `pgrep -f` piped into `kill`, which is not what the
+  warning says: the pattern `arm2_attack.*--draws 100` appeared *as literal text* in the
+  shell's own `-c` argument, so `pgrep` returned that shell's pid and `kill` took it out.
+  **[Proven fix]** `tmux kill-session -t <name>` first, since a tmux-launched job is
+  addressable by session rather than by pattern. Where a pattern is unavoidable, bracket a
+  character (`'[r]anpanmixer/bin/python'`) so the pattern cannot match itself, and verify
+  with `ps -eo pid,etime,args | grep` rather than acting on `pgrep` output directly.
+  ⚠ Broaden the `CLAUDE.md` rule when it is next edited: it names `pkill`, and the hazard
+  is any pattern search whose results are passed to a signal.
