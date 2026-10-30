@@ -418,6 +418,13 @@ def _z_for_one_sided(alpha: float) -> float:
     return f(alpha)
 
 
+# ⚠ Z95, _interval, _fmt and classify_excess are IMPORTED from `arm2_attack`, never
+# redefined here. Two copies of the acc-line arithmetic is how the ceiling branch
+# reached one driver and not the other; one definition means one mutation point and
+# one set of gates for both.
+from arm2_attack import Z95, _fmt, _interval, classify_excess  # noqa: E402,F401
+
+
 def _acc(lp: np.ndarray, lq: np.ndarray) -> tuple:
     """Balanced accuracy and its SE, by A1's convention. Ties split."""
     tpr = ((lp > 0).sum() + 0.5 * (lp == 0).sum()) / len(lp)
@@ -432,12 +439,73 @@ CONDS = ("D1_extremal", "D2_nearest", "D3_random")
 
 
 def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
-            tids: list, n_per: int, pw: list | None = None) -> dict:
+            tids: list, n_per: int, pw: list | None = None,
+            ceilings: dict | None = None,
+            prior_table: dict | None = None) -> tuple[dict, int]:
     table: dict = {"a3": {}, "a4": {}}
+    is_ceil = ceilings is not None
+    knob = "acc_ceiling" if is_ceil else "tau"
+
+    def bound_at(t: float) -> float:
+        """⚠⚠ THE LINE A MEASURED ACCURACY IS TESTED AGAINST -- the whole reason this
+        function exists rather than a bare `C.p_succ_bound(t)` call.
+
+        In CEILING mode the column label IS the measured `acc_ceiling`, so the bound is
+        the label itself. Handing that label to `p_succ_bound` instead returns
+        (1 + acc)/2 -- 0.7500 at the 0.50 column, 0.9000 at 0.80 -- a line 0.10 to 0.25
+        ABOVE the real one, under which a cell can exceed the true ceiling by 0.2 and
+        still print as comfortably within. THAT IS WHAT THIS DRIVER DID until
+        2026-10-29, for every A3 and A4 cell in `logs/B_acc_arm2/a34_ceil.md`;
+        `scripts/arm2_attack.py` never did, because it got the ceiling branch and this
+        file did not. Gated by tests/test_acc_line_interval.py, which injects a value
+        BETWEEN the two lines -- the 0.96 injection on record could not discriminate
+        them, since it clears both.
+        """
+        return float(t) if is_ceil else C.p_succ_bound(t)
+
+    def bound_row(label_gate: bool = True) -> None:
+        """`p_succ_bound` is VACUOUS in ceiling mode -- the realised `tau` is 1.0 to
+        float64 at these `eta_tau` -- so it is printed as such and the real line gets
+        its own row, matching `arm2_attack.py`'s layout exactly."""
+        # ⚠⚠ EVERY NUMBER IN THIS ROW COMES FROM `bound_at`, deliberately. If the row
+        # re-derived the line itself, the PRINTED bound and the CHECKED bound could
+        # drift apart -- a table showing 0.80 while testing against 0.90 -- and that
+        # split is strictly worse than either error alone. One source, so one mutation
+        # breaks both the row and the check.
+        star = " *" if label_gate else ""
+        if is_ceil:
+            # ⚠ NOT vacuous at every column. `ceiling_grid` sets the 0.50 column's eta
+            #   to 0 BY CONSTRUCTION (the untilted control), where tau = 0 exactly and
+            #   `p_succ_bound` is exactly 0.5000 -- a real bound, and the tightest one
+            #   in the table. Printing "~1.0 (vacuous)" there tells a reader no
+            #   proof-derived bound applies to the control column, which is backwards.
+            def _psb(t) -> str:
+                etas = [ceilings[_t][f"{float(t):.2f}"] for _t in ceilings]
+                return "0.5000 (exact, eta = 0)" if max(etas) == 0 else "~1.0 (vacuous)"
+            print(f"| `p_succ_bound`{star} | "
+                  + " | ".join(_psb(t) for t in taus) + " |")
+            print(f"| `acc_ceiling` [THE BOUND, measured per target]{star} | "
+                  + " | ".join(f"{bound_at(t):.4f}" for t in taus) + " |")
+        else:
+            print(f"| `p_succ_bound`{star} | " + " | ".join(
+                ("~1.0 (vacuous)" if t >= 1.0 else f"{bound_at(t):.4f}")
+                for t in taus) + " |")
     print(f"methodology: {prereg} (git_rev {rev})\n")
-    print(f"ARM 2. {len(tids)} targets x {len(taus)} tau x {n_per} draws = "
-          f"{n_per * len(tids)} trials per (tau, condition) PER HYPOTHESIS -- matching "
-          f"A1's realised design of 250. chr21, scope chain, beta_share = 1.\n")
+    print(f"ARM 2. {len(tids)} targets x {len(taus)} {knob} x {n_per} draws = "
+          f"{n_per * len(tids)} trials per ({knob}, condition) PER HYPOTHESIS -- "
+          f"matching A1's realised design of 250. chr21, scope chain, beta_share = 1.\n")
+    if is_ceil:
+        print(f"⚠⚠ CEILING MODE: each of the {len(tids)} targets runs at ITS OWN "
+              f"`eta_tau`, solved from its own `c_quadratic`. The column is "
+              f"`acc_ceiling` and IS the bound -- measured at the solved eta and "
+              f"refined once, not fitted. ⚠ Pinsker is an inequality, so the TRUE "
+              f"ceiling is closer to 0.5 than every column label, and the looseness "
+              f"runs in the direction that flatters us.")
+        for _lab in taus:
+            _v = sorted(ceilings[_t][f"{float(_lab):.2f}"] for _t in tids)
+            print(f"      {float(_lab):.2f}: eta {_v[0]:,.2f} .. {_v[-1]:,.2f} "
+                  f"(median {_v[len(_v) // 2]:,.2f})")
+        print()
 
     # ---------------- the controls first
     print("### The pre-registered positive controls\n")
@@ -484,26 +552,57 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
             for i, _fr in enumerate(LEAK_F):
                 lp = np.array([r["conditions"][cond]["lambda_p"][i] for r in pw])
                 lq = np.array([r["conditions"][cond]["lambda_q"][i] for r in pw])
-                bal = _acc(lp, lq)[0]
-                table.setdefault("power", {}).setdefault(cond, {})[str(_fr)] = bal
-                cells.append(f"{bal:.4f}")
+                bal, se, _tpr, _tnr = _acc(lp, lq)
+                # ⚠ the SE was DISCARDED here until 2026-10-29 (`_acc(lp, lq)[0]`).
+                # n is only 50 per arm on this curve against 250 in the main tables,
+                # so its SE is ~0.048 -- more than double -- and the f = 0 column is
+                # a genuine `eta_tau` = 0 release whose acc line is exactly 0.50.
+                # An f = 0 cell reading 0.59 is therefore WITHIN noise of chance, and
+                # without the interval it reads as signal.
+                table.setdefault("power", {}).setdefault(cond, {})[str(_fr)] = {
+                    "balanced": bal, "se": se, "n_per_arm": len(lp)}
+                cells.append(_fmt(bal, se))
             print(f"| {cond} | " + " | ".join(cells) + " |")
         # the smallest declared leak A3 resolves at all
         for cond in CONDS:
-            curve = [(x, table["power"][cond][str(x)]) for x in LEAK_F]
+            curve = [(x, table["power"][cond][str(x)]["balanced"]) for x in LEAK_F]
             hit = next((x for x, b in curve if b >= 0.75), None)
+            z0 = table["power"][cond]["0.0"]
+            # ⚠ through `_fmt`, never a hand-rolled interval: this bullet printed
+            #   "[0.5000, 0.5000] ... whose 95% bar reaches below it" for a zero-SE
+            #   cell, which is the exact false-precision claim `_fmt` exists to stop.
+            verdict, _z, lo0, _hi0 = classify_excess(
+                z0["balanced"], z0["se"], 0.5, Z95)
+            if not z0["se"] > 0:
+                qual = "and carries NO bar, because it carries no information"
+            elif z0["balanced"] <= 0.5:
+                qual = "sits at or below the chance line"
+            else:
+                qual = (f"whose 95% bar {'reaches' if lo0 <= 0.5 else '⚠⚠ does NOT reach'}"
+                        f" below it")
             print(f"\n- **{cond}:** A3 first reaches 0.75 accuracy at "
                   + (f"**f = {hit:g}**" if hit is not None
                      else "**no declared f** (never reaches 0.75)")
-                  + f"; at f = 0 it sits at {table['power'][cond]['0.0']:.4f}.")
+                  + f"; at f = 0 it sits at {_fmt(z0['balanced'], z0['se'])} "
+                    f"against a chance line of 0.5000, {qual} "
+                    f"(SE {z0['se']:.4f}, n = {z0['n_per_arm']} per arm).")
         print()
 
     if not res:
-        return table
+        # ⚠ --controls-only: no trials, so no bound check ran and there is
+        #   nothing to fail on. `viol` is not bound this far up the function.
+        return table, 0
 
     # ---------------- A3
     print("### A3 — rarity-weighted genotype linkage, re-posed as 1-of-2\n")
-    print("Metrics are rows; `tau` is the column. Balanced accuracy, ties split.\n")
+    print(f"Metrics are rows; `{knob}` is the column. Balanced accuracy, ties split.\n")
+    print(f"⚠ Each cell is `attacker_accuracy` [`acc_ci95`] -- the point estimate and "
+          f"its ERROR BAR, {Z95:.2f} x SE either side, clipped to [0, 1]. The bar is "
+          f"what makes an excess over the line checkable rather than asserted; where a "
+          f"cell sits above the line, read whether its lower limit falls below it. "
+          f"⚠ Two cells carry no bar, because SE is exactly 0 and they are opposites: "
+          f"`DEGENERATE` is a CONSTANT ANSWER at 0.5000 carrying no information, and "
+          f"`EXACT` is PERFECT SEPARATION at 1.0000 carrying all of it.\n")
     hdr = "| metric | " + " | ".join(str(t) for t in taus) + " |"
     print(hdr); print("|" + "---|" * (len(taus) + 1))
     for cond in CONDS:
@@ -516,11 +615,9 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
             table["a3"].setdefault(cond, {})[tau] = {
                 "balanced": bal, "se": se, "tpr": tpr, "tnr": tnr,
                 "n_per_arm": len(lp)}
-            cells.append(f"{bal:.4f}")
+            cells.append(_fmt(bal, se))
         print(f"| {cond} balanced accuracy * | " + " | ".join(cells) + " |")
-    print("| `p_succ_bound` * | " + " | ".join(
-        ("~1.0 (vacuous)" if t >= 1.0 else f"{C.p_succ_bound(t):.4f}")
-        for t in taus) + " |")
+    bound_row()
 
     # ---------------- A4
     print("\n### A4 — segment-restricted likelihood ratio, maximised over blocks\n")
@@ -529,90 +626,189 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
           "noisy accuracies -- so the Bonferroni-corrected comparison below is the "
           "only claimable one, and the raw max is shown beside it to make the size "
           "of that bias visible.\n")
-    print(hdr); print("|" + "---|" * (len(taus) + 1))
+    # ⚠⚠ TWO PASSES, and the split is load-bearing. The SIMULTANEOUS interval needs
+    # `z_a4`, which needs `n_cells`, which is only known once every block-cell has
+    # been counted -- so nothing can be printed until the whole table is computed.
+    # ⚠⚠ AND THE SOURCE MAY BE THE STORED TABLE, NOT `res`. The persisted trials have
+    # every `a4_*` key STRIPPED (~8M numbers), so a `--from-json` re-table CANNOT
+    # recompute these from raw statistics -- it reads the per-cell summary the first
+    # run stored. Before 2026-10-29 this branch did not exist and `--from-json` raised
+    # KeyError on `a4_under_p`, which is why the A4 half of a table could never be
+    # re-emitted without redrawing 7,000 releases.
+    have_raw = bool(res) and "a4_under_p" in next(iter(res[0]["conditions"].values()))
+    if not have_raw and not prior_table:
+        raise SystemExit(
+            "A4 needs either raw per-block statistics in `res` or a stored table to "
+            "re-read. The trials in a persisted JSON carry neither, so pass the whole "
+            "JSON's `table` as prior_table.")
+
+    def _cell(d: dict, tau) -> dict:
+        """A JSON round-trip turns the float column key into a string."""
+        return d[tau] if tau in d else d[str(tau)]
+
     n_cells = 0
+    for size in BLOCK_SIZES:
+        for cond in CONDS:
+            for tau in taus:
+                if have_raw:
+                    rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
+                    lp = np.array([c["a4_under_p"][str(size)] for c in rows])  # (n, B)
+                    lq = np.array([c["a4_under_q"][str(size)] for c in rows])
+                    nb = lp.shape[1]
+                    accs = np.array([_acc(lp[:, b], lq[:, b])[0] for b in range(nb)])
+                    ses = np.array([_acc(lp[:, b], lq[:, b])[1] for b in range(nb)])
+                    b_max = int(accs.argmax())
+                    cell = {
+                        "n_blocks": nb, "max_balanced": float(accs[b_max]),
+                        "argmax_block": b_max, "se_at_max": float(ses[b_max]),
+                        "mean_balanced": float(accs.mean()),
+                        "n_per_arm": int(lp.shape[0]),
+                        # ⚠ the per-block accuracies are KEPT so the table can be
+                        # rebuilt without redrawing 7,000 releases.
+                        "block_balanced": [round(float(x), 6) for x in accs]}
+                else:
+                    cell = dict(_cell(prior_table["a4"][str(size)][cond], tau))
+                table["a4"].setdefault(str(size), {}).setdefault(cond, {})[tau] = cell
+                n_cells += cell["n_blocks"]
+
+    z_a4_sel = _z_for_one_sided(0.05 / n_cells)
+    print(f"⚠ Two intervals per cell, because the statistic is a MAXIMUM. "
+          f"`acc_ci95` (square brackets) is {Z95:.2f} x SE at the argmax block and is "
+          f"ANTI-CONSERVATIVE for a max -- it ignores the selection over B blocks. "
+          f"`(simultaneous)` is {z_a4_sel:.2f} x SE, Bonferroni over all "
+          f"{n_cells:,} block-cells, and is the interval the bound check below uses. "
+          f"The gap between them IS the selection penalty.\n")
+    print(hdr); print("|" + "---|" * (len(taus) + 1))
     for size in BLOCK_SIZES:
         for cond in CONDS:
             cells = []
             for tau in taus:
-                rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
-                lp = np.array([c["a4_under_p"][str(size)] for c in rows])  # (n, B)
-                lq = np.array([c["a4_under_q"][str(size)] for c in rows])
-                nb = lp.shape[1]
-                accs = np.array([_acc(lp[:, b], lq[:, b])[0] for b in range(nb)])
-                ses = np.array([_acc(lp[:, b], lq[:, b])[1] for b in range(nb)])
-                b_max = int(accs.argmax())
-                table["a4"].setdefault(str(size), {}).setdefault(cond, {})[tau] = {
-                    "n_blocks": nb, "max_balanced": float(accs[b_max]),
-                    "argmax_block": b_max, "se_at_max": float(ses[b_max]),
-                    "mean_balanced": float(accs.mean()),
-                    "n_per_arm": int(lp.shape[0]),
-                    # ⚠ the per-block accuracies are KEPT so the table can be rebuilt
-                    # without redrawing 7,000 releases. The raw per-trial block
-                    # statistics are NOT persisted -- they are ~8M numbers -- and these
-                    # determine every reported A4 quantity exactly.
-                    "block_balanced": [round(float(x), 6) for x in accs]}
-                n_cells += nb
-                cells.append(f"{accs[b_max]:.4f}")
+                c = table["a4"][str(size)][cond][tau]
+                if not c["se_at_max"] > 0:
+                    cells.append(_fmt(c["max_balanced"], 0.0))
+                else:
+                    slo, shi = _interval(c["max_balanced"], c["se_at_max"], z_a4_sel)
+                    cells.append(f"{_fmt(c['max_balanced'], c['se_at_max'])} "
+                                 f"({slo:.4f}, {shi:.4f})")
             print(f"| block {size}: {cond} MAX over blocks | " +
                   " | ".join(cells) + " |")
-    print("| `p_succ_bound` * | " + " | ".join(
-        ("~1.0 (vacuous)" if t >= 1.0 else f"{C.p_succ_bound(t):.4f}")
-        for t in taus) + " |")
+    bound_row()
 
     # ---------------- the bound check, Bonferroni over every cell examined
     a3_cells = len(CONDS) * len(taus)
     z_a3 = _z_for_one_sided(0.05 / a3_cells)
     z_a4 = _z_for_one_sided(0.05 / n_cells)
-    print(f"\n**THE BOUND CHECK.** ⚠ SKIPPED where the point is an `eta_tau` (p_succ_bound is 1.0 to float64 there and cannot fail; compare against the exact `acc_ceiling` in logs/B_eta_sweep/). Otherwise one-sided on the excess over `p_succ_bound`, "
+    _bname = "`acc_ceiling`" if is_ceil else "`p_succ_bound`"
+    _skipped = "" if is_ceil else (
+        " ⚠ SKIPPED where the point is an `eta_tau` (`p_succ_bound` is 1.0 to float64 "
+        "there and cannot fail; compare against the exact `acc_ceiling` in "
+        "logs/B_eta_sweep/).")
+    print(f"\n**THE BOUND CHECK.**{_skipped} One-sided on the excess over {_bname}, "
           f"Bonferroni-corrected across the cells actually examined: A3 over "
           f"{a3_cells} cells (z_crit = {z_a3:.2f}), A4 over {n_cells:,} "
           f"block-cells (z_crit = {z_a4:.2f}).\n")
-    viol, reported = [], []
+    if is_ceil:
+        print(f"⚠⚠ THE LINE IS THE COLUMN LABEL, not `p_succ_bound`. In this mode each "
+              f"target ran at its own `eta_tau` solved to land on that label, so the "
+              f"label IS the measured `acc_ceiling` and IS the bound. Handing the label "
+              f"to `p_succ_bound` instead would test against (1 + label)/2 -- 0.7500 at "
+              f"the 0.50 column up to 0.9000 at 0.80 -- which is the defect fixed on "
+              f"2026-10-29.\n")
+
+    # ⚠⚠ THREE OUTCOMES, not two, and the middle one is new (Dylan, 2026-10-29).
+    #   viol        -- significant at the Bonferroni-corrected z. THE CLAIMABLE test.
+    #   bar_clears  -- the 95% ERROR BAR does not reach below the line. Not claimable
+    #                  on its own (see the multiplicity note printed below), but it is
+    #                  the case the reader must be shown rather than have absorbed by
+    #                  a corrected threshold.
+    #   reported    -- above the line by point estimate, bar reaches below. Noise.
+    viol, bar_clears, reported, degen = [], [], [], []
+    n_examined = 0
+
+    def _judge(what: str, bal: float, se: float, t, z_crit: float, extra: str = "") -> None:
+        nonlocal n_examined
+        bound = bound_at(t)
+        n_examined += 1
+        verdict, z, lo, hi = classify_excess(bal, se, bound, z_crit)
+        if verdict == "within":
+            return
+        if verdict == "degenerate":
+            degen.append(f"{what} at {knob}={t}: {bal:.4f} vs bound {bound:.4f}, "
+                         f"se = 0 -- DEGENERATE, no evidence either way" + extra)
+            return
+        msg = (f"{what} at {knob}={t}: {bal:.4f} [{lo:.4f}, {hi:.4f}] vs bound "
+               f"{bound:.4f} (+{bal - bound:.4f}, z = {z:+.2f})" + extra)
+        {"viol": viol, "bar_clears": bar_clears, "reported": reported}[verdict].append(msg)
+
     for cond in CONDS:
         for tau in taus:
+            if not is_ceil and tau >= 1.0:
+                continue
             c = table["a3"][cond][tau]
-            if tau >= 1.0:
-                continue
-            bound = C.p_succ_bound(tau)
-            if c["balanced"] <= bound:
-                continue
-            z = (c["balanced"] - bound) / c["se"] if c["se"] > 0 else float("inf")
-            msg = (f"A3 {cond} at tau={tau}: {c['balanced']:.4f} vs bound "
-                   f"{bound:.4f} (+{c['balanced']-bound:.4f}, z = {z:+.2f})")
-            (viol if z > z_a3 else reported).append(msg)
+            _judge(f"A3 {cond}", c["balanced"], c["se"], tau, z_a3)
     for size in BLOCK_SIZES:
         for cond in CONDS:
             for tau in taus:
+                if not is_ceil and tau >= 1.0:
+                    continue
                 c = table["a4"][str(size)][cond][tau]
-                # ⚠ an eta_tau point: p_succ_bound is 1.0 to float64 and cannot fail
-                if tau >= 1.0:
-                    continue
-                bound = C.p_succ_bound(tau)
-                if c["max_balanced"] <= bound:
-                    continue
-                se = c["se_at_max"]
-                z = (c["max_balanced"] - bound) / se if se > 0 else float("inf")
-                msg = (f"A4 block {size} {cond} at tau={tau}: "
-                       f"{c['max_balanced']:.4f} vs bound {bound:.4f} "
-                       f"(+{c['max_balanced']-bound:.4f}, z = {z:+.2f}, "
-                       f"block {c['argmax_block']} of {c['n_blocks']})")
-                (viol if z > z_a4 else reported).append(msg)
+                # ⚠ the SE is the argmax block's, UNADJUSTED for the selection; the
+                # correction lives in z_a4, so the 95% bar here is anti-conservative.
+                _judge(f"A4 block {size} {cond}", c["max_balanced"], c["se_at_max"],
+                       tau, z_a4,
+                       extra=f", block {c['argmax_block']} of {c['n_blocks']}")
+
+    exp_false = 0.05 * n_examined
     if reported:
-        print(f"⚠ {len(reported)} cell(s) exceed `p_succ_bound` by POINT ESTIMATE but "
-              f"NOT significantly. Reported, not claimed:")
+        print(f"⚠ {len(reported)} cell(s) exceed {_bname} by POINT ESTIMATE, each with "
+              f"a 95% bar REACHING BELOW the line. Reported, not claimed:")
         for m in reported[:12]:
             print(f"    {m}")
         if len(reported) > 12:
             print(f"    ... and {len(reported) - 12} more (see the JSON)")
+    if degen:
+        print(f"\n⚠⚠ {len(degen)} cell(s) sit above {_bname} with se = 0 -- a CONSTANT "
+              f"ANSWER, which is neither a violation nor a null:")
+        for m in degen:
+            print(f"    {m}")
+    if bar_clears:
+        print(f"\n⚠⚠ {len(bar_clears)} cell(s) exceed {_bname} and their 95% bar does "
+              f"NOT reach below the line. Not significant after correction, so not "
+              f"claimable -- but stated here rather than absorbed, because this is the "
+              f"case an uncorrected reader would call a violation:")
+        for m in bar_clears:
+            print(f"    {m}")
+    # ⚠⚠ THE VERDICT GOES IN THE JSON, not only in the prose. A re-table, a figure or
+    # a later audit should not have to re-derive which cells were above the line and
+    # under which bound -- that re-derivation is how the wrong line went unnoticed.
+    table["bound_check"] = {
+        "knob": knob, "bound_is_column_label": is_ceil, "n_examined": n_examined,
+        "z_crit_a3": z_a3, "z_crit_a4": z_a4,
+        "bar_half_width_z": Z95,
+        "n_viol": len(viol), "n_bar_clears": len(bar_clears),
+        "n_reported": len(reported), "n_degenerate": len(degen),
+        "viol": list(viol), "bar_clears": list(bar_clears),
+        "reported": list(reported), "degenerate": list(degen)}
+    # ⚠⚠ THE 5% RATE APPLIES TO A3's CELLS ONLY. A4's are MAXIMA over hundreds of
+    # blocks, and the chance that a max over B noisy blocks lands above the line is far
+    # higher than 5% -- it is what `z_a4` exists to correct for. Quoting 0.05 x 84 would
+    # make a statement about A4 that cannot be falsified by any A4 result.
+    print(f"\n⚠ MULTIPLICITY. {n_examined:,} cells were examined. Of these, "
+          f"{a3_cells} are A3 SINGLE estimates, where a one-sided 5% level puts about "
+          f"{0.05 * a3_cells:,.1f} above the line BY CHANCE even if the mechanism is "
+          f"exact. The other {n_examined - a3_cells} are A4 MAXIMA over hundreds of "
+          f"blocks each ({n_cells:,} block-cells in total), whose chance of landing "
+          f"above the line is far higher than 5% and is NOT quoted here -- that is "
+          f"precisely what the z_crit of {z_a4:.2f} corrects for. A bare count of 95% "
+          f"exceedances is not evidence in either attack; the corrected z is.")
     if viol:
-        print(f"\n⚠⚠⚠ {len(viol)} cell(s) exceed `p_succ_bound` SIGNIFICANTLY. A "
+        print(f"\n⚠⚠⚠ {len(viol)} cell(s) exceed {_bname} SIGNIFICANTLY. A "
               f"measured accuracy above the bound falsifies the IMPLEMENTATION, not "
               f"the theorem:")
         for m in viol:
             print(f"    {m}")
     else:
-        print("\nno condition exceeded `p_succ_bound` significantly, in either attack")
+        print(f"\nno condition exceeded {_bname} significantly, in either attack")
 
     # ---------------- what the nulls do and do not mean
     print()
@@ -633,16 +829,25 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
     se0 = 0.879 / math.sqrt(n_cell)
     print(f"⚠ Minimum detectable advantage at {n_cell} trials per arm per cell "
           f"({n_per} draws x {len(tids)} targets) is {se0:.4f} "
-          f"UNCORRECTED, so tau = 0.05 and 0.10 do not resolve below the bound in "
-          f"either attack; those rows are reported, not claimed, and the PROOF "
-          f"carries them. A4's corrected threshold is {z_a4/1.645:.2f}x wider still.")
+          f"UNCORRECTED. " + (
+              (lambda unres: (
+                  f"A cell resolves only where the bound exceeds {0.5 + se0:.4f}, so "
+                  f"the {', '.join(f'{u:.2f}' for u in unres)} column(s) do NOT "
+                  f"resolve below it in either attack"
+              ) if unres else
+                  f"Every column's bound exceeds {0.5 + se0:.4f}, so every one resolves"
+              )([float(t) for t in taus if float(t) <= 0.5 + se0])
+              if is_ceil else
+              "so tau = 0.05 and 0.10 do not resolve below the bound in either attack")
+          + f"; those rows are reported, not claimed, and the PROOF carries them. "
+            f"A4's corrected threshold is {z_a4/1.645:.2f}x wider still.")
     print("⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample "
           "panel, so it is a LOWER BOUND on decoy difficulty and flatters us.")
     print("⚠ The three conditions share each release and must not be pooled.")
     print(f"⚠ A3 scores on {a3_sites(load_state())['n_bi']:,} bi-allelic cohort sites "
           f"of {len(load_state()['util'].beta):,} chain positions; the rest carry "
           f"weight the attack cannot see, which flatters us.")
-    return table
+    return table, len(viol)
 
 
 def _cap(plan, n):
@@ -716,9 +921,38 @@ def main(argv=None) -> int:
 
     if a.from_json:
         d = json.loads(a.from_json.read_text())
-        _report(d["trials"], d["controls"], tuple(d["taus"]), d.get("methodology", d.get("prereg", "unrecorded")),
-                d["git_rev"], d["targets"], d["n_per"])
-        return 0
+        # ⚠⚠ THE MODE MUST COME BACK WITH THE DATA. A ceiling run's column labels
+        # (0.50 .. 0.80) are legal `tau` values too, so a re-report that guesses will
+        # happily test a ceiling run against `p_succ_bound(label)` and move the bound
+        # line by up to 0.25 without raising anything. That is how the wrong line
+        # shipped in `a34_ceil.md`; refusing to guess is the fix.
+        saved_knob = d.get("knob")
+        saved_ceil = d.get("ceiling_etas")
+        if saved_knob is None:
+            if not a.ceiling_grid:
+                raise SystemExit(
+                    f"{a.from_json} records no `knob`, so its mode is not recoverable "
+                    f"from the file. Its labels {list(d['taus'])} are legal in BOTH "
+                    f"modes and the two bound lines differ by up to 0.25, so this will "
+                    f"not be guessed. Pass --ceiling-grid <verified fit json> to "
+                    f"re-report it as a CEILING run.")
+            saved_ceil = ceiling_grid(a.ceiling_grid, d["targets"])
+            saved_knob = "acc_ceiling"
+            print(f"⚠ mode supplied from --ceiling-grid: this JSON predates the `knob` "
+                  f"field and is being re-reported as a CEILING run.")
+        if saved_knob == "acc_ceiling" and not saved_ceil:
+            raise SystemExit(f"{a.from_json} says knob=acc_ceiling but carries no "
+                             f"`ceiling_etas`, so the per-target eta cannot be shown.")
+        _t, n_viol = _report(
+            d["trials"], d["controls"], tuple(d["taus"]),
+            d.get("methodology", d.get("prereg", "unrecorded")),
+            d["git_rev"], d["targets"], d["n_per"], pw=d.get("power"),
+            ceilings=saved_ceil if saved_knob == "acc_ceiling" else None,
+            prior_table=d.get("table"))
+        # ⚠⚠ a re-table must carry the same verdict as the run. Before 2026-10-29 this
+        # driver returned 0 unconditionally, so a SIGNIFICANT excess exited clean and
+        # the queue's `fail=0` completeness line recorded it as a success.
+        return 1 if n_viol else 0
 
     print(f"methodology: {prereg} (git_rev {rev})")
     print(f"A3 scores on {_A3['n_bi']:,} bi-allelic cohort sites of "
@@ -771,13 +1005,11 @@ def main(argv=None) -> int:
         cg = ceiling_grid(a.ceiling_grid, tids)
         a.ceiling_etas = cg
         a.taus = [round(c, 2) for c in REPORTED_CEILINGS]
-        print(f"⚠⚠ CEILING MODE: each of the {len(tids)} targets at ITS OWN `eta_tau`, "
-              f"from {a.ceiling_grid}. The column is `acc_ceiling` and IS the bound.")
-        for c in REPORTED_CEILINGS:
-            v = sorted(cg[t][f"{c:.2f}"] for t in tids)
-            print(f"      {c:.2f}: eta {v[0]:,.2f} .. {v[-1]:,.2f} "
-                  f"(median {v[len(v)//2]:,.2f})")
-        print()
+        # ⚠ a PRE-RUN confirmation only -- the per-label eta ranges are printed by
+        # `_report`, so that a `--from-json` re-table carries them too. Before
+        # 2026-10-29 they lived only here and a re-tabled md lost its own grid.
+        print(f"⚠⚠ CEILING MODE: {len(tids)} targets, each at ITS OWN `eta_tau`, from "
+              f"{a.ceiling_grid}. The column is `acc_ceiling` and IS the bound.\n")
         jobs = [(t, round(acc, 2), cg[t][f"{acc:.2f}"],
                  _cell_seed(i, CEIL_SEED_OFFSET + REPORTED_CEILINGS.index(acc), k))
                 for i, t in enumerate(tids)
@@ -810,7 +1042,8 @@ def main(argv=None) -> int:
     res = R.run_jobs(_one_trial, jobs, workers=plan.workers, label="trials",
                      progress_every=max(1, len(jobs) // 20))
 
-    table = _report(res, ctl, tuple(a.taus), prereg, rev, tids, a.draws, pw=pw)
+    table, n_viol = _report(res, ctl, tuple(a.taus), prereg, rev, tids, a.draws,
+                            pw=pw, ceilings=getattr(a, "ceiling_etas", None))
     if a.json:
         # ⚠ the raw per-block statistics are DROPPED from the JSON: 1,750 trials x 3
         # conditions x 2 hypotheses x 743 blocks is ~8M numbers. `table["a4"]`
@@ -823,6 +1056,12 @@ def main(argv=None) -> int:
                 for r in res]
         a.json.write_text(json.dumps(
             {"methodology": prereg, "git_rev": rev, "taus": list(a.taus), "targets": tids,
+             # ⚠ THE KNOB IS PART OF THE DATA. Without it `--from-json` cannot tell a
+             # ceiling run from a tau run and the bound line becomes a guess.
+             "knob": ("acc_ceiling" if getattr(a, "ceiling_etas", None)
+                      else ("eta_tau" if getattr(a, "etas", None) else "tau")),
+             "ceiling_etas": getattr(a, "ceiling_etas", None),
+             "ceiling_grid_source": (str(a.ceiling_grid) if a.ceiling_grid else None),
              "n_per": a.draws, "block_sizes": list(BLOCK_SIZES),
              "n_bi_sites": _A3["n_bi"], "controls": ctl, "power": pw, "table": table,
              "trials": lean,
@@ -831,7 +1070,11 @@ def main(argv=None) -> int:
                       "per-block accuracy, which is what the report uses")},
             indent=1) + "\n")
         print(f"\nJSON -> {a.json}")
-    return 0
+    # ⚠⚠ A SIGNIFICANT EXCESS MUST FAIL THE RUN. `arm2_attack.py` has returned
+    # `1 if violations else 0` since it was written; this driver returned 0
+    # unconditionally until 2026-10-29, so a falsifying A3 or A4 cell would have
+    # exited clean and every queue that reads `$?` would have logged `fail=0`.
+    return 1 if n_viol else 0
 
 
 if __name__ == "__main__":

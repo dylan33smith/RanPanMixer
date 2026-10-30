@@ -335,6 +335,48 @@ def main(argv=None) -> int:
                              if g else "n/a")
             print(f"| `reconstruction_accuracy`, {nm} | " + " | ".join(cells) + " |")
 
+    # ⚠⚠ NAME EVERY LINKED TARGET. A bare count in the row leaves the reader to guess
+    # which target, at which column, and by how much -- and the answer decides what the
+    # cell means. A linkage at the UNTILTED column cannot come from the tilt, because
+    # that release carries no target information at all; it is a property of the cohort
+    # and the target's typicality, and reporting it without saying so invites it to be
+    # read as a leak from our mechanism.
+    if "gap" in want:
+        hits = []
+        for col in TAUS:
+            for v in by_tau.get(col, []):
+                for which, blk, key in (
+                        ("genotype", "gap_score", "genotype_g_to_gstar"),
+                        ("haplotype", "diploid_gap_score", "haplotype_g_to_gstar")):
+                    sc = (v.get(blk) or {}).get(key)
+                    if sc is not None and sc >= 0:
+                        hits.append((which, v["subject"], col, sc))
+        print()
+        if not hits:
+            print("✅ **NO TARGET IS LINKED AT ANY POINT, on either gap score** — 0 of "
+                  f"{len(TAUS) * n_t} (target, column) cells reach the `>= 0` rule, "
+                  "against PanMixer's published 55 of 100 Can Link.")
+        else:
+            print(f"⚠⚠ **{len(hits)} (target, column) cell(s) reach the Gap Score "
+                  f"`>= 0` LINK rule.** Named, because the column decides the reading:")
+            for which, subj, col, sc in hits:
+                # ⚠ by LABEL, not by position: the untilted column is the one whose
+                #   `acc_ceiling` is 0.50, where `ceiling_grid` sets eta to 0 exactly.
+                #   A reordered manifest must not silently move this reading.
+                untilted = TAU_LABEL.get(col) == "0.5"
+                print(f"  - **{subj}** at column `{col}`, {which} gap score "
+                      f"**{sc:+,.1f}**."
+                      + ("  ⚠⚠ THIS IS THE UNTILTED COLUMN (`eta_tau` = 0): that "
+                         "release carries ZERO target information, so this linkage "
+                         "CANNOT come from the tilt. It is a property of the cohort "
+                         "and of how typical this target is, and it bounds what the "
+                         "gap score can show about our mechanism rather than "
+                         "measuring it." if untilted else
+                         "  ⚠ n = 1 release per cell, so a single cell cannot be "
+                         "separated from draw variation."))
+            print("  ⚠ n = 1 release per (target, column), so no single cell here is a "
+                  "trend, and the grid is not powered to order the columns.")
+
     print(f"\n⚠ `sampled_gap_score` is NOT runnable here: it reads a PRE-stacker object from "
           f"`starting_data/chr{CHROM}/subjects/`, which is absent from the shipped tree. "
           f"THREE of their four privacy evaluators ran, never four.")

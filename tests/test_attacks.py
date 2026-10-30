@@ -430,7 +430,19 @@ def test_the_attack_does_not_seed_from_the_draw_index_alone() -> None:
                 f"call site {k}: the per-cell seed does not mention the {role} "
                 f"({want!r}); every cell would share a stream over that axis "
                 f"(common random numbers)")
-        assert names & {"tau", "taui", "eta", "SEED_GRID", "ETA_GRID"}, (
+        # ⚠⚠ ONE NAME PER MODE, and the list must grow when a mode does. The ceiling
+        # mode added on 2026-10-28 seeds from `acc` (its operating point is the
+        # `acc_ceiling` label, not a `tau` or an `eta`), and this whitelist was not
+        # updated with it -- so the gate failed on a CORRECT call site and stayed red
+        # from that commit until 2026-10-29. A gate that is red for a false reason is
+        # as bad as one that cannot fire: it trains the next person to skip the suite.
+        # ⚠ `acc` only, NOT `REPORTED_CEILINGS`. The real call site is
+        # `_cell_seed(ti, CEIL_SEED_OFFSET + REPORTED_CEILINGS.index(acc), i)`, whose
+        # varying part is `acc`. Admitting the container name would let
+        # `REPORTED_CEILINGS.index(0.50)` -- a CONSTANT, so every ceiling column drawing
+        # the same releases, which is the common-random-numbers defect itself -- sail
+        # through the only gate that looks at these call sites.
+        assert names & {"tau", "taui", "eta", "SEED_GRID", "ETA_GRID", "acc"}, (
             f"call site {k}: the seed does not mention the operating point; all "
             f"columns would reuse one set of streams, which is the defect measured "
             f"on 2026-10-10 -- the released path was bit-identical across tau at a "
