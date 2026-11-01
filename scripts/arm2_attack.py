@@ -133,6 +133,39 @@ CEIL_SEED_OFFSET = 2000
 REPORTED_CEILINGS = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80)
 CHROM = "chr21"
 DECOY_SEED = 20261010
+# ⚠⚠ ONE DEFINITION OF THE CONDITION SET, and the order is LOAD-BEARING. `q_seed`
+# is keyed on `sorted(decoys).index(name)`, so a new condition must sort AFTER every
+# existing one or it renumbers them and silently changes draw streams already
+# reported. That is why the fourth condition is "D4_farthest" and not "D3_farthest".
+# `pick_decoys` asserts its own keys against this tuple, so the two cannot drift.
+CONDS = ("D1_extremal", "D2_nearest", "D3_random", "D4_farthest")
+
+
+def conds_in(keyed: dict, where: str) -> tuple:
+    """The conditions a RESULT actually carries, in CONDS order.
+
+    ⚠⚠ REPORTING ITERATES THE DATA, NOT THE GLOBAL. `_report` exists so a table can
+    be rebuilt from a stored JSON without re-running 110 CPU-hours of releases, and a
+    `for cond in CONDS` loop breaks that the moment CONDS grows: every pre-2026-10-31
+    run holds three conditions, and re-reporting one raised `KeyError: 'D4_farthest'`
+    (caught by tests/test_acc_line_interval.py, 2026-10-31). Iterating the data keeps
+    old runs readable AND reports a new condition the run did measure -- a hardcoded
+    list can do only one of the two.
+    ⚠ It RAISES on a condition this build has no definition for rather than dropping
+    it: a silently omitted condition is indistinguishable in the table from one that
+    sat at chance, which is the one failure a results table must never be able to hide.
+    """
+    unknown = sorted(set(keyed) - set(CONDS))
+    if unknown:
+        raise SystemExit(
+            f"{where} carries {unknown}, which this build has no definition for. "
+            f"Dropping them would leave a table that cannot be told from one where "
+            f"they sat at chance -- add them to CONDS, or re-report with the build "
+            f"that produced them.")
+    got = tuple(c for c in CONDS if c in keyed)
+    if not got:
+        raise SystemExit(f"{where} carries no known condition at all: {sorted(keyed)}")
+    return got
 # the release-stream base; the per-cell seed is a SeedSequence over
 # (SEED_BASE, target index, tau index, draw index) -- see main().
 SEED_BASE = 50_000
@@ -218,20 +251,78 @@ def concordance(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def pick_decoys(target_id: str, st: dict, rng: np.random.Generator) -> dict:
-    """The three pre-registered decoy conditions for one target.
+    """The four pre-registered decoy conditions for one target.
 
     D1 extremal — constructed, differing from the target at every called position,
       so `u_p - u_q` spans its full range and the ratio bound is saturated.
-    D2 nearest — the highest-concordance other target. THE HARDEST REAL DECOY.
-    D3 random — one other target drawn uniformly, the easy baseline.
+    D2 nearest — the highest-concordance other target.
+    D3 random — one other target drawn uniformly.
+    D4 farthest — the lowest-concordance other target.
 
-    ⚠ A LIMITATION TO STATE, NOT TO HIDE. D2's pool is the OTHER PREPARED TARGETS —
-    nine of them — not the 3,202-sample panel. Nine candidates is a weak version of
-    "the hardest real decoy"; the panel version needs a site-aligned projection of
-    the panel onto our chain axis, which does not exist yet. So D2 as run here is a
-    LOWER BOUND on decoy difficulty, and the real nearest neighbour can only be
-    harder. Widening the pool strengthens the attacker, so this limitation flatters
-    us and must be reported with the result.
+    ⚠⚠ WHICH CONDITION IS THE HARD ONE. THIS COMMENT HAD IT BACKWARDS until
+    2026-10-31, calling D2 "THE HARDEST REAL DECOY" and D3 "the easy baseline", and
+    the error survived three runs. The attack here is TWO-CANDIDATE DISTINGUISHING:
+    the adversary holds one release and both genomes and says which produced it, and
+    by Neyman-Pearson its advantage EQUALS `TV(Q_p, Q_q)`. That distance grows with
+    the target-decoy DISCORDANCE, so a NEARER decoy makes the two distributions more
+    alike and the attacker WEAKER. D2 is therefore the least distinguishable real
+    pair — the easiest cell in the suite, not the hardest — and D1 is the
+    constructed envelope above all of them.
+    ⚠⚠ D4 IS THE STRONGEST REAL TEST, BUT ONLY JUST, AND ONLY ON THE RIGHT
+    ESTIMATOR (measured 2026-10-31 by the rerun that added it). Because this rule
+    thresholds at 0 with equal priors, {L > 0} is the TV-attaining set, so
+        balanced accuracy = 0.5 + TV/2
+    is an IDENTITY -- and TV = E_p[(1 - e^-L)_+] on the same shared Q_p draws has a
+    summand bounded in [0,1] instead of a 0/1 indicator: 2.5x to 9.9x less standard
+    error for the same quantity. ⚠ DO NOT RANK THE CONDITIONS OFF THE BINARISED
+    CELLS. On TV, D4 beats D2 in 6 of 6 tilted chr21 columns (sign test p = 0.031,
+    combined +0.00389 +- 0.00179); on the binarised statistic the same data look
+    like a null with a reversal at the 0.70 label, where the two estimators of the
+    one quantity disagree in SIGN (-3.27 against +1.95). That cell is anomalous,
+    not a reversal.
+    ⚠⚠ CONDITION ON THE GAP. "nearest" and "farthest" are per-target RANKS in a
+    nine-genome pool, not two levels of a distance factor -- at genome scope the
+    pair HG04211-NA19350 is one target's farthest and the other's nearest at once.
+    For the 8 chr21 targets with a real gap, dTV = +0.0126 +- 0.0030 (z = +4.17);
+    for NA19350 and NA20294, whose own nearest neighbour is as far as other targets'
+    farthest, it is NEGATIVE. A two-group effect, not a dose-response.
+    ⚠ AND THE EFFECT IS BELOW THIS ATTACK'S RESOLUTION: the largest per-column
+    half-gap is ~0.008 against `delta` 0.0278. The 50x utility-gap ratio between D1
+    and D4 buys that 0.008 because the divergence is set by Var_p(u_p - u_q), not by
+    the gap -- see `docs/terms.md` under decoy_condition, and do NOT describe the
+    tilt and the normaliser as two mechanisms: to first order the second is minus
+    the first by construction.
+    ⚠ "nearest is the hardest" IS correct for LINKAGE, where a near-identical cohort
+    member is the confuser that can outrank the true target in a ranking. That is a
+    different question from this one and it is Arm 1's attacks that ask it; the
+    intuition does not carry across.
+
+    ⚠ DISCORDANCE IS A PROXY FOR DISTINGUISHABILITY, NOT THE MECHANISM, so D4 is
+    motivated rather than guaranteed. MEASURED genome-wide over 10 targets x 6 tilted
+    labels (logs/B_acc_arm2/genome_ceiling.json, 2026-10-31): the less concordant of
+    D2/D3 carries the higher exact `kl` for 9 of 10 targets, and D2's `acc_ceiling`
+    sits below D3's in 54 of 60 tilted cells. NA20294 is the counterexample and is
+    reported, not dropped — there the MORE discordant decoy has the LOWER `kl`,
+    because the divergence depends on how well the cohort mosaic can EMIT the decoy
+    and not only on how far the decoy disagrees. That is the same reason the extremal
+    construction is not the KL-argmax in general.
+
+    ⚠ A LIMITATION TO STATE, NOT TO HIDE. Every pool here is the OTHER PREPARED
+    TARGETS — nine of them — not the 3,202-sample panel, and it cuts in OPPOSITE
+    directions for the two real conditions. For D2, widening the pool would find a
+    NEARER neighbour, making that pair less distinguishable and the attacker weaker:
+    the narrow pool is conservative there, not flattering. For D4 it is the reverse,
+    and that is the one to report — widening the pool would find a FARTHER genome, so
+    D4 as run is a LOWER BOUND on the real worst case, and a weak one: the chr21
+    argmin beats the second-farthest genome by a median of only 0.0023 concordance,
+    and it is not even stable across scopes of the SAME nine-genome pool (it moves
+    for 6 of 10 targets between chr21 and genome). An argmin that unstable under a
+    scope change cannot be presumed stable under a pool change. ⚠ Only TWO distinct
+    individuals serve as D4 across all ten targets (NA20294 for 7, NA19350 for 3),
+    and both are themselves Arm 2 targets, so the condition rests on a sample of two
+    decoys -- which no amount of n fixes. The true farthest decoy can
+    only be more distinguishable. The panel version of either needs a site-aligned
+    projection of the panel onto our chain axis, which does not exist yet.
     """
     p = st["paths"][target_id]
     others = [k for k in st["paths"] if k != target_id]
@@ -245,10 +336,26 @@ def pick_decoys(target_id: str, st: dict, rng: np.random.Generator) -> dict:
 
     conc = {k: concordance(p, st["paths"][k]) for k in others}
     nearest = max(conc, key=conc.get)
+    # ⚠ D4 IS DETERMINISTIC AND IS NOT REJECTION-SAMPLED. It is the argmin of the same
+    # concordance map, so it cannot collide with D2 unless the map is constant (raised
+    # on below), but it MAY coincide with D3 — genome-wide it does for 2 of 10 targets.
+    # That coincidence is KEPT rather than resolved: moving D4 off the argmin would
+    # stop it being the farthest decoy, which is the only reason the condition exists.
+    # Where the two land on one genome the conditions still differ, because `q_seed` is
+    # keyed on the condition's INDEX, so D3 and D4 draw independent streams from the
+    # same pair and those cells are free independent replicates of each other.
+    # ⚠⚠ THE NAME MUST SORT AFTER "D3_random" and that is why it is D4 and not
+    # "D3_farthest": `q_seed` is `seed ^ (0x5EED * (1 + sorted(decoys).index(name)))`,
+    # so a name sorting before D3 would renumber the existing conditions and silently
+    # change every draw stream already reported.
+    farthest = min(conc, key=conc.get)
     # ⚠⚠ D3 MUST NOT BE D2. A uniform draw over `others` lands on `nearest` with
     # probability 1/len(others) -- 1/9 here -- and it DID: HG01323's draw was index
-    # 5, which was HG04211, its own nearest. For that target the HARDEST decoy and
-    # the EASY baseline were ONE GENOME, so the two conditions were not two
+    # 5, which was HG04211, its own nearest. For that target the LEAST
+    # DISTINGUISHABLE real decoy and the uniform baseline were ONE GENOME -- the
+    # labels here said "HARDEST" and "EASY" until 2026-10-31, which is the same
+    # inversion corrected in `pick_decoys`'s docstring -- so the two conditions
+    # were not two
     # conditions and the D2/D3 contrast carried 1/10 of its trials twice. Arm 1
     # collided the same way on HG00741 and HG01123 (2 of 44).
     # ⚠ REJECTION, not a narrowed pool: each target has its OWN rng
@@ -260,16 +367,37 @@ def pick_decoys(target_id: str, st: dict, rng: np.random.Generator) -> dict:
             f"{target_id}: the decoy pool is {len(others)} target(s), so D3_random "
             f"cannot differ from D2_nearest ({nearest}). Prepare more targets -- "
             f"silently letting them coincide would report one condition as two.")
+    # ⚠ ORDER MATTERS AND IS NOT COSMETIC: the pool-size raise above comes FIRST,
+    # because on a one-genome pool EVERY condition degenerates and "prepare more
+    # targets" is the actionable message. This one fires on a pool big enough for D3
+    # whose concordance map is nonetheless flat -- a different fault with a different
+    # fix, and reporting the symptom instead of the cause is what the contract forbids.
+    if farthest == nearest:
+        raise ValueError(
+            f"{target_id}: the nearest and farthest decoys are both {nearest} over a "
+            f"pool of {len(others)}, so the concordance map is constant and D2/D4 "
+            f"would be one condition wearing two names.")
     random_id = others[int(rng.integers(len(others)))]
     while random_id == nearest:
         random_id = others[int(rng.integers(len(others)))]
-    return {
+    out = {
         "D1_extremal": {"path": extremal, "id": "constructed", "concordance": None},
         "D2_nearest": {"path": st["paths"][nearest], "id": nearest,
                        "concordance": conc[nearest]},
         "D3_random": {"path": st["paths"][random_id], "id": random_id,
                       "concordance": conc[random_id]},
+        "D4_farthest": {"path": st["paths"][farthest], "id": farthest,
+                        "concordance": conc[farthest]},
     }
+    # ⚠ THE GATE THAT CATCHES A CONDITION ADDED IN ONE PLACE ONLY. The reporting
+    # loops and the release-count arithmetic read CONDS; this function builds the
+    # paths. If the two ever disagree, a condition is either run and not reported or
+    # reported and not run, and both failures are silent.
+    if tuple(sorted(out)) != tuple(sorted(CONDS)):
+        raise AssertionError(
+            f"pick_decoys built {tuple(sorted(out))} but CONDS is "
+            f"{tuple(sorted(CONDS))}; a condition was added in one place only.")
+    return out
 
 
 def ceiling_grid(path: Path, tids: list) -> dict:
@@ -319,10 +447,10 @@ def _tau_label(eta: float) -> str:
 
 
 def _one_trial(job: tuple) -> dict:
-    """One release, scored against all three decoys.
+    """One release, scored against all four decoys.
 
-    ⚠ ONE RELEASE SERVES ALL THREE CONDITIONS, which is correct and not a shortcut:
-    a release is drawn from `Q_p` and does not depend on `q`. But it makes the three
+    ⚠ ONE RELEASE SERVES EVERY CONDITION, which is correct and not a shortcut:
+    a release is drawn from `Q_p` and does not depend on `q`. But it makes the
     conditions CORRELATED through the shared draw, so they must never be pooled into
     a single accuracy.
     """
@@ -520,6 +648,12 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
     survived its first run.
     """
     table: dict = {}
+    conds = conds_in(res[0]["conditions"], "the trial records")
+    if conds != CONDS:
+        print(f"⚠ THIS RUN CARRIES {len(conds)} OF {len(CONDS)} CONDITIONS: "
+              f"{', '.join(conds)}; missing "
+              f"{', '.join(c for c in CONDS if c not in conds)}. It predates them, so "
+              f"no row below is a null for a condition that never ran.\n")
     # ⚠ The knob is NAMED, per CLAUDE.md's reporting contract: a column stamped `tau`
     #   while it holds an `acc_ceiling` makes the figure uninterpretable, not imprecise.
     _knob = ("acc_ceiling" if getattr(a, "ceiling_etas", None)
@@ -528,7 +662,7 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
           f"column.\n")
     hdr = "| metric | " + " | ".join(str(t) for t in a.taus) + " |"
     print(hdr); print("|" + "---|" * (len(a.taus) + 1))
-    for cond in ("D1_extremal", "D2_nearest", "D3_random"):
+    for cond in conds:
         cells = []
         for tau in a.taus:
             rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
@@ -567,7 +701,7 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         label = "one-sided P_p(L>0)" if a.one_sided else "balanced accuracy"
         print(f"| {cond} {label} * | " + " | ".join(cells) + " |")
     if not a.one_sided:
-        for cond in ("D1_extremal", "D2_nearest", "D3_random"):
+        for cond in conds:
             print(f"| {cond} one-sided P_p(L>0) [diagnostic, NOT bounded] | " +
                   " | ".join(f"{table[cond][t]['tpr']:.4f}" for t in a.taus) + " |")
     if getattr(a, "ceiling_etas", None):
@@ -746,9 +880,25 @@ def _report(res: list, a, delta: float, prereg: str, rev: str,
         print(f"\n⚠ delta = {delta:.4f}, so a cell resolves only where the exact "
               f"acc_ceiling exceeds {0.5 + delta:.4f}. Below that the CEILING is the "
               f"stronger statement and the attack adds nothing.")
-    print("⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample "
-          "panel, so it is a LOWER BOUND on decoy difficulty and flatters us.")
-    print("⚠ The three conditions share each release and must not be pooled.")
+    print("⚠ EVERY decoy pool is the other nine prepared targets, not the "
+          "3,202-sample panel, and it cuts OPPOSITE ways for the two real conditions: "
+          "widening it would find a NEARER neighbour for D2, making that pair less "
+          "distinguishable and the attacker weaker, and a FARTHER genome for D4. So "
+          "D4 as run is a LOWER BOUND on the real worst case, and a WEAK one: the "
+          "chr21 argmin beats the second-farthest genome by a median 0.0023 in "
+          "concordance, moves for 6 of 10 targets between chr21 and genome scope, and "
+          "only TWO distinct individuals serve as D4 across all ten targets. The "
+          "narrow D2 is conservative, not flattering.")
+    print("⚠ D2_nearest is the LEAST distinguishable real pair and so the WEAKEST "
+          "test of the bound here, not the hardest -- MEASURED, but weakly: the "
+          "optimal distinguisher's advantage equals TV(Q_p, Q_q), which grows with "
+          "discordance, and on the efficient estimator (balanced accuracy = 0.5 + "
+          "TV/2 is an identity here) the farthest decoy beats the nearest in 6 of 6 "
+          "tilted columns, sign test p = 0.031, combined +0.0039 +- 0.0018. That is "
+          "~0.008 against delta 0.0278, so do NOT rank these conditions off the "
+          "binarised cells. 'Nearest is hardest' is a LINKAGE intuition and belongs "
+          "to Arm 1.")
+    print("⚠ The four conditions share each release and must not be pooled.")
 
     if a.json:
         a.json.write_text(json.dumps(
@@ -955,9 +1105,11 @@ def main(argv=None) -> int:
                       reason=f"CAPPED by --workers {a.workers} (planned "
                              f"{plan.workers}: {plan.reason})")
     # ⚠ the balanced design draws from BOTH hypotheses: one Q_p release shared across
-    # the three conditions, plus one Q_q release PER condition. So 4 releases a trial,
-    # not 1, and the cost the pre-registration quotes must say which design it is for.
-    per_trial = 1 if a.one_sided else 1 + 3
+    # the conditions, plus one Q_q release PER condition. So len(CONDS) + 1 releases a
+    # trial, not 1, and the cost the pre-registration quotes must say which design it
+    # is for. ⚠ ADDING THE FOURTH CONDITION RAISED THIS FROM 4 TO 5 (2026-10-31):
+    # derive it, never restate it, or the printed cost silently under-reports the run.
+    per_trial = 1 if a.one_sided else 1 + len(CONDS)
     print(f"{len(tids)} targets x {a.draws} draws x {len(a.taus)} tau = "
           f"{len(jobs):,} trials x {per_trial} release(s) = "
           f"{len(jobs) * per_trial:,} releases")

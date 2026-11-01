@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""ARM 2's `acc_ceiling` GENOME-WIDE for all THREE decoy conditions.
+"""ARM 2's `acc_ceiling` GENOME-WIDE for all FOUR decoy conditions.
 
 ⚠⚠ WHAT THIS EXISTS TO TEST. Every Arm 2 table labels its columns with the
 `acc_ceiling` of the D1_extremal pair alone, and the label is a VALID bound for
-D2_nearest and D3_random only because D1 is the maximum-TV decoy. Arm 1 ASSERTS
+every real decoy only because D1 is the maximum-TV decoy. Arm 1 ASSERTS
 that per cell (`scripts/arm1_attack.py`, `cc <= c1 + 1e-9`). ARM 2 NEVER CHECKED IT,
 and never checked it at genome scope in either arm. The property is an argument
 about the construction -- D1 flips every called allele, so it maximises the utility
@@ -46,7 +46,12 @@ from mechanism import hmm, utility                           # noqa: E402
 from exact_kl_stable import AUTOSOMES, extremal, kl_stable   # noqa: E402
 from arm2_attack import DECOY_SEED, concordance              # noqa: E402
 
-CONDS = ("D1_extremal", "D2_nearest", "D3_random")
+# ⚠ D4_farthest JOINED ON 2026-10-31 AND IS THE CONDITION MOST LIKELY TO BREAK THE
+# ENVELOPE, which is why it has to be measured here rather than argued: it is the most
+# DISCORDANT real genome, so if any real decoy can out-diverge the constructed flip it
+# is this one. ⚠ The name must sort after "D3_random" -- see `arm2_attack.CONDS`.
+CONDS = ("D1_extremal", "D2_nearest", "D3_random", "D4_farthest")
+REAL = tuple(c for c in CONDS if c != "D1_extremal")
 SWEEP = REPO / "logs" / "B_acc_arm2" / "genome_sweep"
 
 
@@ -118,7 +123,7 @@ def kl_one_cell(chrom: str, t: str, grid: dict, decoys: dict,
                           share=float(grid[t]["shares"][chrom]), chrom=chrom).beta
     p = _target_path(t, chrom, ic)
     qs = {"D1_extremal": extremal(p)}
-    for cond in ("D2_nearest", "D3_random"):
+    for cond in REAL:
         qs[cond] = _target_path(decoys[t][cond], chrom, ic)
     for label, eta, _ in grid[t]["points"]:
         for cond in CONDS:
@@ -148,7 +153,7 @@ def main() -> int:
     grid = load_grid(targets)
     partial = len(a.chroms) != len(AUTOSOMES)
 
-    print(f"ARM 2 GENOME-WIDE `acc_ceiling`, ALL THREE CONDITIONS. "
+    print(f"ARM 2 GENOME-WIDE `acc_ceiling`, ALL {len(CONDS)} CONDITIONS. "
           f"{len(targets)} targets x {len(grid[targets[0]]['points'])} labels x "
           f"{len(CONDS)} conditions, {len(a.chroms)} chromosome(s), "
           f"weights {a.weights}, {a.workers} workers.")
@@ -186,12 +191,25 @@ def main() -> int:
         rand = others[int(rng.integers(len(others)))]
         while rand == nearest:
             rand = others[int(rng.integers(len(others)))]
+        # ⚠ D4 is the ARGMIN and is not rejection-sampled: moving it off the argmin
+        # would stop it being the farthest decoy. It MAY equal D3 (genome-wide it does
+        # for 2 of 10 targets) and that is kept and reported, not resolved.
+        farthest = min(conc, key=conc.get)
+        if farthest == nearest:
+            raise SystemExit(
+                f"{t}: nearest and farthest are both {nearest} over a pool of "
+                f"{len(others)}, so the concordance map is constant and D2/D4 would "
+                f"be one condition wearing two names")
         decoys[t] = {"D2_nearest": nearest, "D3_random": rand,
-                     "concordance": conc, "conc_nearest": conc[nearest]}
+                     "D4_farthest": farthest, "concordance": conc,
+                     "conc_nearest": conc[nearest], "conc_farthest": conc[farthest]}
     print(f"  concordance pass: {time.time() - t0:.1f}s")
     for t in targets:
-        print(f"    {t}: D2 {decoys[t]['D2_nearest']} "
-              f"(conc {decoys[t]['conc_nearest']:.6f})  D3 {decoys[t]['D3_random']}")
+        d = decoys[t]
+        print(f"    {t}: D2 {d['D2_nearest']} (conc {d['conc_nearest']:.6f})  "
+              f"D3 {d['D3_random']}  D4 {d['D4_farthest']} "
+              f"(conc {d['conc_farthest']:.6f})"
+              f"{'  ⚠ D3 == D4' if d['D3_random'] == d['D4_farthest'] else ''}")
 
     # ---- pass 2: exact KL per chromosome, summed
     t1 = time.time()
@@ -238,13 +256,14 @@ def main() -> int:
                 rel = abs(kl1 - kl_d1_sweep) / kl_d1_sweep
                 row["d1_vs_sweep_rel"] = rel
 
-    print("\n| target | label | eta | `acc_ceiling` D1 | D2 | D3 | D1 is max |")
-    print("|---|---|---|---|---|---|---|")
+    _cols = " | ".join(c.split("_")[0] for c in CONDS)
+    print(f"\n| target | label | eta | `acc_ceiling` {_cols} | D1 is max |")
+    print("|---|---|---|" + "---|" * (len(CONDS) + 1))
     for r in rows:
         c = r["acc_ceiling"]
         print(f"| {r['target']} | {r['label']:.2f} | {r['eta']:.3f} | "
-              f"{c['D1_extremal']:.6f} | {c['D2_nearest']:.6f} | "
-              f"{c['D3_random']:.6f} | {'yes' if r['d1_is_max'] else '⚠⚠ NO'} |")
+              + " | ".join(f"{c[k]:.6f}" for k in CONDS)
+              + f" | {'yes' if r['d1_is_max'] else '⚠⚠ NO'} |")
 
     rels = [r["d1_vs_sweep_rel"] for r in rows if "d1_vs_sweep_rel" in r]
     if rels and partial:
@@ -267,14 +286,16 @@ def main() -> int:
     tested = [r for r in rows if r["eta"] > 0.0]
     print(f"\n{'⚠⚠ ' if viol else ''}D1 IS THE MAXIMUM-TV DECOY IN "
           f"{len(tested) - len(viol)} OF {len(tested)} TILTED CELLS"
-          f"{'' if viol else ' — the label is a valid bound for D2 and D3 genome-wide'}.")
+          f"{'' if viol else f' — the label is a valid bound for {len(REAL)} real decoy conditions'}"
+          f"{'' if viol else ' at this scope'}.")
     for r in viol:
         c = r["acc_ceiling"]
+        over = [k for k in REAL if c[k] > c["D1_extremal"] + 1e-9]
         print(f"  ⚠⚠ {r['target']} at {r['label']:.2f}: D1 {c['D1_extremal']:.6f} < "
-              f"D2 {c['D2_nearest']:.6f} / D3 {c['D3_random']:.6f} — THE COLUMN LABEL "
-              f"IS NOT CONSERVATIVE FOR THIS CELL.")
-    print("\n⚠ The 0.50 label is eta = 0, where Q_p = Q_q for EVERY decoy, so all "
-          "three ceilings are exactly 0.5 and the cell is a harness check.")
+              + " / ".join(f"{k.split('_')[0]} {c[k]:.6f}" for k in over)
+              + " — THE COLUMN LABEL IS NOT CONSERVATIVE FOR THIS CELL.")
+    print(f"\n⚠ The 0.50 label is eta = 0, where Q_p = Q_q for EVERY decoy, so all "
+          f"{len(CONDS)} ceilings are exactly 0.5 and the cell is a harness check.")
     if partial:
         print("⚠⚠ PARTIAL CHROMOSOME SET — not a genome-wide result.")
 

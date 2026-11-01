@@ -488,7 +488,11 @@ def test_the_corrected_thresholds_are_computed_not_assumed(monkeypatch, m) -> No
     assert mt, "the bound-check header did not print its thresholds"
     a3_cells, z3, a4_cells, z4 = (int(mt.group(1)), float(mt.group(2)),
                                   int(mt.group(3).replace(",", "")), float(mt.group(4)))
-    assert a3_cells == len(m.CONDS) * len(CEILS) == 21
+    # ⚠ THE PRODUCT, NOT A LITERAL. This read `== 21` until 2026-10-31, when the
+    # fourth decoy condition made it 28 and the literal failed a correct reporter --
+    # a pinned grid size is exactly the assumption this test's name says it is not
+    # testing. The product still fires if the reporter drops or double-counts a cell.
+    assert a3_cells == len(m.CONDS) * len(CEILS)
     assert a4_cells == len(m.BLOCK_SIZES) * len(m.CONDS) * len(CEILS) * 10
     assert z3 == pytest.approx(m._z_for_one_sided(0.05 / a3_cells), abs=5e-3)
     assert z4 == pytest.approx(m._z_for_one_sided(0.05 / a4_cells), abs=5e-3)

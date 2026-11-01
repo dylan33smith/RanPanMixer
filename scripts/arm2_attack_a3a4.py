@@ -78,9 +78,9 @@ from mechanism import ffbs, utility  # noqa: E402
 # and the seeding discipline; a second copy would drift and then the two attacks
 # would no longer be running on the same experiment.
 import arm2_attack as A1  # noqa: E402  -- for the WEIGHTS global, which must be SET
-from arm2_attack import (CEIL_SEED_OFFSET, CHROM, DECOY_SEED, ETA_GRID,  # noqa: E402
-                         ETA_SEED_OFFSET, REPORTED_CEILINGS, ceiling_grid,
-                         EXPLORATORY_TAUS, SEED_GRID, TAUS, load_state,
+from arm2_attack import (CEIL_SEED_OFFSET, CHROM, CONDS, DECOY_SEED,  # noqa: E402
+                         ETA_GRID, ETA_SEED_OFFSET, REPORTED_CEILINGS, ceiling_grid,
+                         EXPLORATORY_TAUS, SEED_GRID, TAUS, conds_in, load_state,
                          pick_decoys)
 
 SEED_BASE = 70_000           # disjoint from A1's 50_000
@@ -435,7 +435,9 @@ def _acc(lp: np.ndarray, lq: np.ndarray) -> tuple:
     return bal, se, tpr, tnr
 
 
-CONDS = ("D1_extremal", "D2_nearest", "D3_random")
+# ⚠ CONDS IS IMPORTED, NOT REDEFINED. It was a local copy until 2026-10-31, which
+# is exactly the drift the import block above exists to prevent: a condition added to
+# A1's set would have been scored here and never reported, or the reverse.
 
 
 def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
@@ -443,6 +445,15 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
             ceilings: dict | None = None,
             prior_table: dict | None = None) -> tuple[dict, int]:
     table: dict = {"a3": {}, "a4": {}}
+    # ⚠ see `arm2_attack.conds_in`: the loops below read the RUN's conditions, so a
+    # stored JSON from before a condition existed stays re-reportable.
+    conds = conds_in(res[0]["conditions"] if res else (prior_table or {}).get("a3", {}),
+                     "this run")
+    if conds != CONDS:
+        print(f"⚠ THIS RUN CARRIES {len(conds)} OF {len(CONDS)} CONDITIONS: "
+              f"{', '.join(conds)}; missing "
+              f"{', '.join(c for c in CONDS if c not in conds)}. It predates them, so "
+              f"no row below is a null for a condition that never ran.\n")
     is_ceil = ceilings is not None
     knob = "acc_ceiling" if is_ceil else "tau"
 
@@ -547,7 +558,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
               "by construction.\n")
         fh = "| condition | " + " | ".join(f"f={x:g}" for x in LEAK_F) + " |"
         print(fh); print("|" + "---|" * (len(LEAK_F) + 1))
-        for cond in CONDS:
+        for cond in conds:
             cells = []
             for i, _fr in enumerate(LEAK_F):
                 lp = np.array([r["conditions"][cond]["lambda_p"][i] for r in pw])
@@ -564,7 +575,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
                 cells.append(_fmt(bal, se))
             print(f"| {cond} | " + " | ".join(cells) + " |")
         # the smallest declared leak A3 resolves at all
-        for cond in CONDS:
+        for cond in conds:
             curve = [(x, table["power"][cond][str(x)]["balanced"]) for x in LEAK_F]
             hit = next((x for x, b in curve if b >= 0.75), None)
             z0 = table["power"][cond]["0.0"]
@@ -605,7 +616,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
           f"`EXACT` is PERFECT SEPARATION at 1.0000 carrying all of it.\n")
     hdr = "| metric | " + " | ".join(str(t) for t in taus) + " |"
     print(hdr); print("|" + "---|" * (len(taus) + 1))
-    for cond in CONDS:
+    for cond in conds:
         cells = []
         for tau in taus:
             rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
@@ -648,7 +659,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
 
     n_cells = 0
     for size in BLOCK_SIZES:
-        for cond in CONDS:
+        for cond in conds:
             for tau in taus:
                 if have_raw:
                     rows = [r["conditions"][cond] for r in res if r["tau"] == tau]
@@ -680,7 +691,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
           f"The gap between them IS the selection penalty.\n")
     print(hdr); print("|" + "---|" * (len(taus) + 1))
     for size in BLOCK_SIZES:
-        for cond in CONDS:
+        for cond in conds:
             cells = []
             for tau in taus:
                 c = table["a4"][str(size)][cond][tau]
@@ -695,7 +706,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
     bound_row()
 
     # ---------------- the bound check, Bonferroni over every cell examined
-    a3_cells = len(CONDS) * len(taus)
+    a3_cells = len(conds) * len(taus)
     z_a3 = _z_for_one_sided(0.05 / a3_cells)
     z_a4 = _z_for_one_sided(0.05 / n_cells)
     _bname = "`acc_ceiling`" if is_ceil else "`p_succ_bound`"
@@ -740,14 +751,14 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
                f"{bound:.4f} (+{bal - bound:.4f}, z = {z:+.2f})" + extra)
         {"viol": viol, "bar_clears": bar_clears, "reported": reported}[verdict].append(msg)
 
-    for cond in CONDS:
+    for cond in conds:
         for tau in taus:
             if not is_ceil and tau >= 1.0:
                 continue
             c = table["a3"][cond][tau]
             _judge(f"A3 {cond}", c["balanced"], c["se"], tau, z_a3)
     for size in BLOCK_SIZES:
-        for cond in CONDS:
+        for cond in conds:
             for tau in taus:
                 if not is_ceil and tau >= 1.0:
                     continue
@@ -822,7 +833,7 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
         print("✅ Both positive controls pass, so the nulls are lower bounds on "
               "distinguishability rather than broken instruments. ⚠ They remain LOWER "
               "bounds: the upper bound is `acc_ceiling`, which is proof-derived.")
-    n_cell = table["a3"][CONDS[0]][taus[0]]["n_per_arm"]
+    n_cell = table["a3"][conds[0]][taus[0]]["n_per_arm"]
     assert n_cell == n_per * len(tids), (
         f"per-cell n is {n_cell} but {n_per} draws x {len(tids)} targets is "
         f"{n_per * len(tids)}; the printed delta would describe a different experiment")
@@ -841,9 +852,30 @@ def _report(res: list, ctl: dict, taus: tuple, prereg: str, rev: str,
               "so tau = 0.05 and 0.10 do not resolve below the bound in either attack")
           + f"; those rows are reported, not claimed, and the PROOF carries them. "
             f"A4's corrected threshold is {z_a4/1.645:.2f}x wider still.")
-    print("⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample "
-          "panel, so it is a LOWER BOUND on decoy difficulty and flatters us.")
-    print("⚠ The three conditions share each release and must not be pooled.")
+    # ⚠⚠ CORRECTED 2026-10-31, and it was BACKWARDS: see `arm2_attack.pick_decoys`.
+    # Edited BEFORE this driver started (A1 was running and does not import this file);
+    # the stale version would otherwise have printed a known-false claim into the
+    # results file the paper reads.
+    print("⚠ EVERY decoy pool is the other nine prepared targets, not the "
+          "3,202-sample panel, and it cuts OPPOSITE ways for the two real conditions: "
+          "widening it would find a NEARER neighbour for D2, making that pair less "
+          "distinguishable and the attacker weaker, and a FARTHER genome for D4. So "
+          "D4 as run is a LOWER BOUND on the real worst case, and a WEAK one: the "
+          "chr21 argmin beats the second-farthest genome by a median 0.0023 in "
+          "concordance, moves for 6 of 10 targets between chr21 and genome scope, and "
+          "only TWO distinct individuals serve as D4 across all ten targets. The "
+          "narrow D2 is conservative, not flattering.")
+    print("⚠ D2_nearest is the LEAST distinguishable real pair and so the WEAKEST "
+          "test of the bound here, not the hardest -- MEASURED, but weakly: the "
+          "optimal distinguisher's advantage equals TV(Q_p, Q_q), which grows with "
+          "discordance, and on the efficient estimator (balanced accuracy = 0.5 + "
+          "TV/2 is an identity here) the farthest decoy beats the nearest in 6 of 6 "
+          "tilted columns, sign test p = 0.031, combined +0.0039 +- 0.0018. That is "
+          "~0.008 against delta 0.0278, so do NOT rank these conditions off the "
+          "binarised cells. 'Nearest is hardest' is a LINKAGE intuition and belongs "
+          "to Arm 1.")
+    print(f"⚠ The {len(conds)} conditions share each release and must not be "
+          f"pooled.")
     print(f"⚠ A3 scores on {a3_sites(load_state())['n_bi']:,} bi-allelic cohort sites "
           f"of {len(load_state()['util'].beta):,} chain positions; the rest carry "
           f"weight the attack cannot see, which flatters us.")
@@ -1036,8 +1068,12 @@ def main(argv=None) -> int:
                 for tau in a.taus
                 for k in range(a.draws)]
     plan = _cap(R.plan_workers(per_job_bytes=600_000_000, n_jobs=len(jobs)), a.workers)
-    print(f"\n{len(jobs):,} trials, each drawing 1 release under Q_p and 3 under "
-          f"Q_q (one per condition) = {4*len(jobs):,} releases")
+    # ⚠ DERIVED, NOT RESTATED. This read "3 under Q_q ... = 4*len(jobs)" until
+    # 2026-10-31; the fourth condition made both figures wrong by 25% and a printed
+    # cost that under-reports the run is how a job gets sized for the wrong box.
+    print(f"\n{len(jobs):,} trials, each drawing 1 release under Q_p and "
+          f"{len(CONDS)} under Q_q (one per condition) = "
+          f"{(1 + len(CONDS)) * len(jobs):,} releases")
     print(f"{plan}\n", flush=True)
     res = R.run_jobs(_one_trial, jobs, workers=plan.workers, label="trials",
                      progress_every=max(1, len(jobs) // 20))
