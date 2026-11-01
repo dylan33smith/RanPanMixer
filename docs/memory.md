@@ -9301,3 +9301,56 @@ answered previously, when the old 2.10 and 2.12 items were replaced.
 **⚠ Sections 3 to 5 of the scaffold still cite the OLD Methods numbers.** Fixed per section as
 each is filled, not swept — the same precedent set for retiring "comparator".
 
+## 2026-11-01 — B-LCK-paper-sync: phase-b's work carried onto the paper branch
+
+**Asked.** "Move all the most recent results from phase-b over to paper ... You don't have
+to move the paper stuff over because that is just figures and stuff from another model. You
+can also get rid of all the read mapping stuff."
+
+**⚠⚠ THREE THINGS WOULD HAVE BEEN DESTRUCTIVE AND WERE CAUGHT BY LOOKING FIRST.**
+(1) **`results/` exists ONLY on `paper`** — 22 files, ~207k lines — so any path-level
+checkout of `phase-b` onto `paper` would have DELETED the entire curated results set.
+(2) **`paper`'s `tests/test_attacks.py` deliberately OMITS**
+`test_the_decision_k_addendum_exists_and_is_signed`, and `tests/test_docs_contract.py` is
+deliberately absent, both because that branch carries no `paper/` tree; overwriting either
+from phase-b would have added tests that cannot pass there. (3) `CLAUDE.md` on `paper` is a
+code-only rewrite. The committed trees were otherwise IDENTICAL for `src/`, `scripts/`,
+`configs/` and `docs/terms.md`, so the 23-against-9 commit divergence was almost entirely
+those files plus `docs/` and `paper/`.
+
+**⚠ `paper` IS CHECKED OUT IN ITS OWN WORKTREE at `/home/ds85/rpm_paper_wt`**, which is why
+`git checkout paper` in the main clone fails. A cherry-pick issued after that failed
+checkout ran against `phase-b` instead and had to be aborted; nothing was lost. There is
+also a detached snapshot worktree at `RanPanMixer-paper-snapshot`.
+
+**Done.** Three scope-separated commits on `phase-b` (a16518a, 60cd86d, 6c71175), then the
+two code commits CHERRY-PICKED onto `paper` — both applied cleanly, since neither touches
+the files the branches deliberately differ on. `paper` then got its results snapshot
+refreshed: Arm 2's two attack files re-copied from the n = 1,000 four-condition re-run,
+the new chr21 envelope added with its verified `eta` grid, `readmap.json` and `readmap.md`
+deleted, and the results README edited in place — the two re-runs it recorded as "in
+flight" are marked LANDED and its n = 250 paragraph marked SUPERSEDED.
+
+**✅ VERIFIED.** `phase-b` 499 passed. `paper` **463 passed, 12 skipped**, and the
+difference reconciles EXACTLY: 24 fewer tests collected = `test_docs_contract.py`'s 23 plus
+the one `paper/`-dependent test in `test_attacks.py`, both deliberately absent there. The
+12 skips are the tests needing gitignored `logs/`, which the worktree does not have.
+
+**✅ A SKIP GUARD WAS ADDED FIRST, and it is the reason the branch is green.**
+`tests/test_arm2_chr21_ceiling.py`'s three refusal tests read the verified grid out of
+`logs/` to build tampered copies. `logs/` is gitignored on every branch, so on a fresh
+checkout they would have ERRORED rather than skipped — a new test file failing on the
+release branch for a reason unrelated to the code it gates.
+
+**✅ READ MAPPING: what survives is correct.** Four scripts, the `giraffe_mapping_rates`
+term, and both results files are gone. Four tracked mentions remain and all four say we
+AVOID `vg giraffe` — `src/target/path.py`, `configs/inputs.chr21.yaml`, and two in
+`docs/terms.md`, one of which is the retirement tombstone. Those are statements about our
+method, not read-mapping work.
+
+**⚠ NOT PUSHED.** `paper` is 3 commits ahead of origin/paper, `phase-b` 4 ahead of
+origin/phase-b. ⚠ A stash sits in the paper worktree (`stash@{0}`, the read-map deletions
+parked before the cherry-pick) and is now redundant, kept rather than dropped.
+⚠ The manuscript was NOT carried over, by instruction: `paper/` is 0 files on that branch
+by design and `docs/` there is `terms.md` alone.
+
