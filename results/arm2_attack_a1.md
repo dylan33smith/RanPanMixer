@@ -1,60 +1,61 @@
-⚠⚠ **[CORRECTION - 2026-10-28] THE COLUMN LABELS HERE ARE ONE TARGET'S FIT.**
-All ten targets ran at the shared `eta_tau` list [0.0, 75.7, 151.4, 227.1, 302.8, 378.5,
-454.19], whose mapping to `acc_ceiling` 0.50-0.80 was fitted on **HG00096 alone**
-(`logs/B_eta_grid_v2/chr21_uniform.json`). `c_quadratic` spreads **30.9274%** across the
-ten (2.690912e-06 NA20294 to 3.523140e-06 HG01323), so nine of ten targets sat at a
-ceiling that is not the label -- by up to **0.0365 at the 0.80 column** -- and six of ten
-sat BELOW it, meaning their true bound was TIGHTER than printed.
-✅ **THE NULL SURVIVES THE CORRECTION**: the corrected worst-case bound at 0.80 is 0.7635
-against a measured 0.7080, a margin of 0.0555 rather than 0.092.
-✅ This table's SEEDS are sound -- `scripts/arm2_attack.py` already used a `SeedSequence`
-over the whole cell key, so the defect that voided the A3/A4 table did NOT touch this one.
-✅ REPLACED BY a re-run at per-target `eta_tau` (`logs/B_acc_arm2/a1_ceil.md`), in which
-each column IS the measured bound. This file is kept only until that lands.
-⚠ The text below is preserved VERBATIM as the record of what was run.
+methodology: docs/plan.md direction block, 2026-10-24 (git_rev 6882ad55cac661e4c270070ac1ed725e0e99e3da-dirty+141712599732)
 
-methodology: docs/plan.md direction block, 2026-10-24 (git_rev 6979b5a4a1f096ff39a413271e4cd11c2e8bba16-dirty+844e5210ca16)
+⚠⚠ CEILING MODE: each of the 10 targets runs at ITS OWN `eta_tau`, from logs/B_acc_arm2/arm2_chr21_kl_verified.json. The column is `acc_ceiling` and IS the bound -- measured at the solved eta and refined once, not fitted.
+      0.50: eta 0.00 .. 0.00 (median 0.00)
+      0.55: eta 75.35 .. 86.24 (median 76.41)
+      0.60: eta 150.69 .. 172.45 (median 152.81)
+      0.65: eta 226.03 .. 258.66 (median 229.21)
+      0.70: eta 301.38 .. 344.84 (median 305.59)
+      0.75: eta 376.72 .. 431.01 (median 381.98)
+      0.80: eta 452.06 .. 517.17 (median 458.36)
+⚠ `p_succ_bound` is 1.0 to float64 at every one of these eta, so it is NOT the bound here and is printed as vacuous.
 
-⚠⚠ ETA MODE: driving the tilt by eta [0.0, 75.7, 151.4, 227.1, 302.8, 378.5, 454.19] directly. The equivalent tau is 1.0 to float64 at every point, so p_succ_bound carries NO information here -- compare against the exact acc_ceiling in logs/B_eta_sweep/ instead.
+10 targets x 100 draws x 7 tau = 7,000 trials x 5 release(s) = 35,000 releases
+1000 trials per (tau, condition) per ARM -> minimum detectable advantage delta = 0.0278 (BALANCED 0.879/sqrt(n))
+44 workers (0.94 GB/job, 180 GB usable) — CAPPED by --workers 44 (planned 46: CORE-bound: 48 cores less 2 reserved)
 
-10 targets x 25 draws x 7 tau = 1,750 trials x 4 release(s) = 7,000 releases
-250 trials per (tau, condition) per ARM -> minimum detectable advantage delta = 0.0556 (BALANCED 0.879/sqrt(n))
-30 workers (0.94 GB/job, 174 GB usable) — CAPPED by --workers 30 (planned 46: CORE-bound: 48 cores less 2 reserved)
+  700/7000 trials
+  1400/7000 trials
+  2100/7000 trials
+  2800/7000 trials
+  3500/7000 trials
+  4200/7000 trials
+  4900/7000 trials
+  5600/7000 trials
+  6300/7000 trials
+  7000/7000 trials
+Accuracy of the optimal distinguisher. Metrics are rows; `acc_ceiling` is the column.
 
-  175/1750 trials
-  350/1750 trials
-  525/1750 trials
-  700/1750 trials
-  875/1750 trials
-  1050/1750 trials
-  1225/1750 trials
-  1400/1750 trials
-  1575/1750 trials
-  1750/1750 trials
-Accuracy of the optimal distinguisher. Metrics are rows; `tau` is the column.
-
-| metric | 0.0 | 75.7 | 151.4 | 227.1 | 302.8 | 378.5 | 454.19 |
+| metric | 0.5 | 0.55 | 0.6 | 0.65 | 0.7 | 0.75 | 0.8 |
 |---|---|---|---|---|---|---|---|
-| D1_extremal balanced accuracy * | 0.5000 | 0.5140 | 0.5660 | 0.6280 | 0.6540 | 0.7260 | 0.7080 |
-| D2_nearest balanced accuracy * | 0.5000 | 0.5120 | 0.5340 | 0.5520 | 0.5840 | 0.5900 | 0.6260 |
-| D3_random balanced accuracy * | 0.5000 | 0.5580 | 0.5500 | 0.5380 | 0.5860 | 0.6080 | 0.6080 |
-| D1_extremal one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5080 | 0.6080 | 0.5880 | 0.6480 | 0.7440 | 0.6880 |
-| D2_nearest one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5080 | 0.5640 | 0.5080 | 0.5640 | 0.6200 | 0.5960 |
-| D3_random one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5200 | 0.5400 | 0.5560 | 0.5560 | 0.5840 | 0.6160 |
-| equivalent `tau` | 0 | 1 - 1e-65.45 | 1 - 1e-131.2 | 1 - 1e-197 | 1 - 1e-262.7 | 1 - 1e-328.5 | 1 - 1e-394.2 |
-| `epsilon_tau` | 0 | 151.4 | 302.8 | 454.2 | 605.6 | 757 | 908.38 |
+| D1_extremal balanced accuracy * | 0.5000 [0.4781, 0.5219] | 0.5530 [0.5312, 0.5748] | 0.5895 [0.5679, 0.6111] | 0.5905 [0.5690, 0.6120] | 0.6555 [0.6347, 0.6763] | 0.6905 [0.6702, 0.7108] | 0.7190 [0.6993, 0.7387] |
+| D2_nearest balanced accuracy * | 0.5000 [0.4781, 0.5219] | 0.5485 [0.5267, 0.5703] | 0.5360 [0.5141, 0.5579] | 0.5705 [0.5488, 0.5922] | 0.6200 [0.5987, 0.6413] | 0.6205 [0.5992, 0.6418] | 0.6290 [0.6078, 0.6502] |
+| D3_random balanced accuracy * | 0.5000 [0.4781, 0.5219] | 0.5220 [0.5001, 0.5439] | 0.5440 [0.5222, 0.5658] | 0.5830 [0.5614, 0.6046] | 0.5935 [0.5720, 0.6150] | 0.6265 [0.6053, 0.6477] | 0.6425 [0.6215, 0.6635] |
+| D4_farthest balanced accuracy * | 0.5000 [0.4781, 0.5219] | 0.5315 [0.5096, 0.5534] | 0.5300 [0.5081, 0.5519] | 0.5730 [0.5513, 0.5947] | 0.5735 [0.5518, 0.5952] | 0.6235 [0.6023, 0.6447] | 0.6505 [0.6296, 0.6714] |
+| D1_extremal one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5450 | 0.5860 | 0.5960 | 0.6460 | 0.6800 | 0.7140 |
+| D2_nearest one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5610 | 0.5320 | 0.5620 | 0.6160 | 0.6310 | 0.6430 |
+| D3_random one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5310 | 0.5420 | 0.5880 | 0.5860 | 0.6230 | 0.6380 |
+| D4_farthest one-sided P_p(L>0) [diagnostic, NOT bounded] | 0.5000 | 0.5410 | 0.5460 | 0.5770 | 0.5720 | 0.6450 | 0.6430 |
+| `eta_tau` median [per target] | 0.00 | 76.41 | 152.81 | 229.21 | 305.59 | 381.98 | 458.36 |
+| `eta_tau` min [per target] | 0.00 | 75.35 | 150.69 | 226.03 | 301.38 | 376.72 | 452.06 |
+| `eta_tau` max [per target] | 0.00 | 86.24 | 172.45 | 258.66 | 344.84 | 431.01 | 517.17 |
+| `epsilon_tau` median [per target] | 0.00 | 152.82 | 305.62 | 458.41 | 611.19 | 763.96 | 916.72 |
+| equivalent `tau` | 0 | 1 - 1e-65 or smaller | 1 - 1e-65 or smaller | 1 - 1e-65 or smaller | 1 - 1e-65 or smaller | 1 - 1e-65 or smaller | 1 - 1e-65 or smaller |
 | `p_succ_bound` * | ~1.0 | ~1.0 | ~1.0 | ~1.0 | ~1.0 | ~1.0 | ~1.0 |
-| bound comparison meaningful? | **no (vacuous)** | **no (vacuous)** | **no (vacuous)** | **no (vacuous)** | **no (vacuous)** | **no (vacuous)** | **no (vacuous)** |
+| `acc_ceiling` [THE BOUND, measured per target] * | 0.5000 | 0.5500 | 0.6000 | 0.6500 | 0.7000 | 0.7500 | 0.8000 |
 
-⚠ Bound check is against the EXACT `acc_ceiling` supplied for [0.0, 75.7, 151.4, 227.1, 302.8, 378.5, 454.19], NOT `p_succ_bound` (which is 1.0 to float64 at every one of these eta and so cannot fail).
+⚠ Bound check is against the COLUMN LABEL, which in this mode IS the exact `acc_ceiling`: each target ran at its own `eta_tau`, solved from its own `c` and verified by re-measurement. No --acc-ceiling is involved and none is accepted.
 
-⚠ 1 cell(s) exceed `p_succ_bound` by POINT ESTIMATE but NOT significantly (one-sided 5%, Bonferroni over 21 cells, z_crit = 2.82). Reported, not claimed:
-    D3_random at tau=75.7: 0.5580 vs bound 0.5500 (+0.0080, z = +0.36)
+⚠ 1 cell(s) exceed their own measured `acc_ceiling` by POINT ESTIMATE but NOT significantly (one-sided 5%, Bonferroni over 28 cells, z_crit = 2.91), each with a 95% bar REACHING BELOW the line. Reported, not claimed:
+    D1_extremal at acc_ceiling=0.55: 0.5530 [0.5312, 0.5748] vs bound 0.5500 (+0.0030, z = +0.27)
 
-no condition exceeded the exact acc_ceiling at any eta
+⚠ MULTIPLICITY. 28 cells were examined, so at a one-sided 5% level about 1.4 of them are expected above the line BY CHANCE even if the mechanism is exact. A bare count of 95% exceedances is not evidence; the Bonferroni-corrected z is.
 
-⚠ delta = 0.0556, so a cell resolves only where the exact acc_ceiling exceeds 0.5556. Below that the CEILING is the stronger statement and the attack adds nothing.
-⚠ D2's decoy pool is the other prepared targets, not the 3,202-sample panel, so it is a LOWER BOUND on decoy difficulty and flatters us.
-⚠ The three conditions share each release and must not be pooled.
+no condition exceeded its own measured acc_ceiling at any ceiling
 
-JSON -> logs/B_acc_arm2/a1_acc.json
+⚠ delta = 0.0278, so a cell resolves only where the exact acc_ceiling exceeds 0.5278. Below that the CEILING is the stronger statement and the attack adds nothing.
+⚠ EVERY decoy pool is the other nine prepared targets, not the 3,202-sample panel, and it cuts OPPOSITE ways for the two real conditions: widening it would find a NEARER neighbour for D2, making that pair less distinguishable and the attacker weaker, and a FARTHER genome for D4. So D4 as run is a LOWER BOUND on the real worst case and is the limitation to report; the narrow D2 is conservative, not flattering.
+⚠ D2_nearest is the LEAST distinguishable real pair and so the WEAKEST test of the bound here, not the hardest: the optimal distinguisher's advantage is TV(Q_p, Q_q), which grows with target-decoy discordance. 'Nearest is hardest' is a LINKAGE intuition and belongs to Arm 1.
+⚠ The four conditions share each release and must not be pooled.
+
+JSON -> logs/B_acc_arm2/a1_ceil_n1000_d4.json

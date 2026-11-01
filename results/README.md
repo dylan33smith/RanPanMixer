@@ -1,5 +1,7 @@
 # Results — the `acc_ceiling` 0.50–0.80 regime, chr21, Arm 1 against PanMixer
 
+⚠ **UPDATED 2026-11-01.** Arm 2's attack snapshot is re-copied from the n = 1,000 four-condition re-run, Arm 2's chr21 column-label envelope is now MEASURED and added, and the read-mapping arm is withdrawn from the paper and gone from here.
+
 Every table here is **emitted by a script, not typed**, and carries its own provenance
 line. This directory is the curated set the paper cites; the raw run logs it was taken
 from live under `logs/`, which is gitignored on every branch and is therefore not in git
@@ -32,15 +34,16 @@ level is a floor, never a privacy result.
 | `pm_draw_noise.md` | PanMixer's own draw noise, 5 seeds per cell — the analysis that changed a conclusion | `scripts/pm_draw_noise.py` |
 | `af_ld.md` | `af_loss` and `ld_loss` for BOTH tools on ONE build, their evaluators unmodified | `scripts/arm1_af_ld_results.py` |
 | `af_ld_sensitivity.md` | **read this before quoting `af_ld.md`** — both its headlines are policy-dependent | `scripts/arm1_afld_sensitivity.py` |
-| `readmap.md` + `.json` | read mapping on the released graph, PanMixer's Fig 5A quantity | `scripts/readmap_results.py` |
 | `summary.html` | the figure page: frontier chart and 44-individual paired dot plot, drawn to scale | generated from `summary_figures.json` |
 | `summary_figures.json` | every figure on that page, so no number on it is retyped by hand | consolidated |
 | `kl_fit_verified.json` | the per-target fitted `eta` at each ceiling label, and its measured error | `scripts/arm1_chr21_kl.py --verify` |
 | `arm1_release_record.json` | the release record for all 308 cells (44 targets x 7 ceilings) | `scripts/arm1_release.py --ceilings` |
 | `arm1_exact_endpoint.json` | the exact `E[differ]` and `E_Q[u]` endpoint, zero Monte-Carlo error | same run, rides along |
 | `arm1_attack.md` + `.json` | **ARM 1: A1 and A3 at power on this grid** | `scripts/arm1_attack.py` |
-| `arm2_attack_a1.md` + `.json` | **ARM 2: A1 on this grid**, chr21 at share 1.0, K = 88, nothing held out | `scripts/arm2_attack.py` |
-| `arm2_attack_a34.md` + `.json` | **ARM 2: A3 and A4 on this grid**, with A3's power curve — read that, not its control | `scripts/arm2_attack_a3a4.py` |
+| `arm2_attack_a1.md` + `.json` | **ARM 2: A1 on this grid**, chr21 at share 1.0, K = 88, nothing held out. ⚠ RE-COPIED 2026-11-01 from the n = 1,000 FOUR-condition re-run | `scripts/arm2_attack.py` |
+| `arm2_attack_a34.md` + `.json` | **ARM 2: A3 and A4 on this grid**, with A3's power curve — read that, not its control. ⚠ RE-COPIED 2026-11-01 from the n = 1,000 FOUR-condition re-run | `scripts/arm2_attack_a3a4.py` |
+| `arm2_chr21_ceiling.md` + `.json` | **ARM 2: the column-label envelope, MEASURED EXACTLY for all four decoy conditions on chr21** — whether the constructed decoy the label comes from really does dominate every real pair | `scripts/arm2_chr21_ceiling.py` |
+| `arm2_kl_fit_verified.json` | Arm 2's per-target chr21 `eta_tau` at each ceiling label, measured at the solved `eta` and refined once — the grid both the attack driver and the envelope driver read their bound from | `scripts/arm2_chr21_kl.py --verify` |
 | `arm1_beagle.md` + `.json` | **PanMixer's BEAGLE reconstruction attack on all 308 Arm 1 releases**, their code called, our build | `scripts/arm1_attacks_results.py` |
 | `arm2_queue.log` | the run queue for the three passes above, with completeness counted FROM DISK | `scripts/beagle_attack_run.sh` and the queue driver |
 
@@ -81,7 +84,9 @@ level is a floor, never a privacy result.
   ALONE.** `c_quadratic` spreads 30.9274% across the ten targets, so nine of ten sat at
   a ceiling that is not the label, by up to 0.0365 at the 0.80 column, and six of ten
   sat BELOW it. ✅ The null SURVIVES: corrected worst-case bound 0.7635 against the
-  measured 0.7080. A re-run at per-target `eta_tau` is in flight.
+  measured 0.7080. ✅ **[LANDED 2026-11-01]** the re-run at per-target `eta_tau` is the
+  snapshot now in this directory, at n = 1,000 and with a fourth decoy condition, so
+  every column here IS its own measured ceiling and no shared label is involved.
 - **ARM 2's optimal attacker lands where ARM 1's did, and no condition significantly
   exceeds its ceiling in either arm.** At the 0.80 label A1 reaches **0.7080** in Arm 2
   against **0.706818** in Arm 1 -- within 0.0012, against the same 0.800 bound.
@@ -90,13 +95,38 @@ level is a floor, never a privacy result.
   is chr21 at share **1.0** under the full K = 88 with nothing held out. What agrees is
   where the Neyman-Pearson optimum lands against a bound the two were matched on by
   `acc_ceiling`, which is what matching on `acc_ceiling` rather than `eta_tau` buys.
-  ⚠ Arm 2 is n = 250 per cell per arm against Arm 1's 440, and its `delta` is 0.0556 --
-  a cell resolves only where the ceiling exceeds 0.5556, so the 0.55 and 0.60 columns add
-  nothing over the ceiling itself. One point-estimate exceedance (D3_random at 0.55,
-  0.5580 vs 0.5500, z = +0.36) sits inside exactly that band.
+  ⚠⚠ **[SUPERSEDED 2026-11-01] THE n = 250 FIGURES IN THIS BULLET ARE NOT THE SNAPSHOT.**
+  Arm 2 now runs at n = 1,000 per cell per arm with FOUR conditions, so `delta` is 0.0278
+  and a cell resolves wherever its ceiling exceeds 0.5278 -- which brings 0.55 into range.
+  Read `arm2_attack_a1.md`: at the 0.80 label the most distinguishable REAL pair reaches
+  **0.6505** (D4_farthest) against the 0.8000 bound, and no condition exceeds its own
+  measured ceiling significantly. One point-estimate exceedance remains (D1_extremal at
+  0.55, 0.5530 against 0.5500, z = +0.27, interval reaching below the line), and
+  D1_extremal is the CALIBRATION decoy and is not reported as an attack result.
   ⚠⚠ **A SCOPE SPLIT THAT MUST BE STAMPED, NEVER POOLED.** Arm 2's ATTACK evidence here is
   chr21 at share 1.0 -- the only scope its driver implements -- while Arm 2's UTILITY
   numbers are genome-wide. Two different released objects; they may not share a table.
+- ✅✅ **THE COLUMN LABEL PROVABLY BOUNDS EVERY REAL PAIR ON chr21, MEASURED EXACTLY.**
+  Every Arm 2 column is labelled with the `acc_ceiling` of the constructed `D1_extremal`
+  pair, which bounds the real-genome pairs only if that decoy is the more divergent one.
+  Arm 1 asserts it per cell; this measures it for Arm 2 at the scope its attacks actually
+  run. `D1_extremal` carries the larger exact `kl_exact` in **all 180 (target, label, real
+  condition) cells**, with better than a factor of two to spare: the worst real-to-D1
+  ratio anywhere is **0.478403**, and the most divergent real pair at the 0.80 label has
+  an exact ceiling of **0.7075** against the 0.8000 its column carries.
+  ⚠ This settles the envelope the COLUMN LABEL rests on and NOT the ranking of the
+  conditions by distinguishability: `kl_exact` feeds Pinsker, which is an UPPER bound on
+  total variation. Two different quantities.
+  ✅ **It replaced the suite's last open measurement, and the exact route was the stronger
+  instrument rather than merely the faster one.** By Monte Carlo the per-cell envelope was
+  UNRESOLVED at 0.55, 0.60 and 0.65, where the sampled estimator's median per-cell
+  standard error was 1.007x the exact quantity itself and five cells returned a NEGATIVE
+  divergence. Exactly, 10 of 10 resolve at 0.55, with zero sampling error.
+  ✅ The run re-measures `D1_extremal` against the divergence its own `eta` was solved
+  for and reproduces all 60 cells to **6.82e-13**, because a wrong `beta_v` scope,
+  weighting or chain mask would still return entirely plausible real-decoy numbers.
+  ⚠ chr21 and Arm 2 ONLY. Genome scope carries D1/D2/D3, so no D4 cell may be read
+  against the label there, and Arm 1 does not inherit the fourth condition.
 - **Beagle does not reconstruct our release, and it does worse than guessing.** PanMixer's
   own reconstruction attack on all 308 cells (308/308, 0 failures, counted from disk):
   the published statistic `beagle_accuracy` - `major_allele_accuracy` is **negative at
@@ -136,9 +166,9 @@ level is a floor, never a privacy result.
 - ⚠⚠⚠ **[CORRECTION - 2026-10-28] THE A3/A4 NUMBERS IN THIS BULLET ARE SUPERSEDED.**
   They were drawn under an arithmetic seed that made **450 of 1,750 cells (25.71%)**
   share a release stream with another cell, so they are not independent draws and
-  their standard errors are too narrow (`docs/bugs.md`, occurrence SIX). A re-run at
-  per-target `eta_tau` is in flight. The bullet is preserved verbatim below as the
-  record of what was reported; do not quote its figures until it is replaced.
+  their standard errors are too narrow (`docs/bugs.md`, occurrence SIX). ✅ **[LANDED 2026-11-01]** the
+  re-run is the snapshot now in this directory. The bullet is preserved verbatim below as
+  the record of what was reported; quote `arm2_attack_a34.md` instead.
 - **A3 and A4 add nothing significant, and A3's pre-registered control is worthless.**
   Neither attack exceeds its bound (A3 peaks 0.5980, A4 0.5990, against Bonferroni z_crit
   2.82 over 21 A3 cells and 4.51 over 15,603 A4 block-cells).
@@ -154,9 +184,6 @@ level is a floor, never a privacy result.
   verbatim from the target was the argmax block in 30 of 30 pairs.
   ⚠ A3's `D1_extremal` row is exactly 0.5000 at all seven labels, the same subset-sum
   degeneracy that makes Arm 1's A3 `D1_extremal` row TPR 1.0000 / TNR 0.0000.
-- **Read mapping is flat**: worst degradation anywhere is -0.063 points, against
-  PanMixer's own published -0.01. ⚠ n = 1 graph per column; absolute levels are not
-  comparable to their published figures (vg 1.68 against 1.36), only deltas.
 
 ## What is NOT here
 
@@ -181,8 +208,10 @@ level is a floor, never a privacy result.
   so the panel is not visibly the source) — but n = 5 against n = 39 cannot resolve a
   difference the size of this grid's effects, so it weakens the concern without settling
   it. Do not quote it as the control the exclude-self pass would have been.
-- **Read mapping** on this grid. The existing numbers are on the old genome-wide `eta`
-  grid and are deliberately NOT included here.
+- **Read mapping**, at all. ⚠ WITHDRAWN FROM THE PAPER 2026-11-01 (Dylan: "We got rid of
+  the read mapping work from this paper entirely"), so its four scripts, its terms.md
+  entry and its results files are deleted rather than merely excluded. The Discussion
+  names the omission.
 - **Arm 2's genome-wide UTILITY sweep** at all 10 targets. Arm 2's ATTACK evidence is
   here (A1, A3, A4) but at chr21 share 1.0, the only scope its driver implements; its
   utility numbers are genome-wide and not yet re-run in this regime. ⚠⚠ The two are
