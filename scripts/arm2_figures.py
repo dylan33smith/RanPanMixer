@@ -48,10 +48,31 @@ A34_JSON = REPO / "logs" / "B_acc_arm2" / "a34_ceil.json"
 OUT = REPO / "logs" / "B_acc_arm2" / "figures"
 
 CEILINGS = (0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80)
-CONDS = ("D1_extremal", "D2_nearest", "D3_random")
+# ⚠ CONDS IS READ FROM THE RUN, NOT FIXED HERE. A plotter with a hardcoded condition
+# list SILENTLY DROPS a condition the run measured, and a dropped curve is
+# indistinguishable from a curve at chance -- the one failure mode a figure cannot
+# show. `_conds_of` takes the intersection of this style table and what the JSON
+# actually holds, and raises if the JSON carries a condition it cannot style.
+CONDS = ("D1_extremal", "D2_nearest", "D3_random", "D4_farthest")
 # A3 over its 21 cells, A4 over its 15,603 block-cells. Read from the run, not assumed.
-MARK = {"D1_extremal": "o", "D2_nearest": "s", "D3_random": "^"}
-COL = {"D1_extremal": "#1b4965", "D2_nearest": "#bc4749", "D3_random": "#6a994e"}
+MARK = {"D1_extremal": "o", "D2_nearest": "s", "D3_random": "^", "D4_farthest": "D"}
+COL = {"D1_extremal": "#1b4965", "D2_nearest": "#bc4749", "D3_random": "#6a994e",
+       "D4_farthest": "#8d5a97"}
+
+
+def _conds_of(acc: dict) -> tuple:
+    """The conditions this run actually measured, in CONDS order.
+
+    ⚠ RAISES on a condition with no style rather than skipping it: a run that adds a
+    condition must not produce a figure that quietly omits it. Pre-2026-10-31 runs hold
+    three conditions and plot three curves; the D4 reruns hold four.
+    """
+    unstyled = sorted(set(acc) - set(CONDS))
+    if unstyled:
+        raise SystemExit(
+            f"{unstyled} are in the run but have no marker or colour here, so the "
+            f"figure would drop them silently. Add them to MARK and COL.")
+    return tuple(c for c in CONDS if c in acc)
 
 
 def _k(d: dict, c: float):
@@ -75,15 +96,24 @@ def load() -> dict:
     if a1.get("knob") != "acc_ceiling":
         raise SystemExit(f"{A1_JSON} is not a ceiling run: knob={a1.get('knob')!r}")
 
+    # ⚠ ONE condition set per JSON, taken from the JSON. A1 and A34 are separate runs
+    # and could be at different vintages; plotting A34's conditions on A1's keys is how
+    # a missing curve becomes a KeyError at best and a wrong label at worst.
+    c_a1 = _conds_of(a1["accuracy"])
+    c_a34 = _conds_of(a34["table"]["a3"])
+    if c_a1 != c_a34:
+        print(f"⚠ A1 ran {c_a1} and A34 ran {c_a34}: the panels carry DIFFERENT "
+              f"condition sets and must not be read as one experiment.")
+
     series: dict = {}
     series["A1 — optimal distinguisher"] = {
         cond: [(c, (v := _k(a1["accuracy"][cond], c))["balanced"], v["se_balanced"])
                for c in CEILINGS]
-        for cond in CONDS}
+        for cond in c_a1}
     series["A3 — rarity-weighted linkage"] = {
         cond: [(c, (v := _k(a34["table"]["a3"][cond], c))["balanced"], v["se"])
                for c in CEILINGS]
-        for cond in CONDS}
+        for cond in c_a34}
     # ⚠ A4 is a MAX over blocks, and only ONE size can be drawn. The size shown is
     # the one with the largest EXCESS OVER THE LINE anywhere on the grid -- not the
     # largest absolute accuracy, which is a different and misleading choice: a 0.5830
@@ -94,11 +124,11 @@ def load() -> dict:
     sizes = sorted(a34["table"]["a4"], key=int)
     worst = max(sizes, key=lambda s: max(
         _k(a34["table"]["a4"][s][cond], c)["max_balanced"] - c
-        for cond in CONDS for c in CEILINGS))
+        for cond in c_a34 for c in CEILINGS))
     series[f"A4 — segment LR, max over blocks (size {worst})"] = {
         cond: [(c, (v := _k(a34["table"]["a4"][worst][cond], c))["max_balanced"],
                 v["se_at_max"]) for c in CEILINGS]
-        for cond in CONDS}
+        for cond in c_a34}
 
     for name, by_cond in series.items():
         for cond, pts in by_cond.items():

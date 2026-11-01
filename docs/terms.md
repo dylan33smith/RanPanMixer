@@ -2695,53 +2695,6 @@ Aliases:              "U_AF". ⚠⚠ AND "AF Wasserstein" / "Wasserstein diverge
                       SCALE REFERENCE only. Always say which one is quoted.
 ```
 
-### giraffe_mapping_rates  [utility] [evaluation] [external]
-```
-Is:                   THE UMBRELLA NAME for the three read-mapping fractions PanMixer's
-                      Fig 5A reports, which we now quote because we run their pipeline
-                      on our releases. Their names and DEFINITIONS, verbatim from
-                      external/PanMixer/plot_util/plot_helpers.py:15-19, each a
-                      fraction of `total_aligned`:
-                        * `perfect` = total_perfect / total_aligned
-                        * `gapless` = total_gapless_softclips_allowed / total_aligned
-                        * `mapq60`  = mapping_quality_max_60_reads / total_aligned
-                      ⚠⚠ THE DENOMINATOR IS ALIGNED READS, NOT SUBMITTED READS. A
-                      mapping RATE proper (aligned / submitted) is reported by NEITHER
-                      tool: `total_alignments` is parsed and never used as a
-                      denominator. Calling these "mapping rates" without saying so
-                      redefines the quantity.
-                      ⚠ UTILITY, not privacy. It asks whether a graph carrying an
-                      obfuscated member is still a usable alignment reference for an
-                      unrelated donor -- a DO-NO-HARM check, not a differentiator:
-                      PanMixer's own obfuscation moves these by 0.01 points.
-Computed by:          THEIR pipeline, ours only as orchestration:
-                      external/PanMixer/downloaded_tools/vg (`autoindex --workflow
-                      giraffe`, `giraffe`, `stats -a`), the npy -> VCF step by
-                      external/PanMixer/tools/common/npy_2_vcf.py unmodified; driven by
-                      the orchestration in `logs/B_readmap_eta/run.log` and tabled by
-                      `scripts/readmap_results.py`.
-CHANGES MEANING WITH: the vg VERSION, and this is not a small effect. Ours is 1.68.0,
-                      theirs 1.36; our unobfuscated baseline sits +1.2 to +2.2 points
-                      above their published one and the reference-build hypothesis for
-                      that was TESTED AND REFUTED (docs/memory.md 2026-09-18,
-                      correction 6). So ABSOLUTE levels are not comparable across the
-                      two tools and only the DELTA against each tool's OWN baseline is.
-                      Also with the donor set: ours is the paper's five, their
-                      constants.py:42 substitutes HG01600 for NA18853, and NA18853
-                      (AFR) is the lowest donor on every metric.
-                      Also with how many members are obfuscated: ours substitutes ONE
-                      target into a 44-member graph, as their Fig 5A does.
-Valid vs:             the same tool's own baseline, built through the SAME code path.
-                      ⚠ Not against the other tool's absolute level.
-Status:               REPORTED as the biological-utility counterpart to their Fig 5A.
-                      ⚠ EXPLORATORY in the same sense as `af_loss`/`ld_loss`: decision
-                      H declined both of those, and this axis was likewise not
-                      pre-registered.
-Aliases:              "read mapping rates" in prose IF the aligned-read denominator is
-                      stated. ⚠ NEVER just "mapping rate", which means aligned over
-                      submitted and is a different number nobody reports.
-```
-
 ### donor_coherence  [utility] [evaluation]
 ```
 Is:                   The mean, over random windows of W consecutive positions, of the
@@ -3580,6 +3533,151 @@ Status:               PRIMARY — mark * in tables.
 Aliases:              "attack accuracy", "identification rate"
 ```
 
+### decoy_condition  [attack] [method] [evaluation]
+```
+Is:                   WHICH second input path an `attacker_accuracy` cell pairs the
+                      target against. Arm 2 pre-registers FOUR, and the name carries
+                      the choice so no cell is ever reported without it:
+                        D1_extremal  a CONSTRUCTED path differing from the target at
+                                     every called position, so `u_p - u_q` spans its
+                                     full range. Not a genome; no mosaic reproduces it.
+                        D2_nearest   the highest-concordance other prepared target.
+                        D3_random    one other prepared target drawn uniformly,
+                                     REJECTING a draw that lands on D2.
+                        D4_farthest  the lowest-concordance other prepared target.
+                                     ADDED 2026-10-31 (Dylan).
+                      ⚠⚠ WHICH ONE IS THE HARD CASE, because our own source had this
+                      BACKWARDS for three runs and called D2 "THE HARDEST REAL DECOY".
+                      Arm 2's A1 is two-candidate DISTINGUISHING and its advantage
+                      equals TV(Q_p, Q_q), which GROWS with discordance. So D2 is the
+                      LEAST distinguishable real pair and the WEAKEST test of the
+                      bound; D1 is the constructed envelope above all of them.
+                      D4 IS the strongest real-genome test, but only just, and only
+                      on the efficient estimator. ⚠⚠ USE THE RIGHT STATISTIC. Since the
+                      rule thresholds at 0 with equal priors, balanced accuracy
+                      = 0.5 + TV/2 is an IDENTITY, and TV = E_p[(1 − e^−L)_+] on the
+                      same shared draws has a summand bounded in [0,1] rather than a
+                      0/1 indicator: 2.5x to 9.9x less standard error for one quantity.
+                      On it D4 beats D2 in 6 of 6 tilted chr21 columns (sign test
+                      p = 0.031; combined +0.00389 ± 0.00179, z = +2.17). On the
+                      BINARISED statistic the same data look like a null with a
+                      reversal, which is how this was first misread:
+                      [INCORRECT] - "the rerun REFUTED it; D4 is the WEAKEST at the 0.70
+                      label, D4 − D2 = −0.0465 at z = −3.28"
+                      [CORRECTION - 2026-10-31]: computed on the inefficient estimator,
+                      and at 0.70 the two estimators of that one quantity disagree in
+                      SIGN (−3.27 against +1.95) — an anomalous cell, not a reversal.
+                      ⚠ THE EFFECT IS BELOW THIS ATTACK'S RESOLUTION: the largest
+                      per-column half-gap is ~0.008 against `delta` 0.0278, so never
+                      rank the real conditions by a sign-statistic cell.
+                      ⚠⚠ AND "nearest"/"farthest" ARE PER-TARGET RANKS IN A NINE-POOL,
+                      NOT DISTANCE LEVELS, so the two columns are not two levels of one
+                      factor and must not be pooled across targets without conditioning
+                      on the gap. At genome scope one pair, HG04211–NA19350 at 0.757090,
+                      is HG04211's FARTHEST and NA19350's NEAREST simultaneously. Doing
+                      it properly sharpens the result: for the 8 chr21 targets with a
+                      real gap the combined dTV is +0.0126 ± 0.0030 (z = +4.17), while
+                      for NA19350 and NA20294 — whose own nearest neighbour is as far as
+                      other targets' farthest, gaps 0.017 and 0.011 — it is NEGATIVE,
+                      −0.0148 ± 0.0066. The weighted slope on the gap is +0.46 ± 0.12.
+                      ⚠ But it is a TWO-GROUP effect, not a dose-response: among those 8
+                      the rank correlation with gap size is weak (Spearman 0.36,
+                      permutation p = 0.37), so do not claim the effect scales.
+                      ⚠ AND D3 IS NOT AN INDEPENDENT THIRD CONDITION: its uniform draw
+                      lands on the farthest genome for 3 of 10 chr21 targets, making 30%
+                      of D4 − D3 trials a STRUCTURAL zero; with those removed the
+                      contrast is still unresolved.
+                      ⚠ So the PROXY is weak, not wrong: advantage does equal TV and
+                      discordance does order it, but barely. Decomposing
+                      KL = `eta_tau`·E_p[u_p − u_q] + log(Z_q/Z_p) — the second term is
+                      output-independent, so it is recoverable per cell and constant
+                      there to 3.3e-16 — the TILT term is ordered by discordance in 6
+                      of 6 tilted columns at paired z = +108 to +197, while the KL
+                      ESTIMATOR does not RESOLVE the ordering at all (|z| < 1.5 on all
+                      18 contrasts among the real conditions, and "ordered in 1 of 6"
+                      is exactly the expected count for random ordering of three
+                      items). That is a statement about POWER, not about the ordering.
+                      ⚠⚠ DO NOT READ THE TWO TERMS AS TWO MECHANISMS. With
+                      f = u_p − u_q and K(s) = log E_q[exp(s·eta·f)], the KL is a
+                      Bregman remainder, KL = K'(1) − K(1) = eta²∫₀¹ t·Var_t(f) dt, so
+                      normaliser = −tilt + eta²·Var(f)/2 + O(third cumulant): the
+                      normaliser is MINUS THE TILT TO FIRST ORDER BY CONSTRUCTION, and
+                      all it adds beyond the tilt IS the KL. "The normaliser cancels
+                      99.7% of the tilt" is therefore a restatement of KL << tilt, not
+                      a finding about the mosaic. For D1 the figure is reproducible to
+                      2.4% from 100·(1 − c·eta/|du|) with `c` from the calibration
+                      alone, so it is set by WHICH LABEL was chosen, not measured; and
+                      KL = Var_p(L)/2 holds to 4–8%, which is the cheapest check that
+                      this is a cumulant expansion. ⚠ The 79–119% band is also an
+                      AGGREGATION ARTEFACT: averaging targets before forming the ratio
+                      versus after differs by up to 51 percentage points, per-target
+                      values run −80% to +263%, and the denominator is near zero with
+                      mixed sign. Never quote the band without naming the order.
+                      ⚠ THE DEFENSIBLE MECHANISM STATEMENT: the utility GAP orders by
+                      discordance and is resolved overwhelmingly; the DIVERGENCE is set
+                      by Var_p(f), not by the gap, and this experiment cannot resolve
+                      its between-condition differences. That is why a 50x gap ratio
+                      buys a ~0.008 advantage.
+                      ⚠ "Nearest is hardest" is a
+                      LINKAGE statement — there a near-identical cohort member is the
+                      confuser that can outrank the true target — and belongs to Arm
+                      1's attacks, not here. Do not carry it across.
+Computed by:          scripts/arm2_attack.py:pick_decoys, imported unchanged by
+                      scripts/arm2_attack_a3a4.py so the two attacks cannot drift.
+                      `arm2_attack.CONDS` is the one definition of the set and
+                      `pick_decoys` asserts its own keys against it. ⚠ ARM 1 HAS ITS
+                      OWN `pick_decoys` AND ITS OWN `CONDS` (scripts/arm1_attack.py:
+                      91,179) and does NOT inherit D4; whether its A1 should also get
+                      a farthest condition is undecided.
+CHANGES MEANING WITH: THE POOL, which is the other NINE PREPARED TARGETS and not the
+                      3,202-sample panel — and the limitation runs in OPPOSITE
+                      directions for the two real conditions. Widening it would find a
+                      NEARER neighbour for D2 (less distinguishable, weaker attacker,
+                      so the narrow D2 is conservative) and a FARTHER genome for D4
+                      (more distinguishable, so D4 as run is a LOWER BOUND on the real
+                      worst case). The second is the one the writeup must report.
+                      ⚠ AND WITH THE SCOPE: concordance is computed on the paths
+                      actually loaded, so chr21's nearest need not be genome-wide's.
+                      ⚠ THE NAME IS LOAD-BEARING. `q_seed` is keyed on
+                      `sorted(decoys).index(name)`, so a condition must sort AFTER
+                      every existing one. "D3_farthest" would have renumbered
+                      D3_random and moved every reported random-condition draw stream;
+                      that is why it is D4.
+Measured (chr21 — THE SCOPE THE ATTACKS RAN ON, 10 targets, 2026-10-31,
+                      logs/B_acc_arm2/a1_ceil_n1000_d4.json): the farthest decoy is
+                      NA20294 for 7 of 10 targets and NA19350 for 3; the pool spans
+                      0.730321 to 0.817642; D4 coincides with D3_random for 3 of 10
+                      (HG01323, NA19056, NA20294); the nearest-to-farthest gap runs
+                      0.011391 (NA20294) to 0.080234 (NA19056). ⚠ READ THESE, NOT THE
+                      GENOME ONES, for anything about the chr21 attacks.
+Measured (genome, 10 targets, 2026-10-31, logs/B_acc_arm2/genome_ceiling.json):
+                      the pool is nearly equiconcordant — concordance spans 0.747124
+                      to 0.825023, a range of 0.0779. NA19350 is the farthest decoy
+                      for 9 of 10 targets, so D4 is close to "one genome as decoy"
+                      rather than ten independent worst cases, and the nearest-to-
+                      farthest gap is only 0.0100 for NA19350 and 0.0114 for NA20294
+                      against 0.0716 for HG02389. D4 coincides with D3_random for 2 of
+                      10 targets (HG01468, NA20294); the coincidence is KEPT, since
+                      moving D4 off the argmin would stop it being the farthest, and
+                      those cells are free independent replicates because `q_seed`
+                      differs by condition index.
+                      ⚠⚠ DISCORDANCE IS A PROXY, NOT THE MECHANISM, and it inverts:
+                      the less concordant of D2/D3 carries the higher exact `kl` for 9
+                      of 10 targets and D2's `acc_ceiling` is below D3's in 54 of 60
+                      tilted cells, but NA20294 is a MEASURED counterexample where the
+                      more discordant decoy has the LOWER `kl`. The divergence depends
+                      on how well the cohort mosaic can EMIT the decoy, not only on how
+                      far the decoy disagrees — the same reason the extremal
+                      construction is not the KL-argmax in general. So D4 is MOTIVATED
+                      as the realistic worst case, never guaranteed to be it.
+Valid vs:             another condition at the SAME `acc_ceiling` column and in the
+                      SAME arm. ⚠ NEVER POOLED: one `Q_p` release is shared by every
+                      condition in a trial, so the conditions are CORRELATED through
+                      that draw.
+Status:               METHOD — every attack cell is stamped with its condition.
+Aliases:              "the decoy conditions", "D1-D4". ⚠ NOT "D3_farthest".
+```
+
 ### tv_empirical  [privacy] [evaluation] [diagnostic]
 ```
 Is:                   An ESTIMATE of TV(Q^tau_p, Q^tau_q) from finite samples.
@@ -3823,6 +3921,16 @@ carrying rare alleles. State which, always.
 ---
 
 ## Retired
+
+`giraffe_mapping_rates` — RETIRED 2026-10-30, by Dylan's decision. The umbrella name
+for the three read-mapping fractions (`perfect`, `gapless`, `mapq60`) measured on a
+graph carrying one obfuscated cohort member. Dropped with the whole read-mapping arm:
+cohort-path obfuscation is a SECONDARY part of the paper, so a mapping delta should not
+be one of its headline claims, and the next tool obfuscates the pangenome itself rather
+than paths through a fixed one. ⚠ The measurement itself was sound and is preserved in
+`docs/memory.md` 2026-10-26 and 2026-10-30: worst delta -0.063 points against a ~20%
+cell change, i.e. alignment was nearly insensitive to the substitution. Do not re-add
+without a reason that makes it a primary claim.
 
 `viterbi_release` — RETIRED 2026-08-29, before use. MAP/Viterbi decoding of the
 tilted HMM returns the single highest-probability state sequence. It is NOT a draw
