@@ -1,0 +1,494 @@
+% Methods 2.1-2.9 prose — PARKED 2026-11-01, NOT the current draft.
+%
+% ⚠⚠ DYLAN PULLED THIS OUT OF THE SCAFFOLD on 2026-11-01 and reverted Methods to its
+% fourteen one-line items (doc rev 917). Two reasons, in his words: "you're adding
+% way too much detail that I don't know if we need ... generally trying to include
+% way too many of our findings from the project that were just for our own
+% understanding", and "we are introducing things in the wrong order for all of this".
+% 2.1's second paragraph was named as the specific example of unreadable.
+%
+% ⚠ IT IS KEPT FOR SENTENCES, NOT AS A DRAFT. Nothing here goes back into the paper
+% until the section ORDER is settled in the scaffold, and then only the parts a
+% reader needs in order to follow the method. The verified figures below are still
+% good; the prose around them is what was wrong.
+%
+% ⚠⚠ ONE PARAGRAPH IN 2.1 IS ALSO FACTUALLY WRONG, found 2026-11-01 while answering
+% Dylan's comment on it. It says the chain excludes positions where no donor
+% haplotype has a called allele. That is true of exactly ONE position on chr21,
+% where the chain excludes 8,328. The real exclusion is a single 8,327-position
+% block (10,326,676 to 12,968,320, ~2.6 Mb) of zero genetic distance that no single
+% donor haplotype spans, so the copying model has no path through it — decision K's
+% untraversable block, recorded in data/cohort/chr21/in_chain.npy's own provenance.
+% Do not reuse that paragraph; the fact belongs in one sentence of the dataset
+% description, which Methods does not yet have at all.
+%
+% ⚠ THE DATASET DESCRIPTION IS THE REBUILD'S FIRST ITEM. Dylan: "We need a
+% description of the actual dataset we are using." 2.1 gave a position axis without
+% ever saying whose genomes these are, which is part of why the order read wrong.
+%
+% Every figure below was verified against source or artifacts this session, not
+% quoted from a docstring:
+%   chr21 site axis 340,849 / chain T = 332,521  <- data/cohort/chr21/in_chain.npy
+%   genome-wide T = 22,134,562 over 22 autosomes <- sum over in_chain.npy
+%   K = 88 from 44 individuals                   <- haplotypes.npy shape (88, 340849)
+%   weights = "uniform"                          <- scripts/arm2_attack.py:204,
+%                                                   scripts/arm1_attack.py:94
+%   diploid tilt = eta/2 per haplotype           <- src/mechanism/ffbs.py:617
+%   N_e = 10,000, r = 1.26                       <- src/mechanism/hmm.py NE, R
+%   chr21 eta_tau 75.35 (0.55) to 517.17 (0.80)  <- arm2_chr21_kl_verified.json,
+%     so epsilon_tau = 2*eta_tau is 150.7..1034.3   refined block, 10 targets
+%   genome eta_tau 3308.5..3716.8 at 0.80        <- logs/B_acc_arm2/genome_sweep/*.json
+%     epsilon_tau 6617..7434, log10(1-tau)          aggregate, acc_ceiling 0.80
+%     -2873 (HG00096) to -3228 (NA19350)
+%   Pinsker/Gaussian excess ratio 1.2554 /       <- recomputed from KL = 2(2a-1)^2;
+%     1.2721 / 1.3289 at 0.55 / 0.65 / 0.80        sqrt(pi/2) = 1.2533 is the limit
+%   envelope: D1 > every real decoy in 180/180  <- logs/B_acc_arm2/arm2_chr21_ceiling
+%     chr21 arm 2 cells, worst ratio 0.478403,     .json (MEASURED THIS SESSION; the
+%     worst real ceiling 0.7075 at the 0.80        instrument check reproduced the
+%     label; 264/264 arm 1 chr21 and 60/60         verified D1 kl on all 60 cells to
+%     genome for the conditions measured there     6.82e-13)
+%
+% OPEN DECISIONS, all Dylan's:
+%   A. tau IS EXACTLY 1.0 IN FLOAT64 PAST eta ~ 19, and the reported grid runs
+%      eta ~ 75 to 517 on chr21. So at every reported operating point the
+%      theorem's bound TV <= tau is VACUOUS, not merely loose. The Introduction
+%      as approved states the guarantee in tau. 2.9 and 4.2 own the ladder, but a
+%      referee will reach this before Section 2.9. DECIDED 2026-10-31 (Dylan):
+%      "leave 1.4 alone". The Introduction carries no caveat, so 2.3 below is
+%      where a reader first meets the fact, and the sentence in 2.3 that says it
+%      is load-bearing rather than incidental. The counter-argument -- that a
+%      referee gets there before 2.9 -- was logged and overruled.
+%   B. The Introduction says a new genome "can be mapped or projected onto the
+%      graph"; 2.1 says we JOIN a phased, already-called sample column. Those are
+%      consistent (the Introduction states the general capability), but if the
+%      general claim is not wanted, 1.3's first sentence is where to narrow it.
+%   C. u_ceiling and the "30.749104% of beta_v the target cannot call" figure are
+%      WEIGHTING-SPECIFIC and predate the 2026-10-24 uniform ruling. Not quoted
+%      here. They need re-measuring under uniform before any section uses them.
+%   D. src/mechanism/hmm.py documents four deviations between PanMixer's shipped
+%      sampler and its own published Methods, with a measured consequence. That
+%      is 4.4's material if it is used at all, not 2.4's. Not stated here.
+%   E. THE CALIBRATION IS ALREADY IN 2.3. eta_tau = arctanh(tau)/delta_u is stated
+%      in 2.3 above, where the mechanism is defined. The scaffold's 2.11 line
+%      assigns it to 2.11 instead, "because it is a protocol step and not a
+%      relationship between bounds". Both placements are defensible and only one
+%      should carry it. 2.6 to 2.9 below deliberately do NOT restate it, so the
+%      choice stays open: either 2.11 points back to 2.3, or the formula moves
+%      from 2.3 to 2.11 and 2.3 names only delta_u. Dylan's call.
+%   F. 2.9's envelope paragraph reports a result measured this session, not an
+%      argument. It replaces the one open measurement the suite had left: the
+%      extremal decoy's dominance over D4_farthest was UNRESOLVED by Monte Carlo
+%      at the 0.55, 0.60 and 0.65 labels (the sampled estimator's median per-cell
+%      standard error there was 1.007x the exact divergence itself). The exact
+%      computation settles all 60 cells with zero sampling error.
+%   G. THE RANKING of the three real decoy conditions is NOT in 2.9 and should not
+%      be: on exact divergence the medians order D4 > D3 > D2 at all six labels,
+%      and D4 exceeds D2 in exactly the 8 of 10 targets that have a real
+%      concordance gap and in neither of the 2 that do not. That belongs with the
+%      decoy conditions in 2.12, and 2.12 still says "three conditions" and must
+%      be brought to four.
+
+\section{Methods}
+
+\subsection{Fixed graph and mapped paths}
+
+The graph is fixed and public, and nothing in this paper modifies it: the haplotype
+paths already embedded in it are the donor panel, and a release is a new path over
+the same coordinates. Positions are the variant records of the graph's own call set,
+and the subset the mechanism runs over---the chain---is every position at which at
+least one donor haplotype has a called allele. That exclusion is a function of the
+panel alone and is therefore independent of any target: where no donor has a called
+allele the sampler has nothing to emit. Each chain position additionally carries a
+genetic position in centiMorgans interpolated from a genetic map, and that every
+chain position carries a genuine interpolated value is a checked invariant rather
+than an assumption. On chromosome~21 the site axis holds $340{,}849$ records, of
+which $T = 332{,}521$ are in the chain; genome-wide, across the 22 autosomes,
+$T = 22{,}134{,}562$. The donor panel is $K = 88$ haplotype paths from 44
+individuals.
+
+A target genome enters as a path over the same axis. Our target inputs are phased
+and called against the same reference build as the graph, so a sample column already
+is a path once joined to the site axis; the join is strict on position, reference
+allele and the full alternate-allele string, which is what makes the allele indices
+transferable---under a relaxed join, allele~2 in the target and allele~2 in the panel
+need not be the same piece of sequence. No read-alignment step is involved. A
+position with no record in the target's call set is marked uncalled and contributes
+nothing to the utility, so the attainable utility is strictly below one for every
+target.
+
+One privacy parameter covers one genome. A release spanning several chromosomes
+splits a single budget across them with per-chromosome shares summing to one, and
+the single-chromosome case is the whole budget on one chromosome; spending the full
+budget on each of 22 chromosomes independently would be 22 releases of one person
+rather than one release, and the shares are checked to sum to one wherever the whole
+set is visible. Because the divergence the budget is denominated in is additive
+across chromosomes under that split (Section~\ref{sec:exact}), a curator who changes
+the scope changes the number of positions, and therefore the per-position budget,
+but still receives the ceiling they asked for.
+
+\subsection{Two target regimes}
+
+The mechanism and the guarantee are the same in both regimes; what differs is what
+the graph already contains about the target. No quantity in this paper is reported
+without naming which regime it belongs to.
+
+In the first, the target is external: its genome contributed to neither the graph nor
+the donor panel, and it is absent from every panel an attack draws on. Nothing is
+held out, the full panel is available to the baseline, and nothing in the mechanism
+is a function of the target except the tilt. This is the regime in which we report
+genome-wide results.
+
+In the second, the target is one of the individuals the graph was built from. This is
+the regime of the head-to-head against PanMixer, and it requires per-target
+leave-one-out: both of the target's haplotype paths are removed from the donor panel,
+leaving $K = 86$, so that the support and the baseline remain independent of the
+target. Positions that only the target called leave the chain with them, so each
+target in this regime has its own chain, its own baseline, its own utility weights
+and its own ceiling, and quantities from different targets are consequently not
+pooled. Results in this regime are reported for chromosome~21 alone.
+
+Leave-one-out removes the target from the panel but not from the graph: the topology
+and the site axis were derived with that individual's assemblies among the inputs.
+The guarantee in this regime is therefore conditional on the graph, and we state that
+rather than claim it away.
+
+\subsection{Cohort-tilted private path release}
+
+Given the graph, the donor panel and a target path $p$, the mechanism releases a path
+$y$ drawn from
+\begin{equation}
+Q^{\tau}_{p}(y) \;=\; \frac{R_D(y)\,\exp\!\big(\eta_\tau\, u(p,y)\big)}{Z_p},
+\end{equation}
+where $R_D$ is a target-independent distribution over the paths the donor panel can
+produce, $u$ is a bounded measure of agreement with the target, and $\eta_\tau$ sets
+how strongly the baseline is tilted toward it. The support is $R_D$'s own support, so
+no output the panel cannot produce is ever released and no output it can produce is
+excluded; both the support and the baseline are built from the graph and the panel
+alone.
+
+The utility is a weighted average of per-position indicators,
+\begin{equation}
+u(p,y) \;=\; \sum_{v} \beta_v \,\mathbf{1}[\,y_v = p_v\,],
+\qquad \sum_{v} \beta_v = 1,
+\end{equation}
+so $u \in [0,1]$ by construction, and that it does is asserted at run time rather
+than argued. The weights are uniform over the chain, $\beta_v = 1/T$.
+
+Uniform weighting is a choice and is argued for rather than inherited. Under it, $u$
+has a one-sentence meaning---the fraction of the target's called positions that the
+release reproduces---which is comparable across targets, panels and tools. The
+alternative we began with, $\beta_v \propto 1/\mathrm{support}(v)$, weights a
+property of our data rather than of the position: it directs the budget at the
+positions where our own panel knows least (genome-wide, the $75{,}998$ chain
+positions with support below 40---$0.343\%$ of the chain---carry $2.491\%$ of the
+weight, and a position supported by a single donor carries $85.5$ times the mean
+weight), which makes the released object a function of our call rate and not
+reproducible by anyone holding a different panel. Uniform weighting is also the
+neutral instrument for a claim about the mechanism, since concentrating the weights
+is itself a lever on the exchange rate between privacy and utility, and it is the
+least concentrated weighting we considered: $\sum_v \beta_v^2$ is
+$4.5178\times10^{-8}$ against inverse-support's $7.3440\times10^{-8}$, so reporting
+under uniform weights is conservative in that exchange rate by about
+$\sqrt{1.63} = 1.27$.
+
+The tilt magnitude is calibrated as $\eta_\tau = \operatorname{arctanh}(\tau)/\Delta
+u$, where $\Delta u$ is the range of the utility being tilted with. Here $\Delta u =
+1$ by construction, so $\eta_\tau = \operatorname{arctanh}(\tau)$; the range is
+carried explicitly rather than assumed, because an unnormalised utility does not
+weaken the guarantee but removes it.
+
+The budget does not thin as the path grows. Because the weights sum to one, the total
+tilt between a path matching the target everywhere and one matching it nowhere is
+$\exp(\eta_\tau)$ however the path is partitioned: each position moves less and there
+are proportionally more of them. What does change with $T$ is numerical headroom.
+
+Zero tilt is not a special case. At $\eta_\tau = 0$ every tilt potential is one and
+the draw is a sample from $R_D$ alone---a donor mosaic carrying no target information
+whatever---reached by the identical code path, which is why that column cannot drift
+away from the mechanism it is the floor of.
+
+The sampler takes either $\tau$ or $\eta_\tau$ and never both, the two being related
+by $\tau = \tanh(\eta_\tau)$. Past $\eta_\tau \approx 19$ that expression is exactly
+$1$ in double precision, so at the tilt magnitudes we report the equivalent $\tau$ is
+$1$ and $\eta_\tau$ is the parameter that remains exact.
+
+\subsection{HMM-based implementation}
+
+$R_D$ is a Li--Stephens haplotype-copying chain over the donor panel
+\cite{li2003}. The chain visits the chain positions in order; at each one it occupies
+a single donor haplotype and emits the allele that donor carries there; and the
+genetic distance between consecutive positions decides how readily it switches donor.
+The transition between consecutive positions is
+\begin{equation}
+A_t \;=\; (1 - s_t)\,I \;+\; \frac{s_t}{K}\,J,
+\end{equation}
+with $s_t$ the \emph{total} switch mass, so the per-state coefficient is $s_t/K$ and
+the probability of actually leaving a given donor is $s_t(K-1)/K$. The switch mass
+follows the closed form $p_{\mathrm{stay}} = e^{-d/K} + (1 - e^{-d/K})/K$ with
+$d = \Delta x\, N_e\, r$, where $\Delta x$ is the genetic distance in centiMorgans,
+$N_e = 10{,}000$ and $r = 1.26$; the implementation computes the decomposition and
+the closed form independently and checks that they agree.
+
+Missingness enters as an indicator potential and not as a renormalised transition
+row. $R_D$ is the copying chain conditioned on never occupying a donor that has no
+called allele at the position it occupies, and the conditioning is applied as a
+$0/1$ factor that the forward pass normalises away. Masking a transition row and
+renormalising it is not well defined here: across a step of zero genetic distance the
+transition is the identity, so a donor available at one position and unavailable at
+the next has a masked row summing to exactly zero.
+
+A release is drawn by forward filtering followed by backward sampling, which draws
+exactly from $Q^{\tau}_{p}$ rather than approximating it. Every forward column is
+retained in double precision, because backward sampling needs the whole array and not
+the running vector a forward-only simulation keeps. The transition matrix is never
+materialised: its rank-one-plus-diagonal structure makes each forward step linear in
+$K$ from a single scalar, where a dense matrix per position would be about
+$21$\,GB at chromosome-21 scale. The release is sampled and never maximised.
+Maximum-a-posteriori decoding returns the single most probable state sequence, which
+is not a draw from the release distribution and carries no guarantee at all while
+producing entirely plausible output; a test walks the package's syntax tree and fails
+on any use of \texttt{argmax}.
+
+The log normaliser is accumulated as the sum of the forward scaling constants less
+the baseline's own, since the missingness conditioning contributes to both. It must
+lie in $[0, \eta_\tau]$, and checking that it does is the cheapest correctness test
+available.
+
+\subsection{Diploid releases}
+
+A diploid target's two haplotype paths are one private input and receive one release,
+because that is what the guarantee covers and what one release per genome means. The
+two chains are drawn independently, each at half the tilt exponent, and the utility
+is the mean over the two haplotypes rather than their sum. The mean is what keeps the
+utility inside $[0,1]$, so a single privacy parameter covers the whole diploid
+release; the sum would double the range and with it silently double the calibration
+the guarantee depends on.
+
+\subsection{The privacy guarantee}
+
+Fix the graph, the donor panel and a privacy parameter $\tau \in [0,1)$. Write
+$\mathcal{P}(G)$ for the set of admissible input paths and $Q^{\tau}_{p}$ for the
+release distribution the mechanism induces from input $p$. The mechanism is
+\emph{$\tau$-private against the cohort} for a target $g$ if
+\begin{equation}
+\max_{1 \le i \le n} \mathrm{TV}\!\big(Q^{\tau}_{p_g},\, Q^{\tau}_{p_i}\big)
+\;\le\; \tau ,
+\end{equation}
+and \emph{$\tau$-private pairwise} if the stronger
+\begin{equation}
+\sup_{p,\,q \,\in\, \mathcal{P}(G)}
+\mathrm{TV}\!\big(Q^{\tau}_{p},\, Q^{\tau}_{q}\big) \;\le\; \tau
+\end{equation}
+holds, the supremum running over every admissible pair and not only over cohort
+members. The second implies the first for every target at once, and it is the second
+that the mechanism satisfies.
+
+Total variation is the right currency because of what it means operationally.
+Consider the adversary this paper takes as its reference: it holds one release, both
+candidate input paths and the mechanism itself, and must say which of the two
+produced the release, under an equal prior over the two. By the Neyman--Pearson
+lemma the optimal such test succeeds with probability exactly
+\begin{equation}
+P^{*}_{\mathrm{succ}}(p,q)
+\;=\; \tfrac{1}{2}\big(1 + \mathrm{TV}(Q^{\tau}_{p}, Q^{\tau}_{q})\big),
+\label{eq:succ}
+\end{equation}
+so a pairwise bound of $\tau$ caps optimal identification accuracy at $(1+\tau)/2$
+and caps the advantage over guessing at $\tau/2$. The parameter therefore bounds
+twice the adversary's advantage, not its success rate. The distinction is worth one
+sentence because the other reading is the tempting one and is not merely loose: as a
+bound on the success rate it would assert that at $\tau = 0$ no test succeeds, where
+a coin succeeds half the time.
+
+For the mechanism of Section~2.3 the guarantee holds pairwise and in two forms. For
+any two admissible input paths $p, q \in \mathcal{P}(G)$,
+\begin{equation}
+\mathrm{TV}\!\big(Q^{\tau}_{p}, Q^{\tau}_{q}\big) \;\le\; \tau,
+\qquad\text{and}\qquad
+e^{-\varepsilon_\tau} \;\le\; \frac{Q^{\tau}_{p}(y)}{Q^{\tau}_{q}(y)}
+\;\le\; e^{\varepsilon_\tau}
+\quad\text{for every } y \text{ in the common support},
+\label{eq:thm}
+\end{equation}
+where
+\begin{equation}
+\varepsilon_\tau \;=\; 2\operatorname{arctanh}(\tau)
+\;=\; \log\frac{1+\tau}{1-\tau}.
+\end{equation}
+The first is an averaged statement about the two distributions. The second is
+pointwise, holds output by output, and is the stronger of the two; it is also the
+form a reader arriving from differential privacy will look for first.
+
+The pointwise form makes the cost of the reported operating points explicit, and we
+state that cost here rather than leave it to be worked out. Because $\Delta u = 1$ we
+have $\varepsilon_\tau = 2\eta_\tau$, and the tilt magnitudes we report are large.
+Over the ten external targets of the second regime the chromosome-21 grid runs
+$\eta_\tau$ from $75.35$ at the $0.55$ operating point to $517.17$ at $0.80$, so
+$\varepsilon_\tau$ runs from about $151$ to about $1034$; genome-wide at the $0.80$
+point $\varepsilon_\tau$ runs from $6617$ to $7434$ across the same ten targets. At
+those magnitudes $\tau = \tanh(\eta_\tau)$ is $1$ to double precision---genome-wide
+at $0.80$ it is between $1 - 10^{-2873}$ and $1 - 10^{-3228}$---so at the settings we
+report neither the pairwise bound nor the pointwise ratio bound carries any
+information. What they carry is scope: they hold for every admissible pair at every
+parameter value, which is what makes this a bounded release mechanism rather than a
+heuristic, and no other statement in the paper does that. The bound that carries the
+reported numbers is computed instead from the exact divergence between the two
+release distributions at the operating tilt, and Section~2.9 places the two side by
+side rather than letting the reader discover the gap.
+
+\subsection{Privacy relative to a cohort mixture}
+
+The baseline $R_D$ is the panel's own path model: the distribution over admissible
+paths induced by the donor haplotypes embedded in the graph, with no reference to any
+target. A draw from it is a mosaic of donor segments---a path the cohort could have
+produced and that carries no information about the person being released. It is a
+function of the graph and the panel alone, and the mechanism's output is a tilt of
+it.
+
+Privacy is stated against that object because it is the adversary's real
+alternative. The pairwise statement of Section~2.6 answers ``which of these two
+paths produced this release''. The question a cohort-scale release actually faces is
+closer to ``is this anyone in particular'', and the natural alternative to the target
+is not an arbitrary path but another member of the cohort, or the cohort taken as a
+whole. That question has an answer of the same strength. Let $\pi$ be any prior over
+the cohort and let
+\begin{equation}
+Q^{\pi,\tau}_{D} \;=\; \sum_{i=1}^{n} \pi_i\, Q^{\tau}_{p_i}
+\end{equation}
+be the induced mixture of cohort releases. Then
+\begin{equation}
+\mathrm{TV}\!\big(Q^{\tau}_{p_g},\, Q^{\pi,\tau}_{D}\big) \;\le\; \tau .
+\label{eq:cor}
+\end{equation}
+This follows from the pairwise bound by convexity: total variation is convex in each
+argument, so the distance from a fixed distribution to a mixture is at most the
+largest distance to a component, and every component is within $\tau$ by
+\eqref{eq:thm}. The bound therefore holds for every prior at once---the adversary's
+own included---and does not require the adversary to disclose which prior it holds.
+
+Both statements need the output support to be a single set fixed before the target is
+seen, which is the first of the conditions in Section~2.8. The reason is not
+technical: a release distribution supported on a target-dependent set is
+distinguishable from a cohort member's on the support alone, and no bound on the
+distance between the parts that do overlap repairs that.
+
+The two regimes of Section~2.2 stand differently here, and the difference has to be
+stated rather than smoothed over. For an external target the mixture runs over the
+full panel and nothing in it depends on the target, so \eqref{eq:cor} applies as
+written. For a cohort member it applies to the mixture over the panel with both of
+that target's own haplotypes removed, which is why the leave-one-out construction of
+Section~2.2 is a requirement of the guarantee and not a refinement of it; and even
+then the graph itself was built with that target among its inputs, so in that regime
+the guarantee is conditional on the graph. We state that limit and do not claim it
+away.
+
+\subsection{Conditions required by the guarantee}
+
+The guarantee is not a property of the formula alone. It holds under three
+conditions, and what makes them worth enumerating is that a release can violate any
+of them and still produce entirely plausible output.
+
+First, the output support and the baseline are built from the graph and the panel
+alone, never from the target. In our implementation the only position excluded is one
+at which no donor haplotype has a called allele, which is a property of the panel;
+the support is then $R_D$'s own support, so no output the panel cannot produce is
+released and none it can produce is withheld. Narrowing the support after the target
+is known---to the paths near it, say---buys utility and voids the guarantee, and does
+so without any visible symptom.
+
+Second, the utility is bounded with a known range. Here $u$ maps into $[0,1]$ and
+$\Delta u = 1$ because the weights sum to one, and the calibration of Section~2.3
+divides by $\Delta u$. An unnormalised utility does not weaken the guarantee, it
+removes it: the tilt is then unbounded in the output, and \eqref{eq:thm} has no
+finite $\varepsilon_\tau$ to state.
+
+Third, the release is sampled and never maximised. Maximum-a-posteriori decoding
+returns the single most probable state sequence, which is not a draw from
+$Q^{\tau}_{p}$ and inherits none of the bounds above, while being indistinguishable
+from a legitimate release by inspection.
+
+The guarantee also has a scope, and it is narrower than the person. It covers the
+released path and nothing else: not the raw target genome, not the graph, and not any
+further statistic published about the same individual. Two releases of one target are
+two uses of the parameter, not one.
+
+\subsection{The bound ladder}
+
+Everything this paper bounds is a single quantity---how often an equal-prior
+adversary holding one release and two candidate inputs can say which input produced
+it---and by \eqref{eq:succ} that quantity is an affine function of one distance. What
+differs between the statements in the paper is not the quantity but how conservatively
+it is bounded, and the relationships between them are mathematics rather than
+protocol choices. There are four, loosest first.
+
+\begin{enumerate}
+\item \textbf{The theorem.} $\mathrm{TV} \le \tau$ from \eqref{eq:thm}, hence
+accuracy at most $(1+\tau)/2$. Proven for \emph{any} two admissible input paths, by
+way of $\Delta u$, the full range of the utility function---a worst case the proof
+has to survive.
+\item \textbf{Pinsker from the exact divergence.} For an actual pair at the actual
+tilt, with $D_{\mathrm{KL}} = D_{\mathrm{KL}}(Q^{\tau}_{p} \,\|\, Q^{\tau}_{q})$
+computed exactly,
+\begin{equation}
+\mathrm{TV} \;\le\; \sqrt{D_{\mathrm{KL}}/2},
+\qquad\text{hence}\qquad
+P^{*}_{\mathrm{succ}} \;\le\; \tfrac{1}{2}\Big(1 + \sqrt{D_{\mathrm{KL}}/2}\Big).
+\label{eq:pinsker}
+\end{equation}
+This is the quantity we report as the accuracy ceiling.
+\item \textbf{The Gaussian conversion of the same divergence.} The privacy-loss
+variable is a sum of millions of tiny per-position contributions and is Gaussian to
+central-limit order, which gives
+$\mathrm{TV} = 2\Phi\big(\sqrt{D_{\mathrm{KL}}/2}\big) - 1$ and hence
+$P^{*}_{\mathrm{succ}} \le \Phi\big(\sqrt{D_{\mathrm{KL}}/2}\big)$.
+\item \textbf{The best attacker we implemented.} This rung bounds the quantity from
+\emph{below} and never from above. An attacker that fails is evidence about the
+attacker.
+\end{enumerate}
+
+Rungs 1 to 3 are derivable from the column label alone, because \eqref{eq:pinsker}
+inverts exactly: a reported ceiling $a$ corresponds to
+$D_{\mathrm{KL}} = 2(2a-1)^2$. Rung 4 is measured and not derived.
+
+Pinsker's conservatism relative to the Gaussian conversion can be quoted as measured
+rather than as its limit. Taking the excess over chance on rung 2 divided by the
+excess on rung 3, the ratio runs $1.2554$ at the $0.55$ operating point, $1.2721$ at
+$0.65$ and $1.3289$ at $0.80$. The often-quoted $\sqrt{\pi/2} = 1.2533$ is the
+small-divergence limit and understates the cost at the top of our grid, so we quote
+the measured values.
+
+The two routes point in opposite directions along two different axes, and conflating
+them is what makes this section necessary. The divergence route is far tighter---it
+yields $0.80$ where the theorem yields a bound of essentially $1$---but narrower in
+scope: the theorem covers every input pair, while a ceiling covers the pair it was
+computed for. On assumptions the ordering reverses, since the theorem needs only the
+range of the utility whereas the divergence needs the model; given the model, though,
+the divergence is exact, computed from the hidden Markov model with no Monte-Carlo
+error rather than estimated from draws. The theorem is therefore more general and the
+ceiling is more informative, and neither is simply the more robust of the two.
+
+Because a ceiling is computed for one pair, a column label computed against one decoy
+bounds a second pair only if the decoy it was computed against is the more divergent
+of the two. We calibrate against the constructed extremal decoy of Section~2.11 and
+then measure whether the resulting label dominates, rather than arguing that it must.
+On chromosome 21 in the external-target regime it does, exactly and in every cell:
+across ten targets, six tilted operating points and three real-genome decoy
+conditions, the constructed decoy carries the larger exact divergence in all $180$
+cells, and no real pair reaches half of it---the largest real-to-constructed
+divergence ratio anywhere in that grid is $0.478$. In the reported units, the most
+divergent real pair at the $0.80$ operating point has an exact ceiling of $0.708$
+against the $0.800$ its column is labelled with. The same dominance holds in all
+$264$ cells of the cohort-member regime on chromosome 21 and in all $60$ genome-wide
+cells, for the decoy conditions measured at each scope. That is empirical dominance
+over the pairs we can construct and not a proof over all of them, which is precisely
+why rung 1 stays in the paper despite reading as a vacuous bound at every operating
+point we report: it is the only statement covering every pair, and nothing else in
+the paper does that job.
+
+Two conventions follow, and the paper holds to both. The equivalent $\tau$ is stated
+once, with its value, at the point the grid is introduced: at the $0.80$ operating
+point it is within $10^{-2873}$ of one. Stating it defuses the obvious suspicion,
+where omitting it invites a reader to derive it and wonder what else was left out.
+And the ceiling is never called ``the guarantee'' without qualification. It is the
+operational bound; the theorem is the structural one. Saying so once, early, lets the
+rest of the paper write ``ceiling'' freely.

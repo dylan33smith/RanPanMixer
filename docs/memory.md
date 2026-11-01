@@ -1183,7 +1183,7 @@ the wrong sample; and the converter already writes `./.` for our `-1`.
 
 **Method.** SEVEN graphs through ONE code path — an unobfuscated baseline plus HG00438's
 release at each of the six `eta_tau` — each: assemble the cohort array, their converter
-unmodified, the same bcftools chain as `scripts/run_vg_baseline.sh`,
+unmodified, the same bcftools chain as scripts/run_vg_baseline.sh,
 `vg autoindex --workflow giraffe`, then `vg giraffe` + `vg stats -a` for five external
 donors. 35 of 35 stats files, completeness asserted. ~7 min per graph, 48 min total.
 
@@ -1298,7 +1298,7 @@ fractions of `total_aligned` across those three constructions. ⚠ A mapping RAT
 (aligned / submitted) is reported by NEITHER tool — `total_alignments` is parsed and
 never used as a denominator.
 
-Ours: `scripts/run_vg_baseline.sh` reproduces the UNOBFUSCATED baseline only, ran
+Ours: scripts/run_vg_baseline.sh reproduces the UNOBFUSCATED baseline only, ran
 2026-09-18 exit 0. `grep -rln 'giraffe|vg autoindex|vg stats' scripts/ src/ tests/`
 returns it, `get_read_data.sh`, and `src/target/path.py` (which only records that we
 AVOID giraffe). **Nothing maps reads to a release.**
@@ -3252,6 +3252,13 @@ permitted to replace one.
 The cut existed to exclude what the map could not reach; with those positions filled
 there is nothing left for it to do, so the only exclusion is `support == 0` — a
 property of the cohort rather than of the map.
+
+[SUPERSEDED - 2026-11-01]: true when written, but decision K later added a SECOND
+exclusion, so the chain's exclusions have been TWO ever since: `support == 0`, and an
+`untraversable_block` — a maximal zero-genetic-distance run no single donor spans. On
+chr21 that is 1 position and 8,327 respectively. `docs/terms.md` under chain records
+both correctly; this line does not, and reading it alone put a wrong sentence into a
+paper draft on 2026-10-31.
 
 **Measured on chr21:** the chain goes from **305,886 to 340,848** positions (+11.4%),
 with exactly **one** position excluded and that for having no called donor at all. All
@@ -8386,3 +8393,911 @@ pre-powered spec figure, still quoted at `scripts/arm1_attack.py:11`, and the di
 was already explained in this file on 2026-10-28 — D3 is a uniform draw under a different
 `DECOY_SEED`, while D2 is deterministic, which is why D2's exact agreement is the
 meaningful one.
+
+## 2026-10-30 (later) — [B-EVL-readmap-release] THE READ-MAPPING ARM LEAVES THE PROJECT
+
+**Dylan's decision, verbatim reasoning.** "We have to completely get rid of all the read
+mapping stuff from the project. Our next tool will be building a whole pangenome
+obfuscator, and I don't understand why read mapping would even be affected by our tool at
+all since we aren't actually changing the pangenome, only the cohort paths through it.
+Even if that is not true, this is not an important comparison for this tool because the
+pangenome cohort obfuscation is a separate, secondary part of our paper and so it
+shouldn't be one of the main claims that makes it into the abstract."
+
+**The mechanism half of that premise, checked.** Right in effect, not quite in mechanism.
+Standing constraint 1 builds the output support from G and D only, so a release is a path
+through nodes the graph ALREADY carries: no node or edge is added or removed and the
+topology is untouched. But what changes is which haplotype paths are recorded, and that
+is exactly what `vg giraffe` indexes -- its GBZ/GBWT and minimizer index are built FROM
+the paths -- so mapping is path-sensitive in principle. ⚠ Our own measurement is what
+makes the decision safe rather than merely convenient: a ~20% cell change (137,359 to
+139,327 of 681,648) moved the worst rate by **-0.063 points**. Alignment was nearly
+insensitive to a substitution that large, which is the finding, and it is preserved here.
+
+**What was removed.** Machinery DELETED: readmap_results.py, readmap_acc_run.sh,
+get_read_data.sh, run_vg_baseline.sh, and one stale .pyc. Results RENAMED to
+logs/DEPRECATED_B_readmap_acc_2026-10-30/ and logs/DEPRECATED_B_readmap_eta_2026-10-30/,
+kept as the record and never quoted as a direction. `giraffe_mapping_rates` is RETIRED in
+`docs/terms.md`; the work item is under plan.md's Dropped section with its reason; both
+`docs/data.md` rows are REMOVED with the reason in the row. The read-mapping sentence is
+out of `paper/abstract_2026-10-26.md`. Ported out of the `paper` branch too, where it had
+arrived an hour earlier in the same session.
+
+**What was deliberately KEPT, and why it is not an inconsistency.**
+- `src/target/path.py:10` and `configs/inputs.chr21.yaml:274` say we AVOID `vg giraffe`.
+  Those are statements about what the pipeline does NOT do and they are still true.
+- `primer/src/*.md` describes read mapping as part of the LANDSCAPE and as PanMixer's own
+  published utility metric. Removing it there would misdescribe their paper, not ours.
+- `docs/bugs.md` keeps both read-mapping defect entries. They record transferable
+  lessons -- an `rm -f` with a glob in a scratchpad driver, and a tool-version mismatch --
+  and a bug ledger is history, not a claim about the current tool.
+- This file keeps every historical read-mapping entry, per the in-place correction rule.
+
+⚠ **ONE LOOSE END.** The abstract's "cells changed, 137,359..139,327 of 681,648
+(20.2..20.4%)" row cited the read-mapping run as its provenance. The quantity itself is
+computable from the releases alone and does not depend on mapping, but its pointer now
+names a DEPRECATED directory and needs a new source before it is quoted again. Flagged in
+the abstract's own provenance table rather than silently left.
+
+⚠ **AND A REVERSAL OF MY OWN ADVICE.** `paper/abstract_2026-10-26.md` records me arguing
+the other way on 2026-10-26: "read mapping is the cleaner buy -- it is the project's first
+positive biological-utility result and carries no attribution trap." That was an emphasis
+call, it was explicitly Dylan's to make, and he has made it the other way.
+
+## 2026-10-31 — [B-EVL-arm2-genome-ceiling] THE ARM 2 ENVELOPE IS NOW MEASURED AT GENOME SCOPE, 60 OF 60
+
+**Hypothesis under test.** Every Arm 2 table labels its columns with the `acc_ceiling` of
+the D1_extremal pair alone. That label is a valid bound for the other conditions only if
+D1 is the maximum-TV decoy, which Arm 1 asserts per cell (`scripts/arm1_attack.py:344`)
+and **Arm 2 had never computed at any scope**. The construction argument — D1 flips every
+called allele, so it maximises the utility gap and therefore `kl` at any `eta` — is a
+PREDICTION, and `scripts/arm2_genome_ceiling.py:8-14` says so in the script written to
+test it: `kl` is only approximately quadratic in `eta`, the per-chromosome `share` splits
+the budget unevenly, and a decoy's own chain differs from the target's.
+
+**Method and provenance.** `scripts/arm2_genome_ceiling.py`, 10 targets x 7 labels x 3
+conditions over all 22 autosomes, `T` = 22,134,562, weights `uniform`, exact `kl` per
+(chromosome, target) summed to a genome total and converted by Pinsker. Launched
+2026-10-30, exit 0 at 2026-10-31 01:43 -> `logs/B_acc_arm2/genome_ceiling.json` (70 rows,
+`n_violations` 0) and `genome_ceiling.log`. The `eta` grid is NOT re-solved here: it is
+read from `logs/B_acc_arm2/genome_sweep/<target>.json`, which solved it against D1 at
+genome scope, so the two are parallel.
+
+**Result — the prediction holds, and the harness check is exact.** ✅✅ **D1 IS THE
+MAXIMUM-TV DECOY IN 60 OF 60 TILTED CELLS**, so the shared column label is an ENVELOPING
+bound for D2_nearest and D3_random genome-wide and the fault is tightness, never validity.
+✅ The cross-check that makes that readable: D1's `kl` here against the genome sweep's own
+`kl_exact`, **worst relative difference 0.000e+00 over 60 tilted cells** — the two
+independent routes to the same quantity agree to the last bit, so nothing here rests on
+one implementation. ⚠ The 0.50 label is `eta` = 0, where `Q_p` = `Q_q` for every decoy and
+all ceilings are exactly 0.5; those 10 cells are a harness check, not a measurement.
+
+**Measured in passing — allele-wise discordance is a PROXY for distinguishability, and it
+inverts once in ten.** D2's `acc_ceiling` sits below D3's in **54 of 60** tilted cells,
+and the less concordant of the two carries the higher exact `kl` for **9 of 10 targets**.
+⚠⚠ **NA20294 IS THE COUNTEREXAMPLE AND IT IS REPORTED, NOT DROPPED:** there the MORE
+discordant decoy has the LOWER `kl`, because the divergence depends on how well the cohort
+mosaic can EMIT the decoy and not only on how far the decoy disagrees. That is the same
+mechanism by which the extremal construction fails to be the KL-argmax in general
+(2026-10-30 toy enumeration), and it is the reason the farthest decoy added below is
+MOTIVATED rather than guaranteed.
+
+**What this does NOT close.**
+- ⚠ **chr21 is still assumed.** This measures genome scope. The attacks run on chr21 at
+  the `eta` of `logs/B_acc_arm2/arm2_chr21_kl_verified.json`, which carries no condition
+  field, so Dylan's 2026-10-30 call — Arm 2 also gets Arm 1's per-cell chr21 assert — is
+  still open. A `--chroms chr21` run of this script does NOT substitute: it reads the
+  genome-wide `eta` grid, so its `kl` are partial sums against genome-scope tilts and the
+  script's own `partial` flag prints them as NOT COMPARED.
+- ⚠⚠ **AND THE CONDITION SET HAS SINCE GROWN.** This run covers THREE conditions. The
+  fourth, `D4_farthest`, is the most discordant real genome and therefore the one most
+  likely to break the envelope, and it is unmeasured at BOTH scopes. The 60-of-60 claim
+  must be written as "for D2_nearest and D3_random", never as "for every real decoy".
+
+## 2026-10-31 — [B-ATK-arm2-farthest] THE FOURTH DECOY, AND TWO CLAIMS THAT WERE BACKWARDS FOR THREE RUNS
+
+**Hypothesis under test.** Dylan, 2026-10-30: "the nearest decoys are going to be the
+least distinguishable, so I think we have to rerun the attacks with a farthest decoy set
+... The farthest genome is the actual hard case and I was thinking that the nearest was the
+actual hardest case." Checked against the attack's own definition rather than accepted.
+
+**Result — he is right, and the comment in our own source said the opposite.** Arm 2's A1
+is TWO-CANDIDATE DISTINGUISHING: the adversary holds one release and both genomes and says
+which produced it, and by Neyman-Pearson its advantage EQUALS `TV(Q_p, Q_q)`
+(`scripts/arm2_attack.py:10-26`). That distance GROWS with target-decoy discordance, so a
+NEARER decoy makes the two distributions more alike and the attacker WEAKER.
+
+- ⚠⚠ **[INCORRECT] - `scripts/arm2_attack.py:225` read "D2 nearest — the highest-
+  concordance other target. THE HARDEST REAL DECOY." and `:226` called D3 "the easy
+  baseline".**
+  **[CORRECTION - 2026-10-31]** Backwards. D2 is the LEAST distinguishable real pair and
+  therefore the WEAKEST test of the bound in this experiment — the hardest case for the
+  ATTACKER, not for the mechanism. ⚠ "Nearest is hardest" IS correct for LINKAGE, where a
+  near-identical cohort member is the confuser that can outrank the true target in a
+  ranking; that is a different question and it is Arm 1's attacks that ask it. The two
+  readings were conflated. Survived three runs.
+- ⚠⚠ **[INCORRECT] - `:232-234` read "So D2 as run here is a LOWER BOUND on decoy
+  difficulty, and the real nearest neighbour can only be harder. Widening the pool
+  strengthens the attacker, so this limitation flatters us and must be reported with the
+  result."**
+  **[CORRECTION - 2026-10-31]** The narrow pool cuts in OPPOSITE directions for the two
+  real conditions, and for D2 it runs the other way: widening to the 3,202-sample panel
+  would find a NEARER neighbour, making that pair LESS distinguishable and the attacker
+  WEAKER, so the nine-candidate D2 is conservative, not flattering. The limitation that
+  does flatter us is the new one — widening the pool would find a FARTHER genome, so
+  `D4_farthest` as run is a LOWER BOUND on the real worst case. That is the sentence the
+  writeup needs; the old one pointed at the wrong condition in the wrong direction.
+
+**Method — the name is load-bearing and the seeds had to be proven unmoved.** `q_seed` is
+`seed ^ (0x5EED * (1 + sorted(decoys).index(name)))` (`arm2_attack.py:446`) and
+`seed ^ (0x9000 + sorted(decoys).index(name))` in the A3/A4 driver, so a new condition must
+sort AFTER every existing one. ⚠⚠ **"D3_farthest", the name in Dylan's own message, would
+have renumbered `D3_random` from index 2 to 3 and moved every reported random-condition
+draw stream onto the slot the new condition occupies** — verified arithmetically on both
+seed formulas, and the condition is therefore `D4_farthest`. With it appended, D1/D2/D3
+keep indices 0,1,2 and their seeds are bit-identical.
+
+**Result — what the farthest decoy actually is, genome-wide.** ⚠ A WEAK worst case, and
+the writeup must say so. The nine-target pool is nearly equiconcordant: concordance spans
+**0.747124 to 0.825023, a range of 0.0779**. ⚠⚠ **NA19350 IS THE FARTHEST DECOY FOR 9 OF
+10 TARGETS** (NA20294 for NA19350 itself), so the condition is close to "one particular
+genome as decoy" rather than ten independent worst cases. Nearest-to-farthest gaps run
+0.0100 (NA19350) and 0.0114 (NA20294) at the low end against 0.0716 (HG02389) — for the
+two outlier targets D4 barely differs from D2. ✅ **D4 coincides with D3_random for 2 of 10
+targets** (HG01468, NA20294); the coincidence is KEPT, not rejected, because moving D4 off
+the argmin would stop it being the farthest decoy, and those two cells become free
+INDEPENDENT REPLICATES — `q_seed` is keyed on the condition index, so D3 and D4 draw
+different streams from the same pair.
+
+**Collateral defects found and fixed while wiring it.**
+- ⚠⚠ **A hardcoded condition list in BOTH reporters broke re-reporting of every stored
+  run.** `for cond in CONDS` over a four-condition global against a three-condition JSON
+  raised `KeyError: 'D4_farthest'`, which would have made `--from-json` — the whole reason
+  `_report` is a function, since the releases cost ~110 CPU-hours — unusable on all prior
+  results. Caught by `tests/test_acc_line_interval.py`, not by inspection. Fixed by new
+  `arm2_attack.conds_in()`, which takes the conditions from the DATA, prints a loud notice
+  naming what is missing, and RAISES on a condition the build cannot define rather than
+  dropping it: a silently omitted condition is indistinguishable in a table from one that
+  sat at chance. Verified by re-reporting `a34_ceil_n1000.json` — notice printed, table
+  complete.
+- ⚠ **Two hardcoded release counts under-reported the run by 25%.** `per_trial = 1 + 3` in
+  A1 and `= {4*len(jobs)} releases` in the A3/A4 driver; both now derive from `len(CONDS)`.
+  28,000 releases -> 35,000.
+- ⚠ **`CONDS` was duplicated in the A3/A4 driver** rather than imported, which is exactly
+  the drift its own import block exists to prevent. Now imported.
+- ⚠ **`scripts/arm2_figures.py` would have silently dropped the fourth curve.** It carried
+  its own condition list and its own marker/colour tables; a dropped curve is
+  indistinguishable in a figure from a curve at chance. It now reads each JSON's own
+  condition set, raises on an unstyled condition, and says so when A1 and A34 disagree.
+
+**Gates, injected rather than asserted.** The CONDS/`pick_decoys` drift gate fires when a
+condition is removed from `CONDS` alone; the D2/D4 degeneracy gate fires on a constant
+concordance map. ⚠ Gate ORDER corrected: the pool-size raise precedes the degeneracy raise,
+because on a one-genome pool every condition degenerates and "prepare more targets" is the
+actionable message — reporting the symptom over the cause is what the contract forbids.
+`pytest tests/` 491 passed. ⚠ `tests/test_acc_line_interval.py` pinned `a3_cells == 21`;
+that literal is the assumption the test's own name says it is not making, and it is now the
+product.
+
+**Status — LANDED 2026-10-31 08:58; THE RESULT IS THE SECTION BELOW.** (This line read "IN FLIGHT, nothing quotable yet" until then.) Launched 2026-10-31 02:04 at `--draws 100`
+(n_per 1000), 44 workers, 35,000 releases per driver -> `a1_ceil_n1000_d4.json` with `a1_ceil_n1000_d4.log`, and
+`a34_ceil_n1000_d4.json` with `a34_ceil_n1000_d4.log`, under `logs/B_acc_arm2/`; queue log
+`logs/B_acc_arm2/d4_queue.log`. ⚠ **ARM 1 WAS
+NOT TOUCHED AND DOES NOT INHERIT THIS.** It has its own `pick_decoys` and its own `CONDS`
+(`scripts/arm1_attack.py:91,179`), and its per-cell max-TV assert names D2 and D3
+literally. Whether Arm 1's A1 should also get a farthest condition is Dylan's call and is
+NOT decided here. ✅ The regression gate is free and is built into the queue: D1/D2/D3
+seeds are unchanged, so their cells must reproduce `a1_ceil_n1000.json` bit-for-bit, and
+the queue compares them from disk.
+
+**Result — 2026-10-31 08:58, both drivers exit 0.** `a1_ceil_n1000_d4.json` (3h54m) and
+`a34_ceil_n1000_d4.json` (3h00m), 7,000 trial records and four conditions each, 44 workers.
+
+✅ **THE REGRESSION GATE PASSED, FAR HARDER THAN THE QUEUE CHECKED IT.** The queue compared
+21 summary cells and found 0 differing. An independent audit then walked **98,105 shared
+scalars** (7,000 x `u_p`/`log_z_p`, plus 7,000 x 3 conditions x four per-condition fields,
+plus all 21,000 decoy-identity strings) and found **worst absolute difference 0.0**, with
+every comparator mutation-tested first. It also checked the A3/A4 pair, which the queue
+header asserted but never reported: **0 leaf differences** over 42,000 field groups. So
+adding a condition moved no previously reported number.
+
+⚠⚠ **BUT THE SEED-NAMING ARGUMENT IS NARROWER THAN WE WROTE IT.** Two structural facts:
+the `Q_p` release seed (`arm2_attack.py:446`) does not depend on the condition at all, so
+the statistic under `Q_p` could not have moved under ANY name — the naming bought the
+`lambda_under_q` regression (21,000 values), not the whole thing. And D3's IDENTITY is
+protected not by the sort order but because the rng is consumed only by D3's rejection
+draw, which runs AFTER the deterministic nearest/farthest picks, so adding the D4 entry
+consumes no rng. The name-sort rule protects the seed INDEX. Both still make the rename
+necessary; neither makes it sufficient on its own.
+
+✅ **THE HYPOTHESIS IS WEAKLY SUPPORTED, AND IT TOOK THE RIGHT ESTIMATOR TO SEE IT.**
+Because the rule thresholds the statistic at 0 under equal priors, `{L > 0}` is the
+TV-attaining set, so **balanced accuracy = 0.5 + TV/2 is an IDENTITY**, and
+`TV = E_p[(1 - e^-L)_+]` on the SAME shared draws has a summand bounded in [0,1] instead
+of a 0/1 indicator — **2.5x to 9.9x less standard error for one population quantity.**
+On it the farthest decoy beats the nearest in **6 of 6 tilted chr21 columns** (exact
+two-sided sign test p = 0.031; inverse-variance combined **+0.00389 ± 0.00179**, z = +2.17).
+⚠ **AND IT IS AN ORDER OF MAGNITUDE BELOW THIS ATTACK'S OWN RESOLUTION**: the largest
+per-column half-gap is ~0.008 against `delta` 0.0278. So Dylan's 2026-10-30 reading is
+right in DIRECTION and the effect is far too small for the suite to rank conditions by.
+
+[INCORRECT] - **First reading of this run: "the result contradicts the hypothesis — D4 is not the strongest real condition; in the one column where the three real conditions differ jointly (0.70, permutation p = 0.0027) D4 is the WEAKEST, D4 - D2 = -0.0465 at z = -3.28, surviving Bonferroni over 18 contrasts."**
+[CORRECTION - 2026-10-31]: the arithmetic stands — the contrast really is -0.0465 at
+z = -3.28 and it really does survive Bonferroni — and the CONCLUSION is what was wrong. It
+was computed on the BINARISED statistic, which is the inefficient estimator of the same
+quantity, and the 0.70 cell is internally inconsistent — the two
+estimators disagree in SIGN there (-3.27 against +1.95), traceable to one number,
+`P_q(L>0)` for D2 at 0.70, which is 0.3760 from its own draws but 0.4353 by importance
+sampling from the paired draws. An anomalous cell, not a reversal. The arithmetic was
+right and the conclusion was wrong; the lesson is that binarising an exact log-ratio at
+n = 1000 is what made the study underpowered.
+
+⚠⚠ **"NEAREST" AND "FARTHEST" ARE PER-TARGET RANKS IN A NINE-POOL, NOT DISTANCE LEVELS**,
+so the two columns are not two levels of one factor and must not be pooled across targets
+without conditioning on the gap. The demonstration is exact: at genome scope the single
+pair HG04211–NA19350 at concordance 0.757090 is **HG04211's farthest AND NA19350's
+nearest**. Conditioning sharpens the result — for the **8** chr21 targets with a real gap,
+combined dTV = **+0.0126 ± 0.0030 (z = +4.17)**; for NA19350 and NA20294, whose own nearest
+neighbour is as far as other targets' farthest (gaps 0.017164 and 0.011391 against
+0.063–0.080), it is **NEGATIVE at -0.0148 ± 0.0066**. Weighted slope on the gap
++0.46 ± 0.12. ⚠ A **TWO-GROUP effect, not a dose-response**: among those 8 the rank
+correlation with gap size is weak (Spearman 0.36, permutation p = 0.37). Do not claim
+the effect scales with discordance; claim only that it is absent where the gap is absent.
+
+⚠⚠ **THE ENVELOPE FOR D4 IS STILL NOT ESTABLISHED, AND THE LABEL IS A PER-CELL PROPERTY.**
+Each target runs at its own `eta_tau`, so the label needs KL(D4) <= KL(D1) in EACH
+(target, label) cell, not on the column average. By Monte Carlo off this run's own
+statistic the per-cell envelope **holds at 0.70 / 0.75 / 0.80 (10 of 10 each) and is
+UNRESOLVED at 0.55 / 0.60 / 0.65** — at 0.55 only 1 of 10 cells resolves, 3 of 10 have a
+negative point estimate, D4 specifically tops its cell in 1 of 10 and exceeds D1 in 3 of
+10, and the column fails Bonferroni over the 6 (p = 1.7e-02 against 8.3e-03). The pooled
+column is positive everywhere (z = +2.1 to +15.0) but a sign test on the 10 target means
+gives p = 0.344, so that significance exists only if DRAWS rather than TARGETS are the
+replication unit. ⚠ The estimator is noise-dominated at 0.55: median per-cell SE is
+**1.007x the exact KL itself**, 5 cells return a NEGATIVE KL, and it shows a demonstrated
+**20% false-exceedance rate on D2/D3 cells there** — conditions the exact instrument
+separates by a 2.68–2.90x ratio with zero sampling error. ✅ It IS calibrated where it can
+be checked: against the exact chr21 `kl_exact` over 60 D1 cells, z mean -0.112, sd 0.939,
+0 of 60 beyond |z| = 3. ⚠ Judging that cross-check by RELATIVE difference instead gives an
+alarming 206% at 0.55 purely because the per-cell SE there equals the quantity — the wrong
+statistic, and we nearly reported it as a defect.
+
+[SUPERSEDED - 2026-10-31]: the per-cell envelope above is no longer unresolved anywhere. The
+driver the next paragraph proposed was written and run the same day
+(B-EVL-arm2-chr21-envelope, below): **D1_extremal carries the larger `kl_exact` in all 180
+chr21 Arm 2 (target, label, real condition) cells**, 10 of 10 at 0.55 included, worst
+real-to-D1 ratio 0.478403, zero sampling error. The Monte-Carlo verdicts above stand as a
+record of what the SAMPLED statistic could and could not resolve; they are no longer the
+evidence for the envelope.
+
+✅✅ **AND THE EXACT ROUTE WAS WRONGLY RULED OUT — IT IS A DRIVER, NOT AN INSTRUMENT.**
+We recorded that no exact chr21 per-decoy instrument exists. False:
+`exact_kl_stable.kl_stable` already takes an ARBITRARY decoy path and is already called
+that way by `arm2_genome_ceiling.py:134`, and `beta_v` defaults to share 1.0, which its own
+docstring calls the single-chromosome case — exactly Arm 2's chr21 scope. The missing piece
+is a driver: 10 targets x 6 labels x 3 real conditions = **180 calls at ~17 s, about 51
+minutes serial and minutes on the 44 workers the queue already used.** That closes the
+envelope question exactly, at every label including 0.55, and removes the Monte-Carlo
+argument entirely. ⚠ `arm2_genome_ceiling.py` cannot substitute: it `raise SystemExit`s
+unless scope is genome and reads the genome eta grid (551.4163 at the 0.55 label against
+chr21's 75.7130, with share 0.0150227), which is why its own chr21 smoke disagreed with the
+sweep by 9.883e-01.
+
+[SUPERSEDED - 2026-10-31]: done. `scripts/arm2_chr21_ceiling.py` is that driver and the
+estimate above was close — 240 exact evaluations (four conditions, not three) in **118 s on
+30 workers**, sentinel 0. It imports `load_state`, `concordance`, `DECOY_SEED` and
+`pick_decoys` from `scripts/arm2_attack.py` so the pairs are the attack's own, and reads
+`eta_tau` from `arm2_chr21_kl_verified.json` rather than re-solving it. See
+B-EVL-arm2-chr21-envelope below.
+
+⚠⚠ **THE "TWO MECHANISMS" READING OF THE TILT/NORMALISER SPLIT IS WRONG, ALGEBRAICALLY.**
+With `f = u_p - u_q` and `K(s) = log E_q[exp(s*eta*f)]`, the divergence is a Bregman
+remainder, `KL = K'(1) - K(1) = eta^2 * integral_0^1 t*Var_t(f) dt`, so
+`normaliser = -tilt + eta^2*Var(f)/2 + O(third cumulant)`: **the normaliser is minus the
+tilt to first order BY CONSTRUCTION, and everything it adds beyond the tilt IS the KL.**
+So "the normaliser cancels 99.7% of the tilt" restates `KL << tilt` and says nothing about
+the mosaic. For D1 the figure is reproducible to 2.4% from `100*(1 - c*eta/|du|)` with `c`
+from the calibration alone — it is set by WHICH LABEL was chosen. `KL = Var_p(L)/2` holds
+to 4–8%, which is the cheapest confirmation that this is a cumulant expansion. ⚠ The
+"79–119% band" is additionally an AGGREGATION ARTEFACT: averaging targets before versus
+after forming the ratio differs by up to **51 percentage points**, per-target values run
+-80% to +263%, and the denominator is near zero with mixed sign.
+⚠ **THE DEFENSIBLE MECHANISM STATEMENT**: the utility GAP orders by discordance and is
+resolved overwhelmingly (paired z = +108 to +197), while the DIVERGENCE is set by
+`Var_p(f)` and this experiment cannot resolve its between-condition differences (all 18
+KL contrasts among the real conditions |z| < 1.5, and "KL ordered in 1 of 6 columns" is
+exactly the expected count for random ordering of three items — the null, not a finding).
+That is why a 50x gap ratio between D1 and D4 buys a ~0.008 advantage.
+
+⚠ **D3 IS NOT AN INDEPENDENT THIRD CONDITION AT chr21 SCOPE.** `pick_decoys` rejects
+D3 == D2 but has no D3 != D4 rejection, and the uniform draw lands on the farthest genome
+for **3 of 10** chr21 targets (HG01323, NA19056, NA20294 — all three on NA20294 or
+NA19350). So 30% of D4 - D3 trials are a STRUCTURAL zero; with those targets removed the
+contrast is still unresolved (|z| <= 1.5). ✅ The coincidence cells ARE genuine independent
+replicates, now tested rather than asserted: the shared-draw statistic is bit-identical
+across D3 and D4 in 2,100 of 2,100 trials (and differs by up to 2.83 on non-collision
+targets, so the comparator is not trivially zero), the `Q_q` halves differ in 1,800 of
+1,800 tilted trials, and their pooled within-cell correlation is r = +0.0040 ± 0.0236.
+⚠ At the untilted label all 300 are exactly zero, so that half of the check rests on
+1,800 trials, not 2,100.
+
+⚠⚠ **SCOPE: THE chr21 DECOY IDENTITIES ARE NOT THE GENOME ONES, AND THE ATTACKS ARE
+chr21.** Rebuilt independently from `data/cohort/chr21/in_chain.npy` and
+`data/targets/*/chr21/path.npy`, reproducing all 27 recorded concordances to 0.0: the
+farthest decoy is **NA20294 for 7 of 10 targets and NA19350 for 3**, pool span 0.730321 to
+0.817642, per-target gaps 0.011391 (NA20294) to 0.080234 (NA19056). Genome scope gives
+**NA19350 for 9 of 10 and NA20294 for 1**, span 0.747124 to 0.825023. **The two scopes
+disagree on the farthest identity for 6 of 10 targets.** Quote the chr21 figures for
+anything about these attacks. ⚠ No chr21 pairwise concordance matrix is stored anywhere in
+`logs/`, unlike the genome one in `genome_ceiling.json`; it had to be re-derived from the
+target paths to audit this at all, which is a provenance gap worth closing.
+
+⚠ **D4 IS A WEAK WORST CASE, MORE WEAKLY THAN WE ARGUED.** The chr21 argmin beats the
+second-farthest genome by a median of only **0.002275** (min 0.000255), so an eleventh
+prepared genome need only beat it by ~0.002 to replace it. The argmin is not stable even
+across scopes of the SAME nine-genome pool — it moves for 6 of 10 targets, mean rank
+correlation between chr21 and genome orderings only +0.560 — and an argmin that unstable
+under a scope change cannot be presumed stable under a pool change. All ten chr21 farthest
+values sit in a 0.011-wide band, which is what a 9-sample minimum order statistic looks
+like, not a population tail. ⚠ **Only TWO distinct individuals serve as D4 across all ten
+targets, and both are themselves Arm 2 targets**, so the condition rests on a sample of two
+decoys — which no amount of n fixes. By standing constraint 4 it is a lower bound twice
+over: weak attacker AND narrow pool.
+
+⚠ **A3 AND A4 AGREE AND ADD NOTHING AGAINST THE BOUND.** D4 lands in the same band as D2
+and D3 at every label (A3 at 0.80: D2 0.5785, D3 0.5610, D4 0.5680), and **no condition
+exceeded `acc_ceiling` significantly in either attack**. Three A3 cells exceed by point
+estimate at the UNTILTED label, where the true value is exactly 0.5 — A3 is PanMixer's
+rarity-weighted score, not the log-ratio, so unlike A1 it is not forced to 0.5 at
+`eta_tau` = 0, and those cells are noise correctly reported as not claimable.
+
+✅ **Error-bar provenance.** Contrasts are PAIRED on the shared draw and independent on the
+other half; every significance verdict was reproduced by a paired bootstrap over trials
+(B = 4,000, agreeing to within 0.5%), and an audit showed the hybrid variance form drops a
+within-trial covariance but agrees with the assumption-free per-trial total-difference form
+to within 1.1%. No verdict rests on the variance construction. ⚠ The binomial form is exact
+here only because there are **no ties** in the tilted columns.
+
+**Reconciled with the 2026-10-30 entry above, which found the same defect and deferred
+it.** That entry says "there is no attack in the suite where widening strengthens the
+attacker". ⚠ That was true of the condition set as it then stood and it is now too
+narrow: widening a NEAREST pool finds a closer decoy and weakens the distinguisher, but
+widening a FARTHEST pool finds a more discordant one and STRENGTHENS it. Both statements
+are about the same inequality; the 2026-10-30 one predates the condition for which the
+sign flips. The reason it was deferred — "only because the driver is executing" — is also
+why `scripts/arm2_attack_a3a4.py:856` was corrected TODAY before its own run began rather
+than during it: A1 was executing and does not import that file, so the edit could not
+reach the running build, and leaving it would have printed a known-false claim into the
+results file the paper reads.
+
+⚠ **AND THE TWO CONCORDANCE RANGES IN THIS FILE ARE DIFFERENT SCOPES, NOT A
+CONTRADICTION.** The 2026-10-30 entry records nearest-concordance 0.741712 to 0.817642;
+today's genome-wide pool spans 0.747124 to 0.825023. The first is chr21, the second all 22
+autosomes, and `decoy_condition` in `docs/terms.md` now says the quantity changes meaning
+with the scope — chr21's nearest need not be genome-wide's. Any future comparison of the
+two must name the scope first.
+
+⚠ **STALE COPIES HUNTED, per the in-place correction rule.** The distinctive phrases are
+"HARDEST REAL DECOY", "LOWER BOUND on decoy difficulty" and "strengthens the attacker".
+Live code: `scripts/arm2_attack.py:225,232-234` and `scripts/arm2_attack_a3a4.py:856`,
+both corrected. Historical and left as the record: `docs/memory.md:8308` and `:8372` (this
+file is append-only) and `docs/data.md:375`, whose row is already SUPERSEDED and now
+carries a correction marker. ⚠ `paper/draft_2026-10-13.md:319` and `:436` carry it twice
+and are OLD REGIME — marked rather than rewritten, since the live paper artifact is the
+scaffold and this draft is a dated snapshot. ⚠ The other 20-odd "flatters us" occurrences
+across `scripts/` and `docs/` are about PINSKER LOOSENESS, which is correct and unrelated;
+they were read, not just counted, and left alone.
+
+## 2026-10-31 (later) — [B-DOC-scaffold-intro] THE INTRODUCTION IS FOUR PARAGRAPHS, AND A CITATION TRACKER EXISTS
+
+**Hypothesis.** The scaffold's Introduction had the right bullet FORM (Dylan confirmed the
+nested format) and the wrong FLOW: six subsections, prior work and the bound argument each
+occupying one, and the whole thing carrying numbers that belong to Results.
+
+**Method.** Dylan set the shape himself, four points each mapping to roughly one paragraph:
+(1) why a pangenome rather than a reference sequence, flaws in the reference structure and the
+benefits of pangenomes; (2) what a pangenome graph is in general, close to PanMixer's second
+introduction paragraph, and **no numbers** — those are saved for later sections; (3) the need
+for privacy, then the attack families **listed only**, the problem with releasing a path and how
+identifiable paths are, setting up the claim that what is needed is a method that can provably
+state how much can be released; (4) PathGuard, close to PanMixer's last introduction paragraph.
+Read PanMixer's own introduction from `paper/references/2026_PanMixer_NatComms.pdf` pages 1-2
+(pypdf; `pdftotext` and `pdftoppm` are NOT installed) to match paragraphs 2 and 6 rather than
+paraphrase them from memory.
+
+**Provenance.** Paper scaffold doc `75f5eca4-cc4c-4156-bb93-cfef4e8b80d7`, tab
+`9c5c4d8b-2f62`, body node `1fe7e0aa-1723`; the Introduction list went from `mn495235tcd.58182`
+(rev 902) to `mn495235tcd.72367` (rev 903), with two cross-reference repairs and the vocabulary
+ruling at rev 906.
+
+**Result — the structure.** 1.1 why a pangenome rather than one reference sequence; 1.2 what a
+pangenome graph is and how an individual sits in it; 1.3 what a path discloses and the attacks a
+released path invites; 1.4 PathGuard and what this paper shows.
+[INCORRECT] - **The introduction now carries no numerals at all.**
+[CORRECTION - 2026-10-31]: true of the BULLET version only, which Dylan replaced with prose the same day. The prose carries `tau in [0,1)` and `(1 + tau)/2`, because the theorem's parameter has to be named; what the introduction carries no instance of is a MEASURED quantity, a count of individuals, haplotypes or positions, or a percentage.
+Nothing was dropped without a named home, and the scaffold says so in its own
+closing bullet: the two-regimes split went to 1.4 and 2.2; the stated-bound-versus-defeated-attacks
+argument to the close of 1.3, with its derivation at 2.9 and its consequences at 4.2 and 4.3; the
+prior-work survey to 4.4 and 4.5; the contributions list to 1.4's "what we then show".
+
+**Result — THE NINE OPEN COMMENT THREADS WERE THE REAL CONTENT, AND THREE WERE SUBSTANTIVE.**
+All nine were Dylan's, all written 2026-10-31 between 17:48 and 18:05, all anchored inside the
+text being rewritten, and none had been seen before this pass. Eight detached when the list was
+replaced; each was answered in its thread first.
+- **The read-mapping bullet was STALE AGAINST OUR OWN PROJECT.** It read "our own read-mapping
+  measurement is an Arm 1 result and belongs to 2.13", and that arm left the project on
+  2026-10-30 — 2.13 no longer measures it and 4.9 names the withdrawal. The downstream chain is
+  now cited as MOTIVATION ONLY, with a guard that no downstream application may appear in the
+  introduction as something we measure. Dylan's comment: "We got rid of the read mapping work
+  from this paper entirely."
+- **THE OPEN-RELEASE PREMISE WAS THE WRONG WAY ROUND.** The old bullet made the public release of
+  pangenomes the subject of the paper. Dylan: "The whole paper is about releasing external
+  genomes, not about pangenomes being released publicly." 1.2 now closes on open availability as
+  the PREMISE we work from, and names the subject as what happens when a NEW individual's path is
+  added to a graph like this.
+- **"COMPARATOR" IS RETIRED** as the role word for PanMixer (Dylan: "We need a better term for
+  this role than comparator"). PanMixer is named directly; "the existing method" is the role word
+  where one is needed. Recorded in the scaffold's Label mapping block beside the PathGuard and
+  "cohort" rulings. ⚠ The word survives in sections 2 to 5 of the scaffold and in several
+  `docs/` rows; it is replaced section by section rather than swept.
+
+**Result — one claim TIGHTENED rather than carried forward.** The deterministic-versus-probabilistic
+contrast Dylan asked for on 2026-10-30 is real but the loose version is **false and checkable**:
+in PanMixer it is the SELECTION of blocks that is a deterministic optimisation under a utility
+budget, while the replacement inside a selected block is itself a draw (confirmed in their code
+2026-10-31 — the donor pool deletes both target haplotypes, the initial state is uniform, and the
+block sampler has no emission term). The scaffold now says "the selection is deterministic" and
+forbids "the method is deterministic".
+
+**Result — one guard ADDED that nobody asked for.** Dylan's own phrasing for the setup sentence
+was "a method that can provably define how much of the genome can be released". The proven
+quantity is **how often an adversary can tell one input from another, not a fraction of the
+genome** — posing it in genome-fraction terms would promise a budget we do not offer, and would
+describe PanMixer's knob rather than ours. 1.3 poses the reader's question in his words and
+carries a ⚠ fixing the denomination; 2.6 defines it.
+
+**Result — the citation tracker.** Dylan asked for a folder of referenceable articles and an md
+file tracking where each reference goes. The folder already existed (`paper/references/`, four
+PDFs); `paper/references/REFERENCES.md` is new. **One row per citation SLOT, not per paper** —
+25 slots, 13 open. Its rule: a `Needed` slot stops a claim, not a draft. ⚠⚠ **Slot 13 is
+BLOCKING** — privvg / `odgi priv`, whose primary source is still not in the library, so nothing
+may say or imply "first with a guarantee" until it is read.
+
+**Stale cross-reference found and fixed in place.** Renumbering 1.1-1.6 to 1.1-1.4 broke two
+pointers in the Figure plan, which is the kind of thing this project has been bitten by before:
+Figure 1's "Home: 1.1" is now "panel A at 1.3, panels B and C at 1.4", and "1.2's sharpest
+distinction" is now 1.4's. The same bullet's "a deterministic optimiser" became "a deterministic
+selection" for the reason above.
+
+**What is NOT done.** Sections 2 to 5 are untouched — Dylan reviews each section before the next
+is written. 2.12 still names three decoy conditions and predates D4. `scripts/arm2_figures.py`
+still reads the n=440 `a1_ceil.json` / `a34_ceil.json` rather than the n1000 files. The paper-phase
+working rules still live only in the scaffold.
+
+## 2026-10-31 (later still) — [B-DOC-intro-prose] THE INTRODUCTION IS PROSE, AND DYLAN'S OWN DRAFT STATED THE GUARANTEE WRONG
+
+**Hypothesis.** The four-paragraph bullet restructure earlier the same day had the right shape
+and the wrong FORM. Dylan wrote three paragraphs of real prose himself and said they were closer
+to what he wanted "as far as tone and flow than what is currently in the scaffold", adding that
+it was "a rough rough first draft so some parts might be wrong".
+
+**Method.** Pulled Theorem 1, Corollary 1 and Definition 1 verbatim from
+`paper/Private_Genome_Path_Release.pdf` (pypdf; `pdftotext` and `pdftoppm` are not installed),
+then ran a verification fan-out over four dimensions of his draft — how the guarantee is stated
+and which parameter the paper hands a curator; the formal setup and whether it covers both arms;
+the paragraph-1 pangenome claims and their citations; the mechanism description and the attack
+families — followed by three independent drafts in his register and an adversarial scoring pass.
+8 blocking findings. The economical draft won on tone and factual safety; seven grafts were
+applied from the other two.
+
+**Provenance.** Paper scaffold doc `75f5eca4-cc4c-4156-bb93-cfef4e8b80d7`, tab `9c5c4d8b-2f62`;
+the Introduction went from list `mn495235tcd.72367` (rev 906) to prose blocks at rev 908. LaTeX
+source at `paper/intro_draft_2026-10-31.tex`.
+
+**Result — ⚠⚠ HIS DRAFT CARRIED THE EXACT ERROR THIS PROJECT HAD ALREADY RULED AGAINST.** The
+sentence read "the output distributions induced by any two input paths can be distinguished with
+the probability of no more than a ... privacy parameter tau in [0,1)". Theorem 1 bounds the TOTAL
+VARIATION DISTANCE at tau; Definition 1 does the conversion explicitly, giving the optimal
+equal-prior success probability as (1 + TV)/2, so TV <= tau implies accuracy <= (1 + tau)/2, with
+its own worked example "tau = 0.10 bounds optimal equal-prior binary identification accuracy by
+0.55". As drafted the claim is not loose but IMPOSSIBLE: at tau = 0 it promises probability 0
+where a coin flip already achieves one half, and read charitably as an advantage it is still
+wrong by a factor of two, since the permitted advantage is tau/2. Scaffold 2.6 already carried
+the standing ruling: "a bound on the adversary's ADVANTAGE over a coin, not on its success rate
+— writing it as a bound on the success rate is the tempting error and an impossible claim below
+one half". ⚠ THE DRAFT'S OWN THIRD PARAGRAPH STATED IT CORRECTLY ("differ by more than a
+prescribed total variation distance"), so the document contradicted itself across three
+paragraphs and the fix was to make the headline sentence agree with his own later one.
+
+**Result — one phrase I expected to be wrong and verified was RIGHT.** "limiting the statistical
+distinguishability of the target from individuals represented in D" is Definition 1's own
+against-cohort form, max over cohort members of TV(Q_{p_g}, Q_{p_i}) <= tau, with Corollary 1
+extending it to a cohort mixture. I had it down as a different claim from ours before reading the
+theorem text. Kept verbatim. Theorem 1 is the stronger all-pairs form and is what the headline
+sentence now carries.
+
+**Result — "dual paths" is not a term.** `grep -rn '\bdual\b' docs/ paper/ src/ CLAUDE.md`
+returns NOTHING, and it is not the field's phrase either: PanMixer's own Methods read "two
+haplotype paths". A referee also reads "dual" in the optimisation sense, which is actively
+confusing in a paper whose prior work solves a knapsack. Replaced with "a pair of haplotype
+paths", which matches `src/mechanism/ffbs.py:525` ("a diploid target's two haplotypes are ONE
+private input").
+
+**Result — the causal chain in paragraph 1 was mis-attributed.** His sentence ran "Paths
+correspond to individual haplotypes, so genomes can be represented as dual paths ... RESULTING IN
+reduction of alignment bias, native modeling of structural variations, and preservation of LD and
+phasing". Only the third follows from the premise. Reduced alignment bias and native structural
+variation follow from the GRAPH carrying non-reference sequence as alternative traversals, and
+hold for a graph with no embedded haplotype paths at all. PanMixer attributes the same gains to
+"this expanded representation", not to the path encoding. Split into two sentences across 1.1 and
+1.2.
+
+**Result — one guard added that nobody asked for.** His setup sentence for 1.3 was "a method that
+can provably define how much of the genome can be released". The provable quantity is how often
+an adversary can tell one input from another, NOT a fraction of a genome — a genome-fraction
+phrasing promises a budget we do not offer and describes PanMixer's knob rather than ours. 1.3
+closes on "a statement, fixed before any attack is run, of how well an adversary can tell one
+input path from another".
+
+**Result — TWO THINGS LEFT AS DYLAN'S DECISIONS, not fixed silently.**
+- **THE DIAL.** His draft introduces tau as "a pre-specified privacy parameter", i.e. as the
+  knob. The 2026-10-24 direction block says the knob is not tau, and at the 0.80 operating point
+  tau is 1 - 10^-2873. The prose keeps the theorem in tau and names the identification-accuracy
+  ceiling as the reported quantity. The alternative is to lead with the ceiling and leave tau to
+  2.6.
+- **PARTICIPATION AND CONSENT.** A sentence was drafted for 1.3 and then CUT: no source we hold
+  supports it, and two of the three drafters invented a citation key for it. Inventing a citation
+  is worse than omitting the point. Slot 8, open.
+
+**Result — ⚠⚠ EVERY CITATION KEY IN THE DRAFT IS A PLACEHOLDER.** `find . -name '*.bib'` outside
+`external/` returns nothing: there is NO bibliography in this repo. Fourteen keys appear in the
+prose and four resolve to PDFs we hold (`liao2023`, `blindenbach2026`, `venkatesaramani2023`, and
+our own theory paper for 2.6). The rest are identifications from memory, recorded as UNVERIFIED
+candidates in `paper/references/REFERENCES.md`. That file now carries a key-by-key table beside
+its slot tables, and its own rule: a candidate named there is not evidence.
+
+**Result — a fifth reference PDF arrived that I did not add.** `2023_FirstPangenome.pdf` (27 MB,
+63 pages) appeared in `paper/references/` at 15:29, after I created the tracker at 14:28, and is
+untracked in git. Identified from its metadata as Liao et al., "A draft human pangenome
+reference", Nature 617:312 (2023), doi:10.1038/s41586-023-05896-x. Assumed to be Dylan's, since
+the filename does not follow the convention the tracker documents. It fills slots 5 and 14.
+
+**What is NOT done.** Sections 2 to 5 are still bullet structure. No bibliography exists. 1.4 is
+longer than PanMixer's closing paragraph and will want splitting before "We then show". All three
+drafters independently declined Dylan's own merge of his points 1 and 2 into one paragraph, on
+the ground that 1.2's material is the premise 1.3 argues from — that is a recommendation against
+his structure, not a finding, and it is his to overrule.
+
+## 2026-10-31 (later still) — [B-DOC-methods-prose] METHODS 2.1 TO 2.5, AND WHAT VERIFYING RATHER THAN QUOTING CAUGHT
+
+**Hypothesis.** With the Introduction approved ("keep as drafted" on the dial), Methods was
+next, one stage at a time. The subsections had one-line descriptions; the facts they would
+assert lived in source docstrings, and docstrings in this repo have been wrong before.
+
+**Method.** Read `src/mechanism/utility.py`, `src/mechanism/calibration.py`, `src/mechanism/hmm.py`, `src/mechanism/ffbs.py`, `src/cohort/genmap.py`,
+`src/target/path.py` and the direction block, then checked every number the prose would carry
+against the artifact or the call site rather than against the docstring that stated it. Drafted
+2.1 to 2.5 as prose in the Introduction's register. Inserted the prose before the Methods list
+and deleted only the five list items it replaces, so 2.6 to 2.14 keep their ids and their two
+comment anchors.
+
+**Provenance.** Paper scaffold doc `75f5eca4-cc4c-4156-bb93-cfef4e8b80d7`, rev 908 to 909;
+LaTeX at `paper/methods_draft_2026-10-31.tex`.
+
+**Result — ⚠ 340,849 IS THE SITE AXIS, NOT T, AND TWO SOURCE DOCSTRINGS USE IT AS T.**
+`data/cohort/chr21/in_chain.npy` has length 340,849 and sums to 332,521, so the site axis is
+340,849 records and the chain is T = 332,521. `src/mechanism/hmm.py` writes "340,849 * 88 * 88 *
+8 B", which is right for its purpose since the dense matrix would span the axis; but
+`src/mechanism/utility.py` writes "the per-position tilt is 1.0000016 at T = 340,849", which
+calls the axis T. Genome-wide T = 22,134,562, summed over 22 `in_chain.npy` files, matches the
+addendum. Not corrected in source: that is a source edit outside this task, and it is flagged
+rather than fixed.
+
+**Result — ⚠⚠ THE REPORTED RUNS USE `uniform` WEIGHTS AND THE DATACLASS DEFAULT IS STILL
+`inv_support`.** `utility.Utility.weights` defaults to `"inv_support"`, with only a comment
+saying uniform is the released tool's choice; `scripts/arm2_attack.py:204` and
+`scripts/arm1_attack.py:94` both set `WEIGHTS = "uniform"`. Reading the signature alone would
+have put the wrong utility function in the paper. The argued case for uniform is in
+`utility.py:173` and it is a good Methods paragraph as it stands: 1/support(v) weights a property
+of OUR DATA rather than of the position, directing the budget at the positions our own panel
+knows least about — 75,998 chain positions with support below 40, 0.343% of the chain, carry
+2.491% of the weight and a support-1 position carries 85.5x the mean — which makes the released
+object a function of our call rate and not reproducible by anyone with a different panel. Uniform
+is also the least concentrated weighting considered, sum(beta^2) 4.5178e-08 against inv_support's
+7.3440e-08, so the headline is conservative by about sqrt(1.63) = 1.27x in the exchange rate.
+
+**Result — ⚠⚠ WRITING 2.3 SURFACED A LIVE PROBLEM WITH THE APPROVED INTRODUCTION.**
+`ffbs.release` takes `tau` OR `eta`, never both, and `tau = tanh(eta)`. `tanh` is exactly 1.0 in
+float64 past eta of about 19; the reported grid runs eta_tau from 75.35 to 517.17 on chr21. So at
+EVERY reported operating point the equivalent tau is 1 and the theorem's bound `TV <= tau` is
+VACUOUS rather than merely loose — which is also why `p_succ_bound` prints ~1.0 in every attack
+log. `ffbs.py` says it outright: a release record carrying tau = 1 "means the run was eta-driven
+and its guarantee is VACUOUS -- read `eta_tau` instead". The Introduction, approved the same day,
+states the guarantee in tau. 2.9 and 4.2 own the bound ladder, but a referee reaches the
+vacuousness long before Section 2.9. Flagged in 2.3's notes and in 1.4's; NOT changed, because
+Dylan had just settled the dial and this is his call.
+**[DECIDED - 2026-10-31]:** he answered "leave 1.4 alone". So the introduction keeps its tau statement with no caveat, and 2.3 is where a reader first meets the vacuousness, with 2.9's ladder and 4.2's reading of it behind it. The sentence in 2.3 is therefore the paper's only early disclosure that the theorem's bound carries no information at the settings reported, which makes it load-bearing rather than incidental. The counter-argument was put and overruled: a referee reaches the vacuousness before 2.9, and the scaffold's own 2.6 line holds that owning such a thing in one line costs far less than having it found.
+
+**Result — two things withheld on purpose rather than quoted.**
+- `u_ceiling` and the "30.749104% of beta_v the target cannot call" figure. Both are
+  weighting-specific and both were measured before the 2026-10-24 uniform ruling, so they are
+  not what the current regime would report. 2.1 states the structural fact — positions the
+  target did not call contribute no utility, so the attainable utility is below one — and gives
+  no figure.
+- The four deviations `src/mechanism/hmm.py` documents between PanMixer's shipped sampler and its
+  own published Methods, with the measured consequence that their released mosaic is one donor
+  copied verbatim. That is 4.4's material if it is used at all, and dropping it into 2.4 would be
+  a defect framing in a Methods section. 2.4 says only that our constants come from the published
+  Methods.
+
+**Result — the prose.** 2.1 fixed graph and mapped paths, including the strict join on position,
+reference allele and full ALT string (which is what makes allele indices transferable), that the
+chain's only exclusion is support = 0 and is therefore target-independent, and the scope-additivity
+paragraph.
+
+[INCORRECT] - "the chain's only exclusion is support = 0 and is therefore target-independent"
+[CORRECTION - 2026-11-01]: the chain has TWO exclusions and `support == 0` is the smaller by
+three orders of magnitude — on chr21 it is **1 position** against the **8,327** of decision K's
+untraversable block (10,326,676 to 12,968,320), out of 8,328 excluded in total. Genome-wide it
+is 305 against 172,142 in 20 blocks. BOTH are target-independent, so the conclusion drawn from
+the claim survives; the claim itself described 1/8328 of what happens and misnamed the rest.
+⚠ `docs/terms.md` under chain already said "EXACTLY TWO EXCLUSIONS" and named decision K. The
+failure was reading `src/cohort/genmap.py:chain_mask`'s docstring — which describes the
+post-decision-C code path, not the artifact — instead of terms.md, the file CLAUDE.md says to
+search before naming any quantity. 2.2 the two regimes, with K = 88 external and K = 86 under leave-one-out, chr21 only
+for the head-to-head, and the graph-saw-the-target condition stated and not claimed away. 2.3 the
+release distribution, the bounded utility, the uniform weighting with its argument, the
+calibration eta_tau = arctanh(tau)/delta_u, that the budget does not thin as T grows, and that
+zero tilt is reached by the identical code path. 2.4 the Li-Stephens chain, the
+rank-one-plus-diagonal transition with s_t as TOTAL switch mass, missingness as an indicator
+potential rather than a renormalised row, forward filtering with backward sampling, and the
+argmax ban. 2.5 the diploid release: two chains at eta/2 each, utility the MEAN and not the sum,
+verified at `ffbs.py:617`.
+
+**What is NOT done.** 2.6 to 2.14. Three of them carry commitments from open comment threads:
+2.11 owns the extremal decoy as the calibration pair only; 2.12 is real genomes only, now four
+conditions, and its positive-control line must become proper sub-bullets; 2.10 owns the
+catastrophic-cancellation route and the sign check. The scope-additivity paragraph answers a
+comment thread Dylan never replied to — I proposed 2.1 over 4.8 and put it in 2.1.
+
+## 2026-10-31 — B-EVL-arm2-chr21-envelope: the D4 envelope, closed EXACTLY on chr21
+
+**Hypothesis.** Every Arm 2 chr21 column is labelled with the `acc_ceiling` of the
+`D1_extremal` pair alone, so the label bounds a real-genome pair only if the constructed
+decoy is the more divergent of the two. Arm 1 asserts that per cell
+(`scripts/arm1_attack.py:342-351`); `scripts/arm2_genome_ceiling.py` measured it at genome
+scope for D1/D2/D3 on 2026-10-31. ⚠ chr21 — the scope every Arm 2 attack table actually
+reports — was never measured, and `D4_farthest` was never measured at ANY scope.
+
+**Method.** `scripts/arm2_chr21_ceiling.py`, written this session: a DRIVER, not a new
+instrument. `exact_kl_stable.kl_stable` already takes an arbitrary decoy path, and
+`load_state`, `concordance`, `DECOY_SEED` and `pick_decoys` are IMPORTED from
+`scripts/arm2_attack.py` with the same sha256 rng, so every pair measured is the pair the
+sampled cells were scored against. `eta_tau` is READ from
+`logs/B_acc_arm2/arm2_chr21_kl_verified.json`'s `refined` block, never re-solved. Fan-out
+unit (target, label): 60 jobs, 240 exact divergence evaluations, 30 workers, **118 s**,
+sentinel 0. Completeness asserted; weights `uniform`, `beta_share` 1.0, K = 88.
+
+**✅✅ RESULT — THE ENVELOPE HOLDS IN ALL 180 (target, label, real condition) CELLS, ARM 2,
+chr21, with a margin of better than a factor of two.** No real decoy reaches half the
+constructed decoy's exact divergence: the worst real-to-D1 `kl_exact` ratio anywhere in the
+grid is **0.478403** (NA20294, D2_nearest), and `D4_farthest`'s own ratio runs 0.371586 to
+0.417036 across all 60 cells. In reported units the most divergent real pair at the 0.80
+label has an exact `acc_ceiling` of **0.7075** against the 0.8000 its column carries.
+
+**✅✅ IT REPLACED THE SUITE'S LAST OPEN MEASUREMENT, AND MONTE CARLO HAD BEEN THE WEAKER
+INSTRUMENT, NOT MERELY THE SLOWER ONE.** By the sampled statistic the per-cell D4 envelope
+"held at 0.70 / 0.75 / 0.80 and was UNRESOLVED at 0.55 / 0.60 / 0.65", where the estimator's
+median per-cell SE was 1.007x the exact divergence itself and five cells returned a NEGATIVE
+divergence. The exact route settles 10 of 10 cells at 0.55 along with every other label, with
+zero sampling error.
+
+**✅ THE INSTRUMENT WAS CHECKED BEFORE THE RESULT WAS READ, AND THE CHECK IS NOT DECORATION.**
+The run re-measures D1 at every label against the `kl_exact` its own `eta` was solved for:
+all 60 cells reproduce to **6.82e-13** against a 1e-07 tolerance, and the rebuilt decoy
+identities match the recorded attack exactly — NA20294 as D4 for 7 targets and NA19350 for 3,
+with D3 == D4 on HG01323, NA19056 and NA20294 returning bit-identical divergences. ⚠⚠ AND THE
+GATE WAS MUTATION-TESTED: injecting a beta built at `share` 0.5 instead of 1 makes the check
+fire (D1 0.179957 against 0.720000), **while that same wrong run returns D4 = 0.066949 and an
+envelope that still "holds"** — a plausible, publishable, wrong answer. Verify the instrument,
+not just the result.
+
+**⚠ WHAT IT DOES NOT CLOSE.** `kl_exact` feeds Pinsker, an UPPER BOUND on TV, so this settles
+the envelope the COLUMN LABEL rests on and NOT the ranking of the conditions by
+distinguishability. Those are two quantities.
+
+**✅ THE TWO-GROUP STRUCTURE REPRODUCES EXACTLY.** On `kl_exact` the medians order
+D4 > D3 > D2 at all six labels, and D4 exceeds D2 in **48 of 60 cells = exactly the 8 of 10
+targets with a real concordance gap, 6 of 6 labels each, and NEITHER of the 2 without one,
+0 of 6 each**. Those two are NA19350 and NA20294, gaps 0.0172 and 0.0114 against 0.0626 to
+0.0802 for the other eight — the pool's peripheral genomes, and the two that SERVE as D4 for
+everyone else. The sampled attack found this at p = 0.031 on a variance-reduced estimator;
+exactly, it is 8/8 and 0/2 with no exceptions. ⚠ [EXTENDS, not corrects, the 2026-10-31 note
+that NA20294 is the counterexample]: at chr21 scope there are TWO, NA19350 and NA20294.
+⚠ The worst real pair in the whole suite is a D2_nearest pair, not a D4 pair, because the
+maximum runs over TARGETS: for a peripheral genome even the nearest neighbour is discordant.
+"Nearest" and "farthest" are per-target RANKS, not two levels of a distance factor.
+
+**⚠ STILL OPEN.** Genome scope carries D1/D2/D3 only, so no D4 cell may be read against the
+label there. Arm 1 does not inherit D4 at all.
+
+**✅ THE DRIVER IS GATED, AND THE GATES ARE MUTATION-TESTED.**
+`tests/test_arm2_chr21_ceiling.py`, 8 tests in 0.09 s: the decoy machinery is the SAME
+function objects as `arm2_attack`'s and no helper is redefined locally; `load_grid` refuses a
+mismatched weighting, a non-chr21 `beta_share` and a fit with no `refined` block; and the
+instrument verdict is checked against a FAKE divergence so the test asserts the gate's logic
+rather than the HMM's arithmetic. Four mutations, each caught by the tests that name it: a
+local `pick_decoys` copy fires both sharing tests, dropping the weighting check fires the
+weighting test, hard-coding the verdict to pass fires the instrument test, and loosening the
+tolerance to 1.0 fires the instrument and tolerance tests. ⚠ Nothing in the file calls
+`kl_stable`; one call is ~17 s and the suite is not the place for it.
+
+**Verified.** `pytest tests/test_docs_contract.py` 23 passed; `pytest tests/` **499 passed**
+in 97.95 s (491 before, plus these 8). ⚠ A first run showed 6 failures in
+`tests/test_verify_panel.py` with `FileNotFoundError`, which is the known environment fault
+already in `docs/bugs.md` and not a regression — bare `python` resolved to the BASE conda
+install rather than `ranpanmixer`, where `bcftools` is not on PATH. Read the interpreter path
+in the traceback first; an environment fault and a regression present identically.
+
+**Provenance.** `logs/B_acc_arm2/arm2_chr21_ceiling.json` + `.log` + `.status`,
+`scripts/arm2_chr21_ceiling.py`, `tests/test_arm2_chr21_ceiling.py`.
+
+## 2026-10-31 — B-DOC-methods-2p6-2p9: Methods 2.6 to 2.9 as prose
+
+**What.** The guarantee and the mathematics relating its bounds, drafted into
+`paper/methods_draft_2026-10-31.tex` (now 2.1 to 2.9) and mirrored into the scaffold at
+rev 915, where the four one-line items were replaced by prose and notes.
+
+**✅ 2.6 states the parameter as a bound on TWICE THE ADVERSARY'S ADVANTAGE, not on its
+success rate**, and spends one sentence saying why: read as a bound on the success rate it
+asserts that at `tau` = 0 no test succeeds, where a coin succeeds half the time. The scaffold
+line asked for exactly this and it is the same error the Introduction's headline carried
+before 2026-10-31.
+
+**✅ 2.6 OWNS THE BUDGET AT THE REPORTED OPERATING POINTS rather than leaving it to be
+computed.** Since `delta_u` = 1, `epsilon_tau` = 2 `eta_tau`: chr21 Arm 2 runs 150.7 to
+1034.3 across the grid, and genome-wide at 0.80 it runs **6617 to 7434** over the ten
+targets, where `tau` lies between 1 - 10^-2873 and 1 - 10^-3228. ⚠ The 1 - 10^-2873 already
+in the ladder notes is HG00096's value and is the SMALLEST of the ten, so the range is given
+rather than that one figure. All read from `logs/B_acc_arm2/genome_sweep/` this session.
+
+**✅ Pinsker's measured conservatism recomputed, not quoted:** the rung-2 over rung-3 excess
+ratio is 1.2554 / 1.2721 / 1.3289 at 0.55 / 0.65 / 0.80, against sqrt(pi/2) = 1.2533, which
+is the small-divergence limit and understates the cost at the top of the grid.
+
+**✅ 2.9's envelope paragraph is the measurement above, not an argument.**
+
+**⚠ DECISION FOR DYLAN, LOGGED NOT TAKEN: the calibration has two candidate homes.**
+`eta_tau = arctanh(tau)/delta_u` is already in 2.3's prose, where the mechanism is defined,
+while the scaffold's 2.11 line assigns it to 2.11 "because it is a protocol step and not a
+relationship between bounds". Both are defensible and only one should carry it, so 2.6 to 2.9
+deliberately do not restate it: either 2.11 points back to 2.3, or the formula moves and 2.3
+names only `delta_u`.
+
+**⚠ 2.12 IS NOW PROVABLY OUT OF DATE** and 2.9's notes say so: its line still reads "three
+decoy conditions" and names only D2 and D3 as reported, but the suite has four and the
+ranking material belongs there rather than in 2.9.
+
+## 2026-11-01 — B-DOC-methods-revert: the Methods prose is OUT, and 2.1 was wrong as well as long
+
+**What Dylan said.** "I think you're adding way to much detail that I don't know if we need.
+It is confusing to me in a lot of places (specifically stuff like 2.1 paragraph 2) so I would
+imagine it would be incredibly confusing to a reader. I think you are generally trying to
+include way to many of our findings from the project that were just for our own
+understanding." And: "We also are introducing things in the wrong order for all of this, so I
+think we need to go back to the high level bullet points and restart. At least for the methods
+section."
+
+**Done.** Scaffold rev 917: all 57 prose blocks for 2.1 to 2.9 deleted and the nine bullet
+items restored VERBATIM from an `atRev` 908 read rather than retyped, so Methods is back to
+fourteen one-line items in order. The lead-in records the revert and two rules for the
+rebuild. The LaTeX is PARKED, not deleted, at `paper/methods_draft_2026-10-31.tex` with a
+header saying why. ⚠ Two comment threads detached (`ee24eaac-ee74`, `dc8a5fdb-d49a`); both
+were ANSWERED first, so the answers survive in the threads.
+
+**⚠⚠ AND 2.1 WAS FACTUALLY WRONG, found only because he asked about it.** His comment:
+"How could there be positions in which there is no haplotypes with a called allele? Do we even
+need to include this?" The prose said the chain excludes positions where no donor haplotype
+has a called allele. **`support == 0` holds at exactly ONE position on chr21, where the chain
+excludes 8,328** — so that sentence described 1 of 8,328 exclusions and misnamed the other
+8,327. The real exclusion is decision K's untraversable block: ONE block of 8,327 positions,
+10,326,676 to 12,968,320 (~2.6 Mb), of zero genetic distance that no single donor haplotype
+spans, so the copying model has no path through it. Both numbers are in
+`data/cohort/chr21/in_chain.npy`'s own provenance (`untraversable_blocks.positions_dropped`
+8327, `excluded_zero_support` 1) and the saved note already said the exclusions are TWO. I
+had read `chain_mask`'s docstring, which describes the post-decision-C code path, and not the
+artifact. ⚠⚠ WORSE THAN THAT: `docs/terms.md` under chain ALREADY SAYS "EXACTLY TWO
+EXCLUSIONS", names decision K, and carries the genome-wide split (305 against 172,142 in 20
+blocks). The one file CLAUDE.md tells me to search before naming any quantity had it right,
+and I read a source docstring instead. Same failure as 2026-10-31's chr21 T, one level worse.
+
+**⚠ THE DATASET DESCRIPTION IS MISSING ENTIRELY.** His other 2.1 comment: "We need a
+description of the actual dataset we are using." 2.1 gave the position axis without ever
+saying whose genomes these are, which is part of why the order read wrong. It is the rebuild's
+first item: the graph and its source, the 44 individuals / 88 haplotype paths that are the
+donor panel, the scope reported per regime, and where the targets come from.
+
+**✅ TWO INTRODUCTION THREADS ANSWERED, both with a correction he can act on.** On his
+proposed tau/eta sentence: the first half is true, but "Pinsker ... is then used to derive the
+eta tilt strength" has the DERIVATION BACKWARDS — Pinsker converts a CHOSEN accuracy ceiling
+into a required divergence (`kl_exact` = 2(2a-1)^2) and `eta_tau` comes from inverting the
+divergence-versus-eta relation, so as written it omits the only thing a curator sets. And
+"worst-case Q" overclaims, which he himself ruled on in the 4.8 thread (the extremal flip is
+the `kl_exact` argmax for 0.2% of enumerated admissible paths, median shortfall 61.7%). On
+"we need the strongest possible statement": gave a candidate sentence, and named the two
+things to keep OUT of it — the attack evidence bounds from below, and the ceiling is per
+TARGET, not per pair.
+
+**⚠ THE SAME "worst-case $Q$" AND THE IMPOSSIBLE HEADLINE ARE BOTH LIVE IN HIS COMPLETED
+DRAFT**, now at `paper/intro_2026-11-01.tex` (stored VERBATIM; it is the tone and voice of
+record). The headline reads "the output distributions induced by any two input paths can be
+distinguised with a probability of no more than a pre-specified privacy parameter tau", which
+at tau = 0 claims no test succeeds where a coin succeeds half the time. His own paragraph 3
+states it correctly, so the headline disagrees with the body. Flagged in the file header and
+in chat, not edited — his prose.
+
+**Provenance.** Doc rev 917; `paper/intro_2026-11-01.tex`;
+`paper/methods_draft_2026-10-31.tex` header; assistant memory
+`paper-prose-is-not-a-findings-dump.md`.
+
+## 2026-11-01 — B-DOC-methods-order: the Methods order, settled with Dylan, 14 items to 9
+
+**Why it was wrong.** Three faults, all of them ordering rather than content. (1) The tilted
+release was 2.3 and the Li-Stephens model 2.4, so a reader met "exponential tilt toward the
+target" before meeting the thing being tilted. (2) tau was introduced at 2.6 but the reason it
+is not the operating parameter only arrived at 2.9 to 2.11, so the divergence had no motivation
+when it appeared. (3) There was no dataset description anywhere.
+
+**Dylan's two corrections to my proposal**, and both are better than what I put up. The target
+paths fold into the data section rather than standing alone. And the mechanism must NOT be
+split from the guarantee and the dial, "since they are interrelated -- the tilted release and
+the privacy guarantee both use tau": guarantee first, then the tilted release, then setting the
+tilt with the KL and Pinsker mathematics, then drawing a release; only then the baseline model.
+⚠ He first put the cohort-member regime at the comparison section and moved it back to 2.1 when
+I pointed out that 2.7 and 2.8 both REPORT that regime, so it would have been forward-referenced
+by about two hundred lines.
+
+**A SECOND PASS, same session, on two of Dylan's objections.** (1) "I also don't like the
+splitting the KL divergence. I think we should instead move the baseline distribution section to
+right after the data and graph section." (2) "move the 4 run ladder to the discussion."
+
+**THE SETTLED ORDER (doc rev 928), three stages.** What we are working with and the model we work
+with: **2.1 Data and graph** (both regimes) and **2.2 The baseline model**. The guarantee and the
+mechanism satisfying it: **2.3 The privacy guarantee**, **2.4 The tilted release**, **2.5 Setting
+the tilt**, **2.6 Drawing a release**. The evaluation design: **2.7 Attacks**, **2.8 Utility
+measures**, **2.9 Comparison with PanMixer**.
+
+**✅ WHY MOVING THE MODEL UP DISSOLVES THE SPLIT, which is the point of his objection.** The
+divergence had to be split across two subsections only because it is COMPUTED from the model's
+posterior quantities and the model arrived last — so 2.4 could say what the divergence was and
+only a later subsection could say how it is obtained. With the model at 2.2 the whole of it fits
+in 2.5: definition, the Pinsker conversion, the exact inversion, and the closed-form computation.
+One subsection, one idea. My own two-place arrangement was a workaround for an ordering fault
+rather than a real division of labour.
+
+**✅ THE FOUR-RUNG LADDER IS NOW DISCUSSION MATERIAL**, moved under a new "4.2 in detail" block
+beside 4.2, which already existed to say what the ladder MEANS. Seven blocks moved, including the
+comparison table; 4.2's own line updated to say it now carries the ladder rather than only its
+reading. Methods 2.5 keeps the equations alone. ⚠ What did NOT move is the instruction to say the
+equivalent tau out loud once with its value, and never to call the ceiling "the guarantee"
+unqualified — those are 2.5's own obligations to a reader, not analysis of our instrument.
+
+**✅ TWO READING CALLS I MADE EXPLICIT so he could overrule either, and he took both.** 2.5 is
+the REQUIREMENT that the release is a draw rather than a maximiser, which the guarantee needs,
+so forward filtering and backward sampling as an ACTUAL PROCEDURE went with the model. And the
+exact divergence computation was put with the model rather than with the calibration, because it
+is computed from the model's posterior quantities. ⚠ [SUPERSEDED by the second pass below: the
+second call stops being necessary once the model moves to 2.2, and Dylan rejected the split.]
+
+**⚠ PROPOSED, NOT DONE: the four-rung bound ladder moves to the Discussion.** It compares how
+tight our four bounds are against each other, which is an analysis of our own instrument rather
+than something needed to follow the method. 2.4 keeps the equations (Pinsker, the ceiling, the
+exact inversion). Noted in the doc under the retitled "2.4 in detail" block; Dylan commented
+earlier that the mathematics must be in this section, so the equations stay either way.
+
+**⚠ Three comment threads detached** (`9c672694-8fa8`, `566fa0f9-ef82`, `b4fd2466-9281`), all
+answered previously, when the old 2.10 and 2.12 items were replaced.
+
+**⚠ Sections 3 to 5 of the scaffold still cite the OLD Methods numbers.** Fixed per section as
+each is filled, not swept — the same precedent set for retiring "comparator".
+

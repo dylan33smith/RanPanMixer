@@ -1,0 +1,40 @@
+% Introduction — Dylan's completed first draft, 2026-11-01. VERBATIM below the rule.
+% Supersedes paper/intro_draft_2026-10-31.tex. This is the tone and voice of record
+% for the paper; match it when drafting any other section.
+%
+% TYPOS: "distinguised" -> distinguished; "This first human pangenome" -> The;
+% "it's mapped path" -> its; "Pinskers inequality give" -> Pinsker's ... gives;
+% missing space in "parameter$\tau"; "PanMixer ... report" -> reports.
+%
+% TWO SUBSTANTIVE FLAGS, both raised in the doc rather than edited here:
+%   1. THE HEADLINE GUARANTEE IS STATED IN AN IMPOSSIBLE FORM. "the output
+%      distributions ... can be distinguished with a probability of no more than
+%      tau" claims, at tau = 0, that no test succeeds -- where a coin succeeds half
+%      the time. tau bounds TWICE the adversary's advantage, so the true statement
+%      is "no test can say which of the two produced a release with accuracy better
+%      than (1 + tau)/2". This is paragraph 3's own later wording; the headline
+%      disagrees with it.
+%   2. "a worst-case $Q$" OVERCLAIMS, and Dylan already ruled against it in the 4.8
+%      thread: exhaustive enumeration found the extremal flip is the KL-argmax for
+%      0.2% of admissible paths, median shortfall 61.7%. It saturates the UTILITY
+%      range, which is what the calibration needs; it is not the worst case for
+%      distinguishability. "a constructed decoy that differs from the target at
+%      every called allele" says what it is.
+% Also: the last sentence has the derivation direction backwards -- Pinsker converts
+% a CHOSEN accuracy ceiling into a required divergence, and eta comes from inverting
+% the divergence-versus-eta relation. See the doc thread on that sentence.
+%
+% CITATIONS: \cite{eizenga2020} is slot 2 and \cite{liao2023} (Liao et al. 2023, the
+% named first human pangenome reference) is slots 5 and 14 in
+% paper/references/REFERENCES.md. The alignment-bias / structural-variation / LD
+% sentence is slot 3 and still wants one citation per clause.
+% ---------------------------------------------------------------------------
+
+Linear reference genomes collapse population-level genetic diversity into a single, arbitrary mosaic sequence, forcing all genetic variation to be characterized as errors, mismatches, or deviations from that baseline. Pangenome graphs instead represent the genomic landscape of a population of individuals by encoding shared and divergent sequences directly in the topology, supporting applications including read alignment, genotyping, and variant calling \cite{eizenga2020}. Sequences shared across genomes are represented as nodes and edges record the consecutive ordering of sequences.
+Because non-reference sequences are carried as alternative traversals, alignment bias is reduced and structural variations are natively handled. Paths correspond to individual haplotypes, so a diploid genome is represented as a pair of haplotype paths through the shared sequence graph, preserving linkage disequilibrium (LD) and phasing information. This first human pangenome reference was released in 2023 by Liao et al.
+
+Once a graph has been constructed and released, a new genome can be mapped or projected onto the graph. The resulting path may be identifying, as the set of rare alleles along each individual path are near unique to the person who carries them. A path released without adequate protection is vulnerable to identification via several distinct attacks, among them rarity-weighted linkage against an external panel, membership inference, and imputation reconstruction. The recent method, PanMixer, addresses this problem for individuals that are members of the graph cohort by obfuscating paths under a utility budget, and report successful defense against these attacks. But existing methods, to the best of our knowledge, do not protect against attacks that have not been developed, nor do they provide a release with a guaranteed limit on how well an attacker can distinguish which of two individuals a release originated from.
+
+We present PathGuard, a randomized genome path release mechanism with the guarantee that the output distributions induced by any two input paths can be distinguised with a probability of no more than a pre-specified privacy parameter$\tau\in[0,1)$. Specifically, we consider as the input a fixed pangenome graph $G$ constructed from a public cohort $D=\{g_1,\ldots,g_n\}$ and an external target genome $g\notin D$. For a diploid genome, we consider it's mapped path $p_g$ as the pair of mapped paths of each haplotype through $G$, and our objective is to release a randomized sanitized path while limiting the statistical distinguishability of the target from individuals represented in $D$. Two target regimes are kept apart throughout: an external target, whose genome contributed to neither $G$ nor $D$, and a cohort member, whose own path the graph already carries and which is the regime in which we compare against PanMixer.
+
+The mechanism uses a target-independent Li-Stephens model as a baseline distribution built from $G$ alone and then introduces a bounded preference for paths similar to the target. The released path is drawn from the resulting tilted distribution via forward-filtering backward-sampling with switching probabilities based on genetic distance in centiMorgans (cM). The preference is calibrated so that the output distributions from different input paths differ by no more than the prescribed total variation distance. The guarantee in tau covers every pair of input paths, but at the tilt magnitudes at which the mechanism measurably changes a release, $\tau$ is numerically indistinguishable from one. We therefore derive tilt strength $\eta$ using Kullback-Leibler divergence between the target $P$ and a worst-case $Q$ that differs in allele from the target at every variant location. Pinskers inequality give an upper bound on total variation and accuracy with which an attacker can distinguish whether the release came from the target or a decoy genome.

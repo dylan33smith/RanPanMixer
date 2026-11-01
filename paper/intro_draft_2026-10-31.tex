@@ -1,0 +1,115 @@
+% SUPERSEDED 2026-11-01 by paper/intro_2026-11-01.tex, Dylan's completed first
+% draft. Kept for its decision record only; the prose there is the version of
+% record and the tone to match.
+% Introduction — draft 2026-10-31
+% Built from Dylan's own rough draft of the same day, which set the tone and flow.
+% Structure follows his four points: (1) why a pangenome over a reference sequence,
+% (2) what a pangenome graph is, (3) the privacy need and the attack families,
+% (4) PathGuard.
+%
+% EVERY \cite KEY BELOW IS A PLACEHOLDER. There is no .bib file in this repo and
+% not one key resolves. paper/references/REFERENCES.md tracks each one by slot.
+%
+% OPEN DECISIONS, all Dylan's:
+%   A. The dial. This draft states the theorem in tau and names the accuracy
+%      ceiling as the reported quantity. The 2026-10-24 direction block says the
+%      knob is not tau; at the 0.80 operating point tau is 1 - 10^-2873. The
+%      SETTLED 2026-10-31 (Dylan): "keep as drafted". The theorem stays stated
+%      in tau and the accuracy ceiling is named as the reported quantity.
+%   B. Participation and consent. Left out of 1.3 — the sentence drafted for it had
+%      no source we hold. Slot 8.
+%   C. 1.4 is longer than PanMixer's closing paragraph. Natural split is before
+%      "We then show".
+%   D. His own draft merged points 1 and 2 into one paragraph. Kept separate here,
+%      because 1.2's material is what 1.3 argues from.
+
+\section{Introduction}
+
+% --- 1.1 Why a pangenome rather than a single reference sequence ---
+Linear reference genomes collapse population-level genetic diversity into a single,
+arbitrary mosaic sequence, forcing all genetic variation to be characterized as
+errors, mismatches, or deviations from that baseline \cite{schneider2017}. The
+omission is structural rather than incidental: sequence absent from the backbone has
+no coordinates on it, so reads carrying that sequence mismap or fail to map, and the
+alleles lost this way are those common in the ancestries the backbone represents
+least \cite{ballouz2019}. Pangenome graphs instead represent the genomic landscape of
+a population by encoding shared and divergent sequences directly in the topology,
+supporting applications including read alignment, genotyping, and variant calling
+\cite{eizenga2020,siren2021,ebler2022}. Because non-reference sequence is carried as
+an alternative traversal rather than as a deviation from a backbone, alignment bias
+is reduced \cite{siren2021} and structural variation is modeled natively rather than
+as a symbolic record against that backbone \cite{hickey2024}.
+
+% --- 1.2 What a pangenome graph is, and how an individual sits in it ---
+In such a graph, sequence shared across genomes is carried in the nodes and the edges
+record which pieces follow which, so each genome embedded in the graph is a path
+through them \cite{eizenga2020}. A single node can carry a stretch that many genomes
+share, so what distinguishes an individual is not new sequence but which walk through
+the shared material is theirs. Paths correspond to individual haplotypes, so a
+diploid genome is represented as a pair of haplotype paths through the shared
+sequence graph, and linkage disequilibrium (LD) and phasing information are preserved
+along each one \cite{liao2023}. The first human pangenome reference was released in
+this form, with graph representations produced independently by two construction
+methods \cite{liao2023,garrison2024,hickey2024}, and the consortium behind it
+continues to add individuals \cite{wang2022}. These graphs are released openly, which
+is what makes them useful.
+
+% --- 1.3 What a released path discloses, and the attacks it invites ---
+Once a graph has been constructed and released, a new genome can be mapped or
+projected onto the graph. The resulting path may itself be privacy-sensitive, even
+when the graph and its construction cohort are public: the nodes and edges are
+shared, and what is individual is the walk taken through them. That walk is
+identifying, because the rare and private alleles strung along it are near-unique to
+the one person who carries them, so a path functions as an identifier even though
+most of it is shared with everyone \cite{erlich2014}. A path released without
+adequate protection is open to attacks of several distinct kinds, among them
+rarity-weighted linkage against an external panel \cite{blindenbach2026}, membership
+inference \cite{venkatesaramani2023}, and imputation-style reconstruction from the
+linkage disequilibrium in a reference panel \cite{browning2018}. Each of these is a
+test somebody wrote, so a release that defeats every test on the list says nothing
+about the test nobody has written yet. An existing method, PanMixer, addresses this
+problem for individuals already in the graph, selecting edits under a utility budget
+and reporting that the published attacks no longer succeed \cite{blindenbach2026}.
+What is needed alongside it is a release whose disclosure is limited in advance: a
+statement, fixed before any attack is run, of how well an adversary can tell one
+input path from another.
+
+% --- 1.4 PathGuard ---
+We present PathGuard, a randomized genome path release mechanism with the theoretical
+guarantee that the output distributions induced by any two input paths lie within a
+total variation distance of at most a pre-specified privacy parameter
+$\tau\in[0,1)$, so that under equal priors no test can tell which of the two produced
+a release with accuracy better than $(1+\tau)/2$. Specifically, we consider as the
+input a fixed pangenome graph $G$ constructed from a public cohort
+$D=\{g_1,\ldots,g_n\}$ together with a target genome and its mapped path $p_g$
+through $G$, which for a diploid genome is a pair of haplotype paths the mechanism
+treats as one private input, and our objective is to release a randomized sanitized
+path while limiting the statistical distinguishability of the target from individuals
+represented in $D$. Two target regimes are kept apart throughout: an external target,
+whose genome contributed to neither $G$ nor $D$, and a cohort member, whose own path
+the graph already carries and which is the regime in which we compare directly
+against PanMixer. The bound covers the released path alone, and not the raw target
+genome, the graph, or any other statistic published about the same individual. The
+mechanism uses a target-independent cohort path model as a baseline distribution,
+with both the output support and the baseline built from $G$ and $D$ alone and never
+from the target, and then introduces a bounded preference for paths similar to the
+target; the released path is drawn from the resulting tilted distribution rather than
+chosen from it. The preference is calibrated so that it cannot make output
+distributions induced by different input paths differ by more than the prescribed
+total variation distance. The guarantee in $\tau$ covers every pair of input paths and
+is kept for that reason, but at the tilt magnitudes at which the mechanism measurably
+changes a release $\tau$ is numerically indistinguishable from one, so we
+additionally report, per target, an identification-accuracy ceiling obtained from an
+exact Kullback--Leibler divergence between two release distributions; that conversion
+is an inequality, so the true ceiling is lower than the one we report. Graph-level
+differentially private mechanisms for pangenome data already exist \cite{privvg2022},
+so what is new here is the released object and the limit attached to it: a path
+through a graph held fixed, carrying a bound on identification accuracy stated per
+target before any attack is run. We then show that the stated ceiling holds against
+every distinguisher we could build, including PanMixer's own published evaluators run
+unmodified on our releases; that PathGuard and PanMixer can be placed on one axis, on
+one graph build, for individuals already in the graph; and what the choice costs in
+utility, measured as movement away from an untilted release rather than as a level
+retained. The distance between the distinguishability the bound permits and the
+distinguishability any attacker we could build achieves is this paper's central
+finding, and it widens as the permitted ceiling rises.

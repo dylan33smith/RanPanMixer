@@ -111,7 +111,7 @@ Every entry below has been fixed and verified at least once. Do not re-derive.
   top-level path. The eta-grid driver shipped this on four lines.
   **[Proven fix]** `"${OUT:?}/${G:?}.final.vcf.gz"` — `:?` makes the shell abort with
   a named error instead of expanding to `/`. Applied to every `rm` in
-  `scripts/readmap_acc_run.sh`. ⚠ Also split the two-pattern form into separate
+  scripts/readmap_acc_run.sh. ⚠ Also split the two-pattern form into separate
   explicit paths so no glob straddles a variable boundary.
   **[Severity]** HIGH — latent and destructive, and it survived a run unnoticed.
 
@@ -2120,3 +2120,208 @@ the instrument that reports the check.
   with `ps -eo pid,etime,args | grep` rather than acting on `pgrep` output directly.
   ⚠ Broaden the `CLAUDE.md` rule when it is next edited: it names `pkill`, and the hazard
   is any pattern search whose results are passed to a signal.
+
+## [A new attack condition whose name sorts before an existing one silently re-indexes every reported draw stream] -> [Name it so it sorts LAST, and prove the existing seeds unmoved arithmetically before running anything]
+
+- **[2026-10-31] "D3_farthest" would have moved every D3_random release stream in Arm 2**
+  **[Symptom]** None, and that is the whole danger. Every table would have printed four
+  populated conditions, every gate would have passed, and the exit code would have been 0.
+  The D3_random column would simply have been a DIFFERENT experiment from the one already
+  reported, with no trace in the output that it had moved.
+  **[Cause]** The per-condition release seed is positional, not nominal:
+  `q_seed = seed ^ (0x5EED * (1 + sorted(decoys).index(name)))` in
+  `scripts/arm2_attack.py` and `seed ^ (0x9000 + sorted(decoys).index(name))` in the A3/A4
+  driver. `sorted()` is alphabetical, so inserting "D3_farthest" puts it at index 2 and
+  pushes `D3_random` from 2 to 3 — onto the slot the new condition was meant to occupy.
+  Verified arithmetically on both formulas before any code was changed.
+  **[Proven fix]** The condition is `D4_farthest`, which sorts after every existing name,
+  so D1/D2/D3 keep indices 0,1,2 and their seeds are bit-identical. ⚠ The proof is run,
+  not asserted: both formulas were evaluated for the three old names under the three- and
+  four-name sets and shown equal, and the counterfactual was evaluated too so the failure
+  mode is on the record rather than imagined. ⚠ And the free regression gate is wired into
+  the run queue — since those seeds are unchanged, the four-condition rerun must reproduce
+  the three-condition run's cells bit-for-bit, compared from disk at the end.
+  ⚠ The lesson generalises: any set whose MEMBERS are keyed by their position in a sorted
+  list is append-only in the same sense a seed grid is, and the ordering rule belongs in a
+  comment at the definition, not in the head of whoever adds the next member.
+
+## [A global condition list in the reporter raises KeyError on every result written before the list grew] -> [Take the conditions from the DATA, and RAISE on one the build cannot define]
+
+- **[2026-10-31] adding a fourth decoy broke `--from-json` for every stored Arm 2 run**
+  **[Symptom]** `KeyError: 'D4_farthest'` from `_report`, on a JSON that is complete and
+  correct for the three conditions it holds. ⚠ It surfaced in `pytest`, not in review:
+  `tests/test_acc_line_interval.py` re-reports a real stored run as an end-to-end gate.
+  **[Cause]** Both reporters looped `for cond in CONDS` over a module-level tuple while
+  reading cells out of the run's own records. The two are different things — CONDS is what
+  THIS BUILD defines, the records are what THAT RUN measured — and the loop silently
+  assumed they are the same. The cost is specific: `_report` exists so a table can be
+  rebuilt without redrawing ~110 CPU-hours of releases, and this made every prior result
+  un-re-reportable the moment a condition was added.
+  **[Proven fix]** New `arm2_attack.conds_in(keyed, where)` returns the conditions the
+  RESULT carries, in CONDS order, and both drivers' `_report` iterate that. It prints a
+  loud notice naming which conditions are missing, so a three-condition table can never be
+  read as a null for a condition that never ran. ⚠ And it RAISES on a condition the build
+  has no definition for rather than dropping it: a silently omitted condition is
+  indistinguishable in a results table from one that sat at chance, which is the one
+  failure a results table must never be able to hide. Verified by re-reporting
+  `a34_ceil_n1000.json` — notice printed, table complete, exit clean.
+  ⚠ **THE SAME DEFECT IN A SECOND SHAPE, found by looking:** `scripts/arm2_figures.py`
+  carried its own condition list plus its own marker and colour tables, so a measured
+  fourth curve would have been dropped from the figure — and a dropped curve is
+  indistinguishable from a curve at chance, which is worse than in a table. It now reads
+  each JSON's condition set, raises on a condition with no style, and says so when the A1
+  and A34 panels carry different sets.
+  ⚠ Two hardcoded counts fell out of the same audit: `per_trial = 1 + 3` and
+  `= {4*len(jobs)} releases` under-reported the run by 25% (28,000 -> 35,000). Both now
+  derive from `len(CONDS)`. A printed cost that under-reports is how a job gets sized for
+  the wrong box.
+
+## [An attack looks underpowered and its conditions "indistinguishable", while the artifact already holds a far better estimator of the same quantity] -> [If the rule thresholds the log-ratio at 0 under equal priors, balanced accuracy = 0.5 + TV/2 is an IDENTITY: estimate TV directly]
+
+- **[2026-10-31] binarising an exact log-density ratio inverted an Arm 2 conclusion**
+  **[Symptom]** The four decoy conditions read as mutually indistinguishable with one
+  significant REVERSAL, and the rerun appeared to refute the hypothesis that motivated it.
+  **[Cause]** The driver records `lambda`, the EXACT log-density ratio at the release, then
+  scores it with a 0/1 indicator `lambda > 0`. Because the rule thresholds at 0 with equal
+  priors, `{L > 0}` is exactly the set attaining the total variation distance, so
+  `balanced accuracy = 0.5 + TV/2` is an identity and
+  `TV = E_p[(1 - e^-L)_+]` estimates the SAME population quantity from the SAME draws with
+  a summand bounded in [0,1] instead of an indicator. Measured precision gain: **2.5x at
+  the loosest label to 9.9x at the tightest.** Binarising threw that away and left the
+  study unable to resolve an effect ~3.5x below its own stated `delta`.
+  **[Proven fix]** Estimate TV on the recorded statistic. The conclusion flips: the
+  farthest decoy beats the nearest in **6 of 6** tilted columns (sign test p = 0.031,
+  combined +0.00389 +- 0.00179) where the binarised cells showed a null with a reversal.
+  ⚠ **AND THE TWO ESTIMATORS DISAGREEING IS ITSELF THE DIAGNOSTIC.** At the one column the
+  binarised statistic called significant they disagree in SIGN (-3.27 against +1.95),
+  which localised to a single number -- `P_q(L>0)` for the nearest decoy, 0.3760 from its
+  own draws against 0.4353 by importance sampling from the paired draws. Cross-check the
+  two halves against each other; where they diverge, the cell is anomalous, not a finding.
+  ⚠ Never rank conditions off a binarised cell when the continuous statistic is on disk.
+
+## [Adding a condition re-tests the OLD conditions against a looser threshold, so "no pre-existing cell moved" is true of the table and false of the claim] -> [Regress the critical values, not just the cells]
+
+- **[2026-10-31] a passing regression gate that could not see the thing it guarded**
+  **[Symptom]** `d4_queue.log` printed "PASS: adding D4 did not move a single pre-existing
+  cell", which is true of every accuracy cell and false of the A3/A4 bound check.
+  **[Cause]** The bound check is Bonferroni-corrected over the cells actually examined, and
+  the cell count is derived from the condition list. Adding a fourth condition grew
+  `a3_cells` 21 -> 28 and `n_examined` 84 -> 112, so the critical values the PRE-EXISTING
+  conditions are judged against moved: `z_crit_a3` 2.8227 -> 2.9137 and `z_crit_a4`
+  4.5124 -> 4.5730. No verdict flipped here (`n_viol` is 0 in both runs, largest shared
+  excess z = +1.97), but the direction is one-way: **widening the family can only ever
+  DE-flag a pre-existing cell.** Invariant accuracy cells are not an invariant test.
+  **[Proven fix]** Compare the derived critical values and the examined-cell counts across
+  the two runs as part of the regression, and state in the results file that the family
+  widened. ⚠ Also: the queue asserted the regression for BOTH artifacts in its header and
+  reported it for only one; the A3/A4 pair was verified separately (42,000 field groups, 0
+  leaf differences) and the log never showed it. Assert what you report and report what you
+  assert.
+  ⚠ A summary-cell comparison is also too coarse by construction: it can only see a change
+  of >= 1/n in an accuracy, and only through a SIGN FLIP of the statistic. A mutation test
+  confirmed a sign-preserving perturbation of the raw statistic moves no summary cell at
+  all. The honest gate walks the raw per-trial scalars -- 98,105 of them here, worst
+  absolute difference 0.0.
+
+## [A rejection rule guards one collision and silently permits another, so a fraction of a contrast is a structural zero] -> [Enumerate the pairs the rule must separate, not the one that bit you]
+
+- **[2026-10-31] the uniform decoy draw was rejected against the nearest but not the farthest**
+  **[Symptom]** The farthest-vs-random contrast came out flatly unresolved at every label,
+  which reads as "no difference" and is partly "no contrast".
+  **[Cause]** `pick_decoys` rejects a uniform draw equal to `D2_nearest` -- added when that
+  collision was caught -- but nothing rejects a draw equal to `D4_farthest`, which did not
+  exist then. At chr21 scope it collides for **3 of 10** targets (HG01323, NA19056,
+  NA20294), so **30% of those trials compare a condition against itself**.
+  **[Proven fix]** Report the contrast with the colliding targets removed (still unresolved,
+  |z| <= 1.5) and say which targets were dropped, OR add the rejection and accept that the
+  random condition is then no longer a uniform draw over the pool. ⚠ The collision cells are
+  still usable as independent replicates, and that is now TESTED rather than asserted: the
+  shared-draw statistic is bit-identical across the two conditions in 2,100 of 2,100 trials
+  (and differs by up to 2.83 on non-colliding targets, so the comparator is not trivially
+  zero), their other halves differ in 1,800 of 1,800 tilted trials, and the pooled
+  within-cell correlation is r = +0.0040 +- 0.0236. ⚠ At the untilted label all 300 are
+  exactly zero, so that half of the check rests on 1,800 trials and not 2,100.
+
+## [A per-cell property verified on the column average, where each cell has its own calibration] -> [Test it in the cell the label is attached to]
+
+- **[2026-10-31] a pooled envelope that held everywhere and per-cell that did not**
+  **[Symptom]** "D1's divergence exceeds D4's at every tilted column, z = +2.1 to +15.0,
+  so the label bounds D4." Every number true; the conclusion not supported.
+  **[Cause]** In ceiling mode each target runs at its OWN `eta_tau`, solved so that target
+  lands on the shared label. So the label is attached per (target, label) CELL, and what it
+  needs is the envelope in each cell -- the pooled column estimates only the average over
+  the ten targets. Per cell the envelope **holds at the three loosest labels (10 of 10 each)
+  and is UNRESOLVED at the three tightest**: at the tightest only 1 of 10 cells resolves and
+  3 of 10 have a NEGATIVE point estimate, and that column fails Bonferroni over the six
+  (p = 1.7e-02 against 8.3e-03). A sign test on the ten target means gives p = 0.344, so the
+  pooled significance exists only if DRAWS rather than TARGETS are the replication unit.
+  **[Proven fix]** State the replication unit, test per cell, and report the columns where
+  it is unresolved as unresolved. ⚠ **AND CHECK WHETHER THE EXACT ROUTE EXISTS BEFORE
+  SETTLING FOR SAMPLING.** We recorded that no exact chr21 per-decoy instrument existed.
+  False: `exact_kl_stable.kl_stable` already accepts an arbitrary decoy path and is already
+  called that way by `arm2_genome_ceiling.py`, and `beta_v` defaults to `share` 1.0, which
+  its own docstring calls the single-chromosome case -- exactly this scope. The missing
+  piece was a DRIVER, not an instrument: 180 calls at ~17 s, about 51 minutes serial.
+  "No instrument exists" is a claim to verify by reading the primitive's signature.
+  [SUPERSEDED - 2026-10-31]: the driver was written (`scripts/arm2_chr21_ceiling.py`) and
+  ran all four conditions in 118 s on 30 workers, so the per-cell envelope is resolved at
+  every label and none of the unresolved columns above is still open. The lesson stands and
+  generalised: the exact route was both cheaper AND stronger than the sampling it replaced.
+
+## [A source docstring described the code path, not the artifact, and a paper sentence inherited the error] -> [docs/terms.md is the authority for any quantity; read it first]
+
+- **[2026-11-01] "the chain's only exclusion is support == 0" reached a Methods draft**
+  **[Symptom]** Methods 2.1 stated that the chain excludes positions where no donor
+  haplotype has a called allele. Dylan asked how that could happen at all and whether it
+  was needed. It is true of **exactly ONE position on chr21**, where the chain excludes
+  **8,328** -- so the sentence described 1/8328 of the behaviour and misnamed the rest.
+  **[Cause]** I read `src/cohort/genmap.py:chain_mask`'s docstring, which says that with
+  the coordinate span omitted "the only exclusion is support == 0". That is true of THAT
+  FUNCTION's code path, but decision K added a second exclusion applied by
+  `drop_untraversable` afterwards, inside the same build. The artifact's own saved note on
+  `in_chain.npy` says "the exclusions are TWO", and its provenance carries both counts
+  (`untraversable_blocks.positions_dropped` 8327, `excluded_zero_support` 1).
+  ⚠ The real exclusion is one 8,327-position block, 10,326,676 to 12,968,320 (~2.6 Mb), of
+  zero genetic distance that no single donor haplotype spans, so the copying model has no
+  path through it.
+  **[Proven fix]** Read `docs/terms.md` for the quantity before writing it anywhere. Its
+  `chain` entry already said "EXACTLY TWO EXCLUSIONS", named decision K, and carried the
+  genome-wide split (305 for support == 0 against 172,142 in 20 blocks). CLAUDE.md says to
+  search terms.md before naming any quantity and that was sufficient here; a function
+  docstring describes its own code path and is not the account of what an artifact holds.
+  ⚠ One function's docstring is not one build's behaviour whenever the build calls more
+  than one function.
+
+## [A sampling-vs-exact cross-check judged by relative difference looks like a broken instrument] -> [Judge it in units of its own standard error]
+
+- **[2026-10-31] a 206% disagreement that was the error bar, not a defect**
+  **[Symptom]** The Monte-Carlo divergence estimate differed from the exact enumeration by
+  up to **206%** at the tightest label -- an alarming number that reads as two
+  implementations disagreeing, and was nearly written up as one.
+  **[Cause]** At that label the per-cell standard error is **1.007x the quantity being
+  estimated**, so a ~100% relative error is exactly what agreement looks like. Relative
+  difference is the wrong statistic whenever the estimator's noise is comparable to its
+  target.
+  **[Proven fix]** Use `z = (estimate - exact) / SE`. Over 60 matched cells: mean **-0.112**,
+  sd **0.939**, **0 of 60** beyond |z| = 3, 1 beyond |z| = 2 against ~2.7 expected. The
+  instrument agrees. ⚠ The noise domination is still real and bounds what may be claimed:
+  **5 cells return a NEGATIVE divergence estimate**, which no true divergence can be, and
+  the estimator shows a demonstrated **20% false-exceedance rate** at that label on
+  conditions the exact route separates by a 2.68-2.90x ratio with zero sampling error.
+  A calibrated estimator can still be too coarse for the comparison being asked of it.
+
+## [Six tests fail with FileNotFoundError on a binary that is plainly installed] -> [Check which interpreter is running before diagnosing the code]
+
+- **[2026-10-31] `pytest` run outside the project env, read as a regression**
+  **[Symptom]** `tests/test_verify_panel.py` failed 6 of 6 with
+  `FileNotFoundError: 'bcftools'` immediately after an unrelated edit, which looks like the
+  edit broke a subprocess path.
+  **[Cause]** The shell is re-initialised per command and `cd` had reset the working
+  directory, so `python` resolved to the BASE conda install rather than `ranpanmixer`, where
+  `bcftools` is not on `PATH`. The traceback names the interpreter
+  (`miniconda3/lib/python3.12/...` rather than `miniconda3/envs/ranpanmixer/...`) and that
+  is the tell.
+  **[Proven fix]** `source $CONDA/etc/profile.d/conda.sh && conda activate ranpanmixer`
+  in the same command, then re-run: 491 passed. ⚠ Read the interpreter path in the
+  traceback before attributing a failure to the code; an environment fault and a
+  regression present identically.
